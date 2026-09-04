@@ -72,12 +72,30 @@ export class AuthController {
     });
   }
 
+  @Post('phone/firebase')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Dang nhap so dien thoai qua Firebase Phone Auth' })
+  @ApiOkResponse({ type: AuthResponse })
+  @ApiUnauthorizedResponse({
+    description: 'Firebase token khong hop le hoac khong phai Phone Auth',
+  })
+  loginWithFirebasePhone(
+    @Body() dto: FirebaseLoginDto,
+    @Req() request: Request,
+  ): Promise<AuthResponse> {
+    return this.authService.loginWithFirebasePhone(
+      dto.idToken,
+      this.getClientMetadata(request, dto.deviceId),
+    );
+  }
+
   @Post('google')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Dang nhap bang Google qua Firebase' })
+  @ApiOperation({ summary: 'Dang ky hoac dang nhap bang Google ID token' })
   @ApiOkResponse({ type: AuthResponse })
-  @ApiUnauthorizedResponse({ description: 'Firebase token khong hop le' })
+  @ApiUnauthorizedResponse({ description: 'Google ID token khong hop le' })
   loginWithGoogle(
     @Body() dto: FirebaseLoginDto,
     @Req() request: Request,

@@ -20,6 +20,10 @@ import {
   AuthUser,
 } from '../models/auth-user.model';
 import { PhoneOtpService } from './phone-otp.service';
+import {
+  GoogleIdentity,
+  GoogleTokenVerifierService,
+} from './google-token-verifier.service';
 
 type UserWithIdentities = User & { identities: UserIdentity[] };
 
@@ -34,6 +38,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
     private readonly phoneOtpService: PhoneOtpService,
+    private readonly googleTokenVerifier: GoogleTokenVerifierService,
     config: ConfigService,
   ) {
     this.accessTokenExpiresIn = config.get('JWT_EXPIRES_IN', '15m');
@@ -67,9 +72,24 @@ export class AuthService {
     idToken: string,
     metadata: ClientMetadata,
   ): Promise<AuthResponse> {
-    const token = await this.verifyFirebaseToken(idToken, 'google.com');
-    const user = await this.upsertGoogleUser(token);
+    const identity = await this.googleTokenVerifier.verify(idToken);
+    const user = await this.upsertGoogleUser(identity);
     return this.createSession(user, metadata, 'google.com');
+  }
+
+  async loginWithFirebasePhone(
+    idToken: string,
+    metadata: ClientMetadata,
+  ): Promise<AuthResponse> {
+    const token = await this.verifyFirebaseToken(idToken, 'phone');
+    if (!token.phone_number) {
+      throw new UnauthorizedException(
+        'Firebase token khong chua so dien thoai da xac minh',
+      );
+    }
+
+    const user = await this.upsertPhoneUser(token.phone_number);
+    return this.createSession(user, metadata, 'phone');
   }
 
   async refresh(
@@ -199,14 +219,14 @@ export class AuthService {
   }
 
   private async upsertGoogleUser(
-    token: DecodedIdToken,
+    identity: GoogleIdentity,
   ): Promise<UserWithIdentities> {
     return this.prisma.$transaction(async (transaction) => {
       const existing = await transaction.userIdentity.findUnique({
         where: {
           provider_providerSubject: {
             provider: DbAuthProvider.GOOGLE,
-            providerSubject: token.uid,
+            providerSubject: identity.subject,
           },
         },
       });
@@ -214,14 +234,14 @@ export class AuthService {
       const linkedIdentity = existing
         ? null
         : await transaction.userIdentity.findFirst({
-            where: { providerSubject: token.uid },
+            where: { providerSubject: identity.subject },
             select: { userId: true },
           });
       let userId = existing?.userId ?? linkedIdentity?.userId;
 
       if (!userId) {
         const created = await transaction.user.create({
-          data: { displayName: token.name, avatarUrl: token.picture },
+          data: { displayName: identity.name, avatarUrl: identity.picture },
         });
         userId = created.id;
       }
@@ -230,29 +250,27 @@ export class AuthService {
         where: {
           provider_providerSubject: {
             provider: DbAuthProvider.GOOGLE,
-            providerSubject: token.uid,
+            providerSubject: identity.subject,
           },
         },
         create: {
           userId,
           provider: DbAuthProvider.GOOGLE,
-          providerSubject: token.uid,
-          phoneNumber: token.phone_number,
-          email: token.email,
-          emailVerified: token.email_verified ?? false,
+          providerSubject: identity.subject,
+          email: identity.email,
+          emailVerified: identity.emailVerified,
         },
         update: {
-          phoneNumber: token.phone_number,
-          email: token.email,
-          emailVerified: token.email_verified ?? false,
+          email: identity.email,
+          emailVerified: identity.emailVerified,
         },
       });
 
       return transaction.user.update({
         where: { id: userId },
         data: {
-          ...(token.name ? { displayName: token.name } : {}),
-          ...(token.picture ? { avatarUrl: token.picture } : {}),
+          ...(identity.name ? { displayName: identity.name } : {}),
+          ...(identity.picture ? { avatarUrl: identity.picture } : {}),
         },
         include: { identities: true },
       });

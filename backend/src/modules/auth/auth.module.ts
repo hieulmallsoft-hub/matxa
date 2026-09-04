@@ -7,6 +7,7 @@ import { AccessTokenGuard } from './guards/access-token.guard';
 import { DevelopmentSmsProvider } from './sms/development-sms.provider';
 import { smsProviderFactory } from './sms/sms-provider.factory';
 import { AuthService } from './services/auth.service';
+import { GoogleTokenVerifierService } from './services/google-token-verifier.service';
 import { PhoneOtpService } from './services/phone-otp.service';
 
 @Module({
@@ -27,6 +28,7 @@ import { PhoneOtpService } from './services/phone-otp.service';
     DevelopmentSmsProvider,
     smsProviderFactory,
     PhoneOtpService,
+    GoogleTokenVerifierService,
     AuthService,
     AccessTokenGuard,
   ],

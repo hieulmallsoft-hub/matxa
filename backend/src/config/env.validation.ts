@@ -7,6 +7,7 @@ const REQUIRED_KEYS = [
   'FIREBASE_PROJECT_ID',
   'FIREBASE_CLIENT_EMAIL',
   'FIREBASE_PRIVATE_KEY',
+  'GOOGLE_CLIENT_ID',
 ] as const;
 
 export function validateEnvironment(config: Record<string, unknown>) {

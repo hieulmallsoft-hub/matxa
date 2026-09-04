@@ -63,7 +63,28 @@ Trong development, response `send-otp` co `debugOtp` de test ma khong ton SMS.
 Che do nay bi chan khi `NODE_ENV=production`. Truoc khi production, can cai mot
 implementation `SmsProvider` that va dat `SMS_PROVIDER` theo provider do.
 
-Google van dung Firebase ID token qua `POST /api/auth/google`.
+Google dung Credential Manager tren Android de lay Google ID token va gui thang
+den `POST /api/auth/google`. Backend xac minh token bang Google Auth Library voi
+`GOOGLE_CLIENT_ID`; khong dung Firebase trong luong Google Login. Lan dau backend
+tu tao user, cac lan sau dang nhap vao user co cung Google subject (`sub`).
+
+Khi dung Firebase Phone Auth tren Android, client xac minh OTP voi Firebase, lay
+Firebase ID token roi gui den:
+
+```http
+POST /api/auth/phone/firebase
+```
+
+```json
+{
+  "idToken": "FIREBASE_ID_TOKEN",
+  "deviceId": "android-installation-id"
+}
+```
+
+Backend chi chap nhan token co `firebase.sign_in_provider` la `phone` va co
+`phone_number` da duoc Firebase xac minh. Hai endpoint OTP Redis van duoc giu lai
+de co the ket noi nha cung cap SMS rieng sau nay.
 
 Access token mac dinh het han sau 15 phut. Refresh token mac dinh ton tai 30 ngay,
 chi duoc luu dang hash va duoc xoay vong sau moi lan refresh.
@@ -72,6 +93,7 @@ chi duoc luu dang hash va duoc xoay vong sau moi lan refresh.
 
 - `POST /api/auth/phone/send-otp`: tao va gui OTP.
 - `POST /api/auth/phone/verify-otp`: xac minh OTP va tao session.
+- `POST /api/auth/phone/firebase`: dang nhap bang Firebase Phone ID token.
 - `POST /api/auth/google`: dang nhap bang Firebase Google.
 - `POST /api/auth/refresh`: doi refresh token lay cap token moi.
 - `GET /api/auth/me`: lay tai khoan hien tai, can Bearer access token.
