@@ -5,9 +5,9 @@ services:
     environment:
       POSTGRES_DB: matxa
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - matxa_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -16,5 +16,20 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - matxa_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   matxa_postgres_data:
+  matxa_redis_data:

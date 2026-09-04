@@ -8,12 +8,11 @@ Backend NestJS + TypeScript cho ung dung Matxa, duoc to chuc theo tung module MV
 src/
 |-- common/               Thanh phan dung chung
 |-- config/               Cau hinh ung dung
-|-- database/             Migration va seed
+|-- database/             PostgreSQL qua Prisma
+|-- redis/                Ket noi Redis
 |-- modules/
-|   `-- health/
-|       |-- controllers/  Controller nhan HTTP request
-|       |-- models/       Model bieu dien du lieu
-|       `-- services/     Service xu ly nghiep vu
+|   |-- auth/             OTP, SMS, Google va session
+|   `-- health/           Kiem tra trang thai API
 |-- app.module.ts         Module goc
 `-- main.ts               Diem khoi dong ung dung
 ```
@@ -31,33 +30,48 @@ Kiem tra API tai `GET http://localhost:3000/api/health`.
 
 Swagger UI: `http://localhost:3000/api/docs`.
 
-## Dang nhap
+## Dang nhap bang so dien thoai
 
-Firebase Authentication thuc hien dang nhap tren client. Sau khi client nhan duoc
-Firebase ID token, gui token den mot trong hai endpoint:
+NestJS tao OTP, chi luu HMAC cua OTP trong Redis va goi `SmsProvider`. Gui ma:
 
-- `POST /api/auth/phone`
-- `POST /api/auth/google`
-
-Body:
+```http
+POST /api/auth/phone/send-otp
+```
 
 ```json
 {
-  "idToken": "FIREBASE_ID_TOKEN"
+  "phoneNumber": "+84394338212",
+  "deviceId": "android-installation-id"
 }
 ```
 
-Backend xac minh token va dung provider, tao/cap nhat user trong PostgreSQL, sau
-do tra ve `accessToken` va `refreshToken` cua Matxa. Truoc khi chay, sao chep
-`.env.example` thanh `.env` va dien service account Firebase, `JWT_SECRET` va
-`REFRESH_TOKEN_PEPPER`.
+Xac minh ma:
+
+```http
+POST /api/auth/phone/verify-otp
+```
+
+```json
+{
+  "challengeId": "UUID_TRA_VE_TU_SEND_OTP",
+  "code": "123456",
+  "deviceId": "android-installation-id"
+}
+```
+
+Trong development, response `send-otp` co `debugOtp` de test ma khong ton SMS.
+Che do nay bi chan khi `NODE_ENV=production`. Truoc khi production, can cai mot
+implementation `SmsProvider` that va dat `SMS_PROVIDER` theo provider do.
+
+Google van dung Firebase ID token qua `POST /api/auth/google`.
 
 Access token mac dinh het han sau 15 phut. Refresh token mac dinh ton tai 30 ngay,
 chi duoc luu dang hash va duoc xoay vong sau moi lan refresh.
 
 ### API auth
 
-- `POST /api/auth/phone`: dang nhap bang Firebase Phone.
+- `POST /api/auth/phone/send-otp`: tao va gui OTP.
+- `POST /api/auth/phone/verify-otp`: xac minh OTP va tao session.
 - `POST /api/auth/google`: dang nhap bang Firebase Google.
 - `POST /api/auth/refresh`: doi refresh token lay cap token moi.
 - `GET /api/auth/me`: lay tai khoan hien tai, can Bearer access token.

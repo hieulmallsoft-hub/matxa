@@ -23,6 +23,10 @@ describe('AuthService', () => {
     session: { create: jest.fn() },
   };
   const jwt = { signAsync: jest.fn().mockResolvedValue('access-token') };
+  const phoneOtp = {
+    sendOtp: jest.fn(),
+    verifyOtp: jest.fn(),
+  };
   const config = {
     get: jest.fn((key: string, fallback: unknown) => {
       if (key === 'JWT_EXPIRES_IN') return '15m';
@@ -59,18 +63,20 @@ describe('AuthService', () => {
       {} as never,
       jwt as unknown as JwtService,
       prisma as unknown as PrismaService,
+      phoneOtp as never,
       config as unknown as ConfigService,
     );
   });
 
-  it('creates a local session after a valid phone login', async () => {
+  it('creates a local session after a valid Google login', async () => {
     verifyIdToken.mockResolvedValue({
       uid: 'firebase-user-id',
-      phone_number: '+84901234567',
-      firebase: { sign_in_provider: 'phone' },
+      email: 'user@example.com',
+      email_verified: true,
+      firebase: { sign_in_provider: 'google.com' },
     });
 
-    const result = await service.loginWithPhone('firebase-token', {
+    const result = await service.loginWithGoogle('firebase-token', {
       deviceId: 'device-1',
     });
 
@@ -82,13 +88,13 @@ describe('AuthService', () => {
       .toMatch(/^[a-f0-9]{64}$/);
   });
 
-  it('rejects a Google token on the phone endpoint', async () => {
+  it('rejects a phone token on the Google endpoint', async () => {
     verifyIdToken.mockResolvedValue({
       uid: 'firebase-user-id',
-      firebase: { sign_in_provider: 'google.com' },
+      firebase: { sign_in_provider: 'phone' },
     });
 
-    await expect(service.loginWithPhone('firebase-token', {})).rejects.toThrow(
+    await expect(service.loginWithGoogle('firebase-token', {})).rejects.toThrow(
       'Phuong thuc dang nhap khong hop le',
     );
   });

@@ -4,7 +4,10 @@ import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { AuthController } from './controllers/auth.controller';
 import { firebaseAdminProvider } from './firebase/firebase-admin.provider';
 import { AccessTokenGuard } from './guards/access-token.guard';
+import { DevelopmentSmsProvider } from './sms/development-sms.provider';
+import { smsProviderFactory } from './sms/sms-provider.factory';
 import { AuthService } from './services/auth.service';
+import { PhoneOtpService } from './services/phone-otp.service';
 
 @Module({
   imports: [
@@ -19,7 +22,14 @@ import { AuthService } from './services/auth.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [firebaseAdminProvider, AuthService, AccessTokenGuard],
+  providers: [
+    firebaseAdminProvider,
+    DevelopmentSmsProvider,
+    smsProviderFactory,
+    PhoneOtpService,
+    AuthService,
+    AccessTokenGuard,
+  ],
   exports: [JwtModule],
 })
 export class AuthModule {}

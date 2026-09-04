@@ -13,11 +13,13 @@ import {
 import { FIREBASE_ADMIN } from '../firebase/firebase-admin.provider';
 import { AccessTokenPayload } from '../models/access-token-payload.model';
 import { ClientMetadata } from '../models/auth-request.model';
+import { SendPhoneOtpResponse } from '../models/phone-otp.model';
 import {
   AuthProvider,
   AuthResponse,
   AuthUser,
 } from '../models/auth-user.model';
+import { PhoneOtpService } from './phone-otp.service';
 
 type UserWithIdentities = User & { identities: UserIdentity[] };
 
@@ -31,6 +33,7 @@ export class AuthService {
     @Inject(FIREBASE_ADMIN) private readonly firebaseApp: App,
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
+    private readonly phoneOtpService: PhoneOtpService,
     config: ConfigService,
   ) {
     this.accessTokenExpiresIn = config.get('JWT_EXPIRES_IN', '15m');
@@ -38,12 +41,35 @@ export class AuthService {
     this.refreshTokenPepper = config.getOrThrow<string>('REFRESH_TOKEN_PEPPER');
   }
 
-  loginWithPhone(idToken: string, metadata: ClientMetadata): Promise<AuthResponse> {
-    return this.login(idToken, 'phone', metadata);
+  sendPhoneOtp(
+    phoneNumber: string,
+    deviceId: string,
+    ipAddress: string,
+  ): Promise<SendPhoneOtpResponse> {
+    return this.phoneOtpService.sendOtp(phoneNumber, deviceId, ipAddress);
   }
 
-  loginWithGoogle(idToken: string, metadata: ClientMetadata): Promise<AuthResponse> {
-    return this.login(idToken, 'google.com', metadata);
+  async verifyPhoneOtp(
+    challengeId: string,
+    code: string,
+    metadata: ClientMetadata & { deviceId: string },
+  ): Promise<AuthResponse> {
+    const phoneNumber = await this.phoneOtpService.verifyOtp(
+      challengeId,
+      code,
+      metadata.deviceId,
+    );
+    const user = await this.upsertPhoneUser(phoneNumber);
+    return this.createSession(user, metadata, 'phone');
+  }
+
+  async loginWithGoogle(
+    idToken: string,
+    metadata: ClientMetadata,
+  ): Promise<AuthResponse> {
+    const token = await this.verifyFirebaseToken(idToken, 'google.com');
+    const user = await this.upsertGoogleUser(token);
+    return this.createSession(user, metadata, 'google.com');
   }
 
   async refresh(
@@ -132,13 +158,11 @@ export class AuthService {
     });
   }
 
-  private async login(
-    idToken: string,
-    expectedProvider: AuthProvider,
+  private async createSession(
+    user: UserWithIdentities,
     metadata: ClientMetadata,
+    preferredProvider: AuthProvider,
   ): Promise<AuthResponse> {
-    const token = await this.verifyFirebaseToken(idToken, expectedProvider);
-    const user = await this.upsertUser(token, expectedProvider);
     const sessionId = randomUUID();
     const secret = randomBytes(32).toString('base64url');
 
@@ -154,7 +178,7 @@ export class AuthService {
       },
     });
 
-    return this.buildAuthResponse(user, sessionId, secret, expectedProvider);
+    return this.buildAuthResponse(user, sessionId, secret, preferredProvider);
   }
 
   private async verifyFirebaseToken(
@@ -174,17 +198,14 @@ export class AuthService {
     return token;
   }
 
-  private async upsertUser(
+  private async upsertGoogleUser(
     token: DecodedIdToken,
-    provider: AuthProvider,
   ): Promise<UserWithIdentities> {
-    const dbProvider = provider === 'phone' ? DbAuthProvider.PHONE : DbAuthProvider.GOOGLE;
-
     return this.prisma.$transaction(async (transaction) => {
       const existing = await transaction.userIdentity.findUnique({
         where: {
           provider_providerSubject: {
-            provider: dbProvider,
+            provider: DbAuthProvider.GOOGLE,
             providerSubject: token.uid,
           },
         },
@@ -208,13 +229,13 @@ export class AuthService {
       await transaction.userIdentity.upsert({
         where: {
           provider_providerSubject: {
-            provider: dbProvider,
+            provider: DbAuthProvider.GOOGLE,
             providerSubject: token.uid,
           },
         },
         create: {
           userId,
-          provider: dbProvider,
+          provider: DbAuthProvider.GOOGLE,
           providerSubject: token.uid,
           phoneNumber: token.phone_number,
           email: token.email,
@@ -233,6 +254,45 @@ export class AuthService {
           ...(token.name ? { displayName: token.name } : {}),
           ...(token.picture ? { avatarUrl: token.picture } : {}),
         },
+        include: { identities: true },
+      });
+    });
+  }
+
+  private async upsertPhoneUser(
+    phoneNumber: string,
+  ): Promise<UserWithIdentities> {
+    return this.prisma.$transaction(async (transaction) => {
+      const identity = await transaction.userIdentity.findUnique({
+        where: {
+          provider_providerSubject: {
+            provider: DbAuthProvider.PHONE,
+            providerSubject: phoneNumber,
+          },
+        },
+      });
+
+      let userId = identity?.userId;
+      if (!userId) {
+        const user = await transaction.user.create({ data: {} });
+        userId = user.id;
+        await transaction.userIdentity.create({
+          data: {
+            userId,
+            provider: DbAuthProvider.PHONE,
+            providerSubject: phoneNumber,
+            phoneNumber,
+          },
+        });
+      } else if (identity) {
+        await transaction.userIdentity.update({
+          where: { id: identity.id },
+          data: { phoneNumber },
+        });
+      }
+
+      return transaction.user.findUniqueOrThrow({
+        where: { id: userId },
         include: { identities: true },
       });
     });
