@@ -19,6 +19,7 @@ interface OtpChallenge {
   deviceHash: string;
   otpHash: string;
   attempts: number;
+  bindingHash?: string;
 }
 
 @Injectable()
@@ -58,6 +59,7 @@ export class PhoneOtpService {
     phoneInput: string,
     deviceId: string,
     ipAddress: string,
+    binding?: string,
   ): Promise<SendPhoneOtpResponse> {
     const phoneNumber = this.normalizePhoneNumber(phoneInput);
     const phoneHash = this.hmac(`phone:${phoneNumber}`);
@@ -89,6 +91,7 @@ export class PhoneOtpService {
       deviceHash,
       otpHash: this.hmac(`otp:${challengeId}:${code}`),
       attempts: 0,
+      ...(binding ? { bindingHash: this.hmac(`binding:${binding}`) } : {}),
     };
     const challengeKey = `otp:challenge:${challengeId}`;
 
@@ -118,6 +121,7 @@ export class PhoneOtpService {
     challengeId: string,
     code: string,
     deviceId: string,
+    binding?: string,
   ): Promise<string> {
     const challengeKey = `otp:challenge:${challengeId}`;
     const rawChallenge = await this.redis.client.get(challengeKey);
@@ -133,6 +137,7 @@ export class PhoneOtpService {
         this.hmac(`device:${deviceId}`),
         this.maxAttempts.toString(),
         '3600',
+        binding ? this.hmac(`binding:${binding}`) : '',
       ],
     })) as number;
 
@@ -184,6 +189,7 @@ local raw = redis.call('GET', KEYS[1])
 if not raw then return 0 end
 local challenge = cjson.decode(raw)
 if challenge.deviceHash ~= ARGV[2] then return -3 end
+if (challenge.bindingHash or '') ~= ARGV[5] then return -4 end
 local totalFailures = tonumber(redis.call('GET', KEYS[2]) or '0')
 if totalFailures >= tonumber(ARGV[3]) then return -2 end
 if tonumber(challenge.attempts) >= tonumber(ARGV[3]) then return -2 end

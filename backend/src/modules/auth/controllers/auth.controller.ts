@@ -72,6 +72,47 @@ export class AuthController {
     });
   }
 
+  @Post('phone/link/send-otp')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseGuards(AccessTokenGuard)
+  @ApiBearerAuth('access-token')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Gui OTP de lien ket so dien thoai voi tai khoan' })
+  @ApiAcceptedResponse({ type: SendPhoneOtpResponse })
+  @ApiUnauthorizedResponse({ description: 'Can dang nhap truoc khi lien ket' })
+  linkPhoneSendOtp(
+    @CurrentAuth() auth: AccessTokenPayload,
+    @Body() dto: SendPhoneOtpDto,
+    @Req() request: Request,
+  ): Promise<SendPhoneOtpResponse> {
+    return this.authService.sendPhoneOtp(
+      dto.phoneNumber,
+      dto.deviceId,
+      request.ip ?? request.socket.remoteAddress ?? 'unknown',
+      auth.sub,
+    );
+  }
+
+  @Post('phone/link/verify-otp')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AccessTokenGuard)
+  @ApiBearerAuth('access-token')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Xac minh OTP va lien ket so dien thoai' })
+  @ApiOkResponse({ type: AuthUser })
+  @ApiUnauthorizedResponse({ description: 'OTP hoac access token khong hop le' })
+  linkPhoneVerifyOtp(
+    @CurrentAuth() auth: AccessTokenPayload,
+    @Body() dto: VerifyPhoneOtpDto,
+  ): Promise<AuthUser> {
+    return this.authService.linkVerifiedPhone(
+      auth.sub,
+      dto.challengeId,
+      dto.code,
+      dto.deviceId,
+    );
+  }
+
   @Post('phone/firebase')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })

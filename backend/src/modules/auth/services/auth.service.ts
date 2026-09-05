@@ -1,4 +1,9 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
@@ -50,8 +55,14 @@ export class AuthService {
     phoneNumber: string,
     deviceId: string,
     ipAddress: string,
+    binding?: string,
   ): Promise<SendPhoneOtpResponse> {
-    return this.phoneOtpService.sendOtp(phoneNumber, deviceId, ipAddress);
+    return this.phoneOtpService.sendOtp(
+      phoneNumber,
+      deviceId,
+      ipAddress,
+      binding,
+    );
   }
 
   async verifyPhoneOtp(
@@ -90,6 +101,61 @@ export class AuthService {
 
     const user = await this.upsertPhoneUser(token.phone_number);
     return this.createSession(user, metadata, 'phone');
+  }
+
+  async linkVerifiedPhone(
+    userId: string,
+    challengeId: string,
+    code: string,
+    deviceId: string,
+  ): Promise<AuthUser> {
+    const phoneNumber = await this.phoneOtpService.verifyOtp(
+      challengeId,
+      code,
+      deviceId,
+      userId,
+    );
+
+    const user = await this.prisma.$transaction(async (transaction) => {
+      const [owner, currentPhone] = await Promise.all([
+        transaction.userIdentity.findUnique({
+          where: {
+            provider_providerSubject: {
+              provider: DbAuthProvider.PHONE,
+              providerSubject: phoneNumber,
+            },
+          },
+        }),
+        transaction.userIdentity.findFirst({
+          where: { userId, provider: DbAuthProvider.PHONE },
+        }),
+      ]);
+
+      if (owner && owner.userId !== userId) {
+        throw new ConflictException('So dien thoai da lien ket voi tai khoan khac');
+      }
+      if (currentPhone && currentPhone.providerSubject !== phoneNumber) {
+        throw new ConflictException('Tai khoan da lien ket mot so dien thoai khac');
+      }
+
+      if (!owner && !currentPhone) {
+        await transaction.userIdentity.create({
+          data: {
+            userId,
+            provider: DbAuthProvider.PHONE,
+            providerSubject: phoneNumber,
+            phoneNumber,
+          },
+        });
+      }
+
+      return transaction.user.findUniqueOrThrow({
+        where: { id: userId },
+        include: { identities: true },
+      });
+    });
+
+    return this.toAuthUser(user, 'google.com');
   }
 
   async refresh(
@@ -353,6 +419,10 @@ export class AuthService {
       ...(identity?.email ? { email: identity.email } : {}),
       ...(user.displayName ? { name: user.displayName } : {}),
       ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+      onboardingCompleted: user.identities.some(
+        (item) =>
+          item.provider === DbAuthProvider.PHONE && Boolean(item.phoneNumber),
+      ),
     };
   }
 

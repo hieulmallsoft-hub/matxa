@@ -150,4 +150,49 @@ describe('AuthService', () => {
       service.loginWithFirebasePhone('firebase-token', {}),
     ).rejects.toThrow('Firebase token khong chua so dien thoai da xac minh');
   });
+
+  it('links a verified phone to the current Google user', async () => {
+    phoneOtp.verifyOtp.mockResolvedValue('+84901234567');
+
+    const result = await service.linkVerifiedPhone(
+      'user-id',
+      'challenge-id',
+      '123456',
+      'device-1',
+    );
+
+    expect(phoneOtp.verifyOtp).toHaveBeenCalledWith(
+      'challenge-id',
+      '123456',
+      'device-1',
+      'user-id',
+    );
+    expect(transaction.userIdentity.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-id',
+        provider: 'PHONE',
+        providerSubject: '+84901234567',
+        phoneNumber: '+84901234567',
+      },
+    });
+    expect(result.onboardingCompleted).toBe(true);
+  });
+
+  it('does not link a phone owned by another user', async () => {
+    phoneOtp.verifyOtp.mockResolvedValue('+84901234567');
+    transaction.userIdentity.findUnique.mockResolvedValue({
+      userId: 'another-user-id',
+      provider: 'PHONE',
+      providerSubject: '+84901234567',
+    });
+
+    await expect(
+      service.linkVerifiedPhone(
+        'user-id',
+        'challenge-id',
+        '123456',
+        'device-1',
+      ),
+    ).rejects.toThrow('So dien thoai da lien ket voi tai khoan khac');
+  });
 });

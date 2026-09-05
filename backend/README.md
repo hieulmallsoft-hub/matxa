@@ -94,6 +94,8 @@ chi duoc luu dang hash va duoc xoay vong sau moi lan refresh.
 - `POST /api/auth/phone/send-otp`: tao va gui OTP.
 - `POST /api/auth/phone/verify-otp`: xac minh OTP va tao session.
 - `POST /api/auth/phone/firebase`: dang nhap bang Firebase Phone ID token.
+- `POST /api/auth/phone/link/send-otp`: gui OTP lien ket so, can Bearer token.
+- `POST /api/auth/phone/link/verify-otp`: xac minh va lien ket so vao user hien tai.
 - `POST /api/auth/google`: dang nhap bang Firebase Google.
 - `POST /api/auth/refresh`: doi refresh token lay cap token moi.
 - `GET /api/auth/me`: lay tai khoan hien tai, can Bearer access token.

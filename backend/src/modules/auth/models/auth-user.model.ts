@@ -20,6 +20,11 @@ export class AuthUser {
 
   @ApiPropertyOptional({ format: 'uri' })
   avatarUrl?: string;
+
+  @ApiProperty({
+    description: 'Da xac minh va lien ket so dien thoai de hoan tat dang ky',
+  })
+  onboardingCompleted!: boolean;
 }
 
 export class AuthResponse {
