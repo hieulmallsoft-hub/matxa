@@ -17,6 +17,7 @@ enum UserStatus {
 enum AuthProvider {
   PHONE
   GOOGLE
+  EMAIL
 }
 
 model User {
@@ -40,6 +41,7 @@ model UserIdentity {
   phoneNumber     String?      @map("phone_number")
   email           String?
   emailVerified   Boolean      @default(false) @map("email_verified")
+  passwordHash    String?      @map("password_hash")
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
   user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)

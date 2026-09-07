@@ -23,6 +23,9 @@ import {
 import { Request } from 'express';
 import { CurrentAuth } from '../decorators/current-auth.decorator';
 import { FirebaseLoginDto } from '../dto/firebase-login.dto';
+import { EmailLoginDto } from '../dto/email-login.dto';
+import { RegisterEmailDto } from '../dto/register-email.dto';
+import { SendEmailOtpDto } from '../dto/send-email-otp.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { SendPhoneOtpDto } from '../dto/send-phone-otp.dto';
 import { VerifyPhoneOtpDto } from '../dto/verify-phone-otp.dto';
@@ -31,6 +34,7 @@ import { AccessTokenPayload } from '../models/access-token-payload.model';
 import { ClientMetadata } from '../models/auth-request.model';
 import { AuthResponse, AuthUser } from '../models/auth-user.model';
 import { SendPhoneOtpResponse } from '../models/phone-otp.model';
+import { SendEmailOtpResponse } from '../models/email-otp.model';
 import { AuthService } from '../services/auth.service';
 
 @ApiTags('Authentication')
@@ -38,7 +42,35 @@ import { AuthService } from '../services/auth.service';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('phone/send-otp')
+  @Post('email/send-otp')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Gui OTP xac minh email de dang ky' })
+  @ApiAcceptedResponse({ type: SendEmailOtpResponse })
+  sendEmailOtp(@Body() dto: SendEmailOtpDto): Promise<SendEmailOtpResponse> {
+    return this.authService.sendEmailOtp(dto.email, dto.deviceId);
+  }
+
+  @Post('email/register')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Xac minh OTP email, tao mat khau va dang ky' })
+  @ApiOkResponse({ type: AuthResponse })
+  registerEmail(@Body() dto: RegisterEmailDto, @Req() request: Request): Promise<AuthResponse> {
+    return this.authService.registerWithEmail(dto.challengeId, dto.code, dto.password, {
+      ...this.getClientMetadata(request, dto.deviceId), deviceId: dto.deviceId,
+    });
+  }
+
+  @Post('email/login')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Dang nhap bang email va mat khau' })
+  @ApiOkResponse({ type: AuthResponse })
+  loginEmail(@Body() dto: EmailLoginDto, @Req() request: Request): Promise<AuthResponse> {
+    return this.authService.loginWithEmail(dto.email, dto.password, this.getClientMetadata(request, dto.deviceId));
+  }
+
   @HttpCode(HttpStatus.ACCEPTED)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Gui OTP dang nhap den so dien thoai' })
@@ -56,7 +88,6 @@ export class AuthController {
     );
   }
 
-  @Post('phone/verify-otp')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Xac minh OTP va dang nhap' })
@@ -72,7 +103,6 @@ export class AuthController {
     });
   }
 
-  @Post('phone/link/send-otp')
   @HttpCode(HttpStatus.ACCEPTED)
   @UseGuards(AccessTokenGuard)
   @ApiBearerAuth('access-token')
@@ -93,7 +123,6 @@ export class AuthController {
     );
   }
 
-  @Post('phone/link/verify-otp')
   @HttpCode(HttpStatus.OK)
   @UseGuards(AccessTokenGuard)
   @ApiBearerAuth('access-token')
@@ -113,7 +142,6 @@ export class AuthController {
     );
   }
 
-  @Post('phone/firebase')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Dang nhap so dien thoai qua Firebase Phone Auth' })

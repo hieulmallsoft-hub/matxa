@@ -9,6 +9,7 @@ import { smsProviderFactory } from './sms/sms-provider.factory';
 import { AuthService } from './services/auth.service';
 import { GoogleTokenVerifierService } from './services/google-token-verifier.service';
 import { PhoneOtpService } from './services/phone-otp.service';
+import { EmailOtpService } from './services/email-otp.service';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { PhoneOtpService } from './services/phone-otp.service';
     DevelopmentSmsProvider,
     smsProviderFactory,
     PhoneOtpService,
+    EmailOtpService,
     GoogleTokenVerifierService,
     AuthService,
     AccessTokenGuard,

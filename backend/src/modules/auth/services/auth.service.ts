@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
 import { App } from 'firebase-admin/app';
 import { DecodedIdToken, getAuth } from 'firebase-admin/auth';
 import { PrismaService } from '../../../database/prisma.service';
@@ -25,12 +26,14 @@ import {
   AuthUser,
 } from '../models/auth-user.model';
 import { PhoneOtpService } from './phone-otp.service';
+import { EmailOtpService } from './email-otp.service';
 import {
   GoogleIdentity,
   GoogleTokenVerifierService,
 } from './google-token-verifier.service';
 
 type UserWithIdentities = User & { identities: UserIdentity[] };
+const scryptAsync = promisify(scrypt);
 
 @Injectable()
 export class AuthService {
@@ -43,6 +46,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
     private readonly phoneOtpService: PhoneOtpService,
+    private readonly emailOtpService: EmailOtpService,
     private readonly googleTokenVerifier: GoogleTokenVerifierService,
     config: ConfigService,
   ) {
@@ -86,6 +90,28 @@ export class AuthService {
     const identity = await this.googleTokenVerifier.verify(idToken);
     const user = await this.upsertGoogleUser(identity);
     return this.createSession(user, metadata, 'google.com');
+  }
+
+  sendEmailOtp(email: string, deviceId: string) {
+    return this.emailOtpService.sendOtp(email, deviceId);
+  }
+
+  async registerWithEmail(challengeId: string, code: string, password: string, metadata: ClientMetadata & { deviceId: string }): Promise<AuthResponse> {
+    const email = await this.emailOtpService.verifyOtp(challengeId, code, metadata.deviceId);
+    const user = await this.upsertEmailUser(email, password);
+    return this.createSession(user, metadata, 'email');
+  }
+
+  async loginWithEmail(emailInput: string, password: string, metadata: ClientMetadata): Promise<AuthResponse> {
+    const email = emailInput.trim().toLowerCase();
+    const identity = await this.prisma.userIdentity.findUnique({
+      where: { provider_providerSubject: { provider: DbAuthProvider.EMAIL, providerSubject: email } },
+      include: { user: { include: { identities: true } } },
+    });
+    if (!identity?.passwordHash || !(await this.verifyPassword(password, identity.passwordHash)) || identity.user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Email hoac mat khau khong dung');
+    }
+    return this.createSession(identity.user, metadata, 'email');
   }
 
   async loginWithFirebasePhone(
@@ -300,7 +326,9 @@ export class AuthService {
       const linkedIdentity = existing
         ? null
         : await transaction.userIdentity.findFirst({
-            where: { providerSubject: identity.subject },
+            where: identity.email && identity.emailVerified
+              ? { email: identity.email.toLowerCase(), emailVerified: true }
+              : { providerSubject: identity.subject },
             select: { userId: true },
           });
       let userId = existing?.userId ?? linkedIdentity?.userId;
@@ -323,11 +351,11 @@ export class AuthService {
           userId,
           provider: DbAuthProvider.GOOGLE,
           providerSubject: identity.subject,
-          email: identity.email,
+          email: identity.email?.toLowerCase(),
           emailVerified: identity.emailVerified,
         },
         update: {
-          email: identity.email,
+          email: identity.email?.toLowerCase(),
           emailVerified: identity.emailVerified,
         },
       });
@@ -340,6 +368,24 @@ export class AuthService {
         },
         include: { identities: true },
       });
+    });
+  }
+
+  private async upsertEmailUser(email: string, password: string): Promise<UserWithIdentities> {
+    const passwordHash = await this.hashPassword(password);
+    return this.prisma.$transaction(async (transaction) => {
+      const existing = await transaction.userIdentity.findUnique({
+        where: { provider_providerSubject: { provider: DbAuthProvider.EMAIL, providerSubject: email } },
+      });
+      if (existing) throw new ConflictException('Email da duoc dang ky');
+      const google = await transaction.userIdentity.findFirst({
+        where: { provider: DbAuthProvider.GOOGLE, email, emailVerified: true },
+      });
+      const userId = google?.userId ?? (await transaction.user.create({ data: {} })).id;
+      await transaction.userIdentity.create({
+        data: { userId, provider: DbAuthProvider.EMAIL, providerSubject: email, email, emailVerified: true, passwordHash },
+      });
+      return transaction.user.findUniqueOrThrow({ where: { id: userId }, include: { identities: true } });
     });
   }
 
@@ -406,11 +452,14 @@ export class AuthService {
       ? user.identities.find((item) =>
           preferredProvider === 'phone'
             ? item.provider === DbAuthProvider.PHONE
-            : item.provider === DbAuthProvider.GOOGLE,
+            : preferredProvider === 'email'
+              ? item.provider === DbAuthProvider.EMAIL
+              : item.provider === DbAuthProvider.GOOGLE,
         )
       : user.identities[0];
-    const provider: AuthProvider =
-      identity?.provider === DbAuthProvider.PHONE ? 'phone' : 'google.com';
+    const provider: AuthProvider = identity?.provider === DbAuthProvider.PHONE
+      ? 'phone'
+      : identity?.provider === DbAuthProvider.EMAIL ? 'email' : 'google.com';
 
     return {
       id: user.id,
@@ -419,10 +468,7 @@ export class AuthService {
       ...(identity?.email ? { email: identity.email } : {}),
       ...(user.displayName ? { name: user.displayName } : {}),
       ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
-      onboardingCompleted: user.identities.some(
-        (item) =>
-          item.provider === DbAuthProvider.PHONE && Boolean(item.phoneNumber),
-      ),
+      onboardingCompleted: true,
     };
   }
 
@@ -446,5 +492,19 @@ export class AuthService {
 
   private getRefreshExpiry(): Date {
     return new Date(Date.now() + this.refreshTokenTtlDays * 86_400_000);
+  }
+
+  private async hashPassword(password: string): Promise<string> {
+    const salt = randomBytes(16).toString('hex');
+    const derived = (await scryptAsync(password, salt, 64)) as Buffer;
+    return `${salt}:${derived.toString('hex')}`;
+  }
+
+  private async verifyPassword(password: string, stored: string): Promise<boolean> {
+    const [salt, expectedHex] = stored.split(':');
+    if (!salt || !expectedHex) return false;
+    const actual = (await scryptAsync(password, salt, 64)) as Buffer;
+    const expected = Buffer.from(expectedHex, 'hex');
+    return actual.length === expected.length && timingSafeEqual(actual, expected);
   }
 }

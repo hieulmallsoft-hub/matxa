@@ -83,6 +83,7 @@ describe('AuthService', () => {
       jwt as unknown as JwtService,
       prisma as unknown as PrismaService,
       phoneOtp as never,
+      { sendOtp: jest.fn(), verifyOtp: jest.fn() } as never,
       googleTokenVerifier as never,
       config as unknown as ConfigService,
     );

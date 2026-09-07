@@ -1,12 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export type AuthProvider = 'phone' | 'google.com';
+export type AuthProvider = 'email' | 'google.com' | 'phone';
 
 export class AuthUser {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
-  @ApiProperty({ enum: ['phone', 'google.com'] })
+  @ApiProperty({ enum: ['email', 'google.com'] })
   provider!: AuthProvider;
 
   @ApiPropertyOptional({ example: '+84901234567' })
@@ -21,9 +21,7 @@ export class AuthUser {
   @ApiPropertyOptional({ format: 'uri' })
   avatarUrl?: string;
 
-  @ApiProperty({
-    description: 'Da xac minh va lien ket so dien thoai de hoan tat dang ky',
-  })
+  @ApiProperty({ description: 'Da hoan tat dang ky tai khoan' })
   onboardingCompleted!: boolean;
 }
 
