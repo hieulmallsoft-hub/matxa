@@ -24,8 +24,8 @@ export class EmailOtpService {
       this.from = config.getOrThrow<string>('SMTP_FROM');
       this.transporter = nodemailer.createTransport({
         host: config.getOrThrow<string>('SMTP_HOST'),
-        port: config.get<number>('SMTP_PORT', 587),
-        secure: config.get<boolean>('SMTP_SECURE', false),
+        port: Number(config.get('SMTP_PORT', 587)),
+        secure: String(config.get('SMTP_SECURE', 'false')).toLowerCase() === 'true',
         auth: {
           user: config.getOrThrow<string>('SMTP_USER'),
           pass: config.getOrThrow<string>('SMTP_PASS'),
