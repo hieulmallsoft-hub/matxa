@@ -21,6 +21,14 @@ export function validateEnvironment(config: Record<string, unknown>) {
   assertMinimumSecretLength(config, 'REFRESH_TOKEN_PEPPER');
   assertMinimumSecretLength(config, 'OTP_SECRET');
 
+  if (config.EMAIL_PROVIDER === 'smtp') {
+    for (const key of ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM']) {
+      if (typeof config[key] !== 'string' || config[key].trim().length === 0) {
+        throw new Error(`Bien moi truong ${key} la bat buoc khi EMAIL_PROVIDER=smtp`);
+      }
+    }
+  }
+
   const refreshDays = Number(config.REFRESH_TOKEN_TTL_DAYS ?? 30);
   if (!Number.isInteger(refreshDays) || refreshDays < 1 || refreshDays > 365) {
     throw new Error('REFRESH_TOKEN_TTL_DAYS phai la so nguyen tu 1 den 365');

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { createHmac, randomInt, randomUUID } from 'node:crypto';
 import { RedisService } from '../../../redis/redis.service';
 import { SendEmailOtpResponse } from '../models/email-otp.model';
+import nodemailer, { Transporter } from 'nodemailer';
 
 type EmailChallenge = { email: string; deviceId: string; otpHash: string; attempts: number };
 
@@ -12,11 +13,25 @@ export class EmailOtpService {
   private readonly secret: string;
   private readonly ttl: number;
   private readonly development: boolean;
+  private readonly transporter?: Transporter;
+  private readonly from?: string;
 
   constructor(private readonly redis: RedisService, config: ConfigService) {
     this.secret = config.getOrThrow<string>('OTP_SECRET');
     this.ttl = config.get<number>('OTP_TTL_SECONDS', 300);
     this.development = config.get('EMAIL_PROVIDER', 'development') === 'development';
+    if (!this.development) {
+      this.from = config.getOrThrow<string>('SMTP_FROM');
+      this.transporter = nodemailer.createTransport({
+        host: config.getOrThrow<string>('SMTP_HOST'),
+        port: config.get<number>('SMTP_PORT', 587),
+        secure: config.get<boolean>('SMTP_SECURE', false),
+        auth: {
+          user: config.getOrThrow<string>('SMTP_USER'),
+          pass: config.getOrThrow<string>('SMTP_PASS'),
+        },
+      });
+    }
   }
 
   async sendOtp(input: string, deviceId: string): Promise<SendEmailOtpResponse> {
@@ -32,9 +47,23 @@ export class EmailOtpService {
     const challenge: EmailChallenge = { email, deviceId, otpHash: this.hash(`${challengeId}:${code}`), attempts: 0 };
     await this.redis.client.set(`email-otp:challenge:${challengeId}`, JSON.stringify(challenge), { EX: this.ttl });
 
-    // Development provider. Replace this branch with SMTP/Resend when credentials are supplied.
-    if (this.development) this.logger.warn(`Development email OTP for ${email}: ${code}`);
-    else throw new Error('EMAIL_PROVIDER chua duoc cau hinh');
+    if (this.development) {
+      this.logger.warn(`Development email OTP for ${email}: ${code}`);
+    } else {
+      try {
+        await this.transporter!.sendMail({
+          from: this.from,
+          to: email,
+          subject: 'Ma xac minh tai khoan Matxa',
+          text: `Ma xac minh Matxa cua ban la ${code}. Ma co hieu luc trong ${Math.ceil(this.ttl / 60)} phut. Khong chia se ma nay voi nguoi khac.`,
+          html: `<p>Ma xac minh Matxa cua ban la:</p><p style="font-size:28px;font-weight:bold;letter-spacing:6px">${code}</p><p>Ma co hieu luc trong ${Math.ceil(this.ttl / 60)} phut. Khong chia se ma nay voi nguoi khac.</p>`,
+        });
+      } catch (error) {
+        await this.redis.client.del(`email-otp:challenge:${challengeId}`);
+        this.logger.error('Khong the gui OTP email', error);
+        throw new Error('Khong the gui email xac minh');
+      }
+    }
     return { challengeId, expiresIn: this.ttl, ...(this.development ? { debugOtp: code } : {}) };
   }
 
