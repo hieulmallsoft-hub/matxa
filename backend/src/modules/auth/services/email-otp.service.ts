@@ -64,7 +64,7 @@ export class EmailOtpService {
         throw new Error('Khong the gui email xac minh');
       }
     }
-    return { challengeId, expiresIn: this.ttl, ...(this.development ? { debugOtp: code } : {}) };
+    return { registrationSessionId: challengeId, expiresIn: this.ttl, ...(this.development ? { debugOtp: code } : {}) };
   }
 
   async verifyOtp(challengeId: string, code: string, deviceId: string): Promise<string> {
@@ -81,6 +81,26 @@ export class EmailOtpService {
     }
     await this.redis.client.del(key);
     return challenge.email;
+  }
+
+  async verifyRegistration(sessionId: string, code: string, deviceId: string): Promise<number> {
+    const email = await this.verifyOtp(sessionId, code, deviceId);
+    const ttl = 600;
+    await this.redis.client.set(
+      `email-registration:verified:${sessionId}`,
+      JSON.stringify({ email, deviceId }),
+      { EX: ttl },
+    );
+    return ttl;
+  }
+
+  async consumeVerifiedRegistration(sessionId: string, deviceId: string): Promise<string> {
+    const key = `email-registration:verified:${sessionId}`;
+    const raw = await this.redis.client.getDel(key);
+    if (!raw) throw new UnauthorizedException('Phien dang ky chua xac minh hoac da het han');
+    const session = JSON.parse(raw) as { email: string; deviceId: string };
+    if (session.deviceId !== deviceId) throw new UnauthorizedException('Thiet bi dang ky khong hop le');
+    return session.email;
   }
 
   private hash(value: string): string { return createHmac('sha256', this.secret).update(value).digest('hex'); }

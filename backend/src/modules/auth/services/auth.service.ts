@@ -96,8 +96,13 @@ export class AuthService {
     return this.emailOtpService.sendOtp(email, deviceId);
   }
 
-  async registerWithEmail(challengeId: string, code: string, password: string, metadata: ClientMetadata & { deviceId: string }): Promise<AuthResponse> {
-    const email = await this.emailOtpService.verifyOtp(challengeId, code, metadata.deviceId);
+  async verifyRegistrationOtp(registrationSessionId: string, code: string, deviceId: string) {
+    const expiresIn = await this.emailOtpService.verifyRegistration(registrationSessionId, code, deviceId);
+    return { verified: true, expiresIn };
+  }
+
+  async completeEmailRegistration(registrationSessionId: string, password: string, metadata: ClientMetadata & { deviceId: string }): Promise<AuthResponse> {
+    const email = await this.emailOtpService.consumeVerifiedRegistration(registrationSessionId, metadata.deviceId);
     const user = await this.upsertEmailUser(email, password);
     return this.createSession(user, metadata, 'email');
   }

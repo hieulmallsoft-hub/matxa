@@ -24,7 +24,8 @@ import { Request } from 'express';
 import { CurrentAuth } from '../decorators/current-auth.decorator';
 import { FirebaseLoginDto } from '../dto/firebase-login.dto';
 import { EmailLoginDto } from '../dto/email-login.dto';
-import { RegisterEmailDto } from '../dto/register-email.dto';
+import { CompleteRegistrationDto } from '../dto/complete-registration.dto';
+import { VerifyRegistrationOtpDto } from '../dto/verify-registration-otp.dto';
 import { SendEmailOtpDto } from '../dto/send-email-otp.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { SendPhoneOtpDto } from '../dto/send-phone-otp.dto';
@@ -34,7 +35,7 @@ import { AccessTokenPayload } from '../models/access-token-payload.model';
 import { ClientMetadata } from '../models/auth-request.model';
 import { AuthResponse, AuthUser } from '../models/auth-user.model';
 import { SendPhoneOtpResponse } from '../models/phone-otp.model';
-import { SendEmailOtpResponse } from '../models/email-otp.model';
+import { SendEmailOtpResponse, VerifyRegistrationOtpResponse } from '../models/email-otp.model';
 import { AuthService } from '../services/auth.service';
 
 @ApiTags('Authentication')
@@ -42,7 +43,7 @@ import { AuthService } from '../services/auth.service';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('email/send-otp')
+  @Post('register/start')
   @HttpCode(HttpStatus.ACCEPTED)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Gui OTP xac minh email de dang ky' })
@@ -51,13 +52,22 @@ export class AuthController {
     return this.authService.sendEmailOtp(dto.email, dto.deviceId);
   }
 
-  @Post('email/register')
+  @Post('register/verify-otp')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Xac minh OTP email, tao mat khau va dang ky' })
+  @ApiOperation({ summary: 'Xac minh OTP cua phien dang ky' })
+  @ApiOkResponse({ type: VerifyRegistrationOtpResponse })
+  verifyRegistrationOtp(@Body() dto: VerifyRegistrationOtpDto): Promise<VerifyRegistrationOtpResponse> {
+    return this.authService.verifyRegistrationOtp(dto.registrationSessionId, dto.code, dto.deviceId);
+  }
+
+  @Post('register/complete')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Tao mat khau va hoan tat dang ky' })
   @ApiOkResponse({ type: AuthResponse })
-  registerEmail(@Body() dto: RegisterEmailDto, @Req() request: Request): Promise<AuthResponse> {
-    return this.authService.registerWithEmail(dto.challengeId, dto.code, dto.password, {
+  completeRegistration(@Body() dto: CompleteRegistrationDto, @Req() request: Request): Promise<AuthResponse> {
+    return this.authService.completeEmailRegistration(dto.registrationSessionId, dto.password, {
       ...this.getClientMetadata(request, dto.deviceId), deviceId: dto.deviceId,
     });
   }
