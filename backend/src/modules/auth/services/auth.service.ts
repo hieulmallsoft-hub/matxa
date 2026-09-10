@@ -119,6 +119,44 @@ export class AuthService {
     return this.createSession(identity.user, metadata, 'email');
   }
 
+  async startPasswordReset(emailInput: string, deviceId: string) {
+    const email = emailInput.trim().toLowerCase();
+    const identity = await this.prisma.userIdentity.findUnique({
+      where: { provider_providerSubject: { provider: DbAuthProvider.EMAIL, providerSubject: email } },
+      select: { id: true },
+    });
+    if (!identity) {
+      return { passwordResetSessionId: randomUUID(), expiresIn: 300 };
+    }
+    const result = await this.emailOtpService.sendOtp(email, deviceId, 'password-reset');
+    return {
+      passwordResetSessionId: result.registrationSessionId,
+      expiresIn: result.expiresIn,
+      ...(result.debugOtp ? { debugOtp: result.debugOtp } : {}),
+    };
+  }
+
+  async verifyPasswordResetOtp(sessionId: string, code: string, deviceId: string) {
+    const expiresIn = await this.emailOtpService.verifyPasswordReset(sessionId, code, deviceId);
+    return { verified: true, expiresIn };
+  }
+
+  async completePasswordReset(sessionId: string, newPassword: string, deviceId: string) {
+    const email = await this.emailOtpService.consumeVerifiedPasswordReset(sessionId, deviceId);
+    const passwordHash = await this.hashPassword(newPassword);
+    await this.prisma.$transaction(async (transaction) => {
+      const identity = await transaction.userIdentity.update({
+        where: { provider_providerSubject: { provider: DbAuthProvider.EMAIL, providerSubject: email } },
+        data: { passwordHash },
+      });
+      await transaction.session.updateMany({
+        where: { userId: identity.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    });
+    return { completed: true };
+  }
+
   async loginWithFirebasePhone(
     idToken: string,
     metadata: ClientMetadata,

@@ -5,7 +5,8 @@ import { RedisService } from '../../../redis/redis.service';
 import { SendEmailOtpResponse } from '../models/email-otp.model';
 import nodemailer, { Transporter } from 'nodemailer';
 
-type EmailChallenge = { email: string; deviceId: string; otpHash: string; attempts: number };
+type EmailOtpPurpose = 'registration' | 'password-reset';
+type EmailChallenge = { email: string; deviceId: string; otpHash: string; attempts: number; purpose: EmailOtpPurpose };
 
 @Injectable()
 export class EmailOtpService {
@@ -34,7 +35,7 @@ export class EmailOtpService {
     }
   }
 
-  async sendOtp(input: string, deviceId: string): Promise<SendEmailOtpResponse> {
+  async sendOtp(input: string, deviceId: string, purpose: EmailOtpPurpose = 'registration'): Promise<SendEmailOtpResponse> {
     const email = input.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new BadRequestException('Email khong hop le');
     const limitKey = `email-otp:limit:${this.hash(email)}`;
@@ -44,7 +45,7 @@ export class EmailOtpService {
 
     const challengeId = randomUUID();
     const code = this.development ? '123456' : randomInt(100000, 1000000).toString();
-    const challenge: EmailChallenge = { email, deviceId, otpHash: this.hash(`${challengeId}:${code}`), attempts: 0 };
+    const challenge: EmailChallenge = { email, deviceId, otpHash: this.hash(`${challengeId}:${code}`), attempts: 0, purpose };
     await this.redis.client.set(`email-otp:challenge:${challengeId}`, JSON.stringify(challenge), { EX: this.ttl });
 
     if (this.development) {
@@ -67,12 +68,13 @@ export class EmailOtpService {
     return { registrationSessionId: challengeId, expiresIn: this.ttl, ...(this.development ? { debugOtp: code } : {}) };
   }
 
-  async verifyOtp(challengeId: string, code: string, deviceId: string): Promise<string> {
+  async verifyOtp(challengeId: string, code: string, deviceId: string, purpose: EmailOtpPurpose): Promise<string> {
     const key = `email-otp:challenge:${challengeId}`;
     const raw = await this.redis.client.get(key);
     if (!raw) throw new UnauthorizedException('OTP sai hoac da het han');
     const challenge = JSON.parse(raw) as EmailChallenge;
     if (challenge.deviceId !== deviceId) throw new UnauthorizedException('Thiet bi xac minh khong hop le');
+    if (challenge.purpose !== purpose) throw new UnauthorizedException('Phien OTP khong dung muc dich');
     if (challenge.attempts >= 5) { await this.redis.client.del(key); throw new UnauthorizedException('Da vuot so lan nhap OTP'); }
     if (challenge.otpHash !== this.hash(`${challengeId}:${code}`)) {
       challenge.attempts += 1;
@@ -84,7 +86,7 @@ export class EmailOtpService {
   }
 
   async verifyRegistration(sessionId: string, code: string, deviceId: string): Promise<number> {
-    const email = await this.verifyOtp(sessionId, code, deviceId);
+    const email = await this.verifyOtp(sessionId, code, deviceId, 'registration');
     const ttl = 600;
     await this.redis.client.set(
       `email-registration:verified:${sessionId}`,
@@ -100,6 +102,25 @@ export class EmailOtpService {
     if (!raw) throw new UnauthorizedException('Phien dang ky chua xac minh hoac da het han');
     const session = JSON.parse(raw) as { email: string; deviceId: string };
     if (session.deviceId !== deviceId) throw new UnauthorizedException('Thiet bi dang ky khong hop le');
+    return session.email;
+  }
+
+  async verifyPasswordReset(sessionId: string, code: string, deviceId: string): Promise<number> {
+    const email = await this.verifyOtp(sessionId, code, deviceId, 'password-reset');
+    const ttl = 600;
+    await this.redis.client.set(
+      `email-password-reset:verified:${sessionId}`,
+      JSON.stringify({ email, deviceId }),
+      { EX: ttl },
+    );
+    return ttl;
+  }
+
+  async consumeVerifiedPasswordReset(sessionId: string, deviceId: string): Promise<string> {
+    const raw = await this.redis.client.getDel(`email-password-reset:verified:${sessionId}`);
+    if (!raw) throw new UnauthorizedException('Phien doi mat khau chua xac minh hoac da het han');
+    const session = JSON.parse(raw) as { email: string; deviceId: string };
+    if (session.deviceId !== deviceId) throw new UnauthorizedException('Thiet bi doi mat khau khong hop le');
     return session.email;
   }
 

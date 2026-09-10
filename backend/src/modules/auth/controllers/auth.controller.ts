@@ -26,6 +26,8 @@ import { FirebaseLoginDto } from '../dto/firebase-login.dto';
 import { EmailLoginDto } from '../dto/email-login.dto';
 import { CompleteRegistrationDto } from '../dto/complete-registration.dto';
 import { VerifyRegistrationOtpDto } from '../dto/verify-registration-otp.dto';
+import { CompletePasswordResetDto } from '../dto/complete-password-reset.dto';
+import { VerifyPasswordResetOtpDto } from '../dto/verify-password-reset-otp.dto';
 import { SendEmailOtpDto } from '../dto/send-email-otp.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { SendPhoneOtpDto } from '../dto/send-phone-otp.dto';
@@ -36,6 +38,7 @@ import { ClientMetadata } from '../models/auth-request.model';
 import { AuthResponse, AuthUser } from '../models/auth-user.model';
 import { SendPhoneOtpResponse } from '../models/phone-otp.model';
 import { SendEmailOtpResponse, VerifyRegistrationOtpResponse } from '../models/email-otp.model';
+import { CompletePasswordResetResponse, StartPasswordResetResponse, VerifyPasswordResetResponse } from '../models/password-reset.model';
 import { AuthService } from '../services/auth.service';
 
 @ApiTags('Authentication')
@@ -79,6 +82,33 @@ export class AuthController {
   @ApiOkResponse({ type: AuthResponse })
   loginEmail(@Body() dto: EmailLoginDto, @Req() request: Request): Promise<AuthResponse> {
     return this.authService.loginWithEmail(dto.email, dto.password, this.getClientMetadata(request, dto.deviceId));
+  }
+
+  @Post('password/forgot/start')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Gui OTP email de khoi phuc mat khau' })
+  @ApiAcceptedResponse({ type: StartPasswordResetResponse })
+  startPasswordReset(@Body() dto: SendEmailOtpDto): Promise<StartPasswordResetResponse> {
+    return this.authService.startPasswordReset(dto.email, dto.deviceId);
+  }
+
+  @Post('password/forgot/verify-otp')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Xac minh OTP khoi phuc mat khau' })
+  @ApiOkResponse({ type: VerifyPasswordResetResponse })
+  verifyPasswordReset(@Body() dto: VerifyPasswordResetOtpDto): Promise<VerifyPasswordResetResponse> {
+    return this.authService.verifyPasswordResetOtp(dto.passwordResetSessionId, dto.code, dto.deviceId);
+  }
+
+  @Post('password/forgot/complete')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Dat mat khau moi sau khi xac minh OTP' })
+  @ApiOkResponse({ type: CompletePasswordResetResponse })
+  completePasswordReset(@Body() dto: CompletePasswordResetDto): Promise<CompletePasswordResetResponse> {
+    return this.authService.completePasswordReset(dto.passwordResetSessionId, dto.newPassword, dto.deviceId);
   }
 
   @HttpCode(HttpStatus.ACCEPTED)
