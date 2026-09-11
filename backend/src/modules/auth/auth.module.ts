@@ -34,6 +34,6 @@ import { EmailOtpService } from './services/email-otp.service';
     AuthService,
     AccessTokenGuard,
   ],
-  exports: [JwtModule],
+  exports: [JwtModule, firebaseAdminProvider, AccessTokenGuard],
 })
 export class AuthModule {}
