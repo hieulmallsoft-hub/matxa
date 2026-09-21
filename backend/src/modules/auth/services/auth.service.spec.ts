@@ -3,11 +3,13 @@ import { JwtService } from '@nestjs/jwt';
 import { getAuth } from 'firebase-admin/auth';
 import { PrismaService } from '../../../database/prisma.service';
 import { AuthService } from './auth.service';
+import { createHmac } from 'node:crypto';
 
 jest.mock('firebase-admin/auth', () => ({ getAuth: jest.fn() }));
 
 describe('AuthService', () => {
   const transaction = {
+    session: { updateMany: jest.fn().mockResolvedValue({ count: 1 }), create: jest.fn() },
     userIdentity: {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
@@ -23,7 +25,9 @@ describe('AuthService', () => {
   };
   const prisma = {
     $transaction: jest.fn((callback) => callback(transaction)),
-    session: { create: jest.fn() },
+    session: { create: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn() },
+    userIdentity: { findUnique: jest.fn() },
+    user: { findUnique: jest.fn() },
   };
   const jwt = { signAsync: jest.fn().mockResolvedValue('access-token') };
   const phoneOtp = {
@@ -31,6 +35,8 @@ describe('AuthService', () => {
     verifyOtp: jest.fn(),
   };
   const googleTokenVerifier = { verify: jest.fn() };
+  const emailOtp = { sendOtp: jest.fn(), verifyRegistration: jest.fn(), consumeVerifiedRegistration: jest.fn(),
+    verifyPasswordReset: jest.fn(), consumeVerifiedPasswordReset: jest.fn() };
   const appleTokenVerifier = { verify: jest.fn() };
   const config = {
     get: jest.fn((key: string, fallback: unknown) => {
@@ -84,11 +90,64 @@ describe('AuthService', () => {
       jwt as unknown as JwtService,
       prisma as unknown as PrismaService,
       phoneOtp as never,
-      { sendOtp: jest.fn(), verifyOtp: jest.fn() } as never,
+      emailOtp as never,
       googleTokenVerifier as never,
       appleTokenVerifier as never,
       config as unknown as ConfigService,
     );
+  });
+
+  it('registers an email with a hashed password and verifies login credentials', async () => {
+    emailOtp.consumeVerifiedRegistration.mockResolvedValue('user@example.com');
+    await service.completeEmailRegistration('registration', 'password123', { deviceId: 'device' });
+    const data = transaction.userIdentity.create.mock.calls[0][0].data;
+    expect(data.passwordHash).not.toBe('password123');
+    prisma.userIdentity.findUnique.mockResolvedValue({ ...data, user: { id: 'user-id', status: 'ACTIVE', identities: [data] } });
+    await expect(service.loginWithEmail('user@example.com', 'password123', {})).resolves.toHaveProperty('accessToken');
+    await expect(service.loginWithEmail('user@example.com', 'wrong-password', {})).rejects.toThrow();
+  });
+
+  it('rejects duplicate email registration', async () => {
+    emailOtp.consumeVerifiedRegistration.mockResolvedValue('user@example.com');
+    transaction.userIdentity.findUnique.mockResolvedValue({ id: 'existing' });
+    await expect(service.completeEmailRegistration('registration', 'password123', { deviceId: 'device' })).rejects.toThrow('Email da duoc dang ky');
+    expect(prisma.session.create).not.toHaveBeenCalled();
+  });
+
+  it('resets the password and revokes existing sessions', async () => {
+    emailOtp.consumeVerifiedPasswordReset.mockResolvedValue('user@example.com');
+    transaction.userIdentity.update.mockResolvedValue({ userId: 'user-id' });
+    await expect(service.completePasswordReset('reset', 'new-password123', 'device')).resolves.toEqual({ completed: true });
+    expect(transaction.session.updateMany).toHaveBeenCalledWith({ where: { userId: 'user-id', revokedAt: null }, data: { revokedAt: expect.any(Date) } });
+  });
+
+  function refreshSession() {
+    return { id: 'session', userId: 'user-id', refreshTokenHash: createHmac('sha256', 'a'.repeat(32)).update('secret').digest('hex'),
+      expiresAt: new Date(Date.now() + 60000), revokedAt: null, user: { id: 'user-id', status: 'ACTIVE', identities: [] } };
+  }
+
+  it('rotates refresh tokens and rejects replay, expiry, wrong secret and malformed input', async () => {
+    prisma.session.findUnique.mockResolvedValue(refreshSession());
+    await expect(service.refresh('session.secret', {})).resolves.toHaveProperty('refreshToken');
+    expect(transaction.session.create).toHaveBeenCalled();
+    await expect(service.refresh('session.wrong', {})).rejects.toThrow();
+    await expect(service.refresh('malformed', {})).rejects.toThrow();
+    prisma.session.findUnique.mockResolvedValue({ ...refreshSession(), revokedAt: new Date() });
+    await expect(service.refresh('session.secret', {})).rejects.toThrow();
+    expect(prisma.session.updateMany).toHaveBeenCalled();
+    prisma.session.findUnique.mockResolvedValue({ ...refreshSession(), expiresAt: new Date(0) });
+    await expect(service.refresh('session.secret', {})).rejects.toThrow();
+  });
+
+  it('loads active users and scopes logout to the authenticated user', async () => {
+    prisma.user.findUnique.mockResolvedValue(refreshSession().user);
+    await expect(service.getCurrentUser('user-id')).resolves.toHaveProperty('id', 'user-id');
+    prisma.user.findUnique.mockResolvedValue(null);
+    await expect(service.getCurrentUser('missing')).rejects.toThrow();
+    await service.logout('session', 'user-id');
+    expect(prisma.session.updateMany).toHaveBeenLastCalledWith({ where: { id: 'session', userId: 'user-id', revokedAt: null }, data: { revokedAt: expect.any(Date) } });
+    await service.logoutAll('user-id');
+    expect(prisma.session.updateMany).toHaveBeenLastCalledWith({ where: { userId: 'user-id', revokedAt: null }, data: { revokedAt: expect.any(Date) } });
   });
 
   it('creates a local session after a valid Google login', async () => {
