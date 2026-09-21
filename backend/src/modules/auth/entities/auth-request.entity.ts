@@ -1,5 +1,5 @@
 import { Request } from 'express';
-import { AccessTokenPayload } from './access-token-payload.model';
+import { AccessTokenPayload } from './access-token-payload.entity';
 
 export interface AuthenticatedRequest extends Request {
   auth: AccessTokenPayload;

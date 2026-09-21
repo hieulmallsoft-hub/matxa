@@ -21,6 +21,9 @@ export class AuthUser {
   @ApiPropertyOptional({ format: 'uri' })
   avatarUrl?: string;
 
+  @ApiProperty({ enum: ['CUSTOMER', 'TECHNICIAN', 'ADMIN'] })
+  role!: 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN';
+
   @ApiProperty({ description: 'Da hoan tat dang ky tai khoan' })
   onboardingCompleted!: boolean;
 }

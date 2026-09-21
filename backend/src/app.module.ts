@@ -8,6 +8,10 @@ import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { RedisModule } from './redis/redis.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ChatModule } from './modules/chat/chat.module';
+import { MarketplaceModule } from './modules/marketplace/marketplace.module';
+import { BookingsModule } from './modules/bookings/bookings.module';
+import { ProfileModule } from './modules/profile/profile.module';
 
 @Module({
   imports: [
@@ -18,6 +22,10 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     AuthModule,
     HealthModule,
     NotificationsModule,
+    ChatModule,
+    MarketplaceModule,
+    BookingsModule,
+    ProfileModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

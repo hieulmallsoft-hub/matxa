@@ -2,7 +2,7 @@ import { BadRequestException, HttpException, HttpStatus, Injectable, Logger, Una
 import { ConfigService } from '@nestjs/config';
 import { createHmac, randomInt, randomUUID } from 'node:crypto';
 import { RedisService } from '../../../redis/redis.service';
-import { SendEmailOtpResponse } from '../models/email-otp.model';
+import { SendEmailOtpResponse } from '../entities/email-otp.entity';
 import nodemailer, { Transporter } from 'nodemailer';
 
 type EmailOtpPurpose = 'registration' | 'password-reset';

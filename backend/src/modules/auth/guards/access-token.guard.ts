@@ -6,8 +6,8 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../../database/prisma.service';
-import { AccessTokenPayload } from '../models/access-token-payload.model';
-import { AuthenticatedRequest } from '../models/auth-request.model';
+import { AccessTokenPayload } from '../entities/access-token-payload.entity';
+import { AuthenticatedRequest } from '../entities/auth-request.entity';
 
 @Injectable()
 export class AccessTokenGuard implements CanActivate {

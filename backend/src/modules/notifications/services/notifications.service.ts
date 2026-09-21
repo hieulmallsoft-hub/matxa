@@ -1,11 +1,11 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { App } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
-import { PrismaService } from '../../database/prisma.service';
-import { FIREBASE_ADMIN } from '../auth/firebase/firebase-admin.provider';
-import { ListNotificationsDto } from './dto/list-notifications.dto';
-import { RegisterDeviceTokenDto } from './dto/register-device-token.dto';
-import { TestPushDto } from './dto/test-push.dto';
+import { PrismaService } from '../../../database/prisma.service';
+import { FIREBASE_ADMIN } from '../../auth/firebase/firebase-admin.provider';
+import { ListNotificationsDto } from '../dto/list-notifications.dto';
+import { RegisterDeviceTokenDto } from '../dto/register-device-token.dto';
+import { TestPushDto } from '../dto/test-push.dto';
 
 @Injectable()
 export class NotificationsService {

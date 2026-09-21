@@ -10,7 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { createHmac, randomInt, randomUUID } from 'node:crypto';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { RedisService } from '../../../redis/redis.service';
-import { SendPhoneOtpResponse } from '../models/phone-otp.model';
+import { SendPhoneOtpResponse } from '../entities/phone-otp.entity';
 import { SMS_PROVIDER, SmsProvider } from '../sms/sms-provider.interface';
 
 interface OtpChallenge {

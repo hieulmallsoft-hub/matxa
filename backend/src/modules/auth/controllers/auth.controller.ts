@@ -33,12 +33,12 @@ import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { SendPhoneOtpDto } from '../dto/send-phone-otp.dto';
 import { VerifyPhoneOtpDto } from '../dto/verify-phone-otp.dto';
 import { AccessTokenGuard } from '../guards/access-token.guard';
-import { AccessTokenPayload } from '../models/access-token-payload.model';
-import { ClientMetadata } from '../models/auth-request.model';
-import { AuthResponse, AuthUser } from '../models/auth-user.model';
-import { SendPhoneOtpResponse } from '../models/phone-otp.model';
-import { SendEmailOtpResponse, VerifyRegistrationOtpResponse } from '../models/email-otp.model';
-import { CompletePasswordResetResponse, StartPasswordResetResponse, VerifyPasswordResetResponse } from '../models/password-reset.model';
+import { AccessTokenPayload } from '../entities/access-token-payload.entity';
+import { ClientMetadata } from '../entities/auth-request.entity';
+import { AuthResponse, AuthUser } from '../entities/auth-user.entity';
+import { SendPhoneOtpResponse } from '../entities/phone-otp.entity';
+import { SendEmailOtpResponse, VerifyRegistrationOtpResponse } from '../entities/email-otp.entity';
+import { CompletePasswordResetResponse, StartPasswordResetResponse, VerifyPasswordResetResponse } from '../entities/password-reset.entity';
 import { AuthService } from '../services/auth.service';
 
 @ApiTags('Authentication')

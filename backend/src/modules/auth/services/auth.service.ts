@@ -17,14 +17,14 @@ import {
   UserIdentity,
 } from '../../../generated/prisma/client';
 import { FIREBASE_ADMIN } from '../firebase/firebase-admin.provider';
-import { AccessTokenPayload } from '../models/access-token-payload.model';
-import { ClientMetadata } from '../models/auth-request.model';
-import { SendPhoneOtpResponse } from '../models/phone-otp.model';
+import { AccessTokenPayload } from '../entities/access-token-payload.entity';
+import { ClientMetadata } from '../entities/auth-request.entity';
+import { SendPhoneOtpResponse } from '../entities/phone-otp.entity';
 import {
   AuthProvider,
   AuthResponse,
   AuthUser,
-} from '../models/auth-user.model';
+} from '../entities/auth-user.entity';
 import { PhoneOtpService } from './phone-otp.service';
 import { EmailOtpService } from './email-otp.service';
 import {
@@ -511,6 +511,7 @@ export class AuthService {
       ...(identity?.email ? { email: identity.email } : {}),
       ...(user.displayName ? { name: user.displayName } : {}),
       ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+      role: user.role,
       onboardingCompleted: true,
     };
   }
