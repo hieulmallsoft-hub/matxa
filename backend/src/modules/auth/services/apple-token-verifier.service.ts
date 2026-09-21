@@ -1,7 +1,8 @@
 import { Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash, createPublicKey, JsonWebKey, KeyObject } from 'node:crypto';
+import { createHash, createPublicKey, JsonWebKey, KeyObject, randomBytes } from 'node:crypto';
 import { decode, JwtHeader, JwtPayload, verify } from 'jsonwebtoken';
+import { RedisService } from '../../../redis/redis.service';
 
 export interface AppleIdentity {
   subject: string;
@@ -17,7 +18,17 @@ export class AppleTokenVerifierService {
   private readonly signingKeys = new Map<string, KeyObject>();
   private keysExpireAt = 0;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly config: ConfigService, private readonly redis: RedisService) {}
+
+  async startLogin(): Promise<{ nonce: string; expiresIn: number }> {
+    if (!this.config.get<string>('APPLE_CLIENT_IDS')?.split(',').some((value) => value.trim())) {
+      throw new ServiceUnavailableException('Apple Sign In chua duoc cau hinh');
+    }
+    const nonce = randomBytes(32).toString('hex');
+    const hash = createHash('sha256').update(nonce).digest('hex');
+    await this.redis.client.set(`auth:apple:nonce:${hash}`, '1', { EX: 300 });
+    return { nonce, expiresIn: 300 };
+  }
 
   async verify(idToken: string, rawNonce: string): Promise<AppleIdentity> {
     const audiences = this.config.get<string>('APPLE_CLIENT_IDS')
@@ -43,10 +54,16 @@ export class AppleTokenVerifierService {
         issuer: APPLE_ISSUER,
         audience,
       }) as JwtPayload;
-      if (!payload.sub) throw new Error('Apple token khong co subject');
+      if (typeof payload.sub !== 'string' || !payload.sub || typeof payload.exp !== 'number') {
+        throw new Error('Apple token thieu subject hoac expiry');
+      }
 
       const expectedNonce = createHash('sha256').update(rawNonce).digest('hex');
       if (payload.nonce !== expectedNonce) throw new Error('Apple nonce khong khop');
+      // Atomic consumption prevents concurrent requests from reusing a challenge.
+      if (await this.redis.client.getDel(`auth:apple:nonce:${expectedNonce}`) !== '1') {
+        throw new Error('Apple nonce het han hoac da su dung');
+      }
 
       return {
         subject: payload.sub,

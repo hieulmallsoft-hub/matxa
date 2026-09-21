@@ -147,6 +147,33 @@ describe('AuthService', () => {
     expect(prisma.session.create).toHaveBeenCalledTimes(1);
   });
 
+  it.each([false, true])('does not link Apple by subject when verified email is absent (%s)', async (emailVerified) => {
+    appleTokenVerifier.verify.mockResolvedValue({ subject: 'shared-subject', emailVerified });
+    await service.loginWithApple('token', 'nonce', undefined, {});
+    expect(transaction.userIdentity.findFirst).not.toHaveBeenCalled();
+    expect(transaction.user.create).toHaveBeenCalled();
+  });
+
+  it('does not link Apple using an unverified email', async () => {
+    appleTokenVerifier.verify.mockResolvedValue({ subject: 'apple-user', email: 'user@example.com', emailVerified: false });
+    await service.loginWithApple('token', 'nonce', undefined, {});
+    expect(transaction.userIdentity.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('does not issue a session for a blocked Apple user', async () => {
+    appleTokenVerifier.verify.mockResolvedValue({ subject: 'apple-user', emailVerified: false });
+    transaction.user.update.mockResolvedValueOnce({ id: 'user-id', status: 'BLOCKED', identities: [] });
+    await expect(service.loginWithApple('token', 'nonce', undefined, {})).rejects.toThrow('Tai khoan khong con hoat dong');
+    expect(prisma.session.create).not.toHaveBeenCalled();
+  });
+
+  it('does not write users or sessions for an invalid Apple token', async () => {
+    appleTokenVerifier.verify.mockRejectedValueOnce(new Error('Invalid Apple token'));
+    await expect(service.loginWithApple('token', 'nonce', undefined, {})).rejects.toThrow();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.session.create).not.toHaveBeenCalled();
+  });
+
   it('rejects an invalid Google ID token', async () => {
     googleTokenVerifier.verify.mockRejectedValue(
       new Error('Google ID token khong hop le'),

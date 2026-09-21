@@ -7,7 +7,7 @@ export class AppleLoginDto {
   @IsNotEmpty()
   idToken!: string;
 
-  @ApiProperty({ description: 'Raw nonce do mobile tao; token Apple phai chua SHA-256 cua nonce nay' })
+  @ApiProperty({ description: 'Nonce goc tu POST /api/auth/apple/start; gui SHA-256 hex cua nonce nay cho Apple. Nonce chi dung mot lan, het han sau 300 giay.' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(512)

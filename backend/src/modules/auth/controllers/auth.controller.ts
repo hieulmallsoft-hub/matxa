@@ -216,6 +216,17 @@ export class AuthController {
     );
   }
 
+  @Post('apple/start')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Tao nonce dang nhap Apple, hieu luc 300 giay va chi dung mot lan' })
+  @ApiOkResponse({ schema: { type: 'object', required: ['nonce', 'expiresIn'], properties: {
+    nonce: { type: 'string' }, expiresIn: { type: 'integer', example: 300 },
+  } } })
+  startAppleLogin() {
+    return this.authService.startAppleLogin();
+  }
+
   @Post('apple')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })

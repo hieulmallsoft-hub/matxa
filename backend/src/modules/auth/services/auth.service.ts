@@ -94,6 +94,10 @@ export class AuthService {
     return this.createSession(user, metadata, 'google.com');
   }
 
+  startAppleLogin() {
+    return this.appleTokenVerifier.startLogin();
+  }
+
   async loginWithApple(
     idToken: string,
     nonce: string,
@@ -102,6 +106,9 @@ export class AuthService {
   ): Promise<AuthResponse> {
     const identity = await this.appleTokenVerifier.verify(idToken, nonce);
     const user = await this.upsertAppleUser(identity, fullName);
+    if (user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Tai khoan khong con hoat dong');
+    }
     return this.createSession(user, metadata, 'apple.com');
   }
 
@@ -440,12 +447,10 @@ export class AuthService {
           },
         },
       });
-      const linkedIdentity = existing
+      const linkedIdentity = existing || !identity.email || !identity.emailVerified
         ? null
         : await transaction.userIdentity.findFirst({
-            where: identity.email && identity.emailVerified
-              ? { email: identity.email.toLowerCase(), emailVerified: true }
-              : { providerSubject: identity.subject },
+            where: { email: identity.email.toLowerCase(), emailVerified: true },
             select: { userId: true },
           });
       let userId = existing?.userId ?? linkedIdentity?.userId;
