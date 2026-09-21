@@ -31,6 +31,7 @@ describe('AuthService', () => {
     verifyOtp: jest.fn(),
   };
   const googleTokenVerifier = { verify: jest.fn() };
+  const appleTokenVerifier = { verify: jest.fn() };
   const config = {
     get: jest.fn((key: string, fallback: unknown) => {
       if (key === 'JWT_EXPIRES_IN') return '15m';
@@ -85,6 +86,7 @@ describe('AuthService', () => {
       phoneOtp as never,
       { sendOtp: jest.fn(), verifyOtp: jest.fn() } as never,
       googleTokenVerifier as never,
+      appleTokenVerifier as never,
       config as unknown as ConfigService,
     );
   });
@@ -106,6 +108,43 @@ describe('AuthService', () => {
     expect(prisma.session.create).toHaveBeenCalledTimes(1);
     expect(prisma.session.create.mock.calls[0][0].data.refreshTokenHash)
       .toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('creates a local session after a valid Apple login', async () => {
+    appleTokenVerifier.verify.mockResolvedValue({
+      subject: 'apple-user-id',
+      email: 'apple-user@example.com',
+      emailVerified: true,
+    });
+    transaction.user.update.mockResolvedValueOnce({
+      id: 'user-id',
+      displayName: 'Thu Huong',
+      avatarUrl: null,
+      status: 'ACTIVE',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      identities: [
+        {
+          provider: 'APPLE',
+          phoneNumber: null,
+          email: 'apple-user@example.com',
+        },
+      ],
+    });
+
+    const result = await service.loginWithApple(
+      'apple-identity-token',
+      'raw-nonce',
+      'Thu Huong',
+      { deviceId: 'ios-device-1' },
+    );
+
+    expect(appleTokenVerifier.verify).toHaveBeenCalledWith(
+      'apple-identity-token',
+      'raw-nonce',
+    );
+    expect(result.user.provider).toBe('apple.com');
+    expect(prisma.session.create).toHaveBeenCalledTimes(1);
   });
 
   it('rejects an invalid Google ID token', async () => {

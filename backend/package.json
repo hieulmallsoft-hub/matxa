@@ -35,6 +35,7 @@
     "express": "^5.1.0",
     "firebase-admin": "^14.3.0",
     "google-auth-library": "^11.0.2",
+    "jsonwebtoken": "^9.0.3",
     "libphonenumber-js": "^1.11.20",
     "nodemailer": "^10.0.0",
     "pg": "^8.16.3",

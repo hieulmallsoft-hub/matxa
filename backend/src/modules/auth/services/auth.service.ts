@@ -31,6 +31,7 @@ import {
   GoogleIdentity,
   GoogleTokenVerifierService,
 } from './google-token-verifier.service';
+import { AppleIdentity, AppleTokenVerifierService } from './apple-token-verifier.service';
 
 type UserWithIdentities = User & { identities: UserIdentity[] };
 const scryptAsync = promisify(scrypt);
@@ -48,6 +49,7 @@ export class AuthService {
     private readonly phoneOtpService: PhoneOtpService,
     private readonly emailOtpService: EmailOtpService,
     private readonly googleTokenVerifier: GoogleTokenVerifierService,
+    private readonly appleTokenVerifier: AppleTokenVerifierService,
     config: ConfigService,
   ) {
     this.accessTokenExpiresIn = config.get('JWT_EXPIRES_IN', '15m');
@@ -90,6 +92,17 @@ export class AuthService {
     const identity = await this.googleTokenVerifier.verify(idToken);
     const user = await this.upsertGoogleUser(identity);
     return this.createSession(user, metadata, 'google.com');
+  }
+
+  async loginWithApple(
+    idToken: string,
+    nonce: string,
+    fullName: string | undefined,
+    metadata: ClientMetadata,
+  ): Promise<AuthResponse> {
+    const identity = await this.appleTokenVerifier.verify(idToken, nonce);
+    const user = await this.upsertAppleUser(identity, fullName);
+    return this.createSession(user, metadata, 'apple.com');
   }
 
   sendEmailOtp(email: string, deviceId: string) {
@@ -414,6 +427,64 @@ export class AuthService {
     });
   }
 
+  private async upsertAppleUser(
+    identity: AppleIdentity,
+    fullName?: string,
+  ): Promise<UserWithIdentities> {
+    return this.prisma.$transaction(async (transaction) => {
+      const existing = await transaction.userIdentity.findUnique({
+        where: {
+          provider_providerSubject: {
+            provider: DbAuthProvider.APPLE,
+            providerSubject: identity.subject,
+          },
+        },
+      });
+      const linkedIdentity = existing
+        ? null
+        : await transaction.userIdentity.findFirst({
+            where: identity.email && identity.emailVerified
+              ? { email: identity.email.toLowerCase(), emailVerified: true }
+              : { providerSubject: identity.subject },
+            select: { userId: true },
+          });
+      let userId = existing?.userId ?? linkedIdentity?.userId;
+
+      if (!userId) {
+        const created = await transaction.user.create({
+          data: fullName?.trim() ? { displayName: fullName.trim() } : {},
+        });
+        userId = created.id;
+      }
+
+      await transaction.userIdentity.upsert({
+        where: {
+          provider_providerSubject: {
+            provider: DbAuthProvider.APPLE,
+            providerSubject: identity.subject,
+          },
+        },
+        create: {
+          userId,
+          provider: DbAuthProvider.APPLE,
+          providerSubject: identity.subject,
+          email: identity.email?.toLowerCase(),
+          emailVerified: identity.emailVerified,
+        },
+        update: {
+          email: identity.email?.toLowerCase(),
+          emailVerified: identity.emailVerified,
+        },
+      });
+
+      return transaction.user.update({
+        where: { id: userId },
+        data: fullName?.trim() ? { displayName: fullName.trim() } : {},
+        include: { identities: true },
+      });
+    });
+  }
+
   private async upsertEmailUser(email: string, password: string): Promise<UserWithIdentities> {
     const passwordHash = await this.hashPassword(password);
     return this.prisma.$transaction(async (transaction) => {
@@ -497,12 +568,16 @@ export class AuthService {
             ? item.provider === DbAuthProvider.PHONE
             : preferredProvider === 'email'
               ? item.provider === DbAuthProvider.EMAIL
-              : item.provider === DbAuthProvider.GOOGLE,
+              : preferredProvider === 'apple.com'
+                ? item.provider === DbAuthProvider.APPLE
+                : item.provider === DbAuthProvider.GOOGLE,
         )
       : user.identities[0];
     const provider: AuthProvider = identity?.provider === DbAuthProvider.PHONE
       ? 'phone'
-      : identity?.provider === DbAuthProvider.EMAIL ? 'email' : 'google.com';
+      : identity?.provider === DbAuthProvider.EMAIL
+        ? 'email'
+        : identity?.provider === DbAuthProvider.APPLE ? 'apple.com' : 'google.com';
 
     return {
       id: user.id,

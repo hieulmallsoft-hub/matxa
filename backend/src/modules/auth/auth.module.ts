@@ -10,6 +10,7 @@ import { AuthService } from './services/auth.service';
 import { GoogleTokenVerifierService } from './services/google-token-verifier.service';
 import { PhoneOtpService } from './services/phone-otp.service';
 import { EmailOtpService } from './services/email-otp.service';
+import { AppleTokenVerifierService } from './services/apple-token-verifier.service';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { EmailOtpService } from './services/email-otp.service';
     smsProviderFactory,
     PhoneOtpService,
     EmailOtpService,
+    AppleTokenVerifierService,
     GoogleTokenVerifierService,
     AuthService,
     AccessTokenGuard,

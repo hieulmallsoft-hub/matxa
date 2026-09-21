@@ -23,6 +23,7 @@ import {
 import { Request } from 'express';
 import { CurrentAuth } from '../decorators/current-auth.decorator';
 import { FirebaseLoginDto } from '../dto/firebase-login.dto';
+import { AppleLoginDto } from '../dto/apple-login.dto';
 import { EmailLoginDto } from '../dto/email-login.dto';
 import { CompleteRegistrationDto } from '../dto/complete-registration.dto';
 import { VerifyRegistrationOtpDto } from '../dto/verify-registration-otp.dto';
@@ -211,6 +212,24 @@ export class AuthController {
   ): Promise<AuthResponse> {
     return this.authService.loginWithGoogle(
       dto.idToken,
+      this.getClientMetadata(request, dto.deviceId),
+    );
+  }
+
+  @Post('apple')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Dang ky hoac dang nhap bang Apple identity token' })
+  @ApiOkResponse({ type: AuthResponse })
+  @ApiUnauthorizedResponse({ description: 'Apple identity token, audience hoac nonce khong hop le' })
+  loginWithApple(
+    @Body() dto: AppleLoginDto,
+    @Req() request: Request,
+  ): Promise<AuthResponse> {
+    return this.authService.loginWithApple(
+      dto.idToken,
+      dto.nonce,
+      dto.fullName,
       this.getClientMetadata(request, dto.deviceId),
     );
   }
