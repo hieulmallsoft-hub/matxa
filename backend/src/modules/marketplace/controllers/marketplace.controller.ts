@@ -1,11 +1,12 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiExtraModels, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
-import { CreateAddressDto, CreateAvailabilityDto, CreateTechnicianServiceDto, SearchTechniciansDto, UpdateAddressDto, UpdateTechnicianServiceDto, UpsertTechnicianProfileDto } from '../dto/marketplace.dto';
+import { AvailabilityQueryDto, CreateAddressDto, CreateAvailabilityDto, CreateTechnicianServiceDto, MarketplaceHomeQueryDto, SearchTechniciansDto, UpdateAddressDto, UpdateTechnicianServiceDto, UpsertTechnicianProfileDto } from '../dto/marketplace.dto';
 import { MarketplaceService } from '../services/marketplace.service';
-import { TechnicianListResponse } from '../entities/marketplace.entity';
+import { ComputedAvailabilityResponse, MarketplaceHomeResponse, TechnicianDetailResponse, TechnicianListItem, TechnicianListResponse, WorkingScheduleResponse } from '../entities/marketplace.entity';
+import { OptionalAccessTokenGuard } from '../../auth/guards/optional-access-token.guard';
 
 @ApiTags('Marketplace')
 @Controller('marketplace')
@@ -13,9 +14,11 @@ export class MarketplaceController {
   constructor(private readonly marketplace: MarketplaceService) {}
 
   @Get('home')
+  @UseGuards(OptionalAccessTokenGuard)
+  @ApiOkResponse({ type: MarketplaceHomeResponse })
   @ApiOperation({ summary: 'Du lieu trang chu: banner, danh muc va ky thuat vien' })
-  home(@Query('latitude') latitude?: string, @Query('longitude') longitude?: string) {
-    return this.marketplace.home(latitude === undefined ? undefined : Number(latitude), longitude === undefined ? undefined : Number(longitude));
+  home(@Query() query: MarketplaceHomeQueryDto, @CurrentAuth() auth?: AccessTokenPayload) {
+    return this.marketplace.home(query.latitude, query.longitude, auth?.sub);
   }
 
   @Get('categories')
@@ -23,18 +26,28 @@ export class MarketplaceController {
   categories() { return this.marketplace.categories(); }
 
   @Get('technicians')
+  @UseGuards(OptionalAccessTokenGuard)
   @ApiOperation({ summary: 'Tim kiem va loc ky thuat vien' })
   @ApiOkResponse({ type: TechnicianListResponse })
-  technicians(@Query() query: SearchTechniciansDto) { return this.marketplace.searchTechnicians(query); }
+  technicians(@Query() query: SearchTechniciansDto, @CurrentAuth() auth?: AccessTokenPayload) { return this.marketplace.searchTechnicians(query, auth?.sub); }
 
   @Get('technicians/:id')
+  @UseGuards(OptionalAccessTokenGuard)
+  @ApiOkResponse({ type: TechnicianDetailResponse })
   @ApiOperation({ summary: 'Chi tiet ky thuat vien, bang gia va danh gia' })
-  technician(@Param('id', ParseUUIDPipe) id: string) { return this.marketplace.technicianDetail(id); }
+  technician(@Param('id', ParseUUIDPipe) id: string, @Query() location: MarketplaceHomeQueryDto, @CurrentAuth() auth?: AccessTokenPayload) {
+    return this.marketplace.technicianDetail(id, location, auth?.sub);
+  }
 
   @Get('technicians/:id/availability')
+  @ApiExtraModels(ComputedAvailabilityResponse, WorkingScheduleResponse)
+  @ApiOkResponse({ schema: { oneOf: [
+    { $ref: getSchemaPath(ComputedAvailabilityResponse) },
+    { type: 'array', items: { $ref: getSchemaPath(WorkingScheduleResponse) } },
+  ] } })
   @ApiOperation({ summary: 'Khung gio kha dung cua ky thuat vien' })
-  availability(@Param('id', ParseUUIDPipe) id: string, @Query('from') from: string, @Query('to') to: string) {
-    return this.marketplace.availability(id, from, to);
+  availability(@Param('id', ParseUUIDPipe) id: string, @Query() query: AvailabilityQueryDto) {
+    return this.marketplace.availability(id, query);
   }
 }
 
@@ -45,6 +58,7 @@ export class MarketplaceController {
 export class FavoritesController {
   constructor(private readonly marketplace: MarketplaceService) {}
   @Get() @ApiOperation({ summary: 'Danh sach ky thuat vien yeu thich' })
+  @ApiOkResponse({ type: [TechnicianListItem] })
   list(@CurrentAuth() auth: AccessTokenPayload) { return this.marketplace.favorites(auth.sub); }
   @Post(':technicianId') @ApiOperation({ summary: 'Them vao yeu thich' })
   add(@CurrentAuth() auth: AccessTokenPayload, @Param('technicianId', ParseUUIDPipe) id: string) { return this.marketplace.addFavorite(auth.sub, id); }

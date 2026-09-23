@@ -1,17 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, Matches } from 'class-validator';
 
 export class QuoteBookingDto {
   @ApiProperty() @IsUUID() technicianId!: string;
   @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10) @IsUUID('4', { each: true }) serviceIds!: string[];
   @ApiProperty({ enum: ['HOME', 'ONSITE', 'ONLINE'] }) @IsIn(['HOME', 'ONSITE', 'ONLINE']) mode!: 'HOME' | 'ONSITE' | 'ONLINE';
-  @ApiProperty() @IsDateString() scheduledStart!: string;
+  @ApiProperty({ description: 'ISO timestamp with explicit Z or timezone offset' }) @IsDateString({ strict: true }) @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i) scheduledStart!: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() addressId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) promotionCode?: string;
 }
 
 export class CreateBookingDto extends QuoteBookingDto {
-  @ApiProperty({ enum: ['CASH', 'ONLINE'] }) @IsIn(['CASH', 'ONLINE']) paymentMethod!: 'CASH' | 'ONLINE';
+  @ApiProperty({ enum: ['CASH'], description: 'Hien chi ho tro thanh toan tien mat' }) @IsIn(['CASH']) paymentMethod!: 'CASH' | 'ONLINE';
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) note?: string;
 }
 

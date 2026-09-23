@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { BookingQuoteResponse } from '../entities/booking-quote.entity';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
@@ -14,6 +15,7 @@ export class BookingsController {
   constructor(private readonly bookings: BookingsService) {}
 
   @Post('quote')
+  @ApiCreatedResponse({ type: BookingQuoteResponse })
   @ApiOperation({ summary: 'Kiem tra lich, ma khuyen mai va tinh tong tien' })
   quote(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: QuoteBookingDto) {
     return this.bookings.quote(auth.sub, dto);

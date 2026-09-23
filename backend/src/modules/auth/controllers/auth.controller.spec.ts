@@ -25,7 +25,7 @@ describe('Auth HTTP contracts (mocked business service, real validation and guar
     ['apple', 'loginWithApple', { idToken: 'test-token', nonce: 'nonce', deviceId }, 200],
     ['refresh', 'refresh', { refreshToken: 'session.secret' }, 200],
   ];
-  const service = Object.fromEntries([...rows.map((row) => row[1]), 'getCurrentUser', 'logout', 'logoutAll'].map((name) => [name, jest.fn().mockResolvedValue({ ok: true })]));
+  const service = Object.fromEntries([...rows.map((row) => row[1]), 'getCurrentUser', 'logout', 'logoutAll', 'sendPhoneOtp', 'linkVerifiedPhone'].map((name) => [name, jest.fn().mockResolvedValue({ ok: true })]));
   const session = { findFirst: jest.fn().mockResolvedValue({ id: 'session' }) };
   const jwt = new JwtService({ secret: 'test-secret-for-auth-http-contracts' });
   beforeAll(async () => {
@@ -42,6 +42,17 @@ describe('Auth HTTP contracts (mocked business service, real validation and guar
   });
   afterAll(async () => { await app?.close(); });
   beforeEach(() => { jest.clearAllMocks(); session.findFirst.mockResolvedValue({ id: 'session' }); });
+
+  it.each([
+    ['send-otp', { phoneNumber: '+84901234567', deviceId }, 202, 'sendPhoneOtp'],
+    ['verify-otp', { challengeId: '00000000-0000-4000-8000-000000000001', code: '123456', deviceId }, 200, 'linkVerifiedPhone'],
+  ] as const)('phone/link/%s requires auth and forwards the authenticated user', async (path, body, status, method) => {
+    const options = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+    expect((await fetch(`${base}/phone/link/${path}`, options)).status).toBe(401);
+    const headers = { ...options.headers, Authorization: `Bearer ${jwt.sign({ sub: 'user', sid: 'session' })}` };
+    expect((await fetch(`${base}/phone/link/${path}`, { ...options, headers })).status).toBe(status);
+    expect(service[method].mock.calls[0]).toContain('user');
+  });
 
   it.each(rows)('POST %s accepts its documented body', async (path, method, body, status) => {
     const response = await fetch(`${base}/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

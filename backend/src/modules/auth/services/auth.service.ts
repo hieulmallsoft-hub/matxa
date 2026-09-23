@@ -244,7 +244,7 @@ export class AuthService {
       });
     });
 
-    return this.toAuthUser(user, 'google.com');
+    return this.toAuthUser(user);
   }
 
   async refresh(
@@ -584,10 +584,12 @@ export class AuthService {
         ? 'email'
         : identity?.provider === DbAuthProvider.APPLE ? 'apple.com' : 'google.com';
 
+    const verifiedPhone = user.identities.find((item) => item.provider === DbAuthProvider.PHONE && item.phoneNumber);
     return {
       id: user.id,
       provider,
-      ...(identity?.phoneNumber ? { phoneNumber: identity.phoneNumber } : {}),
+      phoneVerified: Boolean(verifiedPhone),
+      ...(verifiedPhone?.phoneNumber ? { phoneNumber: verifiedPhone.phoneNumber } : {}),
       ...(identity?.email ? { email: identity.email } : {}),
       ...(user.displayName ? { name: user.displayName } : {}),
       ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),

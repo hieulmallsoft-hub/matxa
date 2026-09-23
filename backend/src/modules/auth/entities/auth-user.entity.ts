@@ -12,6 +12,9 @@ export class AuthUser {
   @ApiPropertyOptional({ example: '+84901234567' })
   phoneNumber?: string;
 
+  @ApiProperty({ description: 'Da xac thuc so dien thoai de dat dich vu' })
+  phoneVerified!: boolean;
+
   @ApiPropertyOptional({ example: 'user@example.com' })
   email?: string;
 

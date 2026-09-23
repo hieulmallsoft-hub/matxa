@@ -110,6 +110,7 @@ model TechnicianProfile {
   city            String?
   address         String?
   isVerified      Boolean             @default(false) @map("is_verified")
+  isActive        Boolean             @default(true) @map("is_active")
   isAvailable     Boolean             @default(false) @map("is_available")
   averageRating   Decimal             @default(0) @map("average_rating") @db.Decimal(3, 2)
   reviewCount     Int                 @default(0) @map("review_count")
@@ -123,6 +124,8 @@ model TechnicianProfile {
   reviews         Review[]
 
   @@index([city, isAvailable])
+  @@index([isActive, isAvailable(sort: Desc), averageRating(sort: Desc), id])
+  @@index([tags], type: Gin)
   @@index([averageRating(sort: Desc)])
   @@map("technician_profiles")
 }
@@ -195,6 +198,7 @@ model Address {
   latitude  Decimal   @db.Decimal(10, 7)
   longitude Decimal   @db.Decimal(10, 7)
   isDefault Boolean   @default(false) @map("is_default")
+  deletedAt DateTime? @map("deleted_at")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -231,6 +235,7 @@ model Booking {
   customerId      String            @map("customer_id") @db.Uuid
   technicianId    String            @map("technician_id") @db.Uuid
   addressId       String?           @map("address_id") @db.Uuid
+  addressSnapshot Json?             @map("address_snapshot")
   promotionId     String?           @map("promotion_id") @db.Uuid
   mode            ServiceMode
   status          BookingStatus     @default(PENDING)
