@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { UpdateProfileDto } from '../dto/profile.dto';
 import { ProfileStorageService } from './profile-storage.service';
@@ -31,19 +31,40 @@ export class ProfileService {
       gender: dto.gender,
       nationality: dto.nationality?.trim(),
     };
+    let previousKey: string | null = null;
+    let savedKey: string | undefined;
     if (dto.avatarKey !== undefined) {
-      if (!dto.avatarKey.startsWith(`avatars/${userId}/`)) {
+      const prefix = `avatars/${userId}/`;
+      if (typeof dto.avatarKey !== 'string' || !dto.avatarKey.startsWith(prefix)
+        || !/^[0-9a-f-]{36}\.(jpg|png|webp)$/i.test(dto.avatarKey.slice(prefix.length))) {
         throw new BadRequestException('Avatar key khong hop le');
       }
-      data.avatarKey = dto.avatarKey;
-      data.avatarUrl = this.storage.publicUrlFor(dto.avatarKey);
+      const current = await this.prisma.user.findUnique({ where: { id: userId }, select: { avatarKey: true } });
+      if (!current) throw new NotFoundException('Khong tim thay tai khoan');
+      previousKey = current.avatarKey;
+      savedKey = await this.storage.prepareAvatar(userId, dto.avatarKey);
+      data.avatarKey = savedKey;
+      data.avatarUrl = this.storage.publicUrlFor(savedKey);
     }
 
-    const user = await this.prisma.user.update({
-      where: { id: userId },
+    let user;
+    try {
+      user = await this.prisma.user.update({
+      where: { id: userId, ...(savedKey ? { avatarKey: previousKey } : {}) },
       data,
       select: profileSelect,
     });
+    } catch (error) {
+      if (savedKey) await this.storage.deleteAvatar(userId, savedKey);
+      if (savedKey && (error as { code?: string }).code === 'P2025') {
+        throw new ConflictException('Ho so da thay doi, vui long thu lai');
+      }
+      throw error;
+    }
+    if (savedKey) {
+      await this.storage.deleteAvatar(userId, previousKey);
+      await this.storage.deleteAvatar(userId, dto.avatarKey);
+    }
     return this.toProfile(user);
   }
 
