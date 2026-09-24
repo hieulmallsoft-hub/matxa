@@ -7,6 +7,9 @@ export class TechnicianListItem {
   @ApiProperty({ type: String, nullable: true }) displayName!: string | null;
   @ApiProperty({ type: String, nullable: true }) avatarUrl!: string | null;
   @ApiProperty() averageRating!: number;
+  @ApiProperty({ description: 'Alias of averageRating' }) rating!: number;
+  @ApiProperty({ type: [String], enum: ['HOME', 'ONSITE', 'ONLINE'], description: 'Modes supported by profile and matching active services' }) supportedModes!: string[];
+  @ApiProperty({ type: String, nullable: true, description: 'Currently null: select services and use availability for bookable start times' }) nextAvailableAt!: string | null;
   @ApiProperty() reviewCount!: number;
   @ApiProperty() isAvailable!: boolean;
   @ApiProperty({ type: Number, nullable: true }) distanceKm!: number | null;
@@ -65,10 +68,12 @@ export class PublicTechnicianUser {
 
 export class TechnicianServiceResponse {
   @ApiProperty() id!: string;
-  @ApiProperty({ description: 'Use this value in booking serviceIds' }) serviceId!: string;
+  @ApiProperty({ description: 'Legacy alias of technicianServiceId; no master service entity exists. Use in booking serviceIds.' }) serviceId!: string;
   @ApiProperty() technicianServiceId!: string;
   @ApiProperty() technicianId!: string;
   @ApiProperty() categoryId!: string;
+  @ApiProperty() categoryName!: string;
+  @ApiProperty({ type: [String], enum: ['HOME', 'ONSITE', 'ONLINE'] }) supportedModes!: string[];
   @ApiProperty() name!: string;
   @ApiProperty({ type: String, nullable: true }) description!: string | null;
   @ApiProperty() price!: number;
@@ -100,6 +105,7 @@ export class OnsiteLocationResponse {
 }
 
 export class TechnicianDetailResponse extends TechnicianListItem {
+  @ApiProperty({ type: [String], enum: ['HOME', 'ONSITE', 'ONLINE'], description: 'Union of all active service modes in active categories' }) declare supportedModes: string[];
   @ApiProperty({ type: PublicTechnicianUser }) user!: PublicTechnicianUser;
   @ApiProperty({ type: String, nullable: true }) bio!: string | null;
   @ApiProperty({ type: String, nullable: true }) address!: string | null;

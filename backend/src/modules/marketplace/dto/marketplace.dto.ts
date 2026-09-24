@@ -3,6 +3,8 @@ import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsLatitude, IsLongitude, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, Matches } from 'class-validator';
 
 export class SearchTechniciansDto {
+  @ApiPropertyOptional({ enum: ['recommended', 'distance', 'rating', 'availability'], default: 'recommended', description: 'distance requires latitude and longitude; recommended uses distance when provided, otherwise availability then rating' })
+  @IsOptional() @IsIn(['recommended', 'distance', 'rating', 'availability']) sort?: 'recommended' | 'distance' | 'rating' | 'availability';
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) search?: string;
   @ApiPropertyOptional({ description: 'Alias of search; search takes precedence' }) @IsOptional() @IsString() @MaxLength(100) keyword?: string;
   @ApiPropertyOptional({ enum: ['MALE', 'FEMALE', 'OTHER'] }) @IsOptional() @IsIn(['MALE', 'FEMALE', 'OTHER']) gender?: 'MALE' | 'FEMALE' | 'OTHER';

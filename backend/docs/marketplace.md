@@ -10,7 +10,7 @@ All routes below retain the `/api` prefix and existing response structure. Tabs,
 | GET `/api/marketplace/categories` | Active category IDs/names/slugs for tabs and filters. |
 | GET `/api/marketplace/technicians` | Search, filter, sort and paginate technician cards. |
 | GET `/api/marketplace/technicians/:id` | Existing detail format, now excludes inactive profiles/users and inactive services/categories. |
-| GET `/api/marketplace/technicians/:id/availability` | Existing working-window response; excludes inactive profiles/users. Not a list of computed bookable slots. |
+| GET `/api/marketplace/technicians/:id/availability` | Legacy from/to-only requests return working windows. With serviceIds and mode, returns computed future slots excluding PENDING/CONFIRMED bookings. Requires verified, active profiles/users. |
 
 Home and search allow guests. Without Authorization, `isFavorite` is false. With a Bearer token, the existing access-token/session validation runs and favorites are scoped to its authenticated user. Invalid, expired or revoked supplied credentials return 401; remove Authorization to browse as a guest. A client-supplied userId is never trusted.
 
@@ -30,6 +30,7 @@ Home and search allow guests. Without Authorization, `isFavorite` is false. With
 | mode | HOME / ONSITE / ONLINE; matching service and profile must support it |
 | available | Exactly true or false; false is no longer converted into true |
 | latitude / longitude | Numbers in [-90,90] / [-180,180]; supply both or neither |
+| sort | recommended (default), distance (requires coordinates), rating, availability; explicit sort overrides recommended ordering |
 | page | Integer >=1, default 1 |
 | limit | Integer 1–100, default 20 |
 
@@ -58,6 +59,9 @@ Each card preserves the old field names:
   "isVerified": true,
   "isAvailable": true,
   "averageRating": 4.5,
+  "rating": 4.5,
+  "supportedModes": ["HOME", "ONSITE"],
+  "nextAvailableAt": null,
   "reviewCount": 12,
   "city": null,
   "startingPrice": 150000,
@@ -66,20 +70,20 @@ Each card preserves the old field names:
 }
 ```
 
-Prices/ratings/distances are numbers. Distance is rounded to 0.1 km for display, but ordering uses unrounded distance. Unknown location returns null, sorted last. Starting price is the minimum price of an active service matching the current category/service/mode filters. `isAvailable` is the technician's declared readiness, not a guarantee of an unoccupied booking slot. Quote remains authoritative for selected booking times. `isVerified` remains a badge, not a mandatory publication gate, preserving existing behavior until the approval policy is confirmed.
+Prices/ratings/distances are numbers. Distance is rounded to 0.1 km for display, but ordering uses unrounded distance. Unknown location returns null, sorted last. Starting price is the minimum price of an active service matching the current category/service/mode filters. `isAvailable` is the technician's declared readiness, not a guarantee of an unoccupied booking slot. Quote remains authoritative for selected booking times. `isVerified=true` is mandatory for publication and new booking quotes/creation. Admin verification uses the existing POST /api/admin/marketplace/technicians endpoint.
 
-Eligibility: user ACTIVE, profile isActive=true and at least one matching active service in an active category. `isAvailable=false` does not mean the profile is disabled.
+Eligibility: user ACTIVE, profile isActive=true and isVerified=true and at least one matching active service in an active category. `isAvailable=false` does not mean the profile is disabled.
 
 ## Query logic
 
 `MarketplaceService.searchTechnicians` uses parameterized `Prisma.sql` and `$queryRaw`, never interpolated SQL input:
 
-1. Join technician_profiles to users; filter profile is_active and user status.
+1. Join technician_profiles to users; filter profile is_active, is_verified and user status.
 2. Apply name/gender/tags/availability/profile mode.
 3. A single EXISTS joins technician_services to service_categories and applies all service filters to the SAME active service. An inactive service cannot qualify a technician.
 4. With location, compute Haversine great-circle distance using coordinates in PostgreSQL, sort distance ascending NULLS LAST, availability descending, rating descending, ID ascending. Without location, sort availability/rating/ID. ID breaks ties deterministically.
 5. CTE count and LIMIT/OFFSET pagination run in PostgreSQL; no loading all technicians into Node. Count still returns the correct total for empty/out-of-range pages.
-6. Hydrate only page IDs with Prisma, fetch the cheapest matching service and query favorites once for those IDs. A RepeatableRead transaction keeps page/count/details consistent.
+6. Hydrate only page IDs with Prisma, fetch matching active service prices/modes (ordered by price) and query favorites once for those IDs. A RepeatableRead transaction keeps page/count/details consistent.
 
 The ranking query shape is:
 
@@ -87,7 +91,7 @@ The ranking query shape is:
 WITH filtered AS (
   SELECT p.id, p.is_available, p.average_rating, <distance expression> AS distance
   FROM technician_profiles p JOIN users u ON u.id = p.user_id
-  WHERE p.is_active = true AND u.status = 'ACTIVE'
+  WHERE p.is_active = true AND p.is_verified = true AND u.status = 'ACTIVE'
     AND <parameterized profile filters>
     AND EXISTS (
       SELECT 1 FROM technician_services s
@@ -142,3 +146,38 @@ No results: `{ "items": [], "total": 0, "page": 1, "limit": 20 }`. An out-of-ran
 Run `npm test -- --runInBand marketplace` for DTO/HTTP/optional-auth and query-construction tests, and `npm test -- --runInBand` for all regression tests. Database calls are mocked in these unit/HTTP tests; they do not prove SQL execution on PostgreSQL.
 
 After applying migration to a test database, check active/blocked users, disabled profiles, inactive services/categories, combined category+mode matching, cheapest service, false availability, identical-distance ties, missing coordinates, empty pages, and favorites from two different accounts. Run home with and without a Bearer token and verify effective banner dates. No real customer data or demo fixtures are inserted by these tests.
+
+
+## Publication policy update (2026-09-24)
+
+No schema change or migration is needed for this update: isVerified already exists.
+Unverified profiles are excluded from home/search/category/nearby, detail, favorites,
+availability and quote/create validation. Existing booking history remains accessible.
+No account is automatically verified. Technician self-edit cannot set isVerified.
+
+Card rating is an additive alias of averageRating. supportedModes is the intersection
+of profile modes and matching active service modes; legacy serviceModes is preserved.
+nextAvailableAt is currently null: no service selection/duration exists on a card,
+so the API does not claim that a working window is a bookable slot. Use the existing
+availability endpoint after selecting services, then quote for the final check.
+
+Existing indexes cover technician service (technicianId,isActive),
+(categoryId,isActive), favorite primary key (userId,technicianId), profile active/sort,
+tags GIN, and availability (technicianId,startAt,endAt). No duplicate index added.
+If production EXPLAIN ANALYZE shows many unverified rows scanned, consider replacing
+the profile active/sort index with (isActive,isVerified,isAvailable DESC,averageRating DESC,id).
+A user-status-only index is not automatically useful for the existing primary-key join.
+
+Swagger/Postman checks:
+1. GET /api/marketplace/home with no Authorization: effective banners, active categories, <=10 cards.
+2. GET /api/marketplace/technicians?mode=HOME&available=true&sort=rating&page=1&limit=10
+3. GET /api/marketplace/technicians?latitude=10.77&longitude=106.69&sort=distance
+4. Add categoryId/serviceId UUIDs and tags; the SAME active service must match every service filter.
+5. Repeat with valid Bearer token: favorite flag belongs only to the authenticated user.
+6. Invalid token =>401; invalid sort/UUID/pagination =>400; distance without coordinates =>400.
+7. In a test database, unverify a profile, disable it, or block its user: it disappears from all listings;
+   detail/availability =>404, quote rejects. Restore through the authorized admin flow.
+8. Empty results/out-of-range page retain total/page/limit and items=[].
+
+Tests use mocked Prisma queries and real HTTP validation/auth guards. They do not
+execute the ranking SQL against a real PostgreSQL database or validate a deployed server.

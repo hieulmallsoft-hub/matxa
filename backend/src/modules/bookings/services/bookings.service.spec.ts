@@ -124,7 +124,7 @@ describe('BookingsService', () => {
       scheduledStart: new Date(Date.now() + 3_600_000).toISOString(),
     });
     expect(result).toEqual(expect.objectContaining({ subtotal: 500000, serviceFee: 100000, totalAmount: 600000, durationMinutes: 60 }));
-    expect(technicianService.findMany).toHaveBeenCalledWith({ where: expect.objectContaining({ technician: { isActive: true, user: { status: 'ACTIVE' }, serviceModes: { has: 'HOME' } } }) });
+    expect(technicianService.findMany).toHaveBeenCalledWith({ where: expect.objectContaining({ technician: { isActive: true, isVerified: true, user: { status: 'ACTIVE' }, serviceModes: { has: 'HOME' } } }) });
   });
 
   it('rejects a time range already booked', async () => {

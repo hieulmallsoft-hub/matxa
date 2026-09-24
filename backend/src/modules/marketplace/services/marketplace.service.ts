@@ -32,12 +32,13 @@ export class MarketplaceService {
       throw new BadRequestException('Can gui ca latitude va longitude');
     }
     const hasLocation = query.latitude !== undefined && query.longitude !== undefined;
+    if (query.sort === 'distance' && !hasLocation) throw new BadRequestException('Sap xep khoang cach can latitude va longitude');
     if (hasLocation && (!Number.isFinite(query.latitude) || !Number.isFinite(query.longitude) || Math.abs(query.latitude!) > 90 || Math.abs(query.longitude!) > 180)) {
       throw new BadRequestException('Toa do khong hop le');
     }
     const keyword = (query.search ?? query.keyword)?.trim();
     const tags = [...new Set([...(query.tags ?? []), ...(query.tag ? [query.tag] : [])].map((tag) => tag.trim()).filter(Boolean))];
-    const conditions = [Prisma.sql`p.is_active = true`, Prisma.sql`u.status = 'ACTIVE'`];
+    const conditions = [Prisma.sql`p.is_active = true`, Prisma.sql`p.is_verified = true`, Prisma.sql`u.status = 'ACTIVE'`];
     if (keyword) {
       // Escape LIKE wildcards so search text remains literal, and bind it as a parameter.
       const pattern = `%${keyword.replace(/[\\%_]/g, '\\$&')}%`;
@@ -60,7 +61,9 @@ export class MarketplaceService {
           + COS(RADIANS(${query.latitude!}::double precision)) * COS(RADIANS(p.latitude::double precision))
           * POWER(SIN(RADIANS(p.longitude::double precision - ${query.longitude!}::double precision) / 2), 2)
         )))) END` : Prisma.sql`NULL::double precision`;
-    const order = hasLocation
+    const order = query.sort === 'rating' ? Prisma.sql`average_rating DESC, is_available DESC, id ASC`
+      : query.sort === 'availability' ? Prisma.sql`is_available DESC, average_rating DESC, id ASC`
+      : hasLocation
       ? Prisma.sql`distance ASC NULLS LAST, is_available DESC, average_rating DESC, id ASC`
       : Prisma.sql`is_available DESC, average_rating DESC, id ASC`;
 
@@ -91,7 +94,7 @@ export class MarketplaceService {
               ...(query.serviceId ? { id: query.serviceId } : {}),
               ...(query.mode ? { modes: { has: query.mode } } : {}),
             },
-            select: { price: true }, orderBy: [{ price: 'asc' }, { id: 'asc' }], take: 1,
+            select: { price: true, modes: true }, orderBy: [{ price: 'asc' }, { id: 'asc' }],
           },
         },
       });
@@ -108,15 +111,22 @@ export class MarketplaceService {
 
   async technicianDetail(id: string, location: MarketplaceHomeQueryDto = {}, userId?: string) {
     if ((location.latitude === undefined) !== (location.longitude === undefined)) throw new BadRequestException('Can gui ca latitude va longitude');
+    if (location.latitude !== undefined && (!Number.isFinite(location.latitude) || !Number.isFinite(location.longitude)
+      || Math.abs(location.latitude) > 90 || Math.abs(location.longitude!) > 180)) throw new BadRequestException('Toa do khong hop le');
     const profile = await this.prisma.technicianProfile.findUnique({
       where: { id, ...publicTechnicianWhere },
-      include: {
+      select: {
+        id: true, userId: true, bio: true, gender: true, tags: true, serviceModes: true,
+        latitude: true, longitude: true, city: true, address: true, isVerified: true,
+        isActive: true, isAvailable: true, averageRating: true, reviewCount: true,
+        createdAt: true, updatedAt: true,
         user: { select: { id: true, displayName: true, avatarUrl: true } },
         services: { where: { isActive: true, category: { isActive: true } }, include: { category: true }, orderBy: { price: 'asc' } },
         reviews: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20 },
       },
     });
     if (!profile) throw new NotFoundException('Ky thuat vien khong ton tai');
+    const supportedModes = [...new Set(profile.services.flatMap((service) => service.modes))];
     const favorite = userId ? await this.prisma.favorite.findUnique({ where: { userId_technicianId: { userId, technicianId: id } }, select: { technicianId: true } }) : null;
     let distanceKm: number | null = null;
     if (location.latitude !== undefined && location.longitude !== undefined && profile.latitude !== null && profile.longitude !== null) {
@@ -128,13 +138,15 @@ export class MarketplaceService {
     }
     return {
       ...profile, ...this.technicianCard(profile, Boolean(favorite), distanceKm),
+      supportedModes,
       images: profile.user.avatarUrl ? [profile.user.avatarUrl] : [],
-      onsiteLocation: profile.serviceModes.includes('ONSITE') ? {
+      onsiteLocation: supportedModes.includes('ONSITE') ? {
         address: profile.address, city: profile.city,
         latitude: profile.latitude === null ? null : Number(profile.latitude),
         longitude: profile.longitude === null ? null : Number(profile.longitude),
       } : null,
-      services: profile.services.map((service) => ({ ...service, serviceId: service.id, technicianServiceId: service.id, price: Number(service.price) })),
+      services: profile.services.map((service) => ({ ...service, serviceId: service.id, technicianServiceId: service.id,
+        categoryName: service.category.name, supportedModes: service.modes, price: Number(service.price) })),
     };
   }
 
@@ -175,7 +187,7 @@ export class MarketplaceService {
       orderBy: { createdAt: 'desc' },
       include: { technician: { include: {
         user: { select: { id: true, displayName: true, avatarUrl: true } },
-        services: { where: { isActive: true, category: { isActive: true } }, select: { price: true }, orderBy: { price: 'asc' }, take: 1 },
+        services: { where: { isActive: true, category: { isActive: true } }, select: { price: true, modes: true }, orderBy: { price: 'asc' } },
       } } },
     });
     return rows.map(({ technician }) => {
@@ -289,11 +301,15 @@ export class MarketplaceService {
   }
 
   private technicianCard(profile: Prisma.TechnicianProfileGetPayload<{ include: {
-    user: { select: { id: true; displayName: true; avatarUrl: true } }; services: { select: { price: true } };
+    user: { select: { id: true; displayName: true; avatarUrl: true } }; services: { select: { price: true; modes: true } };
   } }>, isFavorite: boolean, distanceKm: number | null = null) {
     return { id: profile.id, technicianId: profile.id, userId: profile.userId,
       displayName: profile.user.displayName, avatarUrl: profile.user.avatarUrl,
       averageRating: Number(profile.averageRating), reviewCount: profile.reviewCount,
+      rating: Number(profile.averageRating),
+      supportedModes: profile.serviceModes.filter((mode) => profile.services.some((service) => service.modes.includes(mode))),
+      // A card has no chosen services/duration, so it cannot promise a bookable start time.
+      nextAvailableAt: null,
       tags: profile.tags, gender: profile.gender, city: profile.city, serviceModes: profile.serviceModes,
       isVerified: profile.isVerified, isAvailable: profile.isAvailable, isFavorite, distanceKm,
       startingPrice: profile.services[0] ? Number(profile.services[0].price) : null,

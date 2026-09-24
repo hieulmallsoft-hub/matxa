@@ -19,6 +19,17 @@ describe('MarketplaceService', () => {
     await expect(service.searchTechnicians({ latitude: 21, page: 1, limit: 20 })).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('requires coordinates for explicit distance sort', async () => {
+    await expect(service.searchTechnicians({ page: 1, limit: 20, sort: 'distance' })).rejects.toBeInstanceOf(BadRequestException);
+    expect($queryRaw).not.toHaveBeenCalled();
+  });
+
+  it.each(['rating', 'availability'] as const)('supports explicit %s sorting with stable ties', async sort => {
+    await service.searchTechnicians({ page: 1, limit: 20, sort });
+    expect($queryRaw.mock.calls[0][0].text).toContain(sort === 'rating'
+      ? 'average_rating DESC, is_available DESC, id ASC' : 'is_available DESC, average_rating DESC, id ASC');
+  });
+
   it('sorts technicians by distance from the customer', async () => {
     $queryRaw.mockResolvedValue([{ total: 2n, ranked: [{ id: 'near', distance: 1.112 }, { id: 'far', distance: 22.24 }] }]);
     technicianProfile.findMany.mockResolvedValue([
@@ -46,6 +57,7 @@ describe('MarketplaceService', () => {
     expect(sql.values).toContain(false);
     expect(sql.values).toContain('massage');
     expect(sql.text).toContain('p.is_active = true');
+    expect(sql.text).toContain('p.is_verified = true');
     expect(sql.text).toContain("u.status = 'ACTIVE'");
     expect(sql.text).toContain('s.is_active = true');
     expect(sql.text).toContain('c.is_active = true');
@@ -56,14 +68,14 @@ describe('MarketplaceService', () => {
   it('scopes favorites to the authenticated user and orders matching services by price', async () => {
     $queryRaw.mockResolvedValue([{ total: 1n, ranked: [{ id: 't1', distance: null }] }]);
     technicianProfile.findMany.mockResolvedValue([{ id: 't1', userId: 'u1', user: { displayName: 'Name', avatarUrl: null },
-      gender: null, tags: [], serviceModes: ['HOME'], isVerified: false, isAvailable: true, averageRating: 4,
-      reviewCount: 2, city: null, services: [{ price: '150000' }] }]);
+      gender: null, tags: [], serviceModes: ['HOME'], isVerified: true, isAvailable: true, averageRating: 4,
+      reviewCount: 2, city: null, services: [{ price: '150000', modes: ['HOME'] }] }]);
     favorite.findMany.mockResolvedValue([{ technicianId: 't1' }]);
     const result = await service.searchTechnicians({ page: 1, limit: 20, mode: 'HOME' }, 'customer');
-    expect(result.items[0]).toMatchObject({ id: 't1', technicianId: 't1', isFavorite: true, startingPrice: 150000, distanceKm: null });
+    expect(result.items[0]).toMatchObject({ id: 't1', technicianId: 't1', isFavorite: true, startingPrice: 150000, distanceKm: null, rating: 4, supportedModes: ['HOME'], nextAvailableAt: null });
     expect(favorite.findMany).toHaveBeenCalledWith({ where: { userId: 'customer', technicianId: { in: ['t1'] } }, select: { technicianId: true } });
     expect(technicianProfile.findMany.mock.calls[0][0].include.services).toMatchObject({
-      where: { isActive: true, category: { isActive: true }, modes: { has: 'HOME' } }, orderBy: [{ price: 'asc' }, { id: 'asc' }], take: 1,
+      where: { isActive: true, category: { isActive: true }, modes: { has: 'HOME' } }, orderBy: [{ price: 'asc' }, { id: 'asc' }], select: { price: true, modes: true },
     });
   });
 

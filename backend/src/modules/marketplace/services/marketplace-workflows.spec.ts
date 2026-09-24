@@ -14,7 +14,7 @@ describe('Technician detail, favorites, availability and address workflows', () 
   const service = new MarketplaceService(prisma as never);
   const profile = () => ({
     id: 't1', userId: 'tech-user', bio: 'Experience', user: { id: 'tech-user', displayName: 'Lan', avatarUrl: 'https://example.com/avatar.jpg' },
-    averageRating: '4.50', reviewCount: 21, tags: ['yoga'], serviceModes: ['HOME', 'ONSITE'], isVerified: false,
+    averageRating: '4.50', reviewCount: 21, tags: ['yoga'], serviceModes: ['HOME', 'ONSITE'], isVerified: true,
     isActive: true, isAvailable: true, gender: 'FEMALE', city: 'HCM', address: 'Studio', latitude: '10', longitude: '106',
     services: [{ id: 's1', price: '150000.00', durationMinutes: 60, modes: ['HOME', 'ONSITE'], category: { id: 'c1', isActive: true } }],
     reviews: [],
@@ -33,7 +33,7 @@ describe('Technician detail, favorites, availability and address workflows', () 
       onsiteLocation: { address: 'Studio', latitude: 10, longitude: 106 },
       services: [{ id: 's1', serviceId: 's1', technicianServiceId: 's1', price: 150000, durationMinutes: 60 }] });
     expect(technicianProfile.findUnique.mock.calls[0][0]).toMatchObject({
-      where: { id: 't1', ...publicTechnicianWhere }, include: {
+      where: { id: 't1', ...publicTechnicianWhere }, select: {
         user: { select: { id: true, displayName: true, avatarUrl: true } },
         services: { where: { isActive: true, category: { isActive: true } } },
         reviews: { take: 20, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
@@ -44,7 +44,7 @@ describe('Technician detail, favorites, availability and address workflows', () 
   });
 
   it('allows guest detail; missing avatar/location return empty/null', async () => {
-    technicianProfile.findUnique.mockResolvedValue({ ...profile(), latitude: null, user: { id: 'tech-user', displayName: null, avatarUrl: null }, serviceModes: ['HOME'] });
+    technicianProfile.findUnique.mockResolvedValue({ ...profile(), latitude: null, user: { id: 'tech-user', displayName: null, avatarUrl: null }, serviceModes: ['HOME'], services: [{ ...profile().services[0], modes: ['HOME'] }] });
     const result = await service.technicianDetail('t1', { latitude: 10, longitude: 106 });
     expect(result).toMatchObject({ images: [], onsiteLocation: null, distanceKm: null, isFavorite: false });
     expect(favorite.findUnique).not.toHaveBeenCalled();
