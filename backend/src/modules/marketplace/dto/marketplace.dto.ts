@@ -37,6 +37,9 @@ export class AvailabilityQueryDto {
   @ApiPropertyOptional({ type: [String], description: 'TechnicianService IDs, comma-separated or repeated. Required for computed slots.' })
   @IsOptional() @Transform(({ value }) => typeof value === 'string' ? value.split(',').map((id) => id.trim()) : value)
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10) @IsUUID('4', { each: true }) serviceIds?: string[];
+  @ApiPropertyOptional({ type: [String], description: 'Preferred alias of serviceIds. These are TechnicianService IDs used by booking. Do not send both fields.' })
+  @IsOptional() @Transform(({ value }) => typeof value === 'string' ? value.split(',').map((id) => id.trim()) : value)
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10) @IsUUID('4', { each: true }) technicianServiceIds?: string[];
   @ApiPropertyOptional({ enum: ['HOME', 'ONSITE', 'ONLINE'] })
   @IsOptional() @IsIn(['HOME', 'ONSITE', 'ONLINE']) mode?: 'HOME' | 'ONSITE' | 'ONLINE';
   @ApiPropertyOptional({ default: 30, minimum: 5, maximum: 120, description: 'Grid anchored to working interval start' })

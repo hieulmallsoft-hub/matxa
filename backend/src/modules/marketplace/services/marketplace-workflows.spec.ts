@@ -79,8 +79,8 @@ describe('Technician detail, favorites, availability and address workflows', () 
     availabilitySlot.findMany.mockResolvedValue([{ id: 'w1', startAt, endAt }]);
     technicianService.findMany.mockResolvedValue([{ id: 's1', durationMinutes: 60, modes: ['HOME'] }]);
     booking.findMany.mockResolvedValue([{ scheduledStart: new Date('2099-10-01T09:00:00+07:00'), scheduledEnd: new Date('2099-10-01T10:00:00+07:00') }]);
-    const result = await service.availability('t1', { date: '2099-10-01', serviceIds: ['s1', 's1'], mode: 'HOME', stepMinutes: 30 });
-    expect(result).toMatchObject({ durationMinutes: 60, timezone: 'Asia/Ho_Chi_Minh', serviceIds: ['s1'] });
+    const result = await service.availability('t1', { date: '2099-10-01', technicianServiceIds: ['s1', 's1'], mode: 'HOME', stepMinutes: 30 });
+    expect(result).toMatchObject({ date: '2099-10-01', durationMinutes: 60, totalDurationMinutes: 60, timezone: 'Asia/Ho_Chi_Minh', serviceIds: ['s1'], technicianServiceIds: ['s1'] });
     if (!Array.isArray(result)) expect(result.slots).toHaveLength(4);
     expect(booking.findMany).toHaveBeenCalledTimes(1);
     expect(booking.findMany.mock.calls[0][0].where).toMatchObject({ technicianId: 't1', status: { in: ['PENDING', 'CONFIRMED'] },
@@ -89,6 +89,28 @@ describe('Technician detail, favorites, availability and address workflows', () 
     expect(legacy).toEqual([{ id: 'w1', startAt, endAt }]);
     expect(booking.findMany).toHaveBeenCalledTimes(1);
     await expect(service.availability('t1', { date: '2099-10-01', serviceIds: ['s1'], stepMinutes: 30 })).rejects.toThrow('mode');
+    await expect(service.availability('t1', { date: '2099-10-01', serviceIds: ['s1'], technicianServiceIds: ['s1'], mode: 'HOME', stepMinutes: 30 })).rejects.toThrow('serviceIds');
+  });
+
+  it('sums multiple service durations and only queries pending/confirmed bookings', async () => {
+    const startAt = new Date('2099-10-01T08:00:00+07:00');
+    const endAt = new Date('2099-10-01T12:00:00+07:00');
+    availabilitySlot.findMany.mockResolvedValue([{ id: 'w1', startAt, endAt }]);
+    technicianService.findMany.mockResolvedValue([
+      { id: 's1', durationMinutes: 60, modes: ['HOME'] },
+      { id: 's2', durationMinutes: 60, modes: ['HOME'] },
+    ]);
+    booking.findMany.mockResolvedValue([]);
+    const result = await service.availability('t1', { date: '2099-10-01', technicianServiceIds: ['s1', 's2'], mode: 'HOME', stepMinutes: 30 });
+    if (Array.isArray(result)) throw new Error('Expected computed availability');
+    expect(result.totalDurationMinutes).toBe(120);
+    expect(result.slots.map((slot) => slot.startAt.toISOString())).toEqual([
+      '2099-10-01T01:00:00.000Z', '2099-10-01T01:30:00.000Z', '2099-10-01T02:00:00.000Z',
+      '2099-10-01T02:30:00.000Z', '2099-10-01T03:00:00.000Z',
+    ]);
+    expect(booking.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
+      status: { in: ['PENDING', 'CONFIRMED'] },
+    }) }));
   });
 
   it('serializes creation of defaults using a per-user row lock', async () => {

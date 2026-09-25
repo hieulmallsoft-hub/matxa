@@ -12,6 +12,15 @@ describe('Available start slots', () => {
     expect(slots.every((slot) => +slot.endAt - +slot.startAt === 3600000)).toBe(true);
   });
 
+  it('rejects a candidate that contains a booking, and a booking that contains a candidate', () => {
+    const work = [interval('08:00', '12:00')];
+    // 08:00-10:00 contains 09:00-09:30; 09:00-10:00 is contained in 08:30-10:30.
+    expect(starts(buildAvailableSlots(work, [interval('09:00', '09:30')], 120, range, at('07:00'), 30)))
+      .not.toContain(at('08:00').toISOString());
+    expect(starts(buildAvailableSlots(work, [interval('08:30', '10:30')], 60, range, at('07:00'), 30)))
+      .not.toContain(at('09:00').toISOString());
+  });
+
   it('does not bridge separate adjacent working intervals', () => {
     const slots = buildAvailableSlots([interval('08:00', '09:00'), interval('09:00', '10:00')], [], 90, range, at('07:00'), 30);
     expect(slots).toEqual([]);

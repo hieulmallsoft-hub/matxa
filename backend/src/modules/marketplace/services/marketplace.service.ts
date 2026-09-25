@@ -153,7 +153,11 @@ export class MarketplaceService {
   async availability(id: string, query: AvailabilityQueryDto) {
     const { start, end } = availabilityRange(query);
     await this.requireTechnician(id);
-    if (!query.serviceIds) {
+    if (query.serviceIds && query.technicianServiceIds) {
+      throw new BadRequestException('Chi gui serviceIds hoac technicianServiceIds');
+    }
+    const selectedServiceIds = query.technicianServiceIds ?? query.serviceIds;
+    if (!selectedServiceIds) {
       if (query.mode || query.date) throw new BadRequestException('Can serviceIds va mode de lay slot trong');
       // Preserve the existing from/to-only working-schedule contract.
       return this.prisma.availabilitySlot.findMany({
@@ -162,7 +166,7 @@ export class MarketplaceService {
       });
     }
     if (!query.mode) throw new BadRequestException('Can mode de lay slot trong');
-    const services = await loadBookableServices(this.prisma, id, query.serviceIds, query.mode);
+    const services = await loadBookableServices(this.prisma, id, selectedServiceIds, query.mode);
     const durationMinutes = services.reduce((sum, service) => sum + service.durationMinutes, 0);
     const [working, occupied] = await Promise.all([
       this.prisma.availabilitySlot.findMany({
@@ -174,8 +178,9 @@ export class MarketplaceService {
         select: { scheduledStart: true, scheduledEnd: true }, orderBy: { scheduledStart: 'asc' },
       }),
     ]);
-    return { technicianId: id, serviceIds: services.map((service) => service.id), mode: query.mode,
-      timezone: BOOKING_TIMEZONE, from: start, to: end, durationMinutes, stepMinutes: query.stepMinutes,
+    const technicianServiceIds = services.map((service) => service.id);
+    return { technicianId: id, date: query.date ?? null, serviceIds: technicianServiceIds, technicianServiceIds, mode: query.mode,
+      timezone: BOOKING_TIMEZONE, from: start, to: end, durationMinutes, totalDurationMinutes: durationMinutes, stepMinutes: query.stepMinutes,
       slots: buildAvailableSlots(working, occupied.map((booking) => ({ startAt: booking.scheduledStart, endAt: booking.scheduledEnd })),
         durationMinutes, { startAt: start, endAt: end }, new Date(), query.stepMinutes),
     };
