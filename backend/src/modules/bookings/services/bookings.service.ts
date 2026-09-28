@@ -20,6 +20,7 @@ export class BookingsService {
     const scheduledStart = new Date(dto.scheduledStart);
     const scheduledEnd = new Date(scheduledStart.getTime() + durationMinutes * 60_000);
     if (!Number.isFinite(scheduledStart.getTime()) || scheduledStart <= new Date()) throw new BadRequestException('Thoi gian dat lich phai o tuong lai');
+    if (dto.mode !== 'HOME' && dto.addressId) throw new BadRequestException('Chi gui addressId khi dat tai nha');
     const slot = await db.availabilitySlot.findFirst({
       where: { technicianId: dto.technicianId, isAvailable: true, startAt: { lte: scheduledStart }, endAt: { gte: scheduledEnd } },
     });
@@ -42,23 +43,32 @@ export class BookingsService {
     const serviceFee = dto.mode === 'HOME' ? Number(this.config.get('HOME_SERVICE_FEE', 100000)) : 0;
     if (!Number.isFinite(serviceFee) || serviceFee < 0) throw new BadRequestException('Phi dich vu chua duoc cau hinh hop le');
     const promotion = dto.promotionCode ? await this.validPromotion(userId, dto.promotionCode, subtotal, db) : null;
-    const discountAmount = promotion ? this.discount(promotion, subtotal) : 0;
+    // A promotion is validated against the service subtotal, but its discount can
+    // never make the payable amount negative (including the HOME service fee).
+    const discountAmount = promotion ? this.discount(promotion, subtotal, serviceFee) : 0;
+    const totalAmount = Prisma.Decimal.max(0, new Prisma.Decimal(subtotal).plus(serviceFee).minus(discountAmount)).toNumber();
     return {
       technicianId: dto.technicianId,
+      technicianServiceIds: services.map((item) => item.id),
       services: services.map((item) => ({ id: item.id, serviceId: item.id, technicianServiceId: item.id, name: item.name, durationMinutes: item.durationMinutes, price: Number(item.price) })),
       mode: dto.mode,
       scheduledStart,
       scheduledEnd,
       durationMinutes,
       totalDuration: durationMinutes,
+      totalDurationMinutes: durationMinutes,
       startAt: scheduledStart, endAt: scheduledEnd, serviceMode: dto.mode,
       addressSnapshot,
       subtotal,
       serviceFee,
+      homeServiceFee: serviceFee,
       promotionId: promotion?.id ?? null,
       promotionCode: promotion?.code ?? null,
       discountAmount,
-      totalAmount: Prisma.Decimal.max(0, new Prisma.Decimal(subtotal).plus(serviceFee).minus(discountAmount)).toNumber(),
+      discount: discountAmount,
+      promotion: promotion ? { id: promotion.id, code: promotion.code, discount: discountAmount } : null,
+      totalAmount,
+      total: totalAmount,
     };
   }
 
@@ -114,7 +124,7 @@ export class BookingsService {
   async listMine(userId: string) {
     const bookings = await this.prisma.booking.findMany({
       where: { OR: [{ customerId: userId }, { technician: { userId } }] },
-      include: { items: true, payment: true, customer: { select: { id: true, displayName: true, avatarUrl: true } }, technician: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } }, review: true },
+      include: { items: true, payment: true, address: true, customer: { select: { id: true, displayName: true, avatarUrl: true } }, technician: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } }, review: true },
       orderBy: { scheduledStart: 'desc' },
     });
     return bookings.map((booking) => this.withHistoricalAddress(booking));
@@ -191,9 +201,25 @@ export class BookingsService {
     }
   }
 
-  private withHistoricalAddress<T extends { addressSnapshot: Prisma.JsonValue; mode: string }>(booking: T) {
-    // Never read mutable Address data for historical HOME bookings, including after soft deletion.
-    return { ...booking, address: booking.mode === 'HOME' ? booking.addressSnapshot : null };
+  private withHistoricalAddress<T extends {
+    addressSnapshot: Prisma.JsonValue;
+    mode: string;
+    address?: { id: string; address: string; latitude: unknown; longitude: unknown; label: string | null } | null;
+  }>(booking: T) {
+    if (booking.mode !== 'HOME') return { ...booking, address: null };
+    // A snapshot is immutable history. The live relation is used only for legacy rows created
+    // before address_snapshot existed, and is projected to the same safe public shape.
+    if (booking.addressSnapshot && typeof booking.addressSnapshot === 'object' && !Array.isArray(booking.addressSnapshot)) {
+      return { ...booking, address: booking.addressSnapshot };
+    }
+    const legacy = booking.address;
+    return {
+      ...booking,
+      address: legacy ? {
+        id: legacy.id, addressText: legacy.address, address: legacy.address,
+        latitude: Number(legacy.latitude), longitude: Number(legacy.longitude), label: legacy.label,
+      } : null,
+    };
   }
 
   private async validPromotion(userId: string, code: string, subtotal: number, db: Prisma.TransactionClient) {
@@ -206,10 +232,10 @@ export class BookingsService {
     return promotion;
   }
 
-  private discount(promotion: { type: string; value: unknown; maxDiscount: unknown }, subtotal: number) {
+  private discount(promotion: { type: string; value: unknown; maxDiscount: unknown }, subtotal: number, serviceFee: number) {
     let value = promotion.type === 'PERCENT' ? subtotal * Number(promotion.value) / 100 : Number(promotion.value);
     if (promotion.maxDiscount !== null) value = Math.min(value, Number(promotion.maxDiscount));
-    return Math.min(subtotal, Math.max(0, Math.round(value)));
+    return Math.min(subtotal + serviceFee, Math.max(0, Math.round(value)));
   }
 
   private async notifyBookingCreated(customerId: string, technicianUserId: string, bookingId: string) {

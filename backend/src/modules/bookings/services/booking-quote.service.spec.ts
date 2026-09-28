@@ -32,8 +32,9 @@ describe('Quote and create share pricing/validation; address snapshots are immut
 
   it('quotes without reserving or mutating, using backend amounts and durations', async () => {
     const result = await service.quote('customer', { ...dto(), totalAmount: 1, price: 1 } as QuoteBookingDto);
-    expect(result).toMatchObject({ subtotal: 500000, serviceFee: 100000, totalAmount: 600000, durationMinutes: 60,
-      totalDuration: 60, serviceMode: 'HOME', services: [{ id: 's1', serviceId: 's1', technicianServiceId: 's1', price: 500000 }] });
+    expect(result).toMatchObject({ subtotal: 500000, serviceFee: 100000, homeServiceFee: 100000, totalAmount: 600000, total: 600000,
+      discount: 0, durationMinutes: 60, totalDuration: 60, totalDurationMinutes: 60, technicianServiceIds: ['s1'],
+      serviceMode: 'HOME', services: [{ id: 's1', serviceId: 's1', technicianServiceId: 's1', price: 500000 }] });
     expect(+result.endAt - +result.startAt).toBe(3600000);
     expect(result.addressSnapshot).toMatchObject({ addressText: 'Original street', latitude: 10, longitude: 106 });
     expect(db.booking.create).not.toHaveBeenCalled();
@@ -60,11 +61,16 @@ describe('Quote and create share pricing/validation; address snapshots are immut
   });
 
   it.each(['ONSITE', 'ONLINE'] as const)('does not attach a customer address for %s', async (mode) => {
-    const input = { ...dto(), mode };
+    const { addressId: _addressId, ...input } = { ...dto(), mode };
     expect(await service.quote('customer', input)).toMatchObject({ serviceFee: 0, addressSnapshot: null });
     await service.create('customer', { ...input, paymentMethod: 'CASH' });
     expect(db.address.findFirst).not.toHaveBeenCalled();
     expect(db.booking.create.mock.calls[0][0].data.addressId).toBeNull();
+  });
+
+  it.each(['ONSITE', 'ONLINE'] as const)('rejects addressId for %s instead of silently ignoring it', async (mode) => {
+    await expect(service.quote('customer', { ...dto(), mode })).rejects.toThrow('Chi gui addressId');
+    expect(db.address.findFirst).not.toHaveBeenCalled();
   });
 
   it('rejects a missing, foreign or soft-deleted HOME address', async () => {
@@ -72,6 +78,16 @@ describe('Quote and create share pricing/validation; address snapshots are immut
     db.address.findFirst.mockResolvedValue(null);
     await expect(service.quote('customer', dto())).rejects.toThrow('Dia chi khong hop le');
     expect(db.address.findFirst.mock.calls[0][0].where).toEqual({ id: 'a1', userId: 'customer', deletedAt: null });
+  });
+
+  it('uses a safe live-address fallback only for legacy HOME bookings without snapshots', async () => {
+    const legacy = { id: 'legacy', customerId: 'customer', mode: 'HOME', addressSnapshot: null,
+      address: { ...originalAddress, userId: 'customer', deletedAt: new Date() }, technician: { userId: 'tech' } };
+    db.booking.findUnique.mockResolvedValue(legacy);
+    const result = await service.detail('customer', 'legacy');
+    expect(result.address).toEqual({ id: 'a1', addressText: 'Original street', address: 'Original street', latitude: 10, longitude: 106, label: 'Home' });
+    expect(result.address).not.toHaveProperty('userId');
+    expect(result.address).not.toHaveProperty('deletedAt');
   });
 
   it('rejects mismatched services/modes, past starts, unavailable windows and overlaps', async () => {
@@ -89,7 +105,8 @@ describe('Quote and create share pricing/validation; address snapshots are immut
 
   it('sums services once and avoids floating-point subtotal errors', async () => {
     db.technicianService.findMany.mockResolvedValue([{ id: 's2', price: 0.2, durationMinutes: 30, modes: ['ONSITE'] }, { id: 's1', price: 0.1, durationMinutes: 60, modes: ['ONSITE'] }]);
-    const result = await service.quote('customer', { ...dto(), mode: 'ONSITE', serviceIds: ['s1', 's2', 's1'] });
+    const { addressId: _addressId, ...onsite } = { ...dto(), mode: 'ONSITE' as const, serviceIds: ['s1', 's2', 's1'] };
+    const result = await service.quote('customer', onsite);
     expect(result.subtotal).toBe(0.3);
     expect(result.durationMinutes).toBe(90);
     expect(result.services.map((item) => item.id)).toEqual(['s1', 's2']);
@@ -107,5 +124,13 @@ describe('Quote and create share pricing/validation; address snapshots are immut
     await expect(service.quote('customer', { ...dto(), promotionCode: 'EXPIRED' })).rejects.toThrow('het han');
     db.promotion.findFirst.mockResolvedValueOnce({ ...promo, minOrderAmount: 1000000 });
     await expect(service.quote('customer', { ...dto(), promotionCode: 'SALE' })).rejects.toThrow('toi thieu');
+  });
+
+  it('supports fixed promotions and caps any discount at the full payable amount', async () => {
+    db.promotion.findFirst.mockResolvedValue({ id: 'promo', code: 'FREE', type: 'FIXED', value: 9999999,
+      minOrderAmount: 0, maxDiscount: null, perUserLimit: 1, usageLimit: null, usedCount: 0 });
+    const result = await service.quote('customer', { ...dto(), promotionCode: 'FREE' });
+    expect(result).toMatchObject({ discountAmount: 600000, discount: 600000, totalAmount: 0, total: 0,
+      promotion: { id: 'promo', code: 'FREE', discount: 600000 } });
   });
 });
