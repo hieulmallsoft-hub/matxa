@@ -8,9 +8,9 @@ export class RegisterDeviceTokenDto {
   @MaxLength(4096)
   token!: string;
 
-  @ApiProperty({ enum: ['ANDROID', 'IOS'], default: 'ANDROID' })
-  @IsIn(['ANDROID', 'IOS'])
-  platform: 'ANDROID' | 'IOS' = 'ANDROID';
+  @ApiProperty({ enum: ['ANDROID', 'IOS', 'WEB'], default: 'ANDROID' })
+  @IsIn(['ANDROID', 'IOS', 'WEB'])
+  platform: 'ANDROID' | 'IOS' | 'WEB' = 'ANDROID';
 
   @ApiPropertyOptional({ description: 'Ma thiet bi do ung dung mobile tao' })
   @IsOptional()

@@ -62,6 +62,24 @@ describe('BookingsService', () => {
     expect(booking.update).not.toHaveBeenCalled();
   });
 
+  it('stores a structured cancellation reason and notifies the other party', async () => {
+    booking.findUnique.mockResolvedValue(existing('PENDING'));
+    user.findUnique.mockResolvedValue({ role: 'CUSTOMER' });
+    booking.update.mockResolvedValue({ id: 'b1', status: 'CANCELLED' });
+    await expect(service.cancel('customer', 'b1', { reasonCode: 'OTHER', reasonText: 'Đổi lịch cá nhân' })).resolves.toEqual({ id: 'b1', status: 'CANCELLED' });
+    expect(booking.update).toHaveBeenCalledWith({ where: { id: 'b1', status: 'PENDING' }, data: expect.objectContaining({
+      status: 'CANCELLED', cancellationReasonCode: 'OTHER', cancellationReasonText: 'Đổi lịch cá nhân', cancelledByUserId: 'customer', cancelledByRole: 'CUSTOMER',
+    }) });
+    expect(notifications.create).toHaveBeenCalledWith('tech', 'BOOKING_CANCELLED', expect.any(String), expect.any(String), 'matxa://bookings/b1');
+  });
+
+  it('requires text for the OTHER cancellation reason', async () => {
+    booking.findUnique.mockResolvedValue(existing('CONFIRMED'));
+    user.findUnique.mockResolvedValue({ role: 'CUSTOMER' });
+    await expect(service.cancel('customer', 'b1', { reasonCode: 'OTHER' })).rejects.toThrow('ly do khac');
+    expect(booking.update).not.toHaveBeenCalled();
+  });
+
   it('rejects online payment before creating a booking', async () => {
     await expect(service.create('customer', { paymentMethod: 'ONLINE' } as never)).rejects.toThrow('online');
     expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -90,7 +108,10 @@ describe('BookingsService', () => {
     booking.findFirst.mockResolvedValue(existing('COMPLETED'));
     review.create.mockRejectedValueOnce({ code: 'P2034' }).mockResolvedValue({ id: 'review' });
     review.aggregate.mockResolvedValue({ _avg: { rating: 4.5 }, _count: 2 });
-    await expect(service.review('customer', 'b1', { rating: 5 })).resolves.toEqual({ id: 'review' });
+    await expect(service.review('customer', 'b1', { rating: 5 })).resolves.toMatchObject({
+      id: 'review', bookingId: 'b1', rating: 5,
+      technician: { technicianId: 't1', averageRating: 4.5, reviewCount: 2 },
+    });
     expect(prisma.$transaction).toHaveBeenCalledTimes(2);
     expect(prisma.$transaction).toHaveBeenLastCalledWith(expect.any(Function), { isolationLevel: 'Serializable' });
     expect(technicianProfile.update).toHaveBeenCalledWith({ where: { id: 't1' }, data: { averageRating: 4.5, reviewCount: 2 } });

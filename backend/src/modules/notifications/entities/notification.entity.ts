@@ -20,7 +20,7 @@ export class NotificationListResponse {
 
 export class DeviceTokenResponse {
   @ApiProperty() id!: string;
-  @ApiProperty({ enum: ['ANDROID', 'IOS'] }) platform!: string;
+  @ApiProperty({ enum: ['ANDROID', 'IOS', 'WEB'] }) platform!: string;
   @ApiPropertyOptional() deviceId?: string;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() lastSeenAt!: Date;

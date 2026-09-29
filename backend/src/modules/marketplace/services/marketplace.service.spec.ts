@@ -4,9 +4,12 @@ import { MarketplaceService } from './marketplace.service';
 describe('MarketplaceService', () => {
   const technicianProfile = { findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn() };
   const favorite = { findMany: jest.fn(), upsert: jest.fn(), deleteMany: jest.fn() };
+  const promotion = { findMany: jest.fn(), count: jest.fn() };
   const $queryRaw = jest.fn();
-  const tx = { technicianProfile, favorite, $queryRaw };
-  const prisma = { ...tx, $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) };
+  const tx = { technicianProfile, favorite, promotion, $queryRaw };
+  const prisma = { ...tx, $transaction: jest.fn(async (operation: unknown) => Array.isArray(operation)
+    ? Promise.all(operation)
+    : (operation as (client: typeof tx) => unknown)(tx)) };
   const service = new MarketplaceService(prisma as never);
 
   beforeEach(() => {
@@ -17,6 +20,19 @@ describe('MarketplaceService', () => {
 
   it('requires latitude and longitude together', async () => {
     await expect(service.searchTechnicians({ latitude: 21, page: 1, limit: 20 })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('lists only active promotions and derives per-user usage status', async () => {
+    promotion.findMany.mockResolvedValue([{
+      id: 'p1', code: 'WELCOME50', name: 'Welcome', type: 'FIXED', value: '50000',
+      minOrderAmount: '300000', maxDiscount: null, usageLimit: 10, usedCount: 2,
+      perUserLimit: 1, startsAt: new Date(), endsAt: new Date(), isActive: true,
+      usages: [{ id: 'usage-1' }],
+    }]);
+    promotion.count.mockResolvedValue(1);
+    const result = await service.promotions('user-1', { page: 1, limit: 20 });
+    expect(result.items[0]).toMatchObject({ code: 'WELCOME50', value: 50000, minOrderAmount: 300000, availabilityStatus: 'USAGE_EXHAUSTED', isEligible: false, ineligibilityReason: 'USAGE_EXHAUSTED' });
+    expect(promotion.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ isActive: true }), skip: 0, take: 20 }));
   });
 
   it('requires coordinates for explicit distance sort', async () => {

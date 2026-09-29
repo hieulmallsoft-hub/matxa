@@ -53,6 +53,13 @@ enum BookingStatus {
   CANCELLED
 }
 
+enum CancellationReasonCode {
+  NO_LONGER_NEEDED
+  SERVICE_ISSUE
+  PAYMENT_REFUND_ISSUE
+  OTHER
+}
+
 enum PaymentMethod {
   CASH
   ONLINE
@@ -248,6 +255,10 @@ model Booking {
   note            String?
   cancelledAt     DateTime?         @map("cancelled_at")
   cancellationReason String?        @map("cancellation_reason")
+  cancellationReasonCode CancellationReasonCode? @map("cancellation_reason_code")
+  cancellationReasonText String? @map("cancellation_reason_text")
+  cancelledByUserId String? @map("cancelled_by_user_id") @db.Uuid
+  cancelledByRole UserRole? @map("cancelled_by_role")
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
   customer        User              @relation("BookingCustomer", fields: [customerId], references: [id])

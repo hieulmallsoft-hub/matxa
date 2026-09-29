@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { App } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 import { PrismaService } from '../../../database/prisma.service';
@@ -9,6 +9,7 @@ import { TestPushDto } from '../dto/test-push.dto';
 
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
   constructor(
     private readonly prisma: PrismaService,
     @Inject(FIREBASE_ADMIN) private readonly firebaseApp: App,
@@ -41,12 +42,18 @@ export class NotificationsService {
     if (devices.length === 0) return { deviceCount: 0, successCount: 0, failureCount: 0 };
 
     const tokens = devices.map((device) => device.token);
-    const response = await getMessaging(this.firebaseApp).sendEachForMulticast({
-      tokens,
-      notification: { title, body },
-      data,
-      android: { priority: 'high', notification: { channelId: 'matxa_notifications' } },
-    });
+    let response;
+    try {
+      response = await getMessaging(this.firebaseApp).sendEachForMulticast({
+        tokens,
+        notification: { title, body },
+        data,
+        android: { priority: 'high', notification: { channelId: 'matxa_notifications' } },
+      });
+    } catch (error) {
+      this.logger.error(`FCM multicast failed for ${tokens.length} device(s)`, error instanceof Error ? error.stack : undefined);
+      return { deviceCount: tokens.length, successCount: 0, failureCount: tokens.length };
+    }
     const invalidTokens = response.responses.flatMap((item, index) => {
       const code = item.error?.code;
       return code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token'

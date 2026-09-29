@@ -127,6 +127,8 @@ export class AdminPageDto {
   @ApiPropertyOptional({ default: 20, maximum: 100 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit = 20;
 }
 
+export class PromotionListQueryDto extends AdminPageDto {}
+
 export class AdminUsersQueryDto extends AdminPageDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) search?: string;
   @ApiPropertyOptional({ enum: ['CUSTOMER', 'TECHNICIAN', 'ADMIN'] }) @IsOptional() @IsIn(['CUSTOMER', 'TECHNICIAN', 'ADMIN']) role?: 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN';

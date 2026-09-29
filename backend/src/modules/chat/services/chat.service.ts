@@ -52,20 +52,23 @@ export class ChatService {
         },
       },
     });
-    return Promise.all(memberships.map(async ({ conversation, lastReadAt }) => ({
+    const conversationIds = memberships.map(({ conversation }) => conversation.id);
+    const unreadMessages = conversationIds.length === 0 ? [] : await this.prisma.message.findMany({
+      where: { conversationId: { in: conversationIds }, senderId: { not: userId }, recalledAt: null },
+      select: { conversationId: true, createdAt: true },
+    });
+    const unreadByConversation = new Map<string, number>();
+    for (const membership of memberships) {
+      const count = unreadMessages.filter((message) => message.conversationId === membership.conversation.id && (!membership.lastReadAt || message.createdAt > membership.lastReadAt)).length;
+      unreadByConversation.set(membership.conversation.id, count);
+    }
+    return memberships.map(({ conversation }) => ({
       id: conversation.id,
       participant: conversation.members[0]?.user,
       lastMessage: conversation.messages[0] ?? null,
       lastMessageAt: conversation.lastMessageAt,
-      unreadCount: await this.prisma.message.count({
-        where: {
-          conversationId: conversation.id,
-          senderId: { not: userId },
-          recalledAt: null,
-          ...(lastReadAt ? { createdAt: { gt: lastReadAt } } : {}),
-        },
-      }),
-    })));
+      unreadCount: unreadByConversation.get(conversation.id) ?? 0,
+    }));
   }
 
   async listMessages(userId: string, conversationId: string, query: ListMessagesDto) {

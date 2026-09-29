@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, Matches } from 'class-validator';
 
 export class QuoteBookingDto {
@@ -17,7 +17,11 @@ export class CreateBookingDto extends QuoteBookingDto {
 }
 
 export class CancelBookingDto {
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) reason?: string;
+  @ApiPropertyOptional({ enum: ['NO_LONGER_NEEDED', 'SERVICE_ISSUE', 'PAYMENT_REFUND_ISSUE', 'OTHER'] })
+  @IsOptional() @IsIn(['NO_LONGER_NEEDED', 'SERVICE_ISSUE', 'PAYMENT_REFUND_ISSUE', 'OTHER']) reasonCode?: 'NO_LONGER_NEEDED' | 'SERVICE_ISSUE' | 'PAYMENT_REFUND_ISSUE' | 'OTHER';
+  @ApiPropertyOptional({ description: 'Bắt buộc khi reasonCode=OTHER' }) @IsOptional() @IsString() @MaxLength(500) reasonText?: string;
+  /** Legacy alias retained for existing Mobile clients. */
+  @ApiPropertyOptional({ deprecated: true }) @IsOptional() @IsString() @MaxLength(500) reason?: string;
 }
 
 export class UpdateBookingStatusDto {
@@ -26,7 +30,9 @@ export class UpdateBookingStatusDto {
 
 export class CreateReviewDto {
   @ApiProperty({ minimum: 1, maximum: 5 }) @IsInt() @Min(1) @Max(5) rating!: number;
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) comment?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000)
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  comment?: string;
 }
 
 export class BookingHistoryQueryDto {

@@ -60,6 +60,29 @@ export class MarketplaceHomeResponse {
   @ApiProperty({ type: [TechnicianListItem] }) technicians!: TechnicianListItem[];
 }
 
+export class MobilePromotionResponse {
+  @ApiProperty() id!: string;
+  @ApiProperty() code!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty({ enum: ['PERCENT', 'FIXED'] }) type!: string;
+  @ApiProperty() value!: number;
+  @ApiProperty() minOrderAmount!: number;
+  @ApiProperty({ type: Number, nullable: true }) maxDiscount!: number | null;
+  @ApiProperty() startsAt!: Date;
+  @ApiProperty() endsAt!: Date;
+  @ApiProperty() isActive!: boolean;
+  @ApiProperty({ enum: ['AVAILABLE', 'USAGE_EXHAUSTED'] }) availabilityStatus!: string;
+  @ApiProperty() isEligible!: boolean;
+  @ApiProperty({ type: String, nullable: true }) ineligibilityReason!: string | null;
+}
+
+export class MobilePromotionListResponse {
+  @ApiProperty({ type: [MobilePromotionResponse] }) items!: MobilePromotionResponse[];
+  @ApiProperty() total!: number;
+  @ApiProperty() page!: number;
+  @ApiProperty() limit!: number;
+}
+
 export class PublicTechnicianUser {
   @ApiProperty() id!: string;
   @ApiProperty({ type: String, nullable: true }) displayName!: string | null;

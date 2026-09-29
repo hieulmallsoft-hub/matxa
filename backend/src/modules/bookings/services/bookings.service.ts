@@ -174,9 +174,15 @@ export class BookingsService {
   async cancel(userId: string, id: string, dto: CancelBookingDto) {
     const booking = await this.detail(userId, id, true);
     if (!['PENDING', 'CONFIRMED'].includes(booking.status)) throw new BadRequestException('Lich dat khong the huy');
-    const updated = await this.transition(id, booking.status, { status: 'CANCELLED', cancelledAt: new Date(), cancellationReason: dto.reason });
-    const target = booking.customerId === userId ? booking.technician.userId : booking.customerId;
-    void this.notifyStatus(target, id, 'BOOKING_CANCELLED', 'Lich hen da huy', 'Mot lich hen da duoc huy.');
+    if (dto.reasonCode === 'OTHER' && !dto.reasonText?.trim()) throw new BadRequestException('Vui long nhap ly do khac');
+    const actor = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    const updated = await this.transition(id, booking.status, {
+      status: 'CANCELLED', cancelledAt: new Date(), cancellationReason: dto.reasonText ?? dto.reason,
+      cancellationReasonCode: dto.reasonCode, cancellationReasonText: dto.reasonText,
+      cancelledByUserId: userId, cancelledByRole: actor?.role,
+    });
+    const recipients = actor?.role === 'ADMIN' ? [booking.customerId, booking.technician.userId] : [booking.customerId === userId ? booking.technician.userId : booking.customerId];
+    for (const recipient of recipients) void this.notifyStatus(recipient, id, 'BOOKING_CANCELLED', 'Lich hen da huy', 'Mot lich hen da duoc huy.');
     return updated;
   }
 
@@ -202,10 +208,21 @@ export class BookingsService {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         return await this.prisma.$transaction(async (tx) => {
-      const review = await tx.review.create({ data: { bookingId: id, userId, technicianId: booking.technicianId, rating: dto.rating, comment: dto.comment } });
+      const review = await tx.review.create({ data: { bookingId: id, userId, technicianId: booking.technicianId, rating: dto.rating, comment: dto.comment?.trim() || null } });
       const aggregate = await tx.review.aggregate({ where: { technicianId: booking.technicianId }, _avg: { rating: true }, _count: true });
       await tx.technicianProfile.update({ where: { id: booking.technicianId }, data: { averageRating: aggregate._avg.rating ?? 0, reviewCount: aggregate._count } });
-      return review;
+      return {
+        id: review.id,
+        bookingId: review.bookingId ?? id,
+        rating: review.rating ?? dto.rating,
+        comment: review.comment,
+        createdAt: review.createdAt,
+        technician: {
+          technicianId: booking.technicianId,
+          averageRating: Number(aggregate._avg.rating ?? 0),
+          reviewCount: aggregate._count,
+        },
+      };
         }, { isolationLevel: 'Serializable' });
       } catch (error) {
         const code = (error as { code?: string })?.code;
@@ -219,7 +236,7 @@ export class BookingsService {
   private async transition(
     id: string,
     expectedStatus: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED',
-    data: { status: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'; cancelledAt?: Date; cancellationReason?: string },
+    data: { status: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'; cancelledAt?: Date; cancellationReason?: string; cancellationReasonCode?: 'NO_LONGER_NEEDED' | 'SERVICE_ISSUE' | 'PAYMENT_REFUND_ISSUE' | 'OTHER'; cancellationReasonText?: string; cancelledByUserId?: string; cancelledByRole?: 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN' },
   ) {
     try {
       return await this.prisma.booking.update({ where: { id, status: expectedStatus }, data });
@@ -324,6 +341,19 @@ export class BookingsService {
       paymentMethod: booking.payment?.method ?? null,
       canCancel,
       canReview,
+      review: booking.review ? {
+        id: booking.review.id,
+        bookingId: booking.review.bookingId,
+        rating: booking.review.rating,
+        comment: booking.review.comment,
+        createdAt: booking.review.createdAt,
+      } : null,
+      cancellation: booking.status === 'CANCELLED' ? {
+        reasonCode: booking.cancellationReasonCode ?? null,
+        reasonText: booking.cancellationReasonText ?? booking.cancellationReason ?? null,
+        cancelledAt: booking.cancelledAt ?? null,
+        cancelledBy: booking.cancelledByRole ?? null,
+      } : null,
     };
   }
 

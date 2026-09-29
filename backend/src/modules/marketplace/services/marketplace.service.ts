@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../../../database/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
 import { TechnicianListResponse } from '../entities/marketplace.entity';
-import { AvailabilityQueryDto, CreateAddressDto, CreateAvailabilityDto, CreateTechnicianServiceDto, MarketplaceHomeQueryDto, SearchTechniciansDto, UpdateAddressDto, UpdateTechnicianServiceDto, UpsertTechnicianProfileDto } from '../dto/marketplace.dto';
+import { AvailabilityQueryDto, CreateAddressDto, CreateAvailabilityDto, CreateTechnicianServiceDto, MarketplaceHomeQueryDto, PromotionListQueryDto, SearchTechniciansDto, UpdateAddressDto, UpdateTechnicianServiceDto, UpsertTechnicianProfileDto } from '../dto/marketplace.dto';
 import { loadBookableServices, publicTechnicianWhere } from './technician-selection';
 import { availabilityRange, BOOKING_TIMEZONE, buildAvailableSlots } from './availability-slots';
 
@@ -25,6 +25,22 @@ export class MarketplaceService {
 
   categories() {
     return this.prisma.serviceCategory.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] });
+  }
+
+  async promotions(userId: string, query: PromotionListQueryDto) {
+    const now = new Date();
+    const where = { isActive: true, startsAt: { lte: now }, endsAt: { gte: now } };
+    const [promotions, total] = await this.prisma.$transaction([
+      this.prisma.promotion.findMany({ where, orderBy: [{ endsAt: 'asc' }, { createdAt: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit, include: { usages: { where: { userId }, select: { id: true } } } }),
+      this.prisma.promotion.count({ where }),
+    ]);
+    return {
+      items: promotions.map(({ usages, usedCount, usageLimit, ...promotion }: any) => {
+        const exhausted = (usageLimit !== null && usedCount >= usageLimit) || usages.length >= promotion.perUserLimit;
+        return { ...promotion, value: Number(promotion.value), minOrderAmount: Number(promotion.minOrderAmount), maxDiscount: promotion.maxDiscount === null ? null : Number(promotion.maxDiscount), availabilityStatus: exhausted ? 'USAGE_EXHAUSTED' : 'AVAILABLE', isEligible: !exhausted, ineligibilityReason: exhausted ? 'USAGE_EXHAUSTED' : null };
+      }),
+      total, page: query.page, limit: query.limit,
+    };
   }
 
   async searchTechnicians(query: SearchTechniciansDto, userId?: string): Promise<TechnicianListResponse> {

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
@@ -33,6 +33,7 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Gui push thu den cac thiet bi cua tai khoan hien tai' })
   @ApiCreatedResponse({ type: PushResultResponse })
   testPush(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: TestPushDto) {
+    if (process.env.NODE_ENV === 'production') throw new ForbiddenException('Test push is disabled in production');
     return this.notifications.sendTestPush(auth.sub, dto);
   }
 

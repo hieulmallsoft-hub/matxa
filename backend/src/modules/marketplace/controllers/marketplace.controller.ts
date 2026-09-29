@@ -3,9 +3,9 @@ import { ApiBearerAuth, ApiExtraModels, ApiNoContentResponse, ApiOkResponse, Api
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
-import { AvailabilityQueryDto, CreateAddressDto, CreateAvailabilityDto, CreateTechnicianServiceDto, MarketplaceHomeQueryDto, SearchTechniciansDto, UpdateAddressDto, UpdateTechnicianServiceDto, UpsertTechnicianProfileDto } from '../dto/marketplace.dto';
+import { AvailabilityQueryDto, CreateAddressDto, CreateAvailabilityDto, CreateTechnicianServiceDto, MarketplaceHomeQueryDto, PromotionListQueryDto, SearchTechniciansDto, UpdateAddressDto, UpdateTechnicianServiceDto, UpsertTechnicianProfileDto } from '../dto/marketplace.dto';
 import { MarketplaceService } from '../services/marketplace.service';
-import { ComputedAvailabilityResponse, MarketplaceHomeResponse, TechnicianDetailResponse, TechnicianListItem, TechnicianListResponse, WorkingScheduleResponse } from '../entities/marketplace.entity';
+import { ComputedAvailabilityResponse, MarketplaceHomeResponse, MobilePromotionListResponse, TechnicianDetailResponse, TechnicianListItem, TechnicianListResponse, WorkingScheduleResponse } from '../entities/marketplace.entity';
 import { OptionalAccessTokenGuard } from '../../auth/guards/optional-access-token.guard';
 
 @ApiTags('Marketplace')
@@ -19,6 +19,15 @@ export class MarketplaceController {
   @ApiOperation({ summary: 'Du lieu trang chu: banner, danh muc va ky thuat vien' })
   home(@Query() query: MarketplaceHomeQueryDto, @CurrentAuth() auth?: AccessTokenPayload) {
     return this.marketplace.home(query.latitude, query.longitude, auth?.sub);
+  }
+
+  @Get('promotions')
+  @UseGuards(AccessTokenGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOkResponse({ type: MobilePromotionListResponse })
+  @ApiOperation({ summary: 'Danh sach voucher dang hoat dong cho user hien tai' })
+  promotions(@CurrentAuth() auth: AccessTokenPayload, @Query() query: PromotionListQueryDto) {
+    return this.marketplace.promotions(auth.sub, query);
   }
 
   @Get('categories')
