@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, Matches } from 'class-validator';
 
 export class QuoteBookingDto {
@@ -26,4 +27,11 @@ export class UpdateBookingStatusDto {
 export class CreateReviewDto {
   @ApiProperty({ minimum: 1, maximum: 5 }) @IsInt() @Min(1) @Max(5) rating!: number;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) comment?: string;
+}
+
+export class BookingHistoryQueryDto {
+  @ApiPropertyOptional({ enum: ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'] })
+  @IsOptional() @IsIn(['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED']) status?: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+  @ApiPropertyOptional({ default: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
+  @ApiPropertyOptional({ default: 20, maximum: 100 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit = 20;
 }

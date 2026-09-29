@@ -4,6 +4,7 @@ import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { AuthController } from './controllers/auth.controller';
 import { firebaseAdminProvider } from './firebase/firebase-admin.provider';
 import { AccessTokenGuard } from './guards/access-token.guard';
+import { RolesGuard } from './guards/roles.guard';
 import { DevelopmentSmsProvider } from './sms/development-sms.provider';
 import { smsProviderFactory } from './sms/sms-provider.factory';
 import { AuthService } from './services/auth.service';
@@ -35,7 +36,8 @@ import { AppleTokenVerifierService } from './services/apple-token-verifier.servi
     GoogleTokenVerifierService,
     AuthService,
     AccessTokenGuard,
+    RolesGuard,
   ],
-  exports: [JwtModule, firebaseAdminProvider, AccessTokenGuard],
+  exports: [JwtModule, firebaseAdminProvider, AccessTokenGuard, RolesGuard],
 })
 export class AuthModule {}

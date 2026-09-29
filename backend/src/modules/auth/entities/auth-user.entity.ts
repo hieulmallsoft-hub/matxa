@@ -27,6 +27,9 @@ export class AuthUser {
   @ApiProperty({ enum: ['CUSTOMER', 'TECHNICIAN', 'ADMIN'] })
   role!: 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN';
 
+  @ApiProperty({ enum: ['ACTIVE', 'BLOCKED', 'DELETED'] })
+  status!: 'ACTIVE' | 'BLOCKED' | 'DELETED';
+
   @ApiProperty({ description: 'Da hoan tat dang ky tai khoan' })
   onboardingCompleted!: boolean;
 }

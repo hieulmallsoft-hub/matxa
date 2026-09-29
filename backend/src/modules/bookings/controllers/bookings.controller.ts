@@ -1,11 +1,11 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { BookingQuoteResponse } from '../entities/booking-quote.entity';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
 import { BookingsService } from '../services/bookings.service';
-import { CancelBookingDto, CreateBookingDto, CreateReviewDto, QuoteBookingDto, UpdateBookingStatusDto } from '../dto/booking.dto';
+import { BookingHistoryQueryDto, CancelBookingDto, CreateBookingDto, CreateReviewDto, QuoteBookingDto, UpdateBookingStatusDto } from '../dto/booking.dto';
 
 @ApiTags('Bookings')
 @ApiBearerAuth('access-token')
@@ -29,8 +29,8 @@ export class BookingsController {
 
   @Get()
   @ApiOperation({ summary: 'Danh sach lich cua khach hoac ky thuat vien' })
-  list(@CurrentAuth() auth: AccessTokenPayload) {
-    return this.bookings.listMine(auth.sub);
+  list(@CurrentAuth() auth: AccessTokenPayload, @Query() query: BookingHistoryQueryDto) {
+    return this.bookings.listMine(auth.sub, query);
   }
 
   @Get(':id')

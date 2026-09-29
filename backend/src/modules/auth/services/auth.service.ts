@@ -594,6 +594,7 @@ export class AuthService {
       ...(user.displayName ? { name: user.displayName } : {}),
       ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
       role: user.role,
+      status: user.status,
       onboardingCompleted: true,
     };
   }

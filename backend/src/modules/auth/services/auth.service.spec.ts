@@ -141,7 +141,7 @@ describe('AuthService', () => {
 
   it('loads active users and scopes logout to the authenticated user', async () => {
     prisma.user.findUnique.mockResolvedValue(refreshSession().user);
-    await expect(service.getCurrentUser('user-id')).resolves.toHaveProperty('id', 'user-id');
+    await expect(service.getCurrentUser('user-id')).resolves.toMatchObject({ id: 'user-id', status: 'ACTIVE' });
     prisma.user.findUnique.mockResolvedValue(null);
     await expect(service.getCurrentUser('missing')).rejects.toThrow();
     await service.logout('session', 'user-id');

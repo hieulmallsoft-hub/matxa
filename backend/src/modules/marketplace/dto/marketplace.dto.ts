@@ -121,3 +121,39 @@ export class CreateTechnicianByAdminDto extends UpsertTechnicianProfileDto {
   @ApiPropertyOptional({ description: 'Admin-only Marketplace visibility; defaults to true for new profiles' })
   @IsOptional() @IsBoolean() isActive?: boolean;
 }
+
+export class AdminPageDto {
+  @ApiPropertyOptional({ default: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
+  @ApiPropertyOptional({ default: 20, maximum: 100 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit = 20;
+}
+
+export class AdminUsersQueryDto extends AdminPageDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) search?: string;
+  @ApiPropertyOptional({ enum: ['CUSTOMER', 'TECHNICIAN', 'ADMIN'] }) @IsOptional() @IsIn(['CUSTOMER', 'TECHNICIAN', 'ADMIN']) role?: 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN';
+  @ApiPropertyOptional({ enum: ['ACTIVE', 'BLOCKED', 'DELETED'] }) @IsOptional() @IsIn(['ACTIVE', 'BLOCKED', 'DELETED']) status?: 'ACTIVE' | 'BLOCKED' | 'DELETED';
+}
+
+export class AdminBookingsQueryDto extends AdminPageDto {
+  @ApiPropertyOptional({ enum: ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'] }) @IsOptional() @IsIn(['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED']) status?: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+}
+
+export class UpdateUserStatusDto {
+  @ApiProperty({ enum: ['ACTIVE', 'BLOCKED'] }) @IsIn(['ACTIVE', 'BLOCKED']) status!: 'ACTIVE' | 'BLOCKED';
+}
+
+export class UpdateAdminTechnicianDto extends PartialType(UpsertTechnicianProfileDto) {
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isVerified?: boolean;
+}
+
+export class UpdateCategoryDto extends PartialType(CreateCategoryDto) {
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+}
+
+export class UpdateBannerDto extends PartialType(CreateBannerDto) {
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+}
+
+export class UpdatePromotionDto extends PartialType(CreatePromotionDto) {
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+}

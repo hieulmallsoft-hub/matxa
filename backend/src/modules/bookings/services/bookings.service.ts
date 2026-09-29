@@ -4,7 +4,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
 import { loadBookableServices } from '../../marketplace/services/technician-selection';
 import { NotificationsService } from '../../notifications/services/notifications.service';
-import { CancelBookingDto, CreateBookingDto, CreateReviewDto, QuoteBookingDto, UpdateBookingStatusDto } from '../dto/booking.dto';
+import { BookingHistoryQueryDto, CancelBookingDto, CreateBookingDto, CreateReviewDto, QuoteBookingDto, UpdateBookingStatusDto } from '../dto/booking.dto';
 
 @Injectable()
 export class BookingsService {
@@ -63,6 +63,7 @@ export class BookingsService {
       serviceFee,
       homeServiceFee: serviceFee,
       promotionId: promotion?.id ?? null,
+      promotionUsageLimit: promotion?.usageLimit ?? null,
       promotionCode: promotion?.code ?? null,
       discountAmount,
       discount: discountAmount,
@@ -85,6 +86,23 @@ export class BookingsService {
       const booking = await this.prisma.$transaction(async (tx) => {
         // Same domain/pricing validation as quote, re-run inside the write transaction.
         const quote = await this.quote(userId, dto, tx);
+        if (quote.promotionId) {
+          // Atomic reservation prevents two concurrent requests from consuming the
+          // final voucher usage. A later failure rolls this increment back.
+          const reserved = await tx.promotion.updateMany({
+            where: {
+              id: quote.promotionId,
+              isActive: true,
+              startsAt: { lte: new Date() },
+              endsAt: { gte: new Date() },
+              ...(quote.promotionUsageLimit === null
+                ? {}
+                : { usageLimit: quote.promotionUsageLimit, usedCount: { lt: quote.promotionUsageLimit } }),
+            },
+            data: { usedCount: { increment: 1 } },
+          });
+          if (!reserved.count) throw new BadRequestException('Ma khuyen mai da het luot su dung');
+        }
         const created = await tx.booking.create({
           data: {
             customerId: userId,
@@ -106,31 +124,42 @@ export class BookingsService {
           },
           include: { items: true, payment: true, technician: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } }, address: true },
         });
-        if (quote.promotionId) await tx.promotion.update({ where: { id: quote.promotionId }, data: { usedCount: { increment: 1 } } });
         return created;
       }, { isolationLevel: 'Serializable' });
       this.notifyBookingCreated(userId, booking.technician.userId, booking.id).catch(() => undefined);
-      return this.withHistoricalAddress(booking);
+      return this.createdBookingResponse(this.withHistoricalAddress(booking));
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       if ((error as { code?: string })?.code === 'P2034') throw new ConflictException('Du lieu dat lich vua thay doi, vui long thu lai');
-      if (error instanceof Error && (error.message.includes('bookings_no_active_overlap') || error.message.includes('could not serialize'))) {
-        throw new BadRequestException('Khung gio vua duoc nguoi khac dat, vui long chon gio khac');
+      const databaseError = error as { code?: string; meta?: { constraint?: string }; message?: string };
+      if ((databaseError.code === 'P2004' && databaseError.meta?.constraint === 'bookings_no_active_overlap') ||
+          databaseError.message?.includes('bookings_no_active_overlap') || databaseError.message?.includes('could not serialize')) {
+        throw new ConflictException({ code: 'SLOT_UNAVAILABLE', message: 'Khung gio vua duoc nguoi khac dat, vui long chon gio khac' });
       }
       throw error;
     }
   }
 
-  async listMine(userId: string) {
-    const bookings = await this.prisma.booking.findMany({
-      where: { OR: [{ customerId: userId }, { technician: { userId } }] },
+  async listMine(userId: string): Promise<any[]>;
+  async listMine(userId: string, query: BookingHistoryQueryDto): Promise<{ items: any[]; total: number; page: number; limit: number }>;
+  async listMine(userId: string, query?: BookingHistoryQueryDto) {
+    const options = query ?? Object.assign(new BookingHistoryQueryDto(), { page: 1, limit: 100 });
+    const where = { OR: [{ customerId: userId }, { technician: { userId } }], ...(options.status ? { status: options.status } : {}) };
+    const listQuery = this.prisma.booking.findMany({
+      where, skip: (options.page - 1) * options.limit, take: options.limit,
       include: { items: true, payment: true, address: true, customer: { select: { id: true, displayName: true, avatarUrl: true } }, technician: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } }, review: true },
       orderBy: { scheduledStart: 'desc' },
     });
-    return bookings.map((booking) => this.withHistoricalAddress(booking));
+    if (!query) {
+      const bookings = await listQuery;
+      return bookings.map((booking) => this.historyResponse(this.withHistoricalAddress(booking), userId));
+    }
+    const [bookings, total] = await Promise.all([listQuery, this.prisma.booking.count({ where })]);
+    const items = bookings.map((booking) => this.historyResponse(this.withHistoricalAddress(booking), userId));
+    return query ? { items, total, page: options.page, limit: options.limit } : items;
   }
 
-  async detail(userId: string, id: string) {
+  async detail(userId: string, id: string, internal = false) {
     const booking = await this.prisma.booking.findUnique({
       where: { id },
       include: { items: true, payment: true, address: true, promotion: true, review: true, customer: { select: { id: true, displayName: true, avatarUrl: true, role: true } }, technician: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } } },
@@ -138,11 +167,12 @@ export class BookingsService {
     if (!booking) throw new NotFoundException('Lich dat khong ton tai');
     const actor = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     if (booking.customerId !== userId && booking.technician.userId !== userId && actor?.role !== 'ADMIN') throw new ForbiddenException('Ban khong co quyen xem lich dat');
-    return this.withHistoricalAddress(booking);
+    const historical = this.withHistoricalAddress(booking);
+    return internal ? historical : this.historyResponse(historical, userId);
   }
 
   async cancel(userId: string, id: string, dto: CancelBookingDto) {
-    const booking = await this.detail(userId, id);
+    const booking = await this.detail(userId, id, true);
     if (!['PENDING', 'CONFIRMED'].includes(booking.status)) throw new BadRequestException('Lich dat khong the huy');
     const updated = await this.transition(id, booking.status, { status: 'CANCELLED', cancelledAt: new Date(), cancellationReason: dto.reason });
     const target = booking.customerId === userId ? booking.technician.userId : booking.customerId;
@@ -151,7 +181,7 @@ export class BookingsService {
   }
 
   async updateStatus(userId: string, id: string, dto: UpdateBookingStatusDto) {
-    const booking = await this.detail(userId, id);
+    const booking = await this.detail(userId, id, true);
     if (booking.technician.userId !== userId) throw new ForbiddenException('Chi ky thuat vien moi co the cap nhat trang thai');
     const allowed = (booking.status === 'PENDING' && dto.status === 'CONFIRMED') || (booking.status === 'CONFIRMED' && dto.status === 'COMPLETED');
     if (!allowed) throw new BadRequestException('Chuyen trang thai khong hop le');
@@ -219,6 +249,81 @@ export class BookingsService {
         id: legacy.id, addressText: legacy.address, address: legacy.address,
         latitude: Number(legacy.latitude), longitude: Number(legacy.longitude), label: legacy.label,
       } : null,
+    };
+  }
+
+  // The create response is intentionally a mobile-facing projection. It exposes
+  // immutable snapshots and public technician data, never a live customer address
+  // or technician account internals.
+  private createdBookingResponse(booking: any) {
+    return {
+      id: booking.id,
+      status: booking.status,
+      technician: {
+        technicianId: booking.technicianId,
+        displayName: booking.technician?.user?.displayName ?? null,
+        avatarUrl: booking.technician?.user?.avatarUrl ?? null,
+      },
+      items: (Array.isArray(booking.items) ? booking.items : []).map((item: any) => ({
+        technicianServiceId: item.serviceId,
+        serviceId: item.serviceId,
+        name: item.serviceName,
+        price: Number(item.unitPrice),
+        durationMinutes: item.durationMinutes,
+      })),
+      mode: booking.mode,
+      startAt: booking.scheduledStart,
+      endAt: booking.scheduledEnd,
+      subtotal: Number(booking.subtotal),
+      serviceFee: Number(booking.serviceFee),
+      homeServiceFee: Number(booking.serviceFee),
+      discount: Number(booking.discountAmount),
+      discountAmount: Number(booking.discountAmount),
+      total: Number(booking.totalAmount),
+      totalAmount: Number(booking.totalAmount),
+      paymentMethod: booking.payment?.method ?? 'CASH',
+      paymentStatus: booking.payment?.status ?? null,
+      address: booking.address ?? null,
+      addressSnapshot: booking.address ?? null,
+      note: booking.note ?? null,
+      createdAt: booking.createdAt,
+    };
+  }
+
+  private historyResponse(booking: any, userId: string) {
+    const isCustomer = booking.customerId === userId;
+    const canCancel = isCustomer && ['PENDING', 'CONFIRMED'].includes(booking.status);
+    const canReview = isCustomer && booking.status === 'COMPLETED' && !booking.review;
+    return {
+      ...booking,
+      technician: {
+        technicianId: booking.technicianId,
+        displayName: booking.technician?.user?.displayName ?? null,
+        avatarUrl: booking.technician?.user?.avatarUrl ?? null,
+      },
+      items: (booking.items ?? []).map((item: any) => ({
+        ...item,
+        technicianServiceId: item.serviceId,
+        name: item.serviceName,
+        price: Number(item.unitPrice),
+        unitPrice: Number(item.unitPrice),
+      })),
+      service: booking.items?.[0] ? {
+        name: booking.items[0].serviceName,
+        price: Number(booking.items[0].unitPrice),
+        durationMinutes: booking.items[0].durationMinutes,
+      } : null,
+      startAt: booking.scheduledStart,
+      endAt: booking.scheduledEnd,
+      subtotal: Number(booking.subtotal),
+      homeServiceFee: Number(booking.serviceFee),
+      serviceFee: Number(booking.serviceFee),
+      discount: Number(booking.discountAmount),
+      total: Number(booking.totalAmount),
+      totalAmount: Number(booking.totalAmount),
+      paymentMethod: booking.payment?.method ?? null,
+      canCancel,
+      canReview,
     };
   }
 
