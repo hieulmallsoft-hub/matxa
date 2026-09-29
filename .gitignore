@@ -1,0 +1,19 @@
+# Dependencies and generated output
+**/node_modules/
+**/dist/
+**/coverage/
+**/*.tsbuildinfo
+
+# Local configuration and secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Generated Prisma client
+backend/src/generated/
+
+# Tooling / OS files
+**/*.log
+.DS_Store
+.idea/
+.vscode/
