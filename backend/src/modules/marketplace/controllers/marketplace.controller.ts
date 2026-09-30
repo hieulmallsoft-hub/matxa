@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiExtraModels, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags, getSchemaPath } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiExtraModels, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
@@ -83,11 +83,32 @@ export class FavoritesController {
 @Controller('technician')
 export class TechnicianController {
   constructor(private readonly marketplace: MarketplaceService, private readonly applications: TechnicianApplicationsService) {}
-  @Get('application') getApplication(@CurrentAuth() auth: AccessTokenPayload) { return this.applications.getMine(auth.sub); }
-  @Post('application') createApplication(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: UpdateTechnicianApplicationDto) { return this.applications.createMine(auth.sub, dto); }
-  @Patch('application') updateApplication(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: UpdateTechnicianApplicationDto) { return this.applications.updateMine(auth.sub, dto); }
-  @Post('application/document-upload-url') documentUpload(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: TechnicianDocumentUploadDto) { return this.applications.uploadUrl(auth.sub, dto); }
-  @Post('application/submit') submitApplication(@CurrentAuth() auth: AccessTokenPayload) { return this.applications.submit(auth.sub); }
+  @Get('application')
+  @ApiTags('Technician Application')
+  @ApiOperation({ summary: 'Lấy hồ sơ đăng ký KTV của tài khoản hiện tại', description: 'Trả về hồ sơ DRAFT/PENDING/APPROVED/REJECTED. Không nhận userId từ Mobile.' })
+  @ApiOkResponse({ description: 'Hồ sơ đăng ký hiện tại hoặc null nếu chưa tạo' })
+  getApplication(@CurrentAuth() auth: AccessTokenPayload) { return this.applications.getMine(auth.sub); }
+  @Post('application')
+  @ApiTags('Technician Application')
+  @ApiOperation({ summary: 'Tạo hồ sơ đăng ký KTV', description: 'Bước 1: tạo hồ sơ nháp. Sau đó upload đủ CCCD mặt trước, mặt sau và ảnh khuôn mặt.' })
+  @ApiCreatedResponse({ description: 'Hồ sơ đã tạo ở trạng thái DRAFT' })
+  createApplication(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: UpdateTechnicianApplicationDto) { return this.applications.createMine(auth.sub, dto); }
+  @Patch('application')
+  @ApiTags('Technician Application')
+  @ApiOperation({ summary: 'Cập nhật hồ sơ đăng ký KTV', description: 'Chỉ cập nhật hồ sơ DRAFT hoặc REJECTED. Không thể sửa hồ sơ đang chờ duyệt hoặc đã được duyệt.' })
+  @ApiOkResponse({ description: 'Hồ sơ sau khi cập nhật' })
+  updateApplication(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: UpdateTechnicianApplicationDto) { return this.applications.updateMine(auth.sub, dto); }
+  @Post('application/document-upload-url')
+  @ApiTags('Technician Application')
+  @ApiOperation({ summary: 'Tạo URL upload giấy tờ KTV', description: 'Bước 2: nhận presigned URL và PUT file trực tiếp lên S3 private. Không gửi base64 qua API.' })
+  @ApiBody({ schema: { example: { documentType: 'ID_CARD_FRONT', contentType: 'image/jpeg', size: 250000 } } })
+  @ApiCreatedResponse({ description: 'Presigned URL upload, mediaKey và thời hạn 300 giây' })
+  documentUpload(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: TechnicianDocumentUploadDto) { return this.applications.uploadUrl(auth.sub, dto); }
+  @Post('application/submit')
+  @ApiTags('Technician Application')
+  @ApiOperation({ summary: 'Gửi hồ sơ KTV để Admin duyệt', description: 'Bước cuối: yêu cầu đủ thông tin và đủ 3 ảnh ID_CARD_FRONT, ID_CARD_BACK, FACE. Sau khi gửi, hồ sơ chuyển sang PENDING.' })
+  @ApiOkResponse({ description: 'Hồ sơ đã chuyển sang PENDING' })
+  submitApplication(@CurrentAuth() auth: AccessTokenPayload) { return this.applications.submit(auth.sub); }
   @Patch('profile') @ApiOperation({ summary: 'Cap nhat ho so ky thuat vien cua minh' })
   profile(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: UpsertTechnicianProfileDto) { return this.marketplace.upsertMyProfile(auth.sub, dto); }
   @Post('services') @ApiOperation({ summary: 'Them dich vu va bang gia' })

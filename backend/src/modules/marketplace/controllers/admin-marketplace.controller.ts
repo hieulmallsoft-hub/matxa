@@ -17,9 +17,9 @@ import { AdminBookingsQueryDto, AdminPageDto, AdminUsersQueryDto, CreateBannerDt
 @Controller('admin/marketplace')
 export class AdminMarketplaceController {
   constructor(private readonly admin: AdminMarketplaceService, private readonly applications: TechnicianApplicationsService) {}
-  @Get('technician-applications') applicationsList(@Query() query: AdminTechnicianApplicationQueryDto) { return this.applications.list(query); }
-  @Post('technician-applications/:id/approve') approveApplication(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) { return this.applications.approve(auth.sub, id); }
-  @Post('technician-applications/:id/reject') rejectApplication(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: RejectTechnicianApplicationDto) { return this.applications.reject(auth.sub, id, dto.reason); }
+  @Get('technician-applications') @ApiTags('Admin - Technician Applications') @ApiOperation({ summary: 'Danh sách hồ sơ KTV chờ duyệt', description: 'Admin lọc theo trạng thái và phân trang hồ sơ đăng ký.' }) applicationsList(@Query() query: AdminTechnicianApplicationQueryDto) { return this.applications.list(query); }
+  @Post('technician-applications/:id/approve') @ApiTags('Admin - Technician Applications') @ApiOperation({ summary: 'Duyệt hồ sơ KTV', description: 'Chuyển user thành TECHNICIAN và tạo/kích hoạt TechnicianProfile.' }) approveApplication(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) { return this.applications.approve(auth.sub, id); }
+  @Post('technician-applications/:id/reject') @ApiTags('Admin - Technician Applications') @ApiOperation({ summary: 'Từ chối hồ sơ KTV', description: 'Bắt buộc nhập lý do để Mobile hiển thị và chỉnh sửa hồ sơ.' }) rejectApplication(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: RejectTechnicianApplicationDto) { return this.applications.reject(auth.sub, id, dto.reason); }
   @Get('dashboard') @ApiOperation({ summary: 'So lieu van hanh thuc te cho Admin dashboard' })
   dashboard() { return this.admin.dashboard(); }
   @Get('users') @ApiOperation({ summary: 'Danh sach user de tim va quan ly trang thai' })
