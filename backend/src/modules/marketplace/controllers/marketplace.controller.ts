@@ -7,6 +7,8 @@ import { AvailabilityQueryDto, CreateAddressDto, CreateAvailabilityDto, CreateTe
 import { MarketplaceService } from '../services/marketplace.service';
 import { ComputedAvailabilityResponse, MarketplaceHomeResponse, MobilePromotionListResponse, TechnicianDetailResponse, TechnicianListItem, TechnicianListResponse, WorkingScheduleResponse } from '../entities/marketplace.entity';
 import { OptionalAccessTokenGuard } from '../../auth/guards/optional-access-token.guard';
+import { TechnicianApplicationsService } from '../services/technician-applications.service';
+import { TechnicianDocumentUploadDto, UpdateTechnicianApplicationDto } from '../dto/technician-application.dto';
 
 @ApiTags('Marketplace')
 @Controller('marketplace')
@@ -80,7 +82,11 @@ export class FavoritesController {
 @UseGuards(AccessTokenGuard)
 @Controller('technician')
 export class TechnicianController {
-  constructor(private readonly marketplace: MarketplaceService) {}
+  constructor(private readonly marketplace: MarketplaceService, private readonly applications: TechnicianApplicationsService) {}
+  @Get('application') getApplication(@CurrentAuth() auth: AccessTokenPayload) { return this.applications.getMine(auth.sub); }
+  @Patch('application') updateApplication(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: UpdateTechnicianApplicationDto) { return this.applications.updateMine(auth.sub, dto); }
+  @Post('application/document-upload-url') documentUpload(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: TechnicianDocumentUploadDto) { return this.applications.uploadUrl(auth.sub, dto); }
+  @Post('application/submit') submitApplication(@CurrentAuth() auth: AccessTokenPayload) { return this.applications.submit(auth.sub); }
   @Patch('profile') @ApiOperation({ summary: 'Cap nhat ho so ky thuat vien cua minh' })
   profile(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: UpsertTechnicianProfileDto) { return this.marketplace.upsertMyProfile(auth.sub, dto); }
   @Post('services') @ApiOperation({ summary: 'Them dich vu va bang gia' })

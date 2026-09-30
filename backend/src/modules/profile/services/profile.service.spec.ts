@@ -23,12 +23,17 @@ describe('ProfileService', () => {
 
   it('returns profile and completed onboarding status', async () => {
     prisma.user.findUnique.mockResolvedValue(user);
-    await expect(service.getMe(user.id)).resolves.toEqual({ ...user, onboardingCompleted: true });
+    await expect(service.getMe(user.id)).resolves.toEqual({ ...user, status: 'ACTIVE', email: null, phone: null, phoneVerified: false, onboardingCompleted: true });
   });
 
   it('only accepts an avatar key belonging to the current user', async () => {
     await expect(service.updateMe(user.id, { avatarKey: 'avatars/another-user/file.jpg' }))
       .rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects a blank display name', async () => {
+    await expect(service.updateMe(user.id, { displayName: '   ' })).rejects.toThrow('Ten hien thi');
+    expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
   it('saves the public avatar URL derived from the presigned upload key', async () => {

@@ -6,6 +6,8 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
 import { AdminMarketplaceService } from '../services/admin-marketplace.service';
+import { TechnicianApplicationsService } from '../services/technician-applications.service';
+import { AdminTechnicianApplicationQueryDto, RejectTechnicianApplicationDto } from '../dto/technician-application.dto';
 import { AdminBookingsQueryDto, AdminPageDto, AdminUsersQueryDto, CreateBannerDto, CreateCategoryDto, CreatePromotionDto, CreateTechnicianByAdminDto, UpdateAdminTechnicianDto, UpdateBannerDto, UpdateCategoryDto, UpdatePromotionDto, UpdateUserStatusDto } from '../dto/marketplace.dto';
 
 @ApiTags('Admin Marketplace')
@@ -14,7 +16,10 @@ import { AdminBookingsQueryDto, AdminPageDto, AdminUsersQueryDto, CreateBannerDt
 @Roles('ADMIN')
 @Controller('admin/marketplace')
 export class AdminMarketplaceController {
-  constructor(private readonly admin: AdminMarketplaceService) {}
+  constructor(private readonly admin: AdminMarketplaceService, private readonly applications: TechnicianApplicationsService) {}
+  @Get('technician-applications') applicationsList(@Query() query: AdminTechnicianApplicationQueryDto) { return this.applications.list(query); }
+  @Post('technician-applications/:id/approve') approveApplication(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) { return this.applications.approve(auth.sub, id); }
+  @Post('technician-applications/:id/reject') rejectApplication(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: RejectTechnicianApplicationDto) { return this.applications.reject(auth.sub, id, dto.reason); }
   @Get('dashboard') @ApiOperation({ summary: 'So lieu van hanh thuc te cho Admin dashboard' })
   dashboard() { return this.admin.dashboard(); }
   @Get('users') @ApiOperation({ summary: 'Danh sach user de tim va quan ly trang thai' })

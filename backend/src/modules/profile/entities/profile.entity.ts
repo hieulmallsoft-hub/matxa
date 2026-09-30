@@ -8,6 +8,10 @@ export class ProfileModel {
   @ApiPropertyOptional({ enum: ['MALE', 'FEMALE', 'OTHER'] }) gender?: string | null;
   @ApiPropertyOptional() nationality?: string | null;
   @ApiProperty({ enum: UserRole }) role!: UserRole;
+  @ApiProperty({ enum: ['ACTIVE', 'BLOCKED', 'DELETED'] }) status!: string;
+  @ApiPropertyOptional() email?: string | null;
+  @ApiPropertyOptional() phone?: string | null;
+  @ApiProperty() phoneVerified!: boolean;
   @ApiProperty() onboardingCompleted!: boolean;
 }
 

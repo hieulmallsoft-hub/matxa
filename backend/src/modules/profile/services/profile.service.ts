@@ -10,6 +10,8 @@ const profileSelect = {
   gender: true,
   nationality: true,
   role: true,
+  status: true,
+  identities: { select: { provider: true, email: true, phoneNumber: true, emailVerified: true } },
 } as const;
 
 @Injectable()
@@ -26,6 +28,7 @@ export class ProfileService {
   }
 
   async updateMe(userId: string, dto: UpdateProfileDto) {
+    if (dto.displayName !== undefined && !dto.displayName.trim()) throw new BadRequestException('Ten hien thi khong duoc de trong');
     const data: Record<string, string | undefined> = {
       displayName: dto.displayName?.trim(),
       gender: dto.gender,
@@ -75,9 +78,17 @@ export class ProfileService {
     gender: string | null;
     nationality: string | null;
     role: string;
+    status?: string;
+    identities?: Array<{ provider: string; email: string | null; phoneNumber: string | null; emailVerified: boolean }>;
   }) {
+    const emailIdentity = user.identities?.find((identity) => identity.email)?.email ?? null;
+    const phoneIdentity = user.identities?.find((identity) => identity.provider === 'PHONE' && identity.phoneNumber);
     return {
       ...user,
+      status: user.status ?? 'ACTIVE',
+      email: emailIdentity,
+      phone: phoneIdentity?.phoneNumber ?? null,
+      phoneVerified: Boolean(phoneIdentity?.phoneNumber),
       onboardingCompleted: Boolean(user.displayName && user.gender && user.nationality),
     };
   }

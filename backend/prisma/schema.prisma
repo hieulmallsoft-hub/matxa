@@ -78,6 +78,13 @@ enum PromotionType {
   FIXED
 }
 
+enum TechnicianApplicationStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id          String         @id @default(uuid()) @db.Uuid
   displayName String?        @map("display_name")
@@ -101,8 +108,30 @@ model User {
   addresses Address[]
   promotionUsages PromotionUsage[]
   reviews Review[]
+  technicianApplication TechnicianApplication?
 
   @@map("users")
+}
+
+model TechnicianApplication {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @unique @map("user_id") @db.Uuid
+  status         TechnicianApplicationStatus @default(DRAFT)
+  displayName    String?  @map("display_name")
+  gender         Gender?
+  city           String?
+  bio            String?
+  idCardFrontKey String?  @map("id_card_front_key")
+  idCardBackKey  String?  @map("id_card_back_key")
+  faceImageKey   String?  @map("face_image_key")
+  rejectionReason String? @map("rejection_reason")
+  reviewedBy     String?  @map("reviewed_by") @db.Uuid
+  reviewedAt     DateTime? @map("reviewed_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([status, createdAt(sort: Desc)])
+  @@map("technician_applications")
 }
 
 model TechnicianProfile {
