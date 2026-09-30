@@ -2,8 +2,9 @@
 
 ## Flow
 
-1. `GET /api/technician/application` lấy hồ sơ hiện tại.
-2. `PATCH /api/technician/application` lưu thông tin nháp.
+1. `POST /api/technician/application` tạo hồ sơ đăng ký lần đầu.
+2. `GET /api/technician/application` lấy hồ sơ hiện tại.
+3. `PATCH /api/technician/application` chỉnh sửa thông tin nháp.
 3. Gọi `POST /api/technician/application/document-upload-url` ba lần với `ID_CARD_FRONT`, `ID_CARD_BACK`, `FACE`.
 4. Upload file trực tiếp lên S3 bằng `uploadUrl`.
 5. PATCH lại hồ sơ với ba `...Key` trả về.

@@ -84,6 +84,7 @@ export class FavoritesController {
 export class TechnicianController {
   constructor(private readonly marketplace: MarketplaceService, private readonly applications: TechnicianApplicationsService) {}
   @Get('application') getApplication(@CurrentAuth() auth: AccessTokenPayload) { return this.applications.getMine(auth.sub); }
+  @Post('application') createApplication(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: UpdateTechnicianApplicationDto) { return this.applications.createMine(auth.sub, dto); }
   @Patch('application') updateApplication(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: UpdateTechnicianApplicationDto) { return this.applications.updateMine(auth.sub, dto); }
   @Post('application/document-upload-url') documentUpload(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: TechnicianDocumentUploadDto) { return this.applications.uploadUrl(auth.sub, dto); }
   @Post('application/submit') submitApplication(@CurrentAuth() auth: AccessTokenPayload) { return this.applications.submit(auth.sub); }

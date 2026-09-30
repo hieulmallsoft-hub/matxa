@@ -7,6 +7,11 @@ import { TechnicianApplicationStorageService } from './technician-application-st
 export class TechnicianApplicationsService {
   constructor(private readonly prisma: PrismaService, private readonly storage: TechnicianApplicationStorageService) {}
   getMine(userId: string) { return this.prisma.technicianApplication.findUnique({ where: { userId } }); }
+  async createMine(userId: string, dto: UpdateTechnicianApplicationDto) {
+    const existing = await this.prisma.technicianApplication.findUnique({ where: { userId } });
+    if (existing) return existing;
+    return this.updateMine(userId, dto);
+  }
   async updateMine(userId: string, dto: UpdateTechnicianApplicationDto) {
     if (dto.displayName !== undefined && !dto.displayName.trim()) throw new BadRequestException('Ho ten khong duoc de trong');
     const current = await this.prisma.technicianApplication.upsert({ where: { userId }, create: { userId }, update: {} });
