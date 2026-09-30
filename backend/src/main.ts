@@ -16,28 +16,34 @@ async function bootstrap(): Promise<void> {
   );
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('Matxa Backend API')
+    .setTitle('Matxa API · Mobile & Operations')
     .setDescription([
-      'Tai lieu REST API cho mobile Matxa.',
+      '# Matxa API Documentation',
+      'Tài liệu tích hợp chính thức cho Mobile App và Operations Web.',
       '',
-      '**Quy uoc cho mobile**',
-      '- Base URL la `/api`; toan bo request va response su dung JSON.',
-      '- API co bieu tuong khoa can header `Authorization: Bearer <accessToken>`.',
-      '- Lay `accessToken` va `refreshToken` tu API dang nhap; khi access token het han hay goi `POST /auth/refresh`.',
-      '- Thoi gian gui len server dung ISO-8601 UTC, vi du `2026-09-21T09:00:00.000Z`.',
-      '- Tai lieu OpenAPI de generate client: `/api/docs-json`.',
+      '## Quy ước tích hợp',
+      '- **Base URL:** `/api` · mọi request/response dùng JSON.',
+      '- **Authentication:** API có biểu tượng khóa yêu cầu `Authorization: Bearer <accessToken>`.',
+      '- **Token:** lấy từ API đăng nhập; khi hết hạn gọi `POST /auth/refresh`.',
+      '- **Date & time:** gửi ISO-8601 có timezone, ưu tiên UTC `Z`.',
+      '- **Validation:** request sai trả HTTP 400; không gửi field ngoài schema.',
+      '- **OpenAPI JSON:** `/api/docs-json` để generate client.',
+      '',
+      '> Hãy bấm **Authorize** một lần để Swagger tự gắn access token cho các request cần đăng nhập.',
     ].join('\n'))
     .setVersion('1.0')
-    .addTag('Authentication', 'Dang ky, dang nhap, OTP va phien dang nhap.')
-    .addTag('Profile', 'Ho so va anh dai dien cua tai khoan dang nhap.')
-    .addTag('Marketplace', 'Du lieu trang chu, tim kiem va xem ky thuat vien.')
-    .addTag('Favorites', 'Danh sach ky thuat vien yeu thich cua tai khoan.')
-    .addTag('Addresses', 'Dia chi cua khach dung khi dat dich vu tai nha.')
-    .addTag('Technician Management', 'API chi cho tai khoan co vai tro TECHNICIAN.')
-    .addTag('Bookings', 'Bao gia, dat lich, huy lich va danh gia.')
-    .addTag('Chat', 'Chat 1-1; tai anh theo presigned URL S3.')
-    .addTag('Notifications', 'Danh sach thong bao va dang ky Firebase Cloud Messaging.')
-    .addTag('Admin Marketplace', 'API chi cho tai khoan co vai tro ADMIN.')
+    .addTag('Authentication', 'Đăng ký, đăng nhập, OTP và phiên đăng nhập.')
+    .addTag('Profile', 'Tài khoản, hồ sơ cá nhân và avatar.')
+    .addTag('Marketplace', 'Trang chủ, danh mục, tìm kiếm và KTV.')
+    .addTag('Technician Application', 'KTV đăng ký, upload CCCD/khuôn mặt và gửi duyệt.')
+    .addTag('Bookings', 'Quote, đặt lịch, lịch sử, hủy lịch và đánh giá.')
+    .addTag('Chat', 'Chat 1-1 REST và Socket.IO, upload ảnh S3.')
+    .addTag('Notifications', 'Thông báo in-app và Firebase Cloud Messaging.')
+    .addTag('Favorites', 'KTV yêu thích của tài khoản.')
+    .addTag('Addresses', 'Địa chỉ dùng cho dịch vụ tại nhà.')
+    .addTag('Technician Management', 'Dịch vụ, lịch làm việc và hồ sơ KTV đã duyệt.')
+    .addTag('Admin - Technician Applications', 'Admin duyệt hồ sơ đăng ký KTV.')
+    .addTag('Admin Marketplace', 'Admin quản lý user, banner, danh mục, voucher và booking.')
     .addBearerAuth(
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
       'access-token',
@@ -51,9 +57,26 @@ async function bootstrap(): Promise<void> {
   SwaggerModule.setup('docs', app, swaggerDocument, {
     useGlobalPrefix: true,
     customSiteTitle: 'Matxa API Docs',
+    customfavIcon: 'https://swagger.io/favicon-32x32.png',
+    customCss: `
+      .swagger-ui .topbar { background: #123c2d; }
+      .swagger-ui .topbar .download-url-wrapper { display: none; }
+      .swagger-ui .info h1 { color: #123c2d; font-size: 30px; }
+      .swagger-ui .info .description { max-width: 920px; line-height: 1.65; }
+      .swagger-ui .scheme-container { background: #f5f8f6; box-shadow: none; border-radius: 8px; }
+      .swagger-ui .opblock-tag { border-bottom: 1px solid #dfe7e2; padding: 16px 10px; }
+      .swagger-ui .opblock { border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+      .swagger-ui .btn.authorize { border-color: #197044; color: #197044; }
+    `,
     swaggerOptions: {
       persistAuthorization: true,
-      operationsSorter: 'alpha',
+      docExpansion: 'list',
+      filter: true,
+      displayRequestDuration: true,
+      tryItOutEnabled: false,
+      defaultModelsExpandDepth: 1,
+      defaultModelExpandDepth: 2,
+      operationsSorter: 'method',
       tagsSorter: 'alpha',
     },
   });
