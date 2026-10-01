@@ -133,7 +133,7 @@ export class MarketplaceService {
       where: { id, ...publicTechnicianWhere },
       select: {
         id: true, userId: true, bio: true, gender: true, tags: true, serviceModes: true,
-        latitude: true, longitude: true, city: true, address: true, isVerified: true,
+         latitude: true, longitude: true, city: true, district: true, facility: true, address: true, isVerified: true,
         isActive: true, isAvailable: true, averageRating: true, reviewCount: true,
         createdAt: true, updatedAt: true,
         user: { select: { id: true, displayName: true, avatarUrl: true } },

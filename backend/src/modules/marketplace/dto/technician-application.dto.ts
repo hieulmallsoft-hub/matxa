@@ -1,11 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 export class UpdateTechnicianApplicationDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) displayName?: string;
   @ApiPropertyOptional({ enum: ['MALE', 'FEMALE', 'OTHER'] }) @IsOptional() @IsIn(['MALE', 'FEMALE', 'OTHER']) gender?: 'MALE' | 'FEMALE' | 'OTHER';
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) city?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) district?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(150) facility?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) applicationType?: string;
+  @ApiPropertyOptional({ enum: ['HOME', 'ONSITE', 'ONLINE'], isArray: true }) @IsOptional() @IsArray() @IsIn(['HOME', 'ONSITE', 'ONLINE'], { each: true }) supportedModes?: Array<'HOME' | 'ONSITE' | 'ONLINE'>;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) bio?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1024) idCardFrontKey?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1024) idCardBackKey?: string;
@@ -19,7 +23,7 @@ export class TechnicianDocumentUploadDto {
 }
 
 export class AdminTechnicianApplicationQueryDto {
-  @ApiPropertyOptional({ enum: ['DRAFT', 'PENDING', 'APPROVED', 'REJECTED'] }) @IsOptional() @IsIn(['DRAFT', 'PENDING', 'APPROVED', 'REJECTED']) status?: string;
+  @ApiPropertyOptional({ enum: ['DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED'] }) @IsOptional() @IsIn(['DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED']) status?: string;
   @ApiPropertyOptional({ default: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
   @ApiPropertyOptional({ default: 20 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit = 20;
 }
