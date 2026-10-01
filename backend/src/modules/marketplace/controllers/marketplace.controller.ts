@@ -8,6 +8,7 @@ import { MarketplaceService } from '../services/marketplace.service';
 import { ComputedAvailabilityResponse, MarketplaceHomeResponse, MobilePromotionListResponse, TechnicianDetailResponse, TechnicianListItem, TechnicianListResponse, WorkingScheduleResponse } from '../entities/marketplace.entity';
 import { OptionalAccessTokenGuard } from '../../auth/guards/optional-access-token.guard';
 import { TechnicianApplicationsService } from '../services/technician-applications.service';
+import { LocationService } from '../services/location.service';
 import { AddTechnicianGalleryImageDto, TechnicianDocumentUploadDto, TechnicianGalleryUploadDto, UpdateTechnicianApplicationDto } from '../dto/technician-application.dto';
 
 @ApiTags('Marketplace')
@@ -60,6 +61,14 @@ export class MarketplaceController {
   availability(@Param('id', ParseUUIDPipe) id: string, @Query() query: AvailabilityQueryDto) {
     return this.marketplace.availability(id, query);
   }
+}
+
+@ApiTags('Locations')
+@Controller('locations')
+export class LocationsController {
+  constructor(private readonly locations: LocationService) {}
+  @Get('cities') @ApiOperation({ summary: 'Danh sach thanh pho hoat dong' }) cities() { return this.locations.cities(); }
+  @Get('cities/:cityCode/districts') @ApiOperation({ summary: 'Danh sach quan/huyen theo thanh pho' }) districts(@Param('cityCode') cityCode: string) { return this.locations.districts(cityCode); }
 }
 
 @ApiTags('Favorites')

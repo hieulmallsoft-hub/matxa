@@ -83,3 +83,4 @@ ALTER TABLE "technician_service_price_options" ADD CONSTRAINT "technician_servic
 ALTER TABLE "booking_items"
   ADD COLUMN "price_option_id" UUID,
   ADD COLUMN "price_option_code" TEXT;
+

@@ -42,3 +42,8 @@ export class AdminTechnicianApplicationQueryDto {
 export class RejectTechnicianApplicationDto {
   @ApiProperty() @IsString() @MaxLength(1000) reason!: string;
 }
+
+export class ReviewTechnicianKycDto {
+  @ApiProperty({ enum: ['VERIFIED', 'REJECTED'] }) @IsIn(['VERIFIED', 'REJECTED']) status!: 'VERIFIED' | 'REJECTED';
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) reason?: string;
+}

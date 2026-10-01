@@ -3,7 +3,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import {
   AdminBookingsQueryDto, AdminPageDto, AdminUsersQueryDto, CreateBannerDto, CreateCategoryDto,
   CreatePromotionDto, CreateTechnicianByAdminDto, UpdateAdminTechnicianDto, UpdateBannerDto,
-  UpdateCategoryDto, UpdatePromotionDto, UpdateUserStatusDto,
+  UpdateAdminTechnicianPriceOptionDto, UpdateCategoryDto, UpdatePromotionDto, UpdateUserStatusDto,
 } from '../dto/marketplace.dto';
 
 const number = (value: unknown) => Number(value ?? 0);
@@ -98,6 +98,42 @@ export class AdminMarketplaceService {
     const updated = await this.prisma.technicianProfile.updateMany({ where: { id }, data: dto });
     if (!updated.count) throw new NotFoundException('Khong tim thay ky thuat vien');
     return this.prisma.technicianProfile.findUnique({ where: { id } });
+  }
+
+  async technicianServices(id: string) {
+    const technician = await this.prisma.technicianProfile.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        user: { select: { displayName: true } },
+        services: {
+          orderBy: [{ category: { sortOrder: 'asc' } }, { name: 'asc' }],
+          include: {
+            category: { select: { id: true, name: true, slug: true } },
+            priceOptions: { orderBy: [{ durationMinutes: 'asc' }, { sortOrder: 'asc' }] },
+          },
+        },
+      },
+    });
+    if (!technician) throw new NotFoundException('Khong tim thay ky thuat vien');
+    return {
+      ...technician,
+      services: technician.services.map((service) => ({
+        ...service,
+        price: number(service.price),
+        priceOptions: service.priceOptions.map((option) => ({ ...option, price: number(option.price) })),
+      })),
+    };
+  }
+
+  async updateTechnicianPriceOption(technicianId: string, serviceId: string, optionId: string, dto: UpdateAdminTechnicianPriceOptionDto) {
+    const updated = await this.prisma.technicianServicePriceOption.updateMany({
+      where: { id: optionId, technicianServiceId: serviceId, technicianService: { technicianId } },
+      data: { price: dto.price },
+    });
+    if (!updated.count) throw new NotFoundException('Khong tim thay goi gia cua ky thuat vien');
+    const option = await this.prisma.technicianServicePriceOption.findUnique({ where: { id: optionId } });
+    return option && { ...option, price: number(option.price) };
   }
 
   categories() { return this.prisma.serviceCategory.findMany({ orderBy: [{ isActive: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }] }); }

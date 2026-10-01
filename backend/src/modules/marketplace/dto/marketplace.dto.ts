@@ -161,6 +161,12 @@ export class UpdateAdminTechnicianDto extends PartialType(UpsertTechnicianProfil
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isVerified?: boolean;
 }
 
+/** Admin may change a selling price, but cannot alter the duration/template selected by the technician. */
+export class UpdateAdminTechnicianPriceOptionDto {
+  @ApiProperty({ example: 500000, description: 'Giá bán bằng VND cho gói thời lượng hiện có.' })
+  @Type(() => Number) @IsNumber() @Min(0) price!: number;
+}
+
 export class UpdateCategoryDto extends PartialType(CreateCategoryDto) {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
 }

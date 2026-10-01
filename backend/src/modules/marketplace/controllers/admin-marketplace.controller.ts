@@ -7,8 +7,8 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
 import { AdminMarketplaceService } from '../services/admin-marketplace.service';
 import { TechnicianApplicationsService } from '../services/technician-applications.service';
-import { AdminTechnicianApplicationQueryDto, RejectTechnicianApplicationDto } from '../dto/technician-application.dto';
-import { AdminBookingsQueryDto, AdminPageDto, AdminUsersQueryDto, CreateBannerDto, CreateCategoryDto, CreatePromotionDto, CreateTechnicianByAdminDto, UpdateAdminTechnicianDto, UpdateBannerDto, UpdateCategoryDto, UpdatePromotionDto, UpdateUserStatusDto } from '../dto/marketplace.dto';
+import { AdminTechnicianApplicationQueryDto, RejectTechnicianApplicationDto, ReviewTechnicianKycDto } from '../dto/technician-application.dto';
+import { AdminBookingsQueryDto, AdminPageDto, AdminUsersQueryDto, CreateBannerDto, CreateCategoryDto, CreatePromotionDto, CreateTechnicianByAdminDto, UpdateAdminTechnicianDto, UpdateAdminTechnicianPriceOptionDto, UpdateBannerDto, UpdateCategoryDto, UpdatePromotionDto, UpdateUserStatusDto } from '../dto/marketplace.dto';
 
 @ApiTags('Admin Marketplace')
 @ApiBearerAuth('access-token')
@@ -22,6 +22,7 @@ export class AdminMarketplaceController {
   @Post('technician-applications/:id/reject') @ApiTags('Admin - Technician Applications') @ApiOperation({ summary: 'Từ chối hồ sơ KTV', description: 'Bắt buộc nhập lý do để Mobile hiển thị và chỉnh sửa hồ sơ.' }) rejectApplication(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: RejectTechnicianApplicationDto) { return this.applications.reject(auth.sub, id, dto.reason); }
   @Get('technician-applications/:id') @ApiTags('Admin - Technician Applications') @ApiOperation({ summary: 'Chi tiet ho so va KYC private cua KTV' }) applicationDetail(@Param('id', ParseUUIDPipe) id: string) { return this.applications.detail(id); }
   @Post('technician-applications/:id/review') @ApiTags('Admin - Technician Applications') @ApiOperation({ summary: 'Nhan ho so vao trang thai dang review' }) reviewApplication(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) { return this.applications.startReview(auth.sub, id); }
+  @Post('technician-applications/:id/kyc-review') @ApiTags('Admin - Technician Applications') @ApiOperation({ summary: 'Duyet hoac tu choi KYC cua ho so KTV' }) reviewKyc(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReviewTechnicianKycDto) { return this.applications.reviewKyc(auth.sub, id, dto.status, dto.reason); }
   @Get('dashboard') @ApiOperation({ summary: 'So lieu van hanh thuc te cho Admin dashboard' })
   dashboard() { return this.admin.dashboard(); }
   @Get('users') @ApiOperation({ summary: 'Danh sach user de tim va quan ly trang thai' })
@@ -34,6 +35,10 @@ export class AdminMarketplaceController {
   technicians(@Query() query: AdminPageDto) { return this.admin.technicians(query); }
   @Patch('technicians/:id') @ApiOperation({ summary: 'Cap nhat xac minh va ho so KTV' })
   updateTechnician(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateAdminTechnicianDto) { return this.admin.updateTechnician(id, dto); }
+  @Get('technicians/:id/services') @ApiOperation({ summary: 'Danh sach dich vu va goi gia cua mot KTV de Admin dieu chinh gia' })
+  technicianServices(@Param('id', ParseUUIDPipe) id: string) { return this.admin.technicianServices(id); }
+  @Patch('technicians/:id/services/:serviceId/price-options/:optionId') @ApiOperation({ summary: 'Admin cap nhat gia mot goi dich vu cua KTV', description: 'Chi sua price. Thoi luong va code goi gia giu theo template da cau hinh.' })
+  updateTechnicianPriceOption(@Param('id', ParseUUIDPipe) id: string, @Param('serviceId', ParseUUIDPipe) serviceId: string, @Param('optionId', ParseUUIDPipe) optionId: string, @Body() dto: UpdateAdminTechnicianPriceOptionDto) { return this.admin.updateTechnicianPriceOption(id, serviceId, optionId, dto); }
 
   @Get('categories') @ApiOperation({ summary: 'Danh sach category ke ca inactive' })
   categories() { return this.admin.categories(); }

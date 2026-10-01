@@ -247,6 +247,26 @@ model ServiceCategory {
   @@map("service_categories")
 }
 
+model City {
+  code      String     @id
+  name      String
+  isActive  Boolean    @default(true) @map("is_active")
+  sortOrder Int        @default(0) @map("sort_order")
+  districts District[]
+  @@map("cities")
+}
+
+model District {
+  code      String  @id
+  cityCode  String  @map("city_code")
+  name      String
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+  city      City    @relation(fields: [cityCode], references: [code], onDelete: Cascade)
+  @@index([cityCode, isActive, sortOrder])
+  @@map("districts")
+}
+
 model TechnicianService {
   id              String             @id @default(uuid()) @db.Uuid
   technicianId    String             @map("technician_id") @db.Uuid
