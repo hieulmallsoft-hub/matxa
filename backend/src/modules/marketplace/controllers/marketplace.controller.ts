@@ -77,7 +77,6 @@ export class FavoritesController {
   remove(@CurrentAuth() auth: AccessTokenPayload, @Param('technicianId', ParseUUIDPipe) id: string) { return this.marketplace.removeFavorite(auth.sub, id); }
 }
 
-@ApiTags('Technician Management')
 @ApiBearerAuth('access-token')
 @UseGuards(AccessTokenGuard)
 @Controller('technician')
@@ -122,23 +121,23 @@ export class TechnicianController {
   @ApiOperation({ summary: 'Gửi hồ sơ KTV để Admin duyệt', description: 'Bước cuối: yêu cầu đủ thông tin và đủ 3 ảnh ID_CARD_FRONT, ID_CARD_BACK, FACE. Sau khi gửi, hồ sơ chuyển sang PENDING.' })
   @ApiOkResponse({ description: 'Hồ sơ đã chuyển sang PENDING' })
   submitApplication(@CurrentAuth() auth: AccessTokenPayload) { return this.applications.submit(auth.sub); }
-  @Patch('profile') @ApiOperation({ summary: 'Cap nhat ho so ky thuat vien cua minh' })
+  @Patch('profile') @ApiTags('Technician Management') @ApiOperation({ summary: 'Cap nhat ho so ky thuat vien cua minh' })
   profile(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: UpsertTechnicianProfileDto) { return this.marketplace.upsertMyProfile(auth.sub, dto); }
-  @Post('services') @ApiOperation({ summary: 'Them dich vu va bang gia' })
+  @Post('services') @ApiTags('Technician Management') @ApiOperation({ summary: 'Them dich vu va bang gia' })
   service(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateTechnicianServiceDto) { return this.marketplace.createMyService(auth.sub, dto); }
-  @Patch('services/:id') @ApiOperation({ summary: 'Sua dich vu va bang gia' })
+  @Patch('services/:id') @ApiTags('Technician Management') @ApiOperation({ summary: 'Sua dich vu va bang gia' })
   updateService(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateTechnicianServiceDto) { return this.marketplace.updateMyService(auth.sub, id, dto); }
-  @Get('services/:id/price-options') @ApiOperation({ summary: 'Danh sach goi gia cua dich vu cua minh' })
+  @Get('services/:id/price-options') @ApiTags('Technician Management') @ApiOperation({ summary: 'Danh sach goi gia cua dich vu cua minh' })
   priceOptions(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) { return this.marketplace.listMyServicePriceOptions(auth.sub, id); }
-  @Post('services/:id/price-options') @ApiOperation({ summary: 'Them goi gia/thoi luong cho dich vu' })
+  @Post('services/:id/price-options') @ApiTags('Technician Management') @ApiOperation({ summary: 'Them goi gia/thoi luong cho dich vu' })
   createPriceOption(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateTechnicianServicePriceOptionDto) { return this.marketplace.createMyServicePriceOption(auth.sub, id, dto); }
-  @Patch('services/:id/price-options/:optionId') @ApiOperation({ summary: 'Sua goi gia/thoi luong cua dich vu' })
+  @Patch('services/:id/price-options/:optionId') @ApiTags('Technician Management') @ApiOperation({ summary: 'Sua goi gia/thoi luong cua dich vu' })
   updatePriceOption(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Param('optionId', ParseUUIDPipe) optionId: string, @Body() dto: UpdateTechnicianServicePriceOptionDto) { return this.marketplace.updateMyServicePriceOption(auth.sub, id, optionId, dto); }
-  @Delete('services/:id/price-options/:optionId') @HttpCode(HttpStatus.NO_CONTENT) @ApiOperation({ summary: 'Xoa goi gia cua dich vu' })
+  @Delete('services/:id/price-options/:optionId') @HttpCode(HttpStatus.NO_CONTENT) @ApiTags('Technician Management') @ApiOperation({ summary: 'Xoa goi gia cua dich vu' })
   removePriceOption(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Param('optionId', ParseUUIDPipe) optionId: string) { return this.marketplace.removeMyServicePriceOption(auth.sub, id, optionId); }
-  @Post('availability') @ApiOperation({ summary: 'Them khung gio lam viec' })
+  @Post('availability') @ApiTags('Technician Management') @ApiOperation({ summary: 'Them khung gio lam viec' })
   availability(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateAvailabilityDto) { return this.marketplace.createAvailability(auth.sub, dto); }
-  @Delete('availability/:id') @HttpCode(HttpStatus.NO_CONTENT) @ApiOperation({ summary: 'Xoa khung gio lam viec' })
+  @Delete('availability/:id') @HttpCode(HttpStatus.NO_CONTENT) @ApiTags('Technician Management') @ApiOperation({ summary: 'Xoa khung gio lam viec' })
   removeAvailability(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) { return this.marketplace.removeAvailability(auth.sub, id); }
 }
 
