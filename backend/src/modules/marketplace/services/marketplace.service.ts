@@ -2,8 +2,8 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../../../database/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
 import { TechnicianListResponse } from '../entities/marketplace.entity';
-import { AvailabilityQueryDto, CreateAddressDto, CreateAvailabilityDto, CreateTechnicianServiceDto, MarketplaceHomeQueryDto, PromotionListQueryDto, SearchTechniciansDto, UpdateAddressDto, UpdateTechnicianServiceDto, UpsertTechnicianProfileDto } from '../dto/marketplace.dto';
-import { loadBookableServices, publicTechnicianWhere } from './technician-selection';
+import { AvailabilityQueryDto, CreateAddressDto, CreateAvailabilityDto, CreateTechnicianServiceDto, CreateTechnicianServicePriceOptionDto, MarketplaceHomeQueryDto, PromotionListQueryDto, SearchTechniciansDto, UpdateAddressDto, UpdateTechnicianServiceDto, UpdateTechnicianServicePriceOptionDto, UpsertTechnicianProfileDto } from '../dto/marketplace.dto';
+import { applyPriceOptions, loadBookableServices, publicTechnicianWhere } from './technician-selection';
 import { availabilityRange, BOOKING_TIMEZONE, buildAvailableSlots } from './availability-slots';
 
 @Injectable()
@@ -137,7 +137,7 @@ export class MarketplaceService {
         isActive: true, isAvailable: true, averageRating: true, reviewCount: true,
         createdAt: true, updatedAt: true,
         user: { select: { id: true, displayName: true, avatarUrl: true } },
-        services: { where: { isActive: true, category: { isActive: true } }, include: { category: true }, orderBy: { price: 'asc' } },
+         services: { where: { isActive: true, category: { isActive: true } }, include: { category: true, priceOptions: { where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }] } }, orderBy: { price: 'asc' } },
         reviews: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20 },
       },
     });
@@ -161,8 +161,9 @@ export class MarketplaceService {
         latitude: profile.latitude === null ? null : Number(profile.latitude),
         longitude: profile.longitude === null ? null : Number(profile.longitude),
       } : null,
-      services: profile.services.map((service) => ({ ...service, serviceId: service.id, technicianServiceId: service.id,
-        categoryName: service.category.name, supportedModes: service.modes, price: Number(service.price) })),
+       services: profile.services.map((service) => ({ ...service, serviceId: service.id, technicianServiceId: service.id,
+         categoryName: service.category.name, supportedModes: service.modes, price: Number(service.price),
+         priceOptions: (service.priceOptions ?? []).map((option) => ({ ...option, price: Number(option.price) })) })),
     };
   }
 
@@ -182,7 +183,8 @@ export class MarketplaceService {
       });
     }
     if (!query.mode) throw new BadRequestException('Can mode de lay slot trong');
-    const services = await loadBookableServices(this.prisma, id, selectedServiceIds, query.mode);
+    const baseServices = await loadBookableServices(this.prisma, id, selectedServiceIds, query.mode);
+    const services = await applyPriceOptions(this.prisma, baseServices, query.priceOptionIds);
     const durationMinutes = services.reduce((sum, service) => sum + service.durationMinutes, 0);
     const [working, occupied] = await Promise.all([
       this.prisma.availabilitySlot.findMany({
@@ -195,7 +197,7 @@ export class MarketplaceService {
       }),
     ]);
     const technicianServiceIds = services.map((service) => service.id);
-    return { technicianId: id, date: query.date ?? null, serviceIds: technicianServiceIds, technicianServiceIds, mode: query.mode,
+    return { technicianId: id, date: query.date ?? null, serviceIds: technicianServiceIds, technicianServiceIds, priceOptionIds: services.map((service) => service.priceOptionId), mode: query.mode,
       timezone: BOOKING_TIMEZONE, from: start, to: end, durationMinutes, totalDurationMinutes: durationMinutes, stepMinutes: query.stepMinutes,
       slots: buildAvailableSlots(working, occupied.map((booking) => ({ startAt: booking.scheduledStart, endAt: booking.scheduledEnd })),
         durationMinutes, { startAt: start, endAt: end }, new Date(), query.stepMinutes),
@@ -246,14 +248,45 @@ export class MarketplaceService {
 
   async createMyService(userId: string, dto: CreateTechnicianServiceDto) {
     const profile = await this.myProfile(userId);
+    if (dto.modes.some((mode) => !profile.serviceModes.includes(mode))) throw new BadRequestException('Noi phuc vu cua dich vu phai nam trong noi phuc vu cua ho so KTV');
     return this.prisma.technicianService.create({ data: { technicianId: profile.id, ...dto } });
   }
 
   async updateMyService(userId: string, serviceId: string, dto: UpdateTechnicianServiceDto) {
     const profile = await this.myProfile(userId);
+    if (dto.modes && dto.modes.some((mode) => !profile.serviceModes.includes(mode))) throw new BadRequestException('Noi phuc vu cua dich vu phai nam trong noi phuc vu cua ho so KTV');
     const result = await this.prisma.technicianService.updateMany({ where: { id: serviceId, technicianId: profile.id }, data: dto });
     if (!result.count) throw new NotFoundException('Dich vu khong ton tai');
     return this.prisma.technicianService.findUniqueOrThrow({ where: { id: serviceId } });
+  }
+
+  async listMyServicePriceOptions(userId: string, serviceId: string) {
+    const profile = await this.myProfile(userId);
+    await this.requireOwnedService(profile.id, serviceId);
+    return this.prisma.technicianServicePriceOption.findMany({ where: { technicianServiceId: serviceId }, orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }] });
+  }
+
+  async createMyServicePriceOption(userId: string, serviceId: string, dto: CreateTechnicianServicePriceOptionDto) {
+    const profile = await this.myProfile(userId);
+    const service = await this.requireOwnedService(profile.id, serviceId);
+    this.validatePriceTemplate(service.category.slug, dto.durationMinutes);
+    return this.prisma.technicianServicePriceOption.create({ data: { technicianServiceId: serviceId, code: dto.code.trim().toUpperCase(), durationMinutes: dto.durationMinutes, price: dto.price, sortOrder: dto.sortOrder ?? 0, isActive: dto.isActive ?? true } });
+  }
+
+  async updateMyServicePriceOption(userId: string, serviceId: string, optionId: string, dto: UpdateTechnicianServicePriceOptionDto) {
+    const profile = await this.myProfile(userId);
+    const service = await this.requireOwnedService(profile.id, serviceId);
+    if (dto.durationMinutes !== undefined) this.validatePriceTemplate(service.category.slug, dto.durationMinutes);
+    const result = await this.prisma.technicianServicePriceOption.updateMany({ where: { id: optionId, technicianServiceId: serviceId }, data: { ...dto, code: dto.code?.trim().toUpperCase() } });
+    if (!result.count) throw new NotFoundException('Goi gia khong ton tai');
+    return this.prisma.technicianServicePriceOption.findUniqueOrThrow({ where: { id: optionId } });
+  }
+
+  async removeMyServicePriceOption(userId: string, serviceId: string, optionId: string) {
+    const profile = await this.myProfile(userId);
+    await this.requireOwnedService(profile.id, serviceId);
+    const result = await this.prisma.technicianServicePriceOption.deleteMany({ where: { id: optionId, technicianServiceId: serviceId } });
+    if (!result.count) throw new NotFoundException('Goi gia khong ton tai');
   }
 
   async createAvailability(userId: string, dto: CreateAvailabilityDto) {
@@ -341,6 +374,24 @@ export class MarketplaceService {
     const profile = await this.prisma.technicianProfile.findUnique({ where: { userId } });
     if (!profile) throw new ForbiddenException('Tai khoan chua co ho so ky thuat vien');
     return profile;
+  }
+
+  private async requireOwnedService(technicianId: string, serviceId: string) {
+    const service = await this.prisma.technicianService.findFirst({ where: { id: serviceId, technicianId }, include: { category: { select: { slug: true } } } });
+    if (!service) throw new NotFoundException('Dich vu khong ton tai');
+    return service;
+  }
+
+  private validatePriceTemplate(categorySlug: string, durationMinutes: number) {
+    const slug = categorySlug.toLowerCase();
+    const groupA = ['massage', 'gian-co', 'fitness', 'pt', 'yoga', 'pilates'];
+    const groupB = ['coaching', 'co-van', 'tham-van'];
+    const groupC = ['hen-ho', 'dating'];
+    const allowed = groupA.some((item) => slug.includes(item)) ? [60, 90, 120]
+      : groupB.some((item) => slug.includes(item)) ? [60]
+      : groupC.some((item) => slug.includes(item)) ? [120, 240, 360]
+      : null;
+    if (allowed && !allowed.includes(durationMinutes)) throw new BadRequestException(`Danh muc nay chi ho tro goi ${allowed.join(', ')} phut`);
   }
 
   private async requireTechnician(id: string) {

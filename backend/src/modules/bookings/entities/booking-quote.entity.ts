@@ -15,6 +15,8 @@ export class QuotedService {
   @ApiProperty() technicianServiceId!: string;
   @ApiProperty() name!: string;
   @ApiProperty() durationMinutes!: number;
+  @ApiProperty({ type: String, nullable: true }) priceOptionId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) priceOptionCode!: string | null;
   @ApiProperty() price!: number;
 }
 

@@ -12,6 +12,11 @@ ALTER TABLE "technician_applications"
   ADD COLUMN "application_type" TEXT,
   ADD COLUMN "district" TEXT,
   ADD COLUMN "facility" TEXT,
+  ADD COLUMN "address" TEXT,
+  ADD COLUMN "submitted_at" TIMESTAMP(3),
+  ADD COLUMN "under_review_at" TIMESTAMP(3),
+  ADD COLUMN "approved_at" TIMESTAMP(3),
+  ADD COLUMN "rejected_at" TIMESTAMP(3),
   ADD COLUMN "supported_modes" "ServiceMode"[] NOT NULL DEFAULT ARRAY[]::"ServiceMode"[];
 
 ALTER TABLE "technician_profiles"
@@ -74,3 +79,7 @@ CREATE TABLE "technician_service_price_options" (
 CREATE UNIQUE INDEX "technician_service_price_options_service_code_key" ON "technician_service_price_options"("technician_service_id", "code");
 CREATE INDEX "technician_service_price_options_service_active_idx" ON "technician_service_price_options"("technician_service_id", "is_active");
 ALTER TABLE "technician_service_price_options" ADD CONSTRAINT "technician_service_price_options_service_fkey" FOREIGN KEY ("technician_service_id") REFERENCES "technician_services"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "booking_items"
+  ADD COLUMN "price_option_id" UUID,
+  ADD COLUMN "price_option_code" TEXT;

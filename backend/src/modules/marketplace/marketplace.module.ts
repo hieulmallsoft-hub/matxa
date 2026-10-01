@@ -6,9 +6,10 @@ import { AdminMarketplaceController } from './controllers/admin-marketplace.cont
 import { AdminMarketplaceService } from './services/admin-marketplace.service';
 import { TechnicianApplicationsService } from './services/technician-applications.service';
 import { TechnicianApplicationStorageService } from './services/technician-application-storage.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, NotificationsModule],
   controllers: [MarketplaceController, FavoritesController, TechnicianController, AddressesController, AdminMarketplaceController],
   providers: [MarketplaceService, AdminMarketplaceService, TechnicianApplicationsService, TechnicianApplicationStorageService],
   exports: [MarketplaceService],

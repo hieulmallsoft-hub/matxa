@@ -3,12 +3,12 @@ import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiExtraModels, ApiNoConten
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
-import { AvailabilityQueryDto, CreateAddressDto, CreateAvailabilityDto, CreateTechnicianServiceDto, MarketplaceHomeQueryDto, PromotionListQueryDto, SearchTechniciansDto, UpdateAddressDto, UpdateTechnicianServiceDto, UpsertTechnicianProfileDto } from '../dto/marketplace.dto';
+import { AvailabilityQueryDto, CreateAddressDto, CreateAvailabilityDto, CreateTechnicianServiceDto, CreateTechnicianServicePriceOptionDto, MarketplaceHomeQueryDto, PromotionListQueryDto, SearchTechniciansDto, UpdateAddressDto, UpdateTechnicianServiceDto, UpdateTechnicianServicePriceOptionDto, UpsertTechnicianProfileDto } from '../dto/marketplace.dto';
 import { MarketplaceService } from '../services/marketplace.service';
 import { ComputedAvailabilityResponse, MarketplaceHomeResponse, MobilePromotionListResponse, TechnicianDetailResponse, TechnicianListItem, TechnicianListResponse, WorkingScheduleResponse } from '../entities/marketplace.entity';
 import { OptionalAccessTokenGuard } from '../../auth/guards/optional-access-token.guard';
 import { TechnicianApplicationsService } from '../services/technician-applications.service';
-import { TechnicianDocumentUploadDto, UpdateTechnicianApplicationDto } from '../dto/technician-application.dto';
+import { AddTechnicianGalleryImageDto, TechnicianDocumentUploadDto, TechnicianGalleryUploadDto, UpdateTechnicianApplicationDto } from '../dto/technician-application.dto';
 
 @ApiTags('Marketplace')
 @Controller('marketplace')
@@ -104,6 +104,19 @@ export class TechnicianController {
   @ApiBody({ schema: { example: { documentType: 'ID_CARD_FRONT', contentType: 'image/jpeg', size: 250000 } } })
   @ApiCreatedResponse({ description: 'Presigned URL upload, mediaKey và thời hạn 300 giây' })
   documentUpload(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: TechnicianDocumentUploadDto) { return this.applications.uploadUrl(auth.sub, dto); }
+  @Post('application/gallery-upload-url')
+  @ApiTags('Technician Application')
+  @ApiOperation({ summary: 'Tao URL upload anh gallery KTV private' })
+  galleryUpload(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: TechnicianGalleryUploadDto) { return this.applications.galleryUploadUrl(auth.sub, dto); }
+  @Post('application/gallery')
+  @ApiTags('Technician Application')
+  @ApiOperation({ summary: 'Luu anh gallery da upload, toi da 6 anh' })
+  addGallery(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: AddTechnicianGalleryImageDto) { return this.applications.addGalleryImage(auth.sub, dto.storageKey, dto.sortOrder); }
+  @Delete('application/gallery/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiTags('Technician Application')
+  @ApiOperation({ summary: 'Xoa anh gallery cua chinh minh' })
+  removeGallery(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) { return this.applications.removeGalleryImage(auth.sub, id); }
   @Post('application/submit')
   @ApiTags('Technician Application')
   @ApiOperation({ summary: 'Gửi hồ sơ KTV để Admin duyệt', description: 'Bước cuối: yêu cầu đủ thông tin và đủ 3 ảnh ID_CARD_FRONT, ID_CARD_BACK, FACE. Sau khi gửi, hồ sơ chuyển sang PENDING.' })
@@ -115,6 +128,14 @@ export class TechnicianController {
   service(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateTechnicianServiceDto) { return this.marketplace.createMyService(auth.sub, dto); }
   @Patch('services/:id') @ApiOperation({ summary: 'Sua dich vu va bang gia' })
   updateService(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateTechnicianServiceDto) { return this.marketplace.updateMyService(auth.sub, id, dto); }
+  @Get('services/:id/price-options') @ApiOperation({ summary: 'Danh sach goi gia cua dich vu cua minh' })
+  priceOptions(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) { return this.marketplace.listMyServicePriceOptions(auth.sub, id); }
+  @Post('services/:id/price-options') @ApiOperation({ summary: 'Them goi gia/thoi luong cho dich vu' })
+  createPriceOption(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateTechnicianServicePriceOptionDto) { return this.marketplace.createMyServicePriceOption(auth.sub, id, dto); }
+  @Patch('services/:id/price-options/:optionId') @ApiOperation({ summary: 'Sua goi gia/thoi luong cua dich vu' })
+  updatePriceOption(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Param('optionId', ParseUUIDPipe) optionId: string, @Body() dto: UpdateTechnicianServicePriceOptionDto) { return this.marketplace.updateMyServicePriceOption(auth.sub, id, optionId, dto); }
+  @Delete('services/:id/price-options/:optionId') @HttpCode(HttpStatus.NO_CONTENT) @ApiOperation({ summary: 'Xoa goi gia cua dich vu' })
+  removePriceOption(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Param('optionId', ParseUUIDPipe) optionId: string) { return this.marketplace.removeMyServicePriceOption(auth.sub, id, optionId); }
   @Post('availability') @ApiOperation({ summary: 'Them khung gio lam viec' })
   availability(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateAvailabilityDto) { return this.marketplace.createAvailability(auth.sub, dto); }
   @Delete('availability/:id') @HttpCode(HttpStatus.NO_CONTENT) @ApiOperation({ summary: 'Xoa khung gio lam viec' })

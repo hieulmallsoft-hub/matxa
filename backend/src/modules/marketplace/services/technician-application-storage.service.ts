@@ -20,4 +20,8 @@ export class TechnicianApplicationStorageService {
     client.destroy();
     return { uploadUrl, mediaKey: key, expiresIn: 300 };
   }
+
+  createGalleryUploadUrl(userId: string, dto: { contentType: string; size: number }) {
+    return this.createUploadUrl(userId, { ...dto, documentType: 'GALLERY' });
+  }
 }

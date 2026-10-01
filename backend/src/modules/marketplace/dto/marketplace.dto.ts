@@ -40,6 +40,9 @@ export class AvailabilityQueryDto {
   @ApiPropertyOptional({ type: [String], description: 'Preferred alias of serviceIds. These are TechnicianService IDs used by booking. Do not send both fields.' })
   @IsOptional() @Transform(({ value }) => typeof value === 'string' ? value.split(',').map((id) => id.trim()) : value)
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10) @IsUUID('4', { each: true }) technicianServiceIds?: string[];
+  @ApiPropertyOptional({ type: [String], description: 'Price option IDs in the same order as serviceIds/technicianServiceIds.' })
+  @IsOptional() @Transform(({ value }) => typeof value === 'string' ? value.split(',').map((id) => id.trim()) : value)
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10) @IsUUID('4', { each: true }) priceOptionIds?: string[];
   @ApiPropertyOptional({ enum: ['HOME', 'ONSITE', 'ONLINE'] })
   @IsOptional() @IsIn(['HOME', 'ONSITE', 'ONLINE']) mode?: 'HOME' | 'ONSITE' | 'ONLINE';
   @ApiPropertyOptional({ default: 30, minimum: 5, maximum: 120, description: 'Grid anchored to working interval start' })
@@ -70,6 +73,16 @@ export class CreateTechnicianServiceDto {
 export class UpdateTechnicianServiceDto extends PartialType(CreateTechnicianServiceDto) {
   @ApiPropertyOptional() @IsOptional() @Type(() => Boolean) @IsBoolean() isActive?: boolean;
 }
+
+export class CreateTechnicianServicePriceOptionDto {
+  @ApiProperty({ example: '90_MINUTES', description: 'Stable code unique within one technician service' }) @IsString() @MinLength(1) @MaxLength(50) code!: string;
+  @ApiProperty({ example: 90 }) @Type(() => Number) @IsInt() @Min(15) @Max(720) durationMinutes!: number;
+  @ApiProperty({ example: 350000 }) @Type(() => Number) @IsNumber() @Min(0) price!: number;
+  @ApiPropertyOptional({ minimum: 0 }) @IsOptional() @Type(() => Number) @IsInt() @Min(0) sortOrder?: number;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Boolean) @IsBoolean() isActive?: boolean;
+}
+
+export class UpdateTechnicianServicePriceOptionDto extends PartialType(CreateTechnicianServicePriceOptionDto) {}
 
 export class CreateAvailabilityDto {
   @ApiProperty() @IsDateString() startAt!: string;

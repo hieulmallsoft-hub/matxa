@@ -4,7 +4,7 @@ import { loadBookableServices, publicTechnicianWhere } from './technician-select
 describe('Technician publication policy', () => {
   it('requires verification, an active profile/account and an active categorized service', () => {
     expect(publicTechnicianWhere).toEqual({ isActive: true, isVerified: true,
-      user: { status: 'ACTIVE' }, services: { some: { isActive: true, category: { isActive: true } } } });
+      user: { status: 'ACTIVE', technicianApplication: { is: { status: 'APPROVED' } } }, services: { some: { isActive: true, category: { isActive: true } } } });
   });
 
   it('rechecks verification in the service query used by both quote and create', async () => {
@@ -13,7 +13,7 @@ describe('Technician publication policy', () => {
       .rejects.toBeInstanceOf(BadRequestException);
     expect(findMany).toHaveBeenCalledWith({ where: {
       id: { in: ['service-id'] }, technicianId: 'profile-id', isActive: true, category: { isActive: true },
-      technician: { isActive: true, isVerified: true, user: { status: 'ACTIVE' }, serviceModes: { has: 'HOME' } },
+      technician: { isActive: true, isVerified: true, user: { status: 'ACTIVE', technicianApplication: { is: { status: 'APPROVED' } } }, serviceModes: { has: 'HOME' } },
     } });
   });
 });

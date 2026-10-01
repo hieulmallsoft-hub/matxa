@@ -8,6 +8,7 @@ export class UpdateTechnicianApplicationDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) city?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) district?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(150) facility?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(300) address?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) applicationType?: string;
   @ApiPropertyOptional({ enum: ['HOME', 'ONSITE', 'ONLINE'], isArray: true }) @IsOptional() @IsArray() @IsIn(['HOME', 'ONSITE', 'ONLINE'], { each: true }) supportedModes?: Array<'HOME' | 'ONSITE' | 'ONLINE'>;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) bio?: string;
@@ -20,6 +21,16 @@ export class TechnicianDocumentUploadDto {
   @ApiProperty({ enum: ['ID_CARD_FRONT', 'ID_CARD_BACK', 'FACE'] }) @IsIn(['ID_CARD_FRONT', 'ID_CARD_BACK', 'FACE']) documentType!: 'ID_CARD_FRONT' | 'ID_CARD_BACK' | 'FACE';
   @ApiProperty({ enum: ['image/jpeg', 'image/png', 'image/webp'] }) @IsIn(['image/jpeg', 'image/png', 'image/webp']) contentType!: string;
   @ApiProperty() @Type(() => Number) @IsInt() @Min(1) @Max(10 * 1024 * 1024) size!: number;
+}
+
+export class TechnicianGalleryUploadDto {
+  @ApiProperty({ enum: ['image/jpeg', 'image/png', 'image/webp'] }) @IsIn(['image/jpeg', 'image/png', 'image/webp']) contentType!: string;
+  @ApiProperty() @Type(() => Number) @IsInt() @Min(1) @Max(10 * 1024 * 1024) size!: number;
+}
+
+export class AddTechnicianGalleryImageDto {
+  @ApiProperty() @IsString() @MaxLength(1024) storageKey!: string;
+  @ApiPropertyOptional({ minimum: 0 }) @IsOptional() @Type(() => Number) @IsInt() @Min(0) sortOrder?: number;
 }
 
 export class AdminTechnicianApplicationQueryDto {

@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../database/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
-import { loadBookableServices } from '../../marketplace/services/technician-selection';
+import { applyPriceOptions, loadBookableServices } from '../../marketplace/services/technician-selection';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { BookingHistoryQueryDto, CancelBookingDto, CreateBookingDto, CreateReviewDto, QuoteBookingDto, UpdateBookingStatusDto } from '../dto/booking.dto';
 
@@ -15,7 +15,8 @@ export class BookingsService {
   ) {}
 
   async quote(userId: string, dto: QuoteBookingDto, db: Prisma.TransactionClient = this.prisma) {
-    const services = await loadBookableServices(db, dto.technicianId, dto.serviceIds, dto.mode);
+    const baseServices = await loadBookableServices(db, dto.technicianId, dto.serviceIds, dto.mode);
+    const services = await applyPriceOptions(db, baseServices, dto.priceOptionIds);
     const durationMinutes = services.reduce((sum, item) => sum + item.durationMinutes, 0);
     const scheduledStart = new Date(dto.scheduledStart);
     const scheduledEnd = new Date(scheduledStart.getTime() + durationMinutes * 60_000);
@@ -50,7 +51,7 @@ export class BookingsService {
     return {
       technicianId: dto.technicianId,
       technicianServiceIds: services.map((item) => item.id),
-      services: services.map((item) => ({ id: item.id, serviceId: item.id, technicianServiceId: item.id, name: item.name, durationMinutes: item.durationMinutes, price: Number(item.price) })),
+      services: services.map((item) => ({ id: item.id, serviceId: item.id, technicianServiceId: item.id, name: item.name, durationMinutes: item.durationMinutes, price: Number(item.price), priceOptionId: item.priceOptionId, priceOptionCode: item.priceOptionCode })),
       mode: dto.mode,
       scheduledStart,
       scheduledEnd,
@@ -118,7 +119,7 @@ export class BookingsService {
             discountAmount: quote.discountAmount,
             totalAmount: quote.totalAmount,
             note: dto.note,
-            items: { create: quote.services.map((item) => ({ serviceId: item.id, serviceName: item.name, durationMinutes: item.durationMinutes, unitPrice: item.price })) },
+            items: { create: quote.services.map((item) => ({ serviceId: item.id, priceOptionId: item.priceOptionId, priceOptionCode: item.priceOptionCode, serviceName: item.name, durationMinutes: item.durationMinutes, unitPrice: item.price })) },
             payment: { create: { method: dto.paymentMethod, status: dto.paymentMethod === 'CASH' ? 'UNPAID' : 'PENDING', amount: quote.totalAmount } },
             ...(quote.promotionId ? { promotionUsage: { create: { promotionId: quote.promotionId, userId } } } : {}),
           },

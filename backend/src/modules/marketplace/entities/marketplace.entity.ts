@@ -106,6 +106,7 @@ export class TechnicianServiceResponse {
   @ApiProperty({ type: MarketplaceCategoryResponse }) category!: MarketplaceCategoryResponse;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
+  @ApiProperty({ type: [Object], description: 'Selectable duration/price packages for this service' }) priceOptions!: Array<{ id: string; code: string; durationMinutes: number; price: number; isActive: boolean; sortOrder: number }>;
 }
 
 export class TechnicianReviewResponse {
@@ -153,6 +154,7 @@ export class ComputedAvailabilityResponse {
   @ApiProperty({ type: String, nullable: true, example: '2026-09-25' }) date!: string | null;
   @ApiProperty({ type: [String] }) serviceIds!: string[];
   @ApiProperty({ type: [String], description: 'Preferred booking-compatible TechnicianService IDs; alias of serviceIds' }) technicianServiceIds!: string[];
+  @ApiProperty({ type: [String], nullable: true, description: 'Selected price option IDs in service order; null indicates legacy service pricing.' }) priceOptionIds!: Array<string | null>;
   @ApiProperty({ enum: ['HOME', 'ONSITE', 'ONLINE'] }) mode!: string;
   @ApiProperty({ example: 'Asia/Ho_Chi_Minh' }) timezone!: string;
   @ApiProperty() from!: Date;

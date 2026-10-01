@@ -5,6 +5,7 @@ import { ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsIn, IsInt, IsOptio
 export class QuoteBookingDto {
   @ApiProperty() @IsUUID() technicianId!: string;
   @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10) @IsUUID('4', { each: true }) serviceIds!: string[];
+  @ApiPropertyOptional({ type: [String], description: 'Price option IDs in the same order as serviceIds. Required for services that use price options.' }) @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10) @IsUUID('4', { each: true }) priceOptionIds?: string[];
   @ApiProperty({ enum: ['HOME', 'ONSITE', 'ONLINE'] }) @IsIn(['HOME', 'ONSITE', 'ONLINE']) mode!: 'HOME' | 'ONSITE' | 'ONLINE';
   @ApiProperty({ description: 'ISO timestamp with explicit Z or timezone offset' }) @IsDateString({ strict: true }) @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i) scheduledStart!: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() addressId?: string;
