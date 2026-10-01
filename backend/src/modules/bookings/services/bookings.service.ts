@@ -4,7 +4,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
 import { applyPriceOptions, loadBookableServices } from '../../marketplace/services/technician-selection';
 import { NotificationsService } from '../../notifications/services/notifications.service';
-import { BookingHistoryQueryDto, CancelBookingDto, CreateBookingDto, CreateReviewDto, QuoteBookingDto, UpdateBookingStatusDto } from '../dto/booking.dto';
+import { BookingHistoryQueryDto, CancelBookingDto, CreateBookingDto, CreateReviewDto, QuoteBookingDto, TechnicianJobQueryDto, UpdateBookingStatusDto } from '../dto/booking.dto';
 
 @Injectable()
 export class BookingsService {
@@ -172,6 +172,46 @@ export class BookingsService {
     return internal ? historical : this.historyResponse(historical, userId);
   }
 
+  async listTechnicianJobs(userId: string, query: TechnicianJobQueryDto) {
+    await this.requireActiveTechnician(userId);
+    const where = { technician: { userId }, ...(query.status ? { status: query.status } : {}) };
+    const [bookings, total] = await Promise.all([
+      this.prisma.booking.findMany({ where, skip: (query.page - 1) * query.limit, take: query.limit,
+        include: { items: true, payment: true, address: true, customer: { select: { id: true, displayName: true, avatarUrl: true } }, technician: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } }, review: true },
+        orderBy: [{ status: 'asc' }, { scheduledStart: 'asc' }] }),
+      this.prisma.booking.count({ where }),
+    ]);
+    return { items: bookings.map((booking) => this.technicianJobResponse(this.withHistoricalAddress(booking), userId)), total, page: query.page, limit: query.limit };
+  }
+
+  async technicianJobDetail(userId: string, id: string) {
+    await this.requireActiveTechnician(userId);
+    const booking = await this.detail(userId, id, true);
+    if (booking.technician.userId !== userId) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
+    return this.technicianJobResponse(booking, userId);
+  }
+
+  async technicianJobContact(userId: string, id: string) {
+    await this.requireActiveTechnician(userId);
+    const booking = await this.prisma.booking.findUnique({ where: { id }, select: { customerId: true, status: true, technician: { select: { userId: true } }, customer: { select: { displayName: true } } } });
+    if (!booking || booking.technician.userId !== userId) throw new NotFoundException('Don khong ton tai');
+    if (!['CONFIRMED', 'COMPLETED'].includes(booking.status)) throw new ForbiddenException('Chi hien so lien he sau khi da nhan don');
+    const phone = await this.prisma.userIdentity.findFirst({ where: { userId: booking.customerId, provider: 'PHONE', phoneNumber: { not: null } }, select: { phoneNumber: true } });
+    if (!phone?.phoneNumber) throw new NotFoundException('Khach chua co so dien thoai xac thuc');
+    return { bookingId: id, displayName: booking.customer.displayName, phoneNumber: phone.phoneNumber };
+  }
+
+  acceptTechnicianJob(userId: string, id: string) { return this.updateStatus(userId, id, { status: 'CONFIRMED' }); }
+
+  async declineTechnicianJob(userId: string, id: string, dto: CancelBookingDto) {
+    const booking = await this.detail(userId, id, true);
+    if (booking.technician.userId !== userId) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
+    if (booking.status !== 'PENDING') throw new BadRequestException('Chi co the tu choi don moi');
+    return this.cancel(userId, id, dto);
+  }
+
+  completeTechnicianJob(userId: string, id: string) { return this.updateStatus(userId, id, { status: 'COMPLETED' }); }
+
   async cancel(userId: string, id: string, dto: CancelBookingDto) {
     const booking = await this.detail(userId, id, true);
     if (!['PENDING', 'CONFIRMED'].includes(booking.status)) throw new BadRequestException('Lich dat khong the huy');
@@ -247,6 +287,12 @@ export class BookingsService {
       }
       throw error;
     }
+  }
+
+  private async requireActiveTechnician(userId: string) {
+    const profile = await this.prisma.technicianProfile.findFirst({ where: { userId, isActive: true, isVerified: true, user: { status: 'ACTIVE' } }, select: { id: true } });
+    if (!profile) throw new ForbiddenException('Tai khoan KTV chua du dieu kien nhan don');
+    return profile;
   }
 
   private withHistoricalAddress<T extends {
@@ -356,6 +402,14 @@ export class BookingsService {
         cancelledBy: booking.cancelledByRole ?? null,
       } : null,
     };
+  }
+
+  private technicianJobResponse(booking: any, userId: string) {
+    const base = this.historyResponse(booking, userId);
+    return { ...base, jobState: booking.status === 'PENDING' ? 'NEW' : booking.status === 'CONFIRMED' ? 'ACCEPTED' : booking.status,
+      canAccept: booking.status === 'PENDING', canDecline: booking.status === 'PENDING',
+      canComplete: booking.status === 'CONFIRMED' && new Date(booking.scheduledEnd) <= new Date(),
+      customer: booking.customer ? { id: booking.customer.id, displayName: booking.customer.displayName, avatarUrl: booking.customer.avatarUrl } : null };
   }
 
   private async validPromotion(userId: string, code: string, subtotal: number, db: Prisma.TransactionClient) {

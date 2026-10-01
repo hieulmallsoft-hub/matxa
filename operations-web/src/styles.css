@@ -332,6 +332,15 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--forest-mid);
 }
 
+.pricing-picker { max-width: 420px; margin-bottom: 18px; }
+.pricing-list { gap: 14px; }
+.pricing-service { border: 1px solid var(--border-light); border-radius: 12px; padding: 16px; background: var(--bg-subtle); }
+.pricing-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 12px; }
+.pricing-option { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border-light); border-radius: 10px; background: var(--bg-card); }
+.pricing-option > span { font-weight: 700; }
+.pricing-option label { display: grid; gap: 4px; font-size: .82rem; color: var(--text-secondary); }
+.pricing-option button { width: 100%; }
+
 /* ── KPI Stats ── */
 .kpi-grid {
   display: grid;

@@ -2,7 +2,8 @@ import { FormEvent, type ReactNode, useCallback, useEffect, useState } from 'rea
 import { request } from '../api/client';
 import { Card } from '../components/Card';
 import { FormCard } from '../components/Form';
-import { CalendarCheck, ClipboardCheck, FolderTree, Image as ImageIcon, LayoutDashboard, TicketPercent, UserCheck, Users } from 'lucide-react';
+import { TechnicianPricingPanel } from '../components/TechnicianPricingPanel';
+import { CalendarCheck, ClipboardCheck, DollarSign, FolderTree, Image as ImageIcon, LayoutDashboard, TicketPercent, UserCheck, Users } from 'lucide-react';
 import type { Category } from '../types/api';
 
 type Props = { notify: (message: string, error?: boolean) => void; refreshCategories: () => Promise<void> };
@@ -19,7 +20,7 @@ const money = (value: number) => `${new Intl.NumberFormat('vi-VN').format(value)
 const date = (value: string) => new Date(value).toLocaleString('vi-VN');
 
 export function AdminDashboard({ notify, refreshCategories }: Props) {
-  const [tab, setTab] = useState<'overview' | 'users' | 'bookings' | 'applications' | 'technicians' | 'categories' | 'banners' | 'promotions'>('overview');
+  const [tab, setTab] = useState<'overview' | 'users' | 'bookings' | 'applications' | 'technicians' | 'pricing' | 'categories' | 'banners' | 'promotions'>('overview');
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [users, setUsers] = useState<Page<User> | null>(null);
@@ -29,6 +30,7 @@ export function AdminDashboard({ notify, refreshCategories }: Props) {
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [applications, setApplications] = useState<Page<TechnicianApplication> | null>(null);
   const [applicationAction, setApplicationAction] = useState<string | null>(null);
+  const [applicationDetail, setApplicationDetail] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
@@ -73,8 +75,12 @@ export function AdminDashboard({ notify, refreshCategories }: Props) {
     } catch (error) { notify(error instanceof Error ? error.message : 'Không thể xử lý hồ sơ', true); }
     finally { setApplicationAction(null); }
   }
+  async function openApplicationDetail(id: string) {
+    try { setApplicationDetail(await request(`/admin/marketplace/technician-applications/${id}`)); }
+    catch (error) { notify(error instanceof Error ? error.message : 'Không tải được chi tiết hồ sơ', true); }
+  }
   const form = (event: FormEvent<HTMLFormElement>) => new FormData(event.currentTarget);
-  const nav = (value: typeof tab, label: string, icon: ReactNode) => <button className={`tab-btn ${tab === value ? 'active' : ''}`} onClick={() => setTab(value)}>{icon}<span>{label}</span></button>;
+  const nav = (value: typeof tab, label: string, icon: ReactNode) => <><button className={`tab-btn ${tab === value ? 'active' : ''}`} onClick={() => setTab(value)}>{icon}<span>{label}</span></button>{value === 'technicians' && <button className={`tab-btn ${tab === 'pricing' ? 'active' : ''}`} onClick={() => setTab('pricing')}><DollarSign size={18} /><span>Bảng giá KTV</span></button>}</>;
 
   return <div>
     <nav className="tabs-nav">
@@ -86,6 +92,8 @@ export function AdminDashboard({ notify, refreshCategories }: Props) {
     </nav>
 
     {tab === 'applications' && <Card title="Hồ sơ đăng ký kỹ thuật viên" subtitle={`${applications?.total ?? 0} hồ sơ; chỉ Admin mới duyệt.`}><div className="item-list">{applications?.items.map((application) => <div className="list-item-card" key={application.id}><div><div className="item-name">{application.displayName ?? application.user.displayName ?? 'Chưa đặt tên'} · {application.status}</div><div className="item-subtext">{application.city ?? '—'} · {application.district ?? '—'} · KYC: {application.kyc?.status ?? 'NOT_STARTED'}</div></div><div className="button-row">{application.status === 'SUBMITTED' && <button className="quiet" disabled={applicationAction === application.id} onClick={() => void reviewApplication(application, 'review')}>Nhận review</button>}{(application.status === 'SUBMITTED' || application.status === 'UNDER_REVIEW') && <><button className="quiet" disabled={applicationAction === application.id} onClick={() => void reviewApplication(application, 'approve')}>Duyệt</button><button className="quiet" disabled={applicationAction === application.id} onClick={() => void reviewApplication(application, 'reject')}>Từ chối</button></>}</div></div>)}</div></Card>}
+
+    {tab === 'pricing' && <TechnicianPricingPanel technicians={technicians?.items ?? []} notify={notify} />}
 
     {tab === 'overview' && <>
       <div className="kpi-grid">
