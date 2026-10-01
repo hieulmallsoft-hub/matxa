@@ -51,6 +51,9 @@ async function bootstrap(): Promise<void> {
     .build();
   const swaggerDocument = () =>
     SwaggerModule.createDocument(app, swaggerConfig, {
+      // Every operation is explicitly tagged. Disable Nest's controller-name tag
+      // so Technician endpoints are not rendered a second time under "Technician".
+      autoTagControllers: false,
       operationIdFactory: (controllerKey, methodKey) =>
         `${controllerKey}_${methodKey}`,
     });

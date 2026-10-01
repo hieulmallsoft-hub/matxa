@@ -2,7 +2,7 @@ import { FormEvent, type ReactNode, useCallback, useEffect, useState } from 'rea
 import { request } from '../api/client';
 import { Card } from '../components/Card';
 import { FormCard } from '../components/Form';
-import { CalendarCheck, FolderTree, Image as ImageIcon, LayoutDashboard, TicketPercent, UserCheck, Users } from 'lucide-react';
+import { CalendarCheck, ClipboardCheck, FolderTree, Image as ImageIcon, LayoutDashboard, TicketPercent, UserCheck, Users } from 'lucide-react';
 import type { Category } from '../types/api';
 
 type Props = { notify: (message: string, error?: boolean) => void; refreshCategories: () => Promise<void> };
@@ -13,12 +13,13 @@ type Technician = { id: string; user: { id: string; displayName: string | null; 
 type Booking = { id: string; status: string; mode: string; scheduledStart: string; totalAmount: number; customer: { displayName: string | null }; technician: { user: { displayName: string | null } }; items: { serviceName: string }[] };
 type Banner = { id: string; title: string; imageUrl: string; isActive: boolean; sortOrder: number };
 type Promotion = { id: string; code: string; name: string; type: string; value: number; isActive: boolean; startsAt: string; endsAt: string };
+type TechnicianApplication = { id: string; status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED'; displayName: string | null; city: string | null; district: string | null; supportedModes: string[]; rejectionReason: string | null; user: { id: string; displayName: string | null }; kyc?: { status: string } | null };
 
 const money = (value: number) => `${new Intl.NumberFormat('vi-VN').format(value)} đ`;
 const date = (value: string) => new Date(value).toLocaleString('vi-VN');
 
 export function AdminDashboard({ notify, refreshCategories }: Props) {
-  const [tab, setTab] = useState<'overview' | 'users' | 'bookings' | 'technicians' | 'categories' | 'banners' | 'promotions'>('overview');
+  const [tab, setTab] = useState<'overview' | 'users' | 'bookings' | 'applications' | 'technicians' | 'categories' | 'banners' | 'promotions'>('overview');
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [users, setUsers] = useState<Page<User> | null>(null);
@@ -26,17 +27,19 @@ export function AdminDashboard({ notify, refreshCategories }: Props) {
   const [technicians, setTechnicians] = useState<Page<Technician> | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [applications, setApplications] = useState<Page<TechnicianApplication> | null>(null);
+  const [applicationAction, setApplicationAction] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [nextDashboard, nextCategories, nextUsers, nextBookings, nextTechnicians, nextBanners, nextPromotions] = await Promise.all([
+      const [nextDashboard, nextCategories, nextUsers, nextBookings, nextTechnicians, nextBanners, nextPromotions, nextApplications] = await Promise.all([
         request<Dashboard>('/admin/marketplace/dashboard'), request<Category[]>('/admin/marketplace/categories'),
         request<Page<User>>('/admin/marketplace/users?limit=30'), request<Page<Booking>>('/admin/marketplace/bookings?limit=30'),
-        request<Page<Technician>>('/admin/marketplace/technicians?limit=30'), request<Banner[]>('/admin/marketplace/banners'), request<Promotion[]>('/admin/marketplace/promotions'),
+        request<Page<Technician>>('/admin/marketplace/technicians?limit=30'), request<Banner[]>('/admin/marketplace/banners'), request<Promotion[]>('/admin/marketplace/promotions'), request<Page<TechnicianApplication>>('/admin/marketplace/technician-applications?limit=30'),
       ]);
-      setDashboard(nextDashboard); setCategories(nextCategories); setUsers(nextUsers); setBookings(nextBookings); setTechnicians(nextTechnicians); setBanners(nextBanners); setPromotions(nextPromotions);
+      setDashboard(nextDashboard); setCategories(nextCategories); setUsers(nextUsers); setBookings(nextBookings); setTechnicians(nextTechnicians); setBanners(nextBanners); setPromotions(nextPromotions); setApplications(nextApplications);
     } catch (error) { notify(error instanceof Error ? error.message : 'Không tải được dữ liệu quản trị', true); }
     finally { setLoading(false); }
   }, [notify]);
@@ -55,6 +58,21 @@ export function AdminDashboard({ notify, refreshCategories }: Props) {
     try { await request(path, { method: 'DELETE' }); notify('Đã ẩn hoặc xóa dữ liệu.'); await load(); await refreshCategories(); }
     catch (error) { notify(error instanceof Error ? error.message : 'Không thể thực hiện', true); }
   }
+  async function reviewApplication(application: TechnicianApplication, action: 'review' | 'approve' | 'reject') {
+    let body: unknown = undefined;
+    if (action === 'reject') {
+      const reason = window.prompt('Lý do từ chối hồ sơ:');
+      if (!reason?.trim()) return;
+      body = { reason: reason.trim() };
+    }
+    setApplicationAction(application.id);
+    try {
+      await request(`/admin/marketplace/technician-applications/${application.id}/${action}`, { method: 'POST', ...(body ? { body: JSON.stringify(body) } : {}) });
+      notify(action === 'approve' ? 'Đã duyệt kỹ thuật viên.' : action === 'reject' ? 'Đã từ chối hồ sơ.' : 'Hồ sơ đang được review.');
+      await load();
+    } catch (error) { notify(error instanceof Error ? error.message : 'Không thể xử lý hồ sơ', true); }
+    finally { setApplicationAction(null); }
+  }
   const form = (event: FormEvent<HTMLFormElement>) => new FormData(event.currentTarget);
   const nav = (value: typeof tab, label: string, icon: ReactNode) => <button className={`tab-btn ${tab === value ? 'active' : ''}`} onClick={() => setTab(value)}>{icon}<span>{label}</span></button>;
 
@@ -64,7 +82,10 @@ export function AdminDashboard({ notify, refreshCategories }: Props) {
       {nav('technicians', 'Kỹ thuật viên', <UserCheck size={18} />)}{nav('categories', 'Danh mục', <FolderTree size={18} />)}
       {nav('banners', 'Banner', <ImageIcon size={18} />)}{nav('promotions', 'Khuyến mãi', <TicketPercent size={18} />)}
       <button className="quiet" onClick={() => void load()} disabled={loading}>{loading ? 'Đang tải…' : 'Làm mới'}</button>
+      {nav('applications', 'Duyệt KTV', <ClipboardCheck size={18} />)}
     </nav>
+
+    {tab === 'applications' && <Card title="Hồ sơ đăng ký kỹ thuật viên" subtitle={`${applications?.total ?? 0} hồ sơ; chỉ Admin mới duyệt.`}><div className="item-list">{applications?.items.map((application) => <div className="list-item-card" key={application.id}><div><div className="item-name">{application.displayName ?? application.user.displayName ?? 'Chưa đặt tên'} · {application.status}</div><div className="item-subtext">{application.city ?? '—'} · {application.district ?? '—'} · KYC: {application.kyc?.status ?? 'NOT_STARTED'}</div></div><div className="button-row">{application.status === 'SUBMITTED' && <button className="quiet" disabled={applicationAction === application.id} onClick={() => void reviewApplication(application, 'review')}>Nhận review</button>}{(application.status === 'SUBMITTED' || application.status === 'UNDER_REVIEW') && <><button className="quiet" disabled={applicationAction === application.id} onClick={() => void reviewApplication(application, 'approve')}>Duyệt</button><button className="quiet" disabled={applicationAction === application.id} onClick={() => void reviewApplication(application, 'reject')}>Từ chối</button></>}</div></div>)}</div></Card>}
 
     {tab === 'overview' && <>
       <div className="kpi-grid">
