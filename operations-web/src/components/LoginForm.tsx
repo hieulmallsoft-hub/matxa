@@ -8,7 +8,12 @@ export function LoginForm({ onSuccess }: { onSuccess: (auth: AuthResponse) => Pr
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [deviceId] = useState(() => `operations-web-${crypto.randomUUID()}`);
+  const [deviceId] = useState(() => {
+    const uuid = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    return `operations-web-${uuid}`;
+  });
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setLoading(true); setError(null);
