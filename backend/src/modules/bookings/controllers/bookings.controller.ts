@@ -5,7 +5,7 @@ import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
 import { BookingsService } from '../services/bookings.service';
-import { BookingHistoryQueryDto, CancelBookingDto, CreateBookingDto, CreateReviewDto, QuoteBookingDto, UpdateBookingStatusDto } from '../dto/booking.dto';
+import { BookingHistoryQueryDto, CancelBookingDto, CreateBookingDto, CreateOpenBookingDto, CreateReviewDto, QuoteBookingDto, SelectTechnicianDto, UpdateBookingStatusDto } from '../dto/booking.dto';
 
 @ApiTags('Bookings')
 @ApiBearerAuth('access-token')
@@ -25,6 +25,18 @@ export class BookingsController {
   @ApiOperation({ summary: 'Tao lich dat va khoa khung gio' })
   create(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateBookingDto) {
     return this.bookings.create(auth.sub, dto);
+  }
+
+  @Post('open')
+  @ApiOperation({ summary: 'Tao don mo marketplace tu dich vu catalog chung' })
+  createOpen(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateOpenBookingDto) {
+    return this.bookings.createOpen(auth.sub, dto);
+  }
+
+  @Post(':id/select-technician')
+  @ApiOperation({ summary: 'Khach chon mot KTV da ung tuyen cho don OPEN' })
+  selectTechnician(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SelectTechnicianDto) {
+    return this.bookings.selectTechnician(auth.sub, id, dto.applicationId);
   }
 
   @Get()

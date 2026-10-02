@@ -47,10 +47,31 @@ enum ServiceMode {
 }
 
 enum BookingStatus {
+  OPEN
   PENDING
   CONFIRMED
   COMPLETED
   CANCELLED
+}
+
+enum BookingAssignmentMode {
+  DIRECT
+  OPEN_MARKETPLACE
+}
+
+enum BookingTechnicianApplicationStatus {
+  APPLIED
+  SELECTED
+  NOT_SELECTED
+  WITHDRAWN
+  DECLINED
+  EXPIRED
+}
+
+enum ServiceCatalogPricingTemplate {
+  STANDARD_60_90_120
+  FIXED_60
+  DATE_2_4_6_HOURS
 }
 
 enum CancellationReasonCode {
@@ -71,6 +92,24 @@ enum PaymentStatus {
   PAID
   FAILED
   REFUNDED
+}
+
+enum WalletType {
+  ADVERTISING_CREDIT
+}
+enum TopUpStatus {
+  PENDING_PAYMENT
+  PROCESSING
+  SUCCESS
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+enum WalletTransactionType {
+  TOP_UP
+}
+enum WalletPaymentMethod {
+  BANK_TRANSFER
 }
 
 enum PromotionType {
@@ -125,6 +164,8 @@ model User {
   promotionUsages PromotionUsage[]
   reviews Review[]
   technicianApplication TechnicianApplication?
+  wallets               Wallet[]
+  topUpTransactions     TopUpTransaction[]
 
   @@map("users")
 }
@@ -225,6 +266,7 @@ model TechnicianProfile {
   favorites       Favorite[]
   bookings        Booking[]
   reviews         Review[]
+  bookingApplications BookingTechnicianApplication[]
 
   @@index([city, isAvailable])
   @@index([isActive, isAvailable(sort: Desc), averageRating(sort: Desc), id])
@@ -243,8 +285,50 @@ model ServiceCategory {
   createdAt DateTime            @default(now()) @map("created_at")
   updatedAt DateTime            @updatedAt @map("updated_at")
   services  TechnicianService[]
+  catalogItems ServiceCatalogItem[]
+  bookingItems BookingItem[]
 
   @@map("service_categories")
+}
+
+// Platform-owned catalog used by OPEN_MARKETPLACE bookings.  Its prices and
+// duration are copied to BookingItem so later catalog edits never alter history.
+model ServiceCatalogItem {
+  id              String          @id @default(uuid()) @db.Uuid
+  categoryId      String          @map("category_id") @db.Uuid
+  slug            String          @unique
+  name            String
+  description     String?
+  durationMinutes Int             @map("duration_minutes")
+  price           Decimal         @db.Decimal(12, 2)
+  pricingTemplate ServiceCatalogPricingTemplate @default(FIXED_60) @map("pricing_template")
+  sortOrder       Int             @default(0) @map("sort_order")
+  modes           ServiceMode[]   @default([])
+  isActive        Boolean         @default(true) @map("is_active")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  category        ServiceCategory @relation(fields: [categoryId], references: [id])
+  bookingItems    BookingItem[]
+  priceOptions    ServiceCatalogPriceOption[]
+
+  @@index([categoryId, isActive, sortOrder])
+  @@map("service_catalog_items")
+}
+
+model ServiceCatalogPriceOption {
+  id              String             @id @default(uuid()) @db.Uuid
+  catalogServiceId String             @map("catalog_service_id") @db.Uuid
+  code            String
+  durationMinutes Int                @map("duration_minutes")
+  price           Decimal            @db.Decimal(12, 2)
+  isActive        Boolean            @default(true) @map("is_active")
+  sortOrder       Int                @default(0) @map("sort_order")
+  catalogService  ServiceCatalogItem @relation(fields: [catalogServiceId], references: [id], onDelete: Cascade)
+  bookingItems    BookingItem[]
+
+  @@unique([catalogServiceId, code])
+  @@index([catalogServiceId, isActive, sortOrder])
+  @@map("service_catalog_price_options")
 }
 
 model City {
@@ -373,7 +457,9 @@ model Promotion {
 model Booking {
   id              String            @id @default(uuid()) @db.Uuid
   customerId      String            @map("customer_id") @db.Uuid
-  technicianId    String            @map("technician_id") @db.Uuid
+  technicianId    String?           @map("technician_id") @db.Uuid
+  assignmentMode  BookingAssignmentMode @default(DIRECT) @map("assignment_mode")
+  applicationDeadlineAt DateTime?   @map("application_deadline_at")
   addressId       String?           @map("address_id") @db.Uuid
   addressSnapshot Json?             @map("address_snapshot")
   promotionId     String?           @map("promotion_id") @db.Uuid
@@ -395,33 +481,65 @@ model Booking {
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
   customer        User              @relation("BookingCustomer", fields: [customerId], references: [id])
-  technician      TechnicianProfile @relation(fields: [technicianId], references: [id])
+  technician      TechnicianProfile? @relation(fields: [technicianId], references: [id])
   address         Address?          @relation(fields: [addressId], references: [id])
   promotion       Promotion?        @relation(fields: [promotionId], references: [id])
   items           BookingItem[]
   payment         Payment?
   review          Review?
   promotionUsage  PromotionUsage?
+  applications    BookingTechnicianApplication[]
 
   @@index([customerId, createdAt(sort: Desc)])
   @@index([technicianId, scheduledStart])
+  @@index([assignmentMode, status, scheduledStart])
   @@map("bookings")
 }
 
 model BookingItem {
   id              String            @id @default(uuid()) @db.Uuid
   bookingId       String            @map("booking_id") @db.Uuid
-  serviceId       String            @map("service_id") @db.Uuid
+  serviceId       String?           @map("service_id") @db.Uuid
+  catalogServiceId String?          @map("catalog_service_id") @db.Uuid
+  catalogPriceOptionId String?      @map("catalog_price_option_id") @db.Uuid
+  categoryId      String?           @map("category_id") @db.Uuid
+  categoryName    String?           @map("category_name")
   priceOptionId   String?           @map("price_option_id") @db.Uuid
   priceOptionCode String?           @map("price_option_code")
   serviceName     String            @map("service_name")
   durationMinutes Int               @map("duration_minutes")
   unitPrice       Decimal           @map("unit_price") @db.Decimal(12, 2)
   booking         Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  service         TechnicianService @relation(fields: [serviceId], references: [id])
+  service         TechnicianService? @relation(fields: [serviceId], references: [id])
+  catalogService  ServiceCatalogItem? @relation(fields: [catalogServiceId], references: [id])
+  catalogPriceOption ServiceCatalogPriceOption? @relation(fields: [catalogPriceOptionId], references: [id])
+  category        ServiceCategory? @relation(fields: [categoryId], references: [id])
 
   @@index([bookingId])
+  @@index([catalogServiceId])
+  @@index([catalogPriceOptionId])
   @@map("booking_items")
+}
+
+model BookingTechnicianApplication {
+  id                  String                              @id @default(uuid()) @db.Uuid
+  bookingId           String                              @map("booking_id") @db.Uuid
+  technicianProfileId String                              @map("technician_profile_id") @db.Uuid
+  status              BookingTechnicianApplicationStatus
+  appliedAt           DateTime?                           @map("applied_at")
+  selectedAt          DateTime?                           @map("selected_at")
+  withdrawnAt         DateTime?                           @map("withdrawn_at")
+  declinedAt          DateTime?                           @map("declined_at")
+  expiredAt           DateTime?                           @map("expired_at")
+  createdAt           DateTime                            @default(now()) @map("created_at")
+  updatedAt           DateTime                            @updatedAt @map("updated_at")
+  booking             Booking                             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  technicianProfile   TechnicianProfile                   @relation(fields: [technicianProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, technicianProfileId])
+  @@index([bookingId, status])
+  @@index([technicianProfileId, status])
+  @@map("booking_technician_applications")
 }
 
 model Payment {
@@ -438,6 +556,63 @@ model Payment {
   booking     Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@map("payments")
+}
+
+model Wallet {
+  id           String              @id @default(uuid()) @db.Uuid
+  userId       String              @map("user_id") @db.Uuid
+  type         WalletType
+  balanceVnd   Int                 @default(0) @map("balance_vnd")
+  currency     String              @default("VND")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topUps       TopUpTransaction[]
+  ledger       WalletLedgerEntry[]
+  @@unique([userId, type])
+  @@map("wallets")
+}
+
+model TopUpTransaction {
+  id                    String              @id @default(uuid()) @db.Uuid
+  walletId              String              @map("wallet_id") @db.Uuid
+  userId                String              @map("user_id") @db.Uuid
+  amountVnd             Int                 @map("amount_vnd")
+  currency              String              @default("VND")
+  status                TopUpStatus         @default(PENDING_PAYMENT)
+  paymentMethod         WalletPaymentMethod @map("payment_method")
+  referenceCode         String              @unique @map("reference_code")
+  providerTransactionId String?             @unique @map("provider_transaction_id")
+  failureCode           String?             @map("failure_code")
+  failureMessage        String?             @map("failure_message")
+  expiresAt             DateTime            @map("expires_at")
+  processedAt           DateTime?           @map("processed_at")
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+  wallet                Wallet              @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgerEntries         WalletLedgerEntry[]
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([walletId, status])
+  @@map("top_up_transactions")
+}
+
+model WalletLedgerEntry {
+  id              String                 @id @default(uuid()) @db.Uuid
+  walletId        String                 @map("wallet_id") @db.Uuid
+  topUpId         String?                @map("top_up_id") @db.Uuid
+  type            WalletTransactionType
+  amountVnd       Int                    @map("amount_vnd")
+  balanceBeforeVnd Int                   @map("balance_before_vnd")
+  balanceAfterVnd  Int                   @map("balance_after_vnd")
+  referenceType   String                 @map("reference_type")
+  referenceId     String                 @map("reference_id")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  wallet          Wallet                 @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  topUp           TopUpTransaction?      @relation(fields: [topUpId], references: [id], onDelete: SetNull)
+  @@unique([referenceType, referenceId])
+  @@index([walletId, createdAt(sort: Desc)])
+  @@map("wallet_ledger_entries")
 }
 
 model PromotionUsage {

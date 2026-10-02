@@ -17,6 +17,28 @@ export class CreateBookingDto extends QuoteBookingDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) note?: string;
 }
 
+export class OpenBookingItemDto {
+  @ApiProperty() @IsUUID() catalogServiceId!: string;
+  @ApiProperty() @IsUUID() priceOptionId!: string;
+}
+
+/** Customer request for a platform-catalog service; no technician is selected yet. */
+export class CreateOpenBookingDto {
+  @ApiProperty({ type: [OpenBookingItemDto] }) @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10) items!: OpenBookingItemDto[];
+  @ApiProperty({ enum: ['HOME', 'ONSITE', 'ONLINE'] }) @IsIn(['HOME', 'ONSITE', 'ONLINE']) mode!: 'HOME' | 'ONSITE' | 'ONLINE';
+  @ApiProperty({ example: 'HN', description: 'Ma thanh pho theo location master' }) @IsString() @MaxLength(50) city!: string;
+  @ApiPropertyOptional({ example: 'HN-CAU-GIAY' }) @IsOptional() @IsString() @MaxLength(50) district?: string;
+  @ApiProperty({ description: 'ISO timestamp with explicit Z or timezone offset' }) @IsDateString({ strict: true }) @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i) scheduledStart!: string;
+  @ApiPropertyOptional() @IsOptional() @IsUUID() addressId?: string;
+  @ApiPropertyOptional({ description: 'Optional ISO deadline. It must be before scheduledStart.' }) @IsOptional() @IsDateString({ strict: true }) applicationDeadlineAt?: string;
+  @ApiProperty({ enum: ['CASH'] }) @IsIn(['CASH']) paymentMethod!: 'CASH';
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) note?: string;
+}
+
+export class SelectTechnicianDto {
+  @ApiProperty() @IsUUID() applicationId!: string;
+}
+
 export class CancelBookingDto {
   @ApiPropertyOptional({ enum: ['NO_LONGER_NEEDED', 'SERVICE_ISSUE', 'PAYMENT_REFUND_ISSUE', 'OTHER'] })
   @IsOptional() @IsIn(['NO_LONGER_NEEDED', 'SERVICE_ISSUE', 'PAYMENT_REFUND_ISSUE', 'OTHER']) reasonCode?: 'NO_LONGER_NEEDED' | 'SERVICE_ISSUE' | 'PAYMENT_REFUND_ISSUE' | 'OTHER';
@@ -37,11 +59,15 @@ export class CreateReviewDto {
 }
 
 export class BookingHistoryQueryDto {
-  @ApiPropertyOptional({ enum: ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'] })
-  @IsOptional() @IsIn(['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED']) status?: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+  @ApiPropertyOptional({ enum: ['OPEN', 'PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'] })
+  @IsOptional() @IsIn(['OPEN', 'PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED']) status?: string;
   @ApiPropertyOptional({ default: 1, type: Number, description: 'Trang bắt đầu từ 1' }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
   @ApiPropertyOptional({ default: 20, type: Number, maximum: 100, description: 'Số bản ghi mỗi trang' }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit = 20;
 }
 
 /** Inbox shown on the KTV Mobile "Nhận việc" tab. */
-export class TechnicianJobQueryDto extends BookingHistoryQueryDto {}
+export class TechnicianJobQueryDto extends BookingHistoryQueryDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) city?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) district?: string;
+  @ApiPropertyOptional() @IsOptional() @IsUUID() serviceId?: string;
+}

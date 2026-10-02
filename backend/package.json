@@ -12,6 +12,7 @@
     "db:studio": "prisma studio",
     "db:seed-admin": "ts-node --files src/scripts/seed-admin.ts",
     "db:seed-demo": "ts-node --files src/scripts/seed-local-demo.ts",
+    "db:seed-service-catalog": "ts-node --files src/scripts/seed-service-catalog.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",

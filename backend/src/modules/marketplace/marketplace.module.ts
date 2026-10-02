@@ -8,11 +8,13 @@ import { TechnicianApplicationsService } from './services/technician-application
 import { TechnicianApplicationStorageService } from './services/technician-application-storage.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { LocationService } from './services/location.service';
+import { ServiceCatalogController, AdminServiceCatalogController } from './controllers/service-catalog.controller';
+import { ServiceCatalogService } from './services/service-catalog.service';
 
 @Module({
   imports: [AuthModule, NotificationsModule],
-  controllers: [MarketplaceController, LocationsController, FavoritesController, TechnicianController, AddressesController, AdminMarketplaceController],
-  providers: [MarketplaceService, AdminMarketplaceService, TechnicianApplicationsService, TechnicianApplicationStorageService, LocationService],
+  controllers: [MarketplaceController, LocationsController, FavoritesController, TechnicianController, AddressesController, AdminMarketplaceController, ServiceCatalogController, AdminServiceCatalogController],
+  providers: [MarketplaceService, AdminMarketplaceService, TechnicianApplicationsService, TechnicianApplicationStorageService, LocationService, ServiceCatalogService],
   exports: [MarketplaceService],
 })
 export class MarketplaceModule {}

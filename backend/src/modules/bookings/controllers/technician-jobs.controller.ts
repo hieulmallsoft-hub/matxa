@@ -22,6 +22,10 @@ export class TechnicianJobsController {
   detail(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) { return this.bookings.technicianJobDetail(auth.sub, id); }
   @Get(':id/contact') @ApiOperation({ summary: 'KTV lay so lien he cua khach sau khi da nhan don' })
   contact(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) { return this.bookings.technicianJobContact(auth.sub, id); }
+  @Post(':id/apply') @ApiOperation({ summary: 'KTV ung tuyen don OPEN marketplace' })
+  apply(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) { return this.bookings.applyToOpenJob(auth.sub, id); }
+  @Post(':id/withdraw') @ApiOperation({ summary: 'KTV rut ung tuyen khi don con OPEN' })
+  withdraw(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) { return this.bookings.withdrawOpenJobApplication(auth.sub, id); }
   @Post(':id/accept') @ApiOperation({ summary: 'KTV nhan don moi: PENDING sang CONFIRMED' })
   accept(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) { return this.bookings.acceptTechnicianJob(auth.sub, id); }
   @Post(':id/decline') @ApiOperation({ summary: 'KTV tu choi don moi va thong bao cho khach' })

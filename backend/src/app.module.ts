@@ -12,6 +12,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { MarketplaceModule } from './modules/marketplace/marketplace.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { ProfileModule } from './modules/profile/profile.module';
+import { WalletModule } from './modules/wallet/wallet.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ProfileModule } from './modules/profile/profile.module';
     MarketplaceModule,
     BookingsModule,
     ProfileModule,
+    WalletModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
