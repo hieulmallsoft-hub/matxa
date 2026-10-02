@@ -39,8 +39,8 @@ export class CreateReviewDto {
 export class BookingHistoryQueryDto {
   @ApiPropertyOptional({ enum: ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'] })
   @IsOptional() @IsIn(['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED']) status?: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
-  @ApiPropertyOptional({ default: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
-  @ApiPropertyOptional({ default: 20, maximum: 100 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit = 20;
+  @ApiPropertyOptional({ default: 1, type: Number, description: 'Trang bắt đầu từ 1' }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
+  @ApiPropertyOptional({ default: 20, type: Number, maximum: 100, description: 'Số bản ghi mỗi trang' }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit = 20;
 }
 
 /** Inbox shown on the KTV Mobile "Nhận việc" tab. */
