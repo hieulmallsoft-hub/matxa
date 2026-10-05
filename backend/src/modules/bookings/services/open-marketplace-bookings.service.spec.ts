@@ -27,7 +27,7 @@ describe('open marketplace selection', () => {
     };
     const prisma: any = { $transaction: jest.fn(async (callback: any) => callback(tx)) };
     const notifications = { create: jest.fn().mockResolvedValue({}), sendPush: jest.fn().mockResolvedValue({}) };
-    const service = new BookingsService(prisma, { get: jest.fn() } as any, notifications as any);
+    const service = new BookingsService(prisma, { get: jest.fn() } as any, notifications as any, { createPaymentUrl: jest.fn(), verify: jest.fn() } as any);
 
     const response = await service.selectTechnician('customer-1', 'booking-1', 'application-winner');
 

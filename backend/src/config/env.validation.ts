@@ -34,6 +34,13 @@ export function validateEnvironment(config: Record<string, unknown>) {
     throw new Error('REFRESH_TOKEN_TTL_DAYS phai la so nguyen tu 1 den 365');
   }
 
+  if (config.VNPAY_TMN_CODE || config.VNPAY_HASH_SECRET || config.VNPAY_RETURN_URL) {
+    for (const key of ['VNPAY_TMN_CODE', 'VNPAY_HASH_SECRET', 'VNPAY_RETURN_URL']) {
+      if (typeof config[key] !== 'string' || config[key].trim().length === 0) throw new Error(`${key} la bat buoc khi bat VNPAY`);
+    }
+    if ((config.VNPAY_HASH_SECRET as string).length < 16) throw new Error('VNPAY_HASH_SECRET khong hop le');
+  }
+
   const integerSettings = {
     OTP_TTL_SECONDS: [300, 60, 600],
     OTP_RESEND_SECONDS: [60, 30, 300],
@@ -41,6 +48,7 @@ export function validateEnvironment(config: Record<string, unknown>) {
     OTP_PHONE_LIMIT_PER_HOUR: [5, 1, 100],
     OTP_IP_LIMIT_PER_HOUR: [20, 1, 1000],
     OTP_DEVICE_LIMIT_PER_HOUR: [10, 1, 500],
+    VNPAY_PAYMENT_TTL_MINUTES: [15, 1, 60],
   } as const;
   const parsedSettings: Record<string, number> = {};
   for (const [key, [fallback, minimum, maximum]] of Object.entries(

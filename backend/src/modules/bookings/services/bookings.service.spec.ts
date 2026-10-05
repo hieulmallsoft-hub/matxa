@@ -17,7 +17,7 @@ describe('BookingsService', () => {
     $transaction: jest.fn(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx)) };
   const config = { get: jest.fn((_key: string, fallback: unknown) => fallback) };
   const notifications = { create: jest.fn(), sendPush: jest.fn() };
-  const service = new BookingsService(prisma as never, config as never, notifications as never);
+  const service = new BookingsService(prisma as never, config as never, notifications as never, { createPaymentUrl: jest.fn(), verify: jest.fn() } as never);
 
   beforeEach(() => { jest.clearAllMocks(); userIdentity.findFirst.mockResolvedValue({ id: 'phone' }); });
   afterEach(() => jest.restoreAllMocks());
@@ -80,9 +80,9 @@ describe('BookingsService', () => {
     expect(booking.update).not.toHaveBeenCalled();
   });
 
-  it('rejects online payment before creating a booking', async () => {
-    await expect(service.create('customer', { paymentMethod: 'ONLINE' } as never)).rejects.toThrow('online');
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+  it('allows ONLINE to enter the normal booking validation flow', async () => {
+    await expect(service.create('customer', { paymentMethod: 'ONLINE' } as never)).rejects.toThrow('dich vu');
+    expect(prisma.$transaction).toHaveBeenCalled();
   });
 
   it('rechecks technician status inside the creation transaction', async () => {

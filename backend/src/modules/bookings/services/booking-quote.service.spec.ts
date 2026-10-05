@@ -11,7 +11,7 @@ describe('Quote and create share pricing/validation; address snapshots are immut
   const prisma = { ...db, $transaction: jest.fn(async (fn: (client: typeof db) => unknown) => fn(db)) };
   const config = { get: jest.fn((_key: string, fallback: unknown) => fallback) };
   const notifications = { create: jest.fn(), sendPush: jest.fn() };
-  const service = new BookingsService(prisma as never, config as never, notifications as never);
+  const service = new BookingsService(prisma as never, config as never, notifications as never, { createPaymentUrl: jest.fn(), verify: jest.fn() } as never);
   const dto = (): QuoteBookingDto => ({ technicianId: 't1', serviceIds: ['s1'], mode: 'HOME',
     scheduledStart: new Date(Date.now() + 3600000).toISOString(), addressId: 'a1' });
   const originalAddress = { id: 'a1', address: 'Original street', label: 'Home', latitude: 10, longitude: 106 };

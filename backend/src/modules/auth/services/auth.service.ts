@@ -223,15 +223,24 @@ export class AuthService {
       if (owner && owner.userId !== userId) {
         throw new ConflictException('So dien thoai da lien ket voi tai khoan khac');
       }
-      if (currentPhone && currentPhone.providerSubject !== phoneNumber) {
-        throw new ConflictException('Tai khoan da lien ket mot so dien thoai khac');
-      }
-
       if (!owner && !currentPhone) {
         await transaction.userIdentity.create({
           data: {
             userId,
             provider: DbAuthProvider.PHONE,
+            providerSubject: phoneNumber,
+            phoneNumber,
+          },
+        });
+      }
+
+      // A valid, user-bound OTP for the new number authorizes replacing the
+      // previous PHONE identity.  Keep the identity row so existing relations
+      // and audit data remain intact; only the verified phone value changes.
+      if (currentPhone && currentPhone.providerSubject !== phoneNumber) {
+        await transaction.userIdentity.update({
+          where: { id: currentPhone.id },
+          data: {
             providerSubject: phoneNumber,
             phoneNumber,
           },
@@ -423,12 +432,11 @@ export class AuthService {
         },
       });
 
-      return transaction.user.update({
+      // Google profile data is a first-login default only.  A user may have
+      // changed their profile in Matxa, so a subsequent Google login must not
+      // overwrite displayName or avatarUrl with Google's cached profile.
+      return transaction.user.findUniqueOrThrow({
         where: { id: userId },
-        data: {
-          ...(identity.name ? { displayName: identity.name } : {}),
-          ...(identity.picture ? { avatarUrl: identity.picture } : {}),
-        },
         include: { identities: true },
       });
     });

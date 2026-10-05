@@ -4,6 +4,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
 import { applyPriceOptions, loadBookableServices } from '../../marketplace/services/technician-selection';
 import { NotificationsService } from '../../notifications/services/notifications.service';
+import { VnpayService } from './vnpay.service';
 import { BookingHistoryQueryDto, CancelBookingDto, CreateBookingDto, CreateOpenBookingDto, CreateReviewDto, QuoteBookingDto, TechnicianJobQueryDto, UpdateBookingStatusDto } from '../dto/booking.dto';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class BookingsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly notifications: NotificationsService,
+    private readonly vnpay: VnpayService,
   ) {}
 
   async quote(userId: string, dto: QuoteBookingDto, db: Prisma.TransactionClient = this.prisma) {
@@ -75,7 +77,6 @@ export class BookingsService {
   }
 
   async create(userId: string, dto: CreateBookingDto) {
-    if (dto.paymentMethod !== 'CASH') throw new BadRequestException('Thanh toan online chua duoc ho tro');
     const phone = await this.prisma.userIdentity.findFirst({
       where: { userId, provider: 'PHONE', phoneNumber: { not: null } }, select: { id: true },
     });
@@ -139,6 +140,45 @@ export class BookingsService {
       }
       throw error;
     }
+  }
+
+  async createVnpayPayment(userId: string, bookingId: string, ipAddress: string) {
+    const payment = await this.prisma.payment.findFirst({ where: { bookingId, booking: { customerId: userId } }, include: { booking: { select: { id: true } } } });
+    if (!payment) throw new NotFoundException('Thanh toan khong ton tai');
+    if (payment.method !== 'ONLINE') throw new BadRequestException('Booking khong dung thanh toan online');
+    if (payment.status === 'PAID') return { bookingId, paymentId: payment.id, status: 'PAID', paymentUrl: null };
+    const ttlMinutes = Number(this.config.get('VNPAY_PAYMENT_TTL_MINUTES', 15));
+    if (!Number.isInteger(ttlMinutes) || ttlMinutes < 1 || ttlMinutes > 60) throw new BadRequestException('VNPAY_PAYMENT_TTL_MINUTES khong hop le');
+    const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+    const txnRef = payment.providerRef ?? payment.id.replace(/-/g, '');
+    await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'PENDING', provider: 'VNPAY', providerRef: txnRef, expiresAt } });
+    return { bookingId, paymentId: payment.id, status: 'PENDING', expiresAt, paymentUrl: this.vnpay.createPaymentUrl({ txnRef, amountVnd: Number(payment.amount), orderInfo: `MATXA ${bookingId}`, ipAddress, expiresAt }) };
+  }
+
+  async processVnpayIpn(params: Record<string, string | undefined>) {
+    if (!this.vnpay.verify(params)) return { RspCode: '97', Message: 'Invalid signature' };
+    if (params.vnp_TmnCode !== this.config.get<string>('VNPAY_TMN_CODE')) return { RspCode: '97', Message: 'Invalid merchant' };
+    const ref = params.vnp_TxnRef;
+    const amount = Number(params.vnp_Amount) / 100;
+    if (!ref || !Number.isFinite(amount)) return { RspCode: '04', Message: 'Invalid request' };
+    const payment = await this.prisma.payment.findFirst({ where: { provider: 'VNPAY', providerRef: ref } });
+    if (!payment || Number(payment.amount) !== amount) return { RspCode: '04', Message: 'Order not found' };
+    if (payment.status === 'PAID') return { RspCode: '02', Message: 'Order already confirmed' };
+    if (params.vnp_ResponseCode !== '00' || params.vnp_TransactionStatus !== '00') {
+      await this.prisma.payment.updateMany({ where: { id: payment.id, status: 'PENDING' }, data: { status: 'FAILED', responseCode: params.vnp_ResponseCode ?? null, ipnReceivedAt: new Date() } });
+      return { RspCode: '00', Message: 'Confirm Success' };
+    }
+    if (payment.expiresAt && payment.expiresAt < new Date()) return { RspCode: '04', Message: 'Order expired' };
+    const updated = await this.prisma.payment.updateMany({ where: { id: payment.id, status: { in: ['PENDING', 'UNPAID'] } }, data: { status: 'PAID', paidAt: new Date(), ipnReceivedAt: new Date(), responseCode: params.vnp_ResponseCode ?? null, providerTransactionNo: params.vnp_TransactionNo ?? null, bankCode: params.vnp_BankCode ?? null, bankTranNo: params.vnp_BankTranNo ?? null } });
+    return updated.count ? { RspCode: '00', Message: 'Confirm Success' } : { RspCode: '02', Message: 'Order already confirmed' };
+  }
+
+  async vnpayReturn(params: Record<string, string | undefined>) {
+    if (!this.vnpay.verify(params) || params.vnp_TmnCode !== this.config.get<string>('VNPAY_TMN_CODE')) return { valid: false, status: 'INVALID_SIGNATURE' };
+    const payment = params.vnp_TxnRef ? await this.prisma.payment.findFirst({ where: { provider: 'VNPAY', providerRef: params.vnp_TxnRef }, select: { bookingId: true, status: true, amount: true } }) : null;
+    if (!payment || Number(payment.amount) !== Number(params.vnp_Amount) / 100) return { valid: false, status: 'NOT_FOUND' };
+    // Return URL is presentation only. IPN remains the sole writer of PAID.
+    return { valid: true, bookingId: payment.bookingId, paymentStatus: payment.status, gatewayResponseCode: params.vnp_ResponseCode ?? null };
   }
 
   /** Creates an unassigned marketplace request from platform-owned catalog items. */

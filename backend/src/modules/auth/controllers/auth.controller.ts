@@ -149,7 +149,7 @@ export class AuthController {
   @ApiBearerAuth('access-token')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('phone/link/send-otp')
-  @ApiOperation({ summary: 'Gui OTP de lien ket so dien thoai voi tai khoan' })
+  @ApiOperation({ summary: 'Gui OTP den so dien thoai moi de lien ket hoac thay doi so dien thoai' })
   @ApiAcceptedResponse({ type: SendPhoneOtpResponse })
   @ApiUnauthorizedResponse({ description: 'Can dang nhap truoc khi lien ket' })
   linkPhoneSendOtp(
@@ -170,7 +170,7 @@ export class AuthController {
   @ApiBearerAuth('access-token')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('phone/link/verify-otp')
-  @ApiOperation({ summary: 'Xac minh OTP va lien ket so dien thoai' })
+  @ApiOperation({ summary: 'Xac minh OTP va lien ket hoac thay doi so dien thoai' })
   @ApiOkResponse({ type: AuthUser })
   @ApiUnauthorizedResponse({ description: 'OTP hoac access token khong hop le' })
   linkPhoneVerifyOtp(

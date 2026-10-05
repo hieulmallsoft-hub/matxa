@@ -4,10 +4,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { BookingsController } from './controllers/bookings.controller';
 import { TechnicianJobsController } from './controllers/technician-jobs.controller';
 import { BookingsService } from './services/bookings.service';
+import { VnpayService } from './services/vnpay.service';
+import { BookingVnpayController, VnpayController } from './controllers/vnpay.controller';
 
 @Module({
   imports: [AuthModule, NotificationsModule],
-  controllers: [BookingsController, TechnicianJobsController],
-  providers: [BookingsService],
+  controllers: [BookingsController, TechnicianJobsController, VnpayController, BookingVnpayController],
+  providers: [BookingsService, VnpayService],
 })
 export class BookingsModule {}

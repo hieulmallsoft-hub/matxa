@@ -13,7 +13,7 @@ export class QuoteBookingDto {
 }
 
 export class CreateBookingDto extends QuoteBookingDto {
-  @ApiProperty({ enum: ['CASH'], description: 'Hien chi ho tro thanh toan tien mat' }) @IsIn(['CASH']) paymentMethod!: 'CASH' | 'ONLINE';
+  @ApiProperty({ enum: ['CASH', 'ONLINE'], description: 'ONLINE su dung VNPAY khi server da duoc cau hinh' }) @IsIn(['CASH', 'ONLINE']) paymentMethod!: 'CASH' | 'ONLINE';
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) note?: string;
 }
 

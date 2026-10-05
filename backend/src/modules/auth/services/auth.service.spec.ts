@@ -169,6 +169,32 @@ describe('AuthService', () => {
       .toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it('keeps the Matxa profile when an existing user logs in with Google again', async () => {
+    googleTokenVerifier.verify.mockResolvedValue({
+      subject: 'google-user-id',
+      email: 'user@example.com',
+      emailVerified: true,
+      name: 'Google name',
+      picture: 'https://google.example/avatar.jpg',
+    });
+    transaction.userIdentity.findUnique.mockResolvedValue({ userId: 'user-id' });
+    transaction.user.findUniqueOrThrow.mockResolvedValue({
+      id: 'user-id',
+      displayName: 'Ten da chinh trong Matxa',
+      avatarUrl: 'https://cdn.matxa.vn/avatar-custom.jpg',
+      status: 'ACTIVE',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      identities: [{ provider: 'GOOGLE', email: 'user@example.com', phoneNumber: null }],
+    });
+
+    const result = await service.loginWithGoogle('google-token', { deviceId: 'device-1' });
+
+    expect(transaction.user.update).not.toHaveBeenCalled();
+    expect(result.user.name).toBe('Ten da chinh trong Matxa');
+    expect(result.user.avatarUrl).toBe('https://cdn.matxa.vn/avatar-custom.jpg');
+  });
+
   it('creates a local session after a valid Apple login', async () => {
     appleTokenVerifier.verify.mockResolvedValue({
       subject: 'apple-user-id',
@@ -320,5 +346,27 @@ describe('AuthService', () => {
         'device-1',
       ),
     ).rejects.toThrow('So dien thoai da lien ket voi tai khoan khac');
+  });
+
+  it('replaces the current phone after a valid OTP for a new phone', async () => {
+    phoneOtp.verifyOtp.mockResolvedValue('+84987654321');
+    transaction.userIdentity.findFirst.mockResolvedValue({
+      id: 'old-phone-identity',
+      userId: 'user-id',
+      provider: 'PHONE',
+      providerSubject: '+84901234567',
+      phoneNumber: '+84901234567',
+    });
+
+    await service.linkVerifiedPhone('user-id', 'challenge-id', '123456', 'device-1');
+
+    expect(transaction.userIdentity.update).toHaveBeenCalledWith({
+      where: { id: 'old-phone-identity' },
+      data: {
+        providerSubject: '+84987654321',
+        phoneNumber: '+84987654321',
+      },
+    });
+    expect(transaction.userIdentity.create).not.toHaveBeenCalled();
   });
 });
