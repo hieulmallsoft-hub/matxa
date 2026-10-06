@@ -10,6 +10,7 @@ Base URL: `/api`. All endpoints require `Authorization: Bearer <accessToken>`.
 | --- | --- | --- |
 | `OPEN` | `null` | Don phu hop; hien Apply / Decline |
 | `OPEN` | `APPLIED` | Dang cho khach xac nhan; hien Withdraw |
+| `EXPIRED` | `EXPIRED` | Don da het han; khong con thao tac |
 | `CONFIRMED` | `SELECTED` | Da duoc chon; duoc contact va complete |
 | `CONFIRMED` | `NOT_SELECTED` | Khach da chon KTV khac |
 | `CANCELLED` | any | Don da huy |
@@ -23,7 +24,7 @@ Do not infer an application state from `bookingStatus`, and never allow Mobile t
 
 Only an active, verified, approved technician receives jobs. The API checks mode, catalog-category eligibility, location, availability and confirmed-booking conflicts before showing an un-applied OPEN job.
 
-`status` may be a booking state (`OPEN`, `CONFIRMED`, `COMPLETED`, `CANCELLED`) or the current application state (`APPLIED`, `SELECTED`, `NOT_SELECTED`, `WITHDRAWN`, `DECLINED`, `EXPIRED`).
+`status` may be a booking state (`OPEN`, `EXPIRED`, `CONFIRMED`, `COMPLETED`, `CANCELLED`) or the current application state (`APPLIED`, `SELECTED`, `NOT_SELECTED`, `WITHDRAWN`, `DECLINED`, `EXPIRED`). OPEN jobs whose `applicationDeadlineAt` has passed are excluded even before the background worker has updated them.
 
 For an OPEN job the response deliberately omits exact customer address/contact. Important fields:
 
@@ -77,7 +78,7 @@ Customer creates an open booking with platform catalog IDs:
 }
 ```
 
-`applicationDeadlineAt` is optional; the backend does not impose a default expiry period.
+`applicationDeadlineAt` is optional. If omitted, backend calculates it using `OPEN_BOOKING_APPLICATION_TTL_MINUTES` (default 60 minutes). Mobile uses `applicationDeadlineAt` and optional `expiresInSeconds` from the server for its countdown; it must never decide expiry itself.
 
 Select one applicant:
 
@@ -87,9 +88,13 @@ Select one applicant:
 { "applicationId": "uuid" }
 ```
 
-The customer must own the OPEN booking. Selection is atomic: the winner becomes `SELECTED`, every other `APPLIED` application becomes `NOT_SELECTED`, the booking receives `technicianId` and transitions to `CONFIRMED`.
+The customer must own the OPEN booking and select before `applicationDeadlineAt`. Selection is atomic: the winner becomes `SELECTED`, every other `APPLIED` application becomes `NOT_SELECTED`, the booking receives `technicianId` and transitions to `CONFIRMED`.
 
-If another selection has already won, expect `409`. Refresh the booking instead of retrying with another application.
+If another selection has already won, or the deadline passed, expect `409` (`BOOKING_EXPIRED` after expiry). Refresh the booking instead of retrying with another application. Do not reopen an expired booking: customer must create a new booking (repost/clone is a later phase).
+
+## Deadline expiry
+
+The backend worker periodically transitions overdue unassigned OPEN bookings to `EXPIRED`. All `APPLIED` applications become `EXPIRED`; `DECLINED` and `WITHDRAWN` remain unchanged. A customer receives `BOOKING_EXPIRED`. On `EXPIRED`, display **Don da het han**, hide Apply, Withdraw, Contact, Cancel and Complete. The worker is idempotent; clients should refresh on retry rather than attempt a state transition.
 
 ## Error handling and security
 

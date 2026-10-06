@@ -49,6 +49,9 @@ export function validateEnvironment(config: Record<string, unknown>) {
     OTP_IP_LIMIT_PER_HOUR: [20, 1, 1000],
     OTP_DEVICE_LIMIT_PER_HOUR: [10, 1, 500],
     VNPAY_PAYMENT_TTL_MINUTES: [15, 1, 60],
+    OPEN_BOOKING_APPLICATION_TTL_MINUTES: [60, 5, 10080],
+    OPEN_BOOKING_EXPIRATION_INTERVAL_SECONDS: [60, 15, 3600],
+    OPEN_BOOKING_EXPIRATION_BATCH_SIZE: [100, 1, 500],
   } as const;
   const parsedSettings: Record<string, number> = {};
   for (const [key, [fallback, minimum, maximum]] of Object.entries(

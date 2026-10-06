@@ -72,8 +72,8 @@ export class CreateReviewDto {
 }
 
 export class BookingHistoryQueryDto {
-  @ApiPropertyOptional({ enum: ['OPEN', 'PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'] })
-  @IsOptional() @IsIn(['OPEN', 'PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED']) status?: string;
+  @ApiPropertyOptional({ enum: ['OPEN', 'EXPIRED', 'PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'] })
+  @IsOptional() @IsIn(['OPEN', 'EXPIRED', 'PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED']) status?: string;
   @ApiPropertyOptional({ default: 1, type: Number, description: 'Trang bắt đầu từ 1' }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
   @ApiPropertyOptional({ default: 20, type: Number, maximum: 100, description: 'Số bản ghi mỗi trang' }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit = 20;
 }

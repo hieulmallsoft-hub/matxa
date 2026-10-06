@@ -188,8 +188,11 @@ export class BookingsService {
     const start = new Date(dto.scheduledStart);
     if (!Number.isFinite(start.getTime()) || start <= new Date()) throw new BadRequestException('Thoi gian dat lich phai o tuong lai');
     if (dto.mode !== 'HOME' && dto.addressId) throw new BadRequestException('Chi gui addressId khi dat tai nha');
-    const deadline = dto.applicationDeadlineAt ? new Date(dto.applicationDeadlineAt) : null;
-    if (deadline && (!Number.isFinite(deadline.getTime()) || deadline <= new Date() || deadline >= start)) throw new BadRequestException('Han ung tuyen phai nam giua hien tai va gio dat lich');
+    const now = new Date();
+    const defaultTtlMinutes = Number(this.config.get('OPEN_BOOKING_APPLICATION_TTL_MINUTES', 60));
+    const requestedDeadline = dto.applicationDeadlineAt ? new Date(dto.applicationDeadlineAt) : null;
+    const deadline = requestedDeadline ?? new Date(now.getTime() + defaultTtlMinutes * 60_000);
+    if (!Number.isFinite(deadline.getTime()) || deadline <= now || deadline >= start) throw new BadRequestException('Han ung tuyen phai nam giua hien tai va gio dat lich');
     const catalogIds = [...new Set(dto.items.map((item) => item.catalogServiceId))];
     if (catalogIds.length !== dto.items.length) throw new BadRequestException('Khong duoc trung dich vu catalog');
     const catalog = await this.prisma.serviceCatalogItem.findMany({ where: { id: { in: catalogIds }, isActive: true, category: { isActive: true } }, include: { category: { select: { name: true } }, priceOptions: { where: { isActive: true } } } });
@@ -219,7 +222,7 @@ export class BookingsService {
       items: { create: ordered.map(({ service, option }) => ({ catalogServiceId: service.id, catalogPriceOptionId: option.id, categoryId: service.categoryId, categoryName: service.category.name, serviceName: service.name, durationMinutes: option.durationMinutes, unitPrice: option.price })) },
       payment: { create: { method: dto.paymentMethod, status: 'UNPAID', amount: subtotal + serviceFee } },
     }, include: { items: { include: { catalogService: true } }, payment: true } });
-    return this.openBookingResponse(created, null, false);
+    return { ...this.openBookingResponse(created, null, false), expiresInSeconds: Math.max(0, Math.floor((deadline.getTime() - Date.now()) / 1000)) };
   }
 
   async applyToOpenJob(userId: string, bookingId: string) {
@@ -257,13 +260,13 @@ export class BookingsService {
     let result: { booking: any; winnerUserId: string; loserUserIds: string[] };
     try {
       result = await this.prisma.$transaction(async (tx) => {
-        const claimed = await tx.booking.updateMany({ where: { id: bookingId, customerId, assignmentMode: 'OPEN_MARKETPLACE', status: 'OPEN', technicianId: null }, data: { status: 'OPEN' } });
+        const now = new Date();
+        const claimed = await tx.booking.updateMany({ where: { id: bookingId, customerId, assignmentMode: 'OPEN_MARKETPLACE', status: 'OPEN', technicianId: null, OR: [{ applicationDeadlineAt: null }, { applicationDeadlineAt: { gt: now } }] }, data: { status: 'OPEN' } });
         if (!claimed.count) throw new ConflictException('Don da duoc chon KTV, huy, hoac khong con mo');
         const application = await tx.bookingTechnicianApplication.findFirst({ where: { id: applicationId, bookingId, status: 'APPLIED' }, include: { technicianProfile: { include: { user: { select: { id: true } } } } } });
         if (!application) throw new BadRequestException('Ung tuyen khong hop le');
         const booking = await tx.booking.findUniqueOrThrow({ where: { id: bookingId }, include: { items: { include: { catalogService: true } } } });
         await this.assertOpenEligibility(tx, booking, application.technicianProfileId);
-        const now = new Date();
         await tx.bookingTechnicianApplication.update({ where: { id: application.id }, data: { status: 'SELECTED', selectedAt: now } });
         await tx.bookingTechnicianApplication.updateMany({ where: { bookingId, id: { not: application.id }, status: 'APPLIED' }, data: { status: 'NOT_SELECTED' } });
         const assigned = await tx.booking.update({ where: { id: bookingId }, data: { technicianId: application.technicianProfileId, status: 'CONFIRMED' }, include: { items: { include: { catalogService: true } }, payment: true } });
@@ -312,12 +315,13 @@ export class BookingsService {
 
   async listTechnicianJobs(userId: string, query: TechnicianJobQueryDto) {
     const profile = await this.requireActiveTechnician(userId);
+    const now = new Date();
     const directWhere: Prisma.BookingWhereInput = { technician: { userId }, assignmentMode: 'DIRECT', ...(query.status && ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(query.status) ? { status: query.status as any } : {}) };
     const openWhere: Prisma.BookingWhereInput = {
       assignmentMode: 'OPEN_MARKETPLACE',
       ...(query.city ? { addressSnapshot: { path: ['city'], equals: query.city } } : {}),
-      ...(query.status && ['OPEN', 'CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(query.status) ? { status: query.status as any } : {}),
-      OR: [{ status: 'OPEN' }, { applications: { some: { technicianProfileId: profile.id } } }],
+      ...(query.status && ['OPEN', 'EXPIRED', 'CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(query.status) ? { status: query.status as any } : {}),
+      OR: [{ status: 'OPEN', OR: [{ applicationDeadlineAt: null }, { applicationDeadlineAt: { gt: now } }] }, { applications: { some: { technicianProfileId: profile.id } } }],
       ...(query.serviceId ? { items: { some: { catalogServiceId: query.serviceId } } } : {}),
     };
     const [bookings, total] = await Promise.all([
@@ -342,6 +346,12 @@ export class BookingsService {
     const profile = await this.requireActiveTechnician(userId);
     const booking = await this.detail(userId, id, true);
     if (booking.assignmentMode === 'OPEN_MARKETPLACE') {
+      if (booking.status === 'OPEN' && booking.applicationDeadlineAt && booking.applicationDeadlineAt <= new Date()) {
+        await this.expireOpenBookingIfDue(id);
+        const expired = await this.detail(userId, id, true);
+        const application = await this.prisma.bookingTechnicianApplication.findUnique({ where: { bookingId_technicianProfileId: { bookingId: id, technicianProfileId: profile.id } } });
+        return this.openBookingResponse(expired, application?.status ?? null, false);
+      }
       const application = await this.prisma.bookingTechnicianApplication.findUnique({ where: { bookingId_technicianProfileId: { bookingId: id, technicianProfileId: profile.id } } });
       if (booking.status === 'OPEN' && !application) await this.assertOpenEligibility(this.prisma, booking, profile.id);
       else if (!application) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
@@ -396,6 +406,25 @@ export class BookingsService {
     return updated;
   }
 
+  /** Idempotent DB-conditional terminal transition. Safe when invoked by many app instances. */
+  async expireOpenBookingIfDue(bookingId: string, now = new Date()) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.findUnique({ where: { id: bookingId }, select: { id: true, customerId: true, applicationDeadlineAt: true } });
+      if (!booking?.applicationDeadlineAt || booking.applicationDeadlineAt > now) return null;
+      const claimed = await tx.booking.updateMany({
+        where: { id: bookingId, assignmentMode: 'OPEN_MARKETPLACE', status: 'OPEN', technicianId: null, applicationDeadlineAt: { lte: now } },
+        data: { status: 'EXPIRED', expiredAt: now },
+      });
+      if (!claimed.count) return null;
+      const applications = await tx.bookingTechnicianApplication.updateMany({ where: { bookingId, status: 'APPLIED' }, data: { status: 'EXPIRED', expiredAt: now } });
+      return { customerId: booking.customerId, applicationCount: applications.count, deadline: booking.applicationDeadlineAt, expiredAt: now };
+    });
+    if (result) {
+      void this.notifyStatus(result.customerId, bookingId, 'BOOKING_EXPIRED', 'Don da het han', 'Don OPEN chua duoc chon KTV truoc han ung tuyen.');
+    }
+    return result;
+  }
+
   async updateStatus(userId: string, id: string, dto: UpdateBookingStatusDto) {
     const booking = await this.detail(userId, id, true);
     if (booking.technician?.userId !== userId) throw new ForbiddenException('Chi ky thuat vien moi co the cap nhat trang thai');
@@ -447,7 +476,7 @@ export class BookingsService {
 
   private async transition(
     id: string,
-    expectedStatus: 'OPEN' | 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED',
+    expectedStatus: 'OPEN' | 'EXPIRED' | 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED',
     data: { status: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'; cancelledAt?: Date; cancellationReason?: string; cancellationReasonCode?: 'NO_LONGER_NEEDED' | 'SERVICE_ISSUE' | 'PAYMENT_REFUND_ISSUE' | 'OTHER'; cancellationReasonText?: string; cancelledByUserId?: string; cancelledByRole?: 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN' },
   ) {
     try {
@@ -469,7 +498,10 @@ export class BookingsService {
   private async openJobForTechnician(bookingId: string, technicianProfileId: string, requireEligible: boolean) {
     const booking = await this.prisma.booking.findUnique({ where: { id: bookingId }, include: { items: { include: { catalogService: true } } } });
     if (!booking || booking.assignmentMode !== 'OPEN_MARKETPLACE' || booking.status !== 'OPEN' || booking.technicianId) throw new ConflictException('Don khong con mo de ung tuyen');
-    if (booking.applicationDeadlineAt && booking.applicationDeadlineAt <= new Date()) throw new ConflictException('Don da het han ung tuyen');
+    if (booking.applicationDeadlineAt && booking.applicationDeadlineAt <= new Date()) {
+      await this.expireOpenBookingIfDue(bookingId);
+      throw new ConflictException('BOOKING_EXPIRED');
+    }
     if (requireEligible) await this.assertOpenEligibility(this.prisma, booking, technicianProfileId);
     return booking;
   }
@@ -496,7 +528,7 @@ export class BookingsService {
   }
 
   private openBookingResponse(booking: any, applicationStatus: string | null, selected: boolean) {
-    const canApply = booking.status === 'OPEN' && !applicationStatus;
+    const canApply = booking.status === 'OPEN' && !applicationStatus && (!booking.applicationDeadlineAt || new Date(booking.applicationDeadlineAt) > new Date());
     return {
       bookingId: booking.id, id: booking.id, assignmentMode: booking.assignmentMode, bookingStatus: booking.status,
       applicationStatus, scheduledAt: booking.scheduledStart, scheduledStart: booking.scheduledStart, scheduledEnd: booking.scheduledEnd,
@@ -508,7 +540,7 @@ export class BookingsService {
       canApply, canDecline: canApply, canWithdraw: booking.status === 'OPEN' && applicationStatus === 'APPLIED',
       canContact: selected && ['CONFIRMED', 'COMPLETED'].includes(booking.status), canCancel: selected && booking.status === 'CONFIRMED',
       canComplete: selected && booking.status === 'CONFIRMED' && new Date(booking.scheduledEnd) <= new Date(),
-      customerSelectedAnotherTechnician: applicationStatus === 'NOT_SELECTED', applicationDeadlineAt: booking.applicationDeadlineAt ?? null,
+      customerSelectedAnotherTechnician: applicationStatus === 'NOT_SELECTED', applicationDeadlineAt: booking.applicationDeadlineAt ?? null, expiredAt: booking.expiredAt ?? null,
     };
   }
 

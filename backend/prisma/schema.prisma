@@ -48,6 +48,7 @@ enum ServiceMode {
 
 enum BookingStatus {
   OPEN
+  EXPIRED
   PENDING
   CONFIRMED
   COMPLETED
@@ -468,6 +469,7 @@ model Booking {
   technicianId    String?           @map("technician_id") @db.Uuid
   assignmentMode  BookingAssignmentMode @default(DIRECT) @map("assignment_mode")
   applicationDeadlineAt DateTime?   @map("application_deadline_at")
+  expiredAt       DateTime?         @map("expired_at")
   addressId       String?           @map("address_id") @db.Uuid
   addressSnapshot Json?             @map("address_snapshot")
   promotionId     String?           @map("promotion_id") @db.Uuid
@@ -503,6 +505,7 @@ model Booking {
   @@index([customerId, createdAt(sort: Desc)])
   @@index([technicianId, scheduledStart])
   @@index([assignmentMode, status, scheduledStart])
+  @@index([assignmentMode, status, applicationDeadlineAt])
   @@map("bookings")
 }
 
