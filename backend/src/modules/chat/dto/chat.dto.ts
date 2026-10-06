@@ -17,12 +17,13 @@ export class SendMessageDto {
   type!: 'TEXT' | 'IMAGE' | 'LOCATION';
 
   @ApiPropertyOptional() @ValidateIf((value) => value.type === 'TEXT') @IsString() @MaxLength(4000) text?: string;
-  @ApiPropertyOptional() @ValidateIf((value) => value.type === 'IMAGE') @IsString() @MaxLength(1024) mediaUrl?: string;
+  @ApiPropertyOptional({ description: 'Presigned read URL is returned by server; never submit external URLs.' }) @IsOptional() @IsString() @MaxLength(2048) mediaUrl?: string;
   @ApiPropertyOptional() @ValidateIf((value) => value.type === 'IMAGE') @IsString() @MaxLength(1024) mediaKey?: string;
   @ApiPropertyOptional() @ValidateIf((value) => value.type === 'LOCATION') @Type(() => Number) @IsLatitude() latitude?: number;
   @ApiPropertyOptional() @ValidateIf((value) => value.type === 'LOCATION') @Type(() => Number) @IsLongitude() longitude?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) address?: string;
-  @ApiPropertyOptional() @IsOptional() @IsUUID() bookingId?: string;
+  // Booking is derived from Conversation by the server. It must never be
+  // supplied by Mobile when sending a message.
 }
 
 export class EditMessageDto {

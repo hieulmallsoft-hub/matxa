@@ -47,6 +47,19 @@ export class CancelBookingDto {
   @ApiPropertyOptional({ deprecated: true }) @IsOptional() @IsString() @MaxLength(500) reason?: string;
 }
 
+export class TechnicianCancellationEvidenceUploadDto {
+  @ApiProperty({ enum: ['image/jpeg', 'image/png', 'image/webp'] }) @IsIn(['image/jpeg', 'image/png', 'image/webp']) contentType!: string;
+  @ApiProperty({ maximum: 10485760 }) @Type(() => Number) @IsInt() @Min(1) @Max(10485760) size!: number;
+}
+
+export class TechnicianCancelBookingDto {
+  @ApiProperty({ enum: ['CUSTOMER_NO_SHOW', 'UNSAFE_SITUATION', 'INAPPROPRIATE_REQUEST', 'SERVICE_LOCATION_UNAVAILABLE', 'CUSTOMER_REQUESTED_CANCEL', 'OTHER'] })
+  @IsIn(['CUSTOMER_NO_SHOW', 'UNSAFE_SITUATION', 'INAPPROPRIATE_REQUEST', 'SERVICE_LOCATION_UNAVAILABLE', 'CUSTOMER_REQUESTED_CANCEL', 'OTHER'])
+  reasonCode!: 'CUSTOMER_NO_SHOW' | 'UNSAFE_SITUATION' | 'INAPPROPRIATE_REQUEST' | 'SERVICE_LOCATION_UNAVAILABLE' | 'CUSTOMER_REQUESTED_CANCEL' | 'OTHER';
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) reasonText?: string;
+  @ApiPropertyOptional({ type: [String], maximum: 5 }) @IsOptional() @IsArray() @ArrayMaxSize(5) @IsString({ each: true }) @MaxLength(1024, { each: true }) evidenceStorageKeys?: string[];
+}
+
 export class UpdateBookingStatusDto {
   @ApiProperty({ enum: ['CONFIRMED', 'COMPLETED'] }) @IsIn(['CONFIRMED', 'COMPLETED']) status!: 'CONFIRMED' | 'COMPLETED';
 }

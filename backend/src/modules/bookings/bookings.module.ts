@@ -5,11 +5,13 @@ import { BookingsController } from './controllers/bookings.controller';
 import { TechnicianJobsController } from './controllers/technician-jobs.controller';
 import { BookingsService } from './services/bookings.service';
 import { VnpayService } from './services/vnpay.service';
+import { BookingCancellationStorageService } from './services/booking-cancellation-storage.service';
+import { TechnicianBookingCancellationService } from './services/technician-booking-cancellation.service';
 import { BookingVnpayController, VnpayController } from './controllers/vnpay.controller';
 
 @Module({
   imports: [AuthModule, NotificationsModule],
   controllers: [BookingsController, TechnicianJobsController, VnpayController, BookingVnpayController],
-  providers: [BookingsService, VnpayService],
+  providers: [BookingsService, VnpayService, BookingCancellationStorageService, TechnicianBookingCancellationService],
 })
 export class BookingsModule {}

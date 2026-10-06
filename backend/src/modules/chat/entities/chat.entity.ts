@@ -27,6 +27,7 @@ export class MessageModel {
 
 export class ConversationModel {
   @ApiProperty() id!: string;
+  @ApiPropertyOptional() bookingId?: string;
   @ApiProperty({ type: ChatUserModel }) participant!: ChatUserModel;
   @ApiPropertyOptional({ type: MessageModel }) lastMessage?: MessageModel;
   @ApiProperty() unreadCount!: number;

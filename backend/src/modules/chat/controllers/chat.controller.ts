@@ -19,10 +19,17 @@ export class ChatController {
   ) {}
 
   @Post()
-  @ApiOperation({ summary: 'Tao hoac mo lai chat 1-1 voi mot nguoi dung' })
+  @ApiOperation({ summary: 'Deprecated: chat moi phai duoc tao theo booking' })
   @ApiCreatedResponse({ type: ConversationModel })
   create(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateConversationDto) {
     return this.chat.createConversation(auth.sub, dto);
+  }
+
+  @Post('booking/:bookingId')
+  @ApiOperation({ summary: 'Tao hoac mo chat cua booking; participant duoc lay tu Booking' })
+  @ApiCreatedResponse({ type: ConversationModel })
+  createForBooking(@CurrentAuth() auth: AccessTokenPayload, @Param('bookingId', ParseUUIDPipe) bookingId: string) {
+    return this.chat.createBookingConversation(auth.sub, bookingId);
   }
 
   @Get()
@@ -51,7 +58,7 @@ export class ChatController {
   @ApiCreatedResponse({ type: UploadUrlModel })
   async uploadUrl(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateUploadUrlDto) {
     await this.chat.ensureMember(auth.sub, id);
-    return this.storage.createUploadUrl(id, dto);
+    return this.storage.createUploadUrl(id, auth.sub, dto);
   }
 
   @Patch(':id/read')

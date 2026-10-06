@@ -78,6 +78,11 @@ enum CancellationReasonCode {
   NO_LONGER_NEEDED
   SERVICE_ISSUE
   PAYMENT_REFUND_ISSUE
+  CUSTOMER_NO_SHOW
+  UNSAFE_SITUATION
+  INAPPROPRIATE_REQUEST
+  SERVICE_LOCATION_UNAVAILABLE
+  CUSTOMER_REQUESTED_CANCEL
   OTHER
 }
 
@@ -156,6 +161,8 @@ model User {
   notifications Notification[]
   deviceTokens DeviceToken[]
   conversationMembers ConversationMember[]
+  customerBookingConversations Conversation[] @relation("BookingConversationCustomer")
+  technicianBookingConversations Conversation[] @relation("BookingConversationTechnician")
   sentMessages Message[] @relation("MessageSender")
   technicianProfile TechnicianProfile?
   favorites Favorite[]
@@ -166,6 +173,7 @@ model User {
   technicianApplication TechnicianApplication?
   wallets               Wallet[]
   topUpTransactions     TopUpTransaction[]
+  bookingCancellations  BookingCancellation[] @relation("BookingCancellationActor")
 
   @@map("users")
 }
@@ -489,6 +497,8 @@ model Booking {
   review          Review?
   promotionUsage  PromotionUsage?
   applications    BookingTechnicianApplication[]
+  conversation    Conversation?
+  cancellation    BookingCancellation?
 
   @@index([customerId, createdAt(sort: Desc)])
   @@index([technicianId, scheduledStart])
@@ -540,6 +550,35 @@ model BookingTechnicianApplication {
   @@index([bookingId, status])
   @@index([technicianProfileId, status])
   @@map("booking_technician_applications")
+}
+
+model BookingCancellation {
+  id          String                  @id @default(uuid()) @db.Uuid
+  bookingId   String                  @unique @map("booking_id") @db.Uuid
+  actorUserId String                  @map("actor_user_id") @db.Uuid
+  actorRole   UserRole                @map("actor_role")
+  reasonCode  CancellationReasonCode  @map("reason_code")
+  reasonText  String?                 @map("reason_text")
+  cancelledAt DateTime                @map("cancelled_at")
+  createdAt   DateTime                @default(now()) @map("created_at")
+  booking     Booking                 @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  actor       User                    @relation("BookingCancellationActor", fields: [actorUserId], references: [id])
+  evidence    BookingCancellationEvidence[]
+
+  @@index([actorUserId, createdAt(sort: Desc)])
+  @@map("booking_cancellations")
+}
+
+model BookingCancellationEvidence {
+  id             String              @id @default(uuid()) @db.Uuid
+  cancellationId String              @map("cancellation_id") @db.Uuid
+  storageKey     String              @map("storage_key")
+  mediaType      String              @map("media_type")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  cancellation   BookingCancellation @relation(fields: [cancellationId], references: [id], onDelete: Cascade)
+
+  @@unique([cancellationId, storageKey])
+  @@map("booking_cancellation_evidence")
 }
 
 model Payment {
@@ -675,14 +714,24 @@ model HomeBanner {
 
 model Conversation {
   id            String               @id @default(uuid()) @db.Uuid
-  participantKey String              @unique @map("participant_key")
+  // Null values represent legacy direct conversations. New booking chats are
+  // isolated by bookingId so the same customer/KTV can have separate threads.
+  bookingId     String?              @unique @map("booking_id") @db.Uuid
+  customerId    String?              @map("customer_id") @db.Uuid
+  technicianUserId String?           @map("technician_user_id") @db.Uuid
+  participantKey String              @map("participant_key")
   lastMessageAt DateTime?            @map("last_message_at")
   createdAt     DateTime             @default(now()) @map("created_at")
   updatedAt     DateTime             @updatedAt @map("updated_at")
   members       ConversationMember[]
   messages      Message[]
+  booking       Booking?             @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  customer      User?                @relation("BookingConversationCustomer", fields: [customerId], references: [id], onDelete: SetNull)
+  technicianUser User?               @relation("BookingConversationTechnician", fields: [technicianUserId], references: [id], onDelete: SetNull)
 
   @@index([lastMessageAt(sort: Desc)])
+  @@index([participantKey])
+  @@index([customerId, technicianUserId])
   @@map("conversations")
 }
 
