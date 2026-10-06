@@ -5,6 +5,7 @@ import { Prisma } from '../../../generated/prisma/client';
 import { applyPriceOptions, loadBookableServices } from '../../marketplace/services/technician-selection';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { VnpayService } from './vnpay.service';
+import { PlatformFeePolicyService } from './platform-fee-policy.service';
 import { BookingHistoryQueryDto, CancelBookingDto, CreateBookingDto, CreateOpenBookingDto, CreateReviewDto, QuoteBookingDto, TechnicianJobQueryDto, UpdateBookingStatusDto } from '../dto/booking.dto';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class BookingsService {
     private readonly config: ConfigService,
     private readonly notifications: NotificationsService,
     private readonly vnpay: VnpayService,
+    private readonly feePolicy: PlatformFeePolicyService = new PlatformFeePolicyService(),
   ) {}
 
   async quote(userId: string, dto: QuoteBookingDto, db: Prisma.TransactionClient = this.prisma) {
@@ -50,6 +52,7 @@ export class BookingsService {
     // never make the payable amount negative (including the HOME service fee).
     const discountAmount = promotion ? this.discount(promotion, subtotal, serviceFee) : 0;
     const totalAmount = Prisma.Decimal.max(0, new Prisma.Decimal(subtotal).plus(serviceFee).minus(discountAmount)).toNumber();
+    const financials = this.feePolicy.calculate({ assignmentMode: 'DIRECT', grossServiceAmount: subtotal, paymentMethod: (dto as CreateBookingDto).paymentMethod ?? 'CASH', calculatedAt: new Date() });
     return {
       technicianId: dto.technicianId,
       technicianServiceIds: services.map((item) => item.id),
@@ -73,6 +76,9 @@ export class BookingsService {
       promotion: promotion ? { id: promotion.id, code: promotion.code, discount: discountAmount } : null,
       totalAmount,
       total: totalAmount,
+      grossServiceAmount: financials.grossServiceAmount.toNumber(), platformFee: financials.platformFee.toNumber(),
+      technicianEarning: financials.technicianEarning.toNumber(), customerPayableAmount: totalAmount,
+      feePolicyVersion: financials.feePolicyVersion,
     };
   }
 
@@ -119,6 +125,9 @@ export class BookingsService {
             serviceFee: quote.serviceFee,
             discountAmount: quote.discountAmount,
             totalAmount: quote.totalAmount,
+            grossServiceAmount: quote.grossServiceAmount, platformFee: quote.platformFee,
+            technicianEarning: quote.technicianEarning, customerPayableAmount: quote.customerPayableAmount,
+            feePolicyVersion: quote.feePolicyVersion,
             note: dto.note,
             items: { create: quote.services.map((item) => ({ serviceId: item.id, priceOptionId: item.priceOptionId, priceOptionCode: item.priceOptionCode, serviceName: item.name, durationMinutes: item.durationMinutes, unitPrice: item.price })) },
             payment: { create: { method: dto.paymentMethod, status: dto.paymentMethod === 'CASH' ? 'UNPAID' : 'PENDING', amount: quote.totalAmount } },
@@ -214,11 +223,16 @@ export class BookingsService {
     const durationMinutes = ordered.reduce((sum, item) => sum + item.option.durationMinutes, 0);
     const serviceFee = dto.mode === 'HOME' ? Number(this.config.get('HOME_SERVICE_FEE', 100000)) : 0;
     const subtotal = ordered.reduce((sum, item) => sum + Number(item.option.price), 0);
+    const financials = this.feePolicy.calculate({ assignmentMode: 'OPEN_MARKETPLACE', grossServiceAmount: subtotal, paymentMethod: dto.paymentMethod, calculatedAt: new Date() });
+    const customerPayableAmount = new Prisma.Decimal(subtotal).plus(serviceFee);
     const created = await this.prisma.booking.create({ data: {
       customerId: userId, assignmentMode: 'OPEN_MARKETPLACE', status: 'OPEN', mode: dto.mode,
       addressId: dto.mode === 'HOME' ? dto.addressId : null, addressSnapshot: addressSnapshot ?? { city: dto.city, district: dto.district ?? null },
       applicationDeadlineAt: deadline, scheduledStart: start, scheduledEnd: new Date(start.getTime() + durationMinutes * 60_000),
-      subtotal, serviceFee, discountAmount: 0, totalAmount: subtotal + serviceFee, note: dto.note,
+      subtotal, serviceFee, discountAmount: 0, totalAmount: customerPayableAmount,
+      grossServiceAmount: financials.grossServiceAmount, platformFee: financials.platformFee,
+      technicianEarning: financials.technicianEarning, customerPayableAmount,
+      feePolicyVersion: financials.feePolicyVersion, note: dto.note,
       items: { create: ordered.map(({ service, option }) => ({ catalogServiceId: service.id, catalogPriceOptionId: option.id, categoryId: service.categoryId, categoryName: service.category.name, serviceName: service.name, durationMinutes: option.durationMinutes, unitPrice: option.price })) },
       payment: { create: { method: dto.paymentMethod, status: 'UNPAID', amount: subtotal + serviceFee } },
     }, include: { items: { include: { catalogService: true } }, payment: true } });
@@ -337,7 +351,7 @@ export class BookingsService {
         try { await this.assertOpenEligibility(this.prisma, booking, profile.id); } catch { continue; }
       }
       if (query.status && ['APPLIED', 'SELECTED', 'NOT_SELECTED', 'WITHDRAWN', 'DECLINED', 'EXPIRED'].includes(query.status) && app?.status !== query.status) continue;
-      visible.push(booking.assignmentMode === 'OPEN_MARKETPLACE' ? this.openBookingResponse(booking, app?.status ?? null, Boolean(app?.status === 'SELECTED')) : this.technicianJobResponse(this.withHistoricalAddress(booking), userId));
+      visible.push(booking.assignmentMode === 'OPEN_MARKETPLACE' ? this.openBookingResponse(booking, app?.status ?? null, Boolean(app?.status === 'SELECTED'), true) : this.technicianJobResponse(this.withHistoricalAddress(booking), userId));
     }
     return { items: visible, total, page: query.page, limit: query.limit };
   }
@@ -350,12 +364,12 @@ export class BookingsService {
         await this.expireOpenBookingIfDue(id);
         const expired = await this.detail(userId, id, true);
         const application = await this.prisma.bookingTechnicianApplication.findUnique({ where: { bookingId_technicianProfileId: { bookingId: id, technicianProfileId: profile.id } } });
-        return this.openBookingResponse(expired, application?.status ?? null, false);
+        return this.openBookingResponse(expired, application?.status ?? null, false, true);
       }
       const application = await this.prisma.bookingTechnicianApplication.findUnique({ where: { bookingId_technicianProfileId: { bookingId: id, technicianProfileId: profile.id } } });
       if (booking.status === 'OPEN' && !application) await this.assertOpenEligibility(this.prisma, booking, profile.id);
       else if (!application) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
-      return this.openBookingResponse(booking, application?.status ?? null, application?.status === 'SELECTED');
+      return this.openBookingResponse(booking, application?.status ?? null, application?.status === 'SELECTED', true);
     }
     if (booking.technician?.userId !== userId) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
     return this.technicianJobResponse(booking, userId);
@@ -527,7 +541,7 @@ export class BookingsService {
     if (conflict) throw new ConflictException('KTV da co lich trung thoi gian');
   }
 
-  private openBookingResponse(booking: any, applicationStatus: string | null, selected: boolean) {
+  private openBookingResponse(booking: any, applicationStatus: string | null, selected: boolean, includeTechnicianPricing = false) {
     const canApply = booking.status === 'OPEN' && !applicationStatus && (!booking.applicationDeadlineAt || new Date(booking.applicationDeadlineAt) > new Date());
     return {
       bookingId: booking.id, id: booking.id, assignmentMode: booking.assignmentMode, bookingStatus: booking.status,
@@ -541,6 +555,7 @@ export class BookingsService {
       canContact: selected && ['CONFIRMED', 'COMPLETED'].includes(booking.status), canCancel: selected && booking.status === 'CONFIRMED',
       canComplete: selected && booking.status === 'CONFIRMED' && new Date(booking.scheduledEnd) <= new Date(),
       customerSelectedAnotherTechnician: applicationStatus === 'NOT_SELECTED', applicationDeadlineAt: booking.applicationDeadlineAt ?? null, expiredAt: booking.expiredAt ?? null,
+      ...(includeTechnicianPricing ? { pricing: this.technicianPricing(booking) } : {}),
     };
   }
 
@@ -607,8 +622,10 @@ export class BookingsService {
     const isCustomer = booking.customerId === userId;
     const canCancel = isCustomer && ['PENDING', 'CONFIRMED'].includes(booking.status);
     const canReview = isCustomer && booking.status === 'COMPLETED' && !booking.review;
+    // Financial accounting belongs to KTV/admin responses, never customer history.
+    const { grossServiceAmount, platformFee, technicianEarning, customerPayableAmount, feePolicyVersion, ...customerSafeBooking } = booking;
     return {
-      ...booking,
+      ...customerSafeBooking,
       technician: {
         technicianId: booking.technicianId,
         displayName: booking.technician?.user?.displayName ?? null,
@@ -658,7 +675,17 @@ export class BookingsService {
     return { ...base, jobState: booking.status === 'PENDING' ? 'NEW' : booking.status === 'CONFIRMED' ? 'ACCEPTED' : booking.status,
       canAccept: booking.status === 'PENDING', canDecline: booking.status === 'PENDING',
       canComplete: booking.status === 'CONFIRMED' && new Date(booking.scheduledEnd) <= new Date(),
-      customer: booking.customer ? { id: booking.customer.id, displayName: booking.customer.displayName, avatarUrl: booking.customer.avatarUrl } : null };
+      customer: booking.customer ? { id: booking.customer.id, displayName: booking.customer.displayName, avatarUrl: booking.customer.avatarUrl } : null,
+      pricing: this.technicianPricing(booking) };
+  }
+
+  private technicianPricing(booking: any) {
+    return {
+      grossServiceAmount: booking.grossServiceAmount === null || booking.grossServiceAmount === undefined ? null : Number(booking.grossServiceAmount),
+      platformFee: booking.platformFee === null || booking.platformFee === undefined ? null : Number(booking.platformFee),
+      technicianEarning: booking.technicianEarning === null || booking.technicianEarning === undefined ? null : Number(booking.technicianEarning),
+      currency: 'VND',
+    };
   }
 
   private async validPromotion(userId: string, code: string, subtotal: number, db: Prisma.TransactionClient) {

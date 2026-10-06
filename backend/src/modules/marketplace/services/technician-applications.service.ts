@@ -7,7 +7,23 @@ import { NotificationsService } from '../../notifications/services/notifications
 @Injectable()
 export class TechnicianApplicationsService {
   constructor(private readonly prisma: PrismaService, private readonly storage: TechnicianApplicationStorageService, private readonly notifications: NotificationsService) {}
-  getMine(userId: string) { return this.prisma.technicianApplication.findUnique({ where: { userId }, include: { gallery: { orderBy: { sortOrder: 'asc' } }, kyc: { select: { status: true, rejectionReason: true } } } }); }
+  async getMine(userId: string) {
+    const app = await this.prisma.technicianApplication.findUnique({
+      where: { userId },
+      include: { gallery: { orderBy: { sortOrder: 'asc' } }, kyc: { include: { documents: true } } },
+    });
+    if (!app) return null;
+    const legacyDocuments = [
+      { type: 'ID_CARD_FRONT', storageKey: app.idCardFrontKey },
+      { type: 'ID_CARD_BACK', storageKey: app.idCardBackKey },
+      { type: 'FACE', storageKey: app.faceImageKey },
+    ].filter((item): item is { type: string; storageKey: string } => Boolean(item.storageKey));
+    const [gallery, documents] = await Promise.all([
+      Promise.all(app.gallery.map(async (image) => ({ ...image, ...(await this.storage.createPrivateViewUrl(image.storageKey)) }))),
+      Promise.all(legacyDocuments.map(async (document) => ({ ...document, ...(await this.storage.createPrivateViewUrl(document.storageKey)) }))),
+    ]);
+    return { ...app, gallery, documents };
+  }
   async createMine(userId: string, dto: UpdateTechnicianApplicationDto) {
     const existing = await this.prisma.technicianApplication.findUnique({ where: { userId } });
     if (existing) return existing;

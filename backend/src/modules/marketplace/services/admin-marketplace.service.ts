@@ -80,6 +80,14 @@ export class AdminMarketplaceService {
     ]);
     return { items: items.map((booking) => ({ ...booking, subtotal: number(booking.subtotal), serviceFee: number(booking.serviceFee),
       discountAmount: number(booking.discountAmount), totalAmount: number(booking.totalAmount),
+      financials: {
+        grossServiceAmount: booking.grossServiceAmount === null ? null : number(booking.grossServiceAmount),
+        platformFee: booking.platformFee === null ? null : number(booking.platformFee),
+        technicianEarning: booking.technicianEarning === null ? null : number(booking.technicianEarning),
+        customerPayableAmount: booking.customerPayableAmount === null ? null : number(booking.customerPayableAmount),
+        feePolicyVersion: booking.feePolicyVersion,
+        currency: 'VND',
+      },
       items: booking.items.map((item) => ({ ...item, unitPrice: number(item.unitPrice) })),
     })), total, page, limit };
   }
