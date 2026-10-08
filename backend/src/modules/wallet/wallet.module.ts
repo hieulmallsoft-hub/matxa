@@ -3,5 +3,10 @@ import { WalletController, AdminWalletController } from './wallet.controller';
 import { WalletService } from './wallet.service';
 import { AuthModule } from '../auth/auth.module';
 
-@Module({ imports: [AuthModule], controllers: [WalletController, AdminWalletController], providers: [WalletService], exports: [WalletService] })
+@Module({
+  imports: [AuthModule],
+  controllers: [WalletController, AdminWalletController],
+  providers: [WalletService],
+  exports: [WalletService],
+})
 export class WalletModule {}

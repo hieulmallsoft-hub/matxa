@@ -5,21 +5,46 @@ import { EmailOtpService } from './email-otp.service';
 
 describe('Email OTP (in-memory Redis, mocked SMTP)', () => {
   const values = new Map<string, string>();
-  const redis = { client: {
-    incr: jest.fn(async (key: string) => { const n = Number(values.get(key) ?? 0) + 1; values.set(key, String(n)); return n; }),
-    expire: jest.fn(),
-    set: jest.fn(async (key: string, value: string) => { values.set(key, value); }),
-    get: jest.fn(async (key: string) => values.get(key) ?? null),
-    del: jest.fn(async (key: string) => Number(values.delete(key))),
-    getDel: jest.fn(async (key: string) => { const value = values.get(key) ?? null; values.delete(key); return value; }),
-  } };
+  const redis = {
+    client: {
+      incr: jest.fn(async (key: string) => {
+        const n = Number(values.get(key) ?? 0) + 1;
+        values.set(key, String(n));
+        return n;
+      }),
+      expire: jest.fn(),
+      set: jest.fn(async (key: string, value: string) => {
+        values.set(key, value);
+      }),
+      get: jest.fn(async (key: string) => values.get(key) ?? null),
+      del: jest.fn(async (key: string) => Number(values.delete(key))),
+      getDel: jest.fn(async (key: string) => {
+        const value = values.get(key) ?? null;
+        values.delete(key);
+        return value;
+      }),
+    },
+  };
   function make(provider = 'development') {
-    const settings: Record<string, unknown> = { EMAIL_PROVIDER: provider, OTP_SECRET: 'test-secret', OTP_TTL_SECONDS: 300,
-      SMTP_FROM: 'test@example.com', SMTP_HOST: 'smtp.example.com', SMTP_USER: 'test', SMTP_PASS: 'test' };
-    const config = { get: (key: string, fallback: unknown) => settings[key] ?? fallback, getOrThrow: (key: string) => settings[key] };
+    const settings: Record<string, unknown> = {
+      EMAIL_PROVIDER: provider,
+      OTP_SECRET: 'test-secret',
+      OTP_TTL_SECONDS: 300,
+      SMTP_FROM: 'test@example.com',
+      SMTP_HOST: 'smtp.example.com',
+      SMTP_USER: 'test',
+      SMTP_PASS: 'test',
+    };
+    const config = {
+      get: (key: string, fallback: unknown) => settings[key] ?? fallback,
+      getOrThrow: (key: string) => settings[key],
+    };
     return new EmailOtpService(redis as unknown as RedisService, config as unknown as ConfigService);
   }
-  beforeEach(() => { values.clear(); jest.clearAllMocks(); });
+  beforeEach(() => {
+    values.clear();
+    jest.clearAllMocks();
+  });
   afterEach(() => jest.restoreAllMocks());
   it('development mode returns a debug code and does not send mail', async () => {
     const transport = jest.spyOn(nodemailer, 'createTransport');
@@ -60,7 +85,9 @@ describe('Email OTP (in-memory Redis, mocked SMTP)', () => {
     expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: 'user@example.com' }));
   });
   it('removes the challenge when SMTP fails', async () => {
-    jest.spyOn(nodemailer, 'createTransport').mockReturnValue({ sendMail: jest.fn().mockRejectedValue(new Error('SMTP unavailable')) } as never);
+    jest
+      .spyOn(nodemailer, 'createTransport')
+      .mockReturnValue({ sendMail: jest.fn().mockRejectedValue(new Error('SMTP unavailable')) } as never);
     await expect(make('smtp').sendOtp('user@example.com', 'device')).rejects.toThrow('Khong the gui email');
     expect([...values.keys()].some((key) => key.startsWith('email-otp:challenge:'))).toBe(false);
   });

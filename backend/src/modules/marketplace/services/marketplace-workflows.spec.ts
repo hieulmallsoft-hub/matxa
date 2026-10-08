@@ -6,17 +6,57 @@ describe('Technician detail, favorites, availability and address workflows', () 
   const technicianService = { findMany: jest.fn() };
   const availabilitySlot = { findMany: jest.fn() };
   const booking = { findMany: jest.fn() };
-  const favorite = { findUnique: jest.fn(), findUniqueOrThrow: jest.fn(), findMany: jest.fn(), upsert: jest.fn(), deleteMany: jest.fn() };
-  const address = { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() };
+  const favorite = {
+    findUnique: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
+    findMany: jest.fn(),
+    upsert: jest.fn(),
+    deleteMany: jest.fn(),
+  };
+  const address = {
+    findMany: jest.fn(),
+    findFirst: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    updateMany: jest.fn(),
+  };
   const tx = { address, $queryRaw: jest.fn() };
-  const prisma = { technicianProfile, technicianService, availabilitySlot, booking, favorite, address,
-    $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)) };
+  const prisma = {
+    technicianProfile,
+    technicianService,
+    availabilitySlot,
+    booking,
+    favorite,
+    address,
+    $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)),
+  };
   const service = new MarketplaceService(prisma as never);
   const profile = () => ({
-    id: 't1', userId: 'tech-user', bio: 'Experience', user: { id: 'tech-user', displayName: 'Lan', avatarUrl: 'https://example.com/avatar.jpg' },
-    averageRating: '4.50', reviewCount: 21, tags: ['yoga'], serviceModes: ['HOME', 'ONSITE'], isVerified: true,
-    isActive: true, isAvailable: true, gender: 'FEMALE', city: 'HCM', address: 'Studio', latitude: '10', longitude: '106',
-    services: [{ id: 's1', price: '150000.00', durationMinutes: 60, modes: ['HOME', 'ONSITE'], category: { id: 'c1', isActive: true } }],
+    id: 't1',
+    userId: 'tech-user',
+    bio: 'Experience',
+    user: { id: 'tech-user', displayName: 'Lan', avatarUrl: 'https://example.com/avatar.jpg' },
+    averageRating: '4.50',
+    reviewCount: 21,
+    tags: ['yoga'],
+    serviceModes: ['HOME', 'ONSITE'],
+    isVerified: true,
+    isActive: true,
+    isAvailable: true,
+    gender: 'FEMALE',
+    city: 'HCM',
+    address: 'Studio',
+    latitude: '10',
+    longitude: '106',
+    services: [
+      {
+        id: 's1',
+        price: '150000.00',
+        durationMinutes: 60,
+        modes: ['HOME', 'ONSITE'],
+        category: { id: 'c1', isActive: true },
+      },
+    ],
     reviews: [],
   });
   beforeEach(() => {
@@ -29,22 +69,37 @@ describe('Technician detail, favorites, availability and address workflows', () 
   it('returns public detail with bookable service IDs, numeric prices, location and favorites', async () => {
     favorite.findUnique.mockResolvedValue({ technicianId: 't1' });
     const result = await service.technicianDetail('t1', { latitude: 10, longitude: 106 }, 'customer');
-    expect(result).toMatchObject({ technicianId: 't1', distanceKm: 0, isFavorite: true, images: ['https://example.com/avatar.jpg'],
+    expect(result).toMatchObject({
+      technicianId: 't1',
+      distanceKm: 0,
+      isFavorite: true,
+      images: ['https://example.com/avatar.jpg'],
       onsiteLocation: { address: 'Studio', latitude: 10, longitude: 106 },
-      services: [{ id: 's1', serviceId: 's1', technicianServiceId: 's1', price: 150000, durationMinutes: 60 }] });
+      services: [{ id: 's1', serviceId: 's1', technicianServiceId: 's1', price: 150000, durationMinutes: 60 }],
+    });
     expect(technicianProfile.findUnique.mock.calls[0][0]).toMatchObject({
-      where: { id: 't1', ...publicTechnicianWhere }, select: {
+      where: { id: 't1', ...publicTechnicianWhere },
+      select: {
         user: { select: { id: true, displayName: true, avatarUrl: true } },
         services: { where: { isActive: true, category: { isActive: true } } },
         reviews: { take: 20, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
       },
     });
     expect(result.user).not.toHaveProperty('email');
-    expect(favorite.findUnique).toHaveBeenCalledWith({ where: { userId_technicianId: { userId: 'customer', technicianId: 't1' } }, select: { technicianId: true } });
+    expect(favorite.findUnique).toHaveBeenCalledWith({
+      where: { userId_technicianId: { userId: 'customer', technicianId: 't1' } },
+      select: { technicianId: true },
+    });
   });
 
   it('allows guest detail; missing avatar/location return empty/null', async () => {
-    technicianProfile.findUnique.mockResolvedValue({ ...profile(), latitude: null, user: { id: 'tech-user', displayName: null, avatarUrl: null }, serviceModes: ['HOME'], services: [{ ...profile().services[0], modes: ['HOME'] }] });
+    technicianProfile.findUnique.mockResolvedValue({
+      ...profile(),
+      latitude: null,
+      user: { id: 'tech-user', displayName: null, avatarUrl: null },
+      serviceModes: ['HOME'],
+      services: [{ ...profile().services[0], modes: ['HOME'] }],
+    });
     const result = await service.technicianDetail('t1', { latitude: 10, longitude: 106 });
     expect(result).toMatchObject({ images: [], onsiteLocation: null, distanceKm: null, isFavorite: false });
     expect(favorite.findUnique).not.toHaveBeenCalled();
@@ -56,12 +111,22 @@ describe('Technician detail, favorites, availability and address workflows', () 
   it('returns favorite cards and never touches booking data', async () => {
     favorite.findMany.mockResolvedValue([{ technician: profile() }]);
     const result = await service.favorites('customer');
-    expect(result[0]).toMatchObject({ technicianId: 't1', displayName: 'Lan', averageRating: 4.5, isFavorite: true, startingPrice: 150000 });
+    expect(result[0]).toMatchObject({
+      technicianId: 't1',
+      displayName: 'Lan',
+      averageRating: 4.5,
+      isFavorite: true,
+      startingPrice: 150000,
+    });
     expect(favorite.findMany.mock.calls[0][0].where).toEqual({ userId: 'customer', technician: publicTechnicianWhere });
     favorite.upsert.mockResolvedValue({ userId: 'customer', technicianId: 't1' });
     await service.addFavorite('customer', 't1');
     await service.addFavorite('customer', 't1');
-    expect(favorite.upsert).toHaveBeenLastCalledWith({ where: { userId_technicianId: { userId: 'customer', technicianId: 't1' } }, create: { userId: 'customer', technicianId: 't1' }, update: {} });
+    expect(favorite.upsert).toHaveBeenLastCalledWith({
+      where: { userId_technicianId: { userId: 'customer', technicianId: 't1' } },
+      create: { userId: 'customer', technicianId: 't1' },
+      update: {},
+    });
     await service.removeFavorite('customer', 't1');
     expect(favorite.deleteMany).toHaveBeenCalledWith({ where: { userId: 'customer', technicianId: 't1' } });
     expect(booking.findMany).not.toHaveBeenCalled();
@@ -78,18 +143,50 @@ describe('Technician detail, favorites, availability and address workflows', () 
     const endAt = new Date('2099-10-01T12:00:00+07:00');
     availabilitySlot.findMany.mockResolvedValue([{ id: 'w1', startAt, endAt }]);
     technicianService.findMany.mockResolvedValue([{ id: 's1', durationMinutes: 60, modes: ['HOME'] }]);
-    booking.findMany.mockResolvedValue([{ scheduledStart: new Date('2099-10-01T09:00:00+07:00'), scheduledEnd: new Date('2099-10-01T10:00:00+07:00') }]);
-    const result = await service.availability('t1', { date: '2099-10-01', technicianServiceIds: ['s1', 's1'], mode: 'HOME', stepMinutes: 30 });
-    expect(result).toMatchObject({ date: '2099-10-01', durationMinutes: 60, totalDurationMinutes: 60, timezone: 'Asia/Ho_Chi_Minh', serviceIds: ['s1'], technicianServiceIds: ['s1'] });
+    booking.findMany.mockResolvedValue([
+      { scheduledStart: new Date('2099-10-01T09:00:00+07:00'), scheduledEnd: new Date('2099-10-01T10:00:00+07:00') },
+    ]);
+    const result = await service.availability('t1', {
+      date: '2099-10-01',
+      technicianServiceIds: ['s1', 's1'],
+      mode: 'HOME',
+      stepMinutes: 30,
+    });
+    expect(result).toMatchObject({
+      date: '2099-10-01',
+      durationMinutes: 60,
+      totalDurationMinutes: 60,
+      timezone: 'Asia/Ho_Chi_Minh',
+      serviceIds: ['s1'],
+      technicianServiceIds: ['s1'],
+    });
     if (!Array.isArray(result)) expect(result.slots).toHaveLength(4);
     expect(booking.findMany).toHaveBeenCalledTimes(1);
-    expect(booking.findMany.mock.calls[0][0].where).toMatchObject({ technicianId: 't1', status: { in: ['PENDING', 'CONFIRMED'] },
-      scheduledStart: { lt: new Date('2099-10-01T17:00:00Z') }, scheduledEnd: { gt: new Date('2099-09-30T17:00:00Z') } });
-    const legacy = await service.availability('t1', { from: startAt.toISOString(), to: endAt.toISOString(), stepMinutes: 30 });
+    expect(booking.findMany.mock.calls[0][0].where).toMatchObject({
+      technicianId: 't1',
+      status: { in: ['PENDING', 'CONFIRMED'] },
+      scheduledStart: { lt: new Date('2099-10-01T17:00:00Z') },
+      scheduledEnd: { gt: new Date('2099-09-30T17:00:00Z') },
+    });
+    const legacy = await service.availability('t1', {
+      from: startAt.toISOString(),
+      to: endAt.toISOString(),
+      stepMinutes: 30,
+    });
     expect(legacy).toEqual([{ id: 'w1', startAt, endAt }]);
     expect(booking.findMany).toHaveBeenCalledTimes(1);
-    await expect(service.availability('t1', { date: '2099-10-01', serviceIds: ['s1'], stepMinutes: 30 })).rejects.toThrow('mode');
-    await expect(service.availability('t1', { date: '2099-10-01', serviceIds: ['s1'], technicianServiceIds: ['s1'], mode: 'HOME', stepMinutes: 30 })).rejects.toThrow('serviceIds');
+    await expect(
+      service.availability('t1', { date: '2099-10-01', serviceIds: ['s1'], stepMinutes: 30 }),
+    ).rejects.toThrow('mode');
+    await expect(
+      service.availability('t1', {
+        date: '2099-10-01',
+        serviceIds: ['s1'],
+        technicianServiceIds: ['s1'],
+        mode: 'HOME',
+        stepMinutes: 30,
+      }),
+    ).rejects.toThrow('serviceIds');
   });
 
   it('sums multiple service durations and only queries pending/confirmed bookings', async () => {
@@ -101,16 +198,28 @@ describe('Technician detail, favorites, availability and address workflows', () 
       { id: 's2', durationMinutes: 60, modes: ['HOME'] },
     ]);
     booking.findMany.mockResolvedValue([]);
-    const result = await service.availability('t1', { date: '2099-10-01', technicianServiceIds: ['s1', 's2'], mode: 'HOME', stepMinutes: 30 });
+    const result = await service.availability('t1', {
+      date: '2099-10-01',
+      technicianServiceIds: ['s1', 's2'],
+      mode: 'HOME',
+      stepMinutes: 30,
+    });
     if (Array.isArray(result)) throw new Error('Expected computed availability');
     expect(result.totalDurationMinutes).toBe(120);
     expect(result.slots.map((slot) => slot.startAt.toISOString())).toEqual([
-      '2099-10-01T01:00:00.000Z', '2099-10-01T01:30:00.000Z', '2099-10-01T02:00:00.000Z',
-      '2099-10-01T02:30:00.000Z', '2099-10-01T03:00:00.000Z',
+      '2099-10-01T01:00:00.000Z',
+      '2099-10-01T01:30:00.000Z',
+      '2099-10-01T02:00:00.000Z',
+      '2099-10-01T02:30:00.000Z',
+      '2099-10-01T03:00:00.000Z',
     ]);
-    expect(booking.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
-      status: { in: ['PENDING', 'CONFIRMED'] },
-    }) }));
+    expect(booking.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: { in: ['PENDING', 'CONFIRMED'] },
+        }),
+      }),
+    );
   });
 
   it('serializes creation of defaults using a per-user row lock', async () => {
@@ -120,7 +229,10 @@ describe('Technician detail, favorites, availability and address workflows', () 
     expect(result.isDefault).toBe(true);
     expect(tx.$queryRaw).toHaveBeenCalled();
     expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(address.findFirst.mock.invocationCallOrder[0]);
-    expect(address.updateMany).toHaveBeenCalledWith({ where: { userId: 'customer', deletedAt: null }, data: { isDefault: false } });
+    expect(address.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'customer', deletedAt: null },
+      data: { isDefault: false },
+    });
   });
 
   it('rejects editing/removing another user address before any mutation', async () => {
@@ -135,7 +247,10 @@ describe('Technician detail, favorites, availability and address workflows', () 
   it('soft-deletes a default and promotes the oldest remaining live address', async () => {
     address.findFirst.mockResolvedValueOnce({ id: 'a1', isDefault: true }).mockResolvedValueOnce({ id: 'a2' });
     await service.removeAddress('customer', 'a1');
-    expect(address.update).toHaveBeenNthCalledWith(1, { where: { id: 'a1' }, data: { deletedAt: expect.any(Date), isDefault: false } });
+    expect(address.update).toHaveBeenNthCalledWith(1, {
+      where: { id: 'a1' },
+      data: { deletedAt: expect.any(Date), isDefault: false },
+    });
     expect(address.update).toHaveBeenNthCalledWith(2, { where: { id: 'a2' }, data: { isDefault: true } });
     expect(address.findFirst.mock.calls[1][0].where).toEqual({ userId: 'customer', deletedAt: null });
   });

@@ -33,7 +33,11 @@ export class NotificationsService {
     const title = dto.title ?? 'Matxa test notification';
     const body = dto.body ?? 'Firebase Cloud Messaging da hoat dong.';
     const notification = await this.create(userId, 'TEST', title, body, 'matxa://notifications');
-    const result = await this.sendPush(userId, title, body, { notificationId: notification.id, type: 'TEST', actionUrl: 'matxa://notifications' });
+    const result = await this.sendPush(userId, title, body, {
+      notificationId: notification.id,
+      type: 'TEST',
+      actionUrl: 'matxa://notifications',
+    });
     return { notificationId: notification.id, ...result };
   }
 
@@ -51,7 +55,10 @@ export class NotificationsService {
         android: { priority: 'high', notification: { channelId: 'matxa_notifications' } },
       });
     } catch (error) {
-      this.logger.error(`FCM multicast failed for ${tokens.length} device(s)`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `FCM multicast failed for ${tokens.length} device(s)`,
+        error instanceof Error ? error.stack : undefined,
+      );
       return { deviceCount: tokens.length, successCount: 0, failureCount: tokens.length };
     }
     const invalidTokens = response.responses.flatMap((item, index) => {
@@ -69,7 +76,12 @@ export class NotificationsService {
   async list(userId: string, query: ListNotificationsDto) {
     const where = { userId, ...(query.unreadOnly ? { readAt: null } : {}) };
     const [items, total, unreadCount] = await this.prisma.$transaction([
-      this.prisma.notification.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (query.page - 1) * query.limit, take: query.limit }),
+      this.prisma.notification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
       this.prisma.notification.count({ where }),
       this.prisma.notification.count({ where: { userId, readAt: null } }),
     ]);
@@ -83,7 +95,10 @@ export class NotificationsService {
   }
 
   async markAllRead(userId: string) {
-    const result = await this.prisma.notification.updateMany({ where: { userId, readAt: null }, data: { readAt: new Date() } });
+    const result = await this.prisma.notification.updateMany({
+      where: { userId, readAt: null },
+      data: { readAt: new Date() },
+    });
     return { updated: result.count };
   }
 

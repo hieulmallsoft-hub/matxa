@@ -10,13 +10,8 @@ export const firebaseAdminProvider: Provider = {
   useFactory: (config: ConfigService): App => {
     const projectId = config.getOrThrow<string>('FIREBASE_PROJECT_ID');
     const clientEmail = config.getOrThrow<string>('FIREBASE_CLIENT_EMAIL');
-    const privateKey = config
-      .getOrThrow<string>('FIREBASE_PRIVATE_KEY')
-      .replace(/\\n/g, '\n');
+    const privateKey = config.getOrThrow<string>('FIREBASE_PRIVATE_KEY').replace(/\\n/g, '\n');
 
-    return (
-      getApps()[0] ??
-      initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) })
-    );
+    return getApps()[0] ?? initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
   },
 };

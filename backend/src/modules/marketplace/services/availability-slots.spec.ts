@@ -7,7 +7,14 @@ describe('Available start slots', () => {
   const starts = (slots: ReturnType<typeof buildAvailableSlots>) => slots.map((slot) => slot.startAt.toISOString());
 
   it('subtracts booked intervals, permits touching boundaries and respects total duration', () => {
-    const slots = buildAvailableSlots([interval('08:00', '12:00')], [interval('09:00', '10:00')], 60, range, at('07:00'), 30);
+    const slots = buildAvailableSlots(
+      [interval('08:00', '12:00')],
+      [interval('09:00', '10:00')],
+      60,
+      range,
+      at('07:00'),
+      30,
+    );
     expect(starts(slots)).toEqual(['08:00', '10:00', '10:30', '11:00'].map((time) => at(time).toISOString()));
     expect(slots.every((slot) => +slot.endAt - +slot.startAt === 3600000)).toBe(true);
   });
@@ -15,31 +22,56 @@ describe('Available start slots', () => {
   it('rejects a candidate that contains a booking, and a booking that contains a candidate', () => {
     const work = [interval('08:00', '12:00')];
     // 08:00-10:00 contains 09:00-09:30; 09:00-10:00 is contained in 08:30-10:30.
-    expect(starts(buildAvailableSlots(work, [interval('09:00', '09:30')], 120, range, at('07:00'), 30)))
-      .not.toContain(at('08:00').toISOString());
-    expect(starts(buildAvailableSlots(work, [interval('08:30', '10:30')], 60, range, at('07:00'), 30)))
-      .not.toContain(at('09:00').toISOString());
+    expect(starts(buildAvailableSlots(work, [interval('09:00', '09:30')], 120, range, at('07:00'), 30))).not.toContain(
+      at('08:00').toISOString(),
+    );
+    expect(starts(buildAvailableSlots(work, [interval('08:30', '10:30')], 60, range, at('07:00'), 30))).not.toContain(
+      at('09:00').toISOString(),
+    );
   });
 
   it('does not bridge separate adjacent working intervals', () => {
-    const slots = buildAvailableSlots([interval('08:00', '09:00'), interval('09:00', '10:00')], [], 90, range, at('07:00'), 30);
+    const slots = buildAvailableSlots(
+      [interval('08:00', '09:00'), interval('09:00', '10:00')],
+      [],
+      90,
+      range,
+      at('07:00'),
+      30,
+    );
     expect(slots).toEqual([]);
   });
 
   it('merges the effect of overlapping bookings and deduplicates overlapping work windows', () => {
     const windows = [interval('08:00', '12:00'), interval('08:00', '12:00')];
-    const slots = buildAvailableSlots(windows, [interval('08:30', '10:00'), interval('09:30', '11:00')], 60, range, at('07:00'), 30);
+    const slots = buildAvailableSlots(
+      windows,
+      [interval('08:30', '10:00'), interval('09:30', '11:00')],
+      60,
+      range,
+      at('07:00'),
+      30,
+    );
     expect(starts(slots)).toEqual([at('11:00').toISOString()]);
   });
 
   it('excludes now/past starts and clips to the requested range', () => {
-    const slots = buildAvailableSlots([interval('08:00', '12:00')], [], 60, interval('08:15', '11:00'), at('09:00'), 30);
+    const slots = buildAvailableSlots(
+      [interval('08:00', '12:00')],
+      [],
+      60,
+      interval('08:15', '11:00'),
+      at('09:00'),
+      30,
+    );
     expect(starts(slots)).toEqual(['09:30', '10:00'].map((time) => at(time).toISOString()));
   });
 
   it('handles fully occupied and empty schedules', () => {
     expect(buildAvailableSlots([], [], 60, range, at('07:00'), 30)).toEqual([]);
-    expect(buildAvailableSlots([interval('08:00', '12:00')], [interval('07:00', '13:00')], 60, range, at('07:00'), 30)).toEqual([]);
+    expect(
+      buildAvailableSlots([interval('08:00', '12:00')], [interval('07:00', '13:00')], 60, range, at('07:00'), 30),
+    ).toEqual([]);
   });
 
   it('interprets date in Vietnam and emits UTC boundaries', () => {
@@ -51,14 +83,25 @@ describe('Available start slots', () => {
   it('handles a working interval crossing midnight', () => {
     const start = new Date('2030-10-01T23:00:00+07:00');
     const end = new Date('2030-10-02T02:00:00+07:00');
-    const slots = buildAvailableSlots([{ startAt: start, endAt: end }], [], 60, { startAt: start, endAt: end }, at('07:00'), 60);
+    const slots = buildAvailableSlots(
+      [{ startAt: start, endAt: end }],
+      [],
+      60,
+      { startAt: start, endAt: end },
+      at('07:00'),
+      60,
+    );
     expect(slots).toHaveLength(3);
     expect(slots[2].endAt).toEqual(end);
   });
 
-  it.each([{}, { date: '2030-10-01', from: '2030-10-01T00:00:00Z' },
+  it.each([
+    {},
+    { date: '2030-10-01', from: '2030-10-01T00:00:00Z' },
     { from: '2030-10-01T00:00:00Z', to: '2030-12-01T00:00:00Z' },
-    { from: 'bad', to: 'bad' }, { from: '2030-10-02T00:00:00Z', to: '2030-10-01T00:00:00Z' }])('rejects invalid range %j', (query) => {
+    { from: 'bad', to: 'bad' },
+    { from: '2030-10-02T00:00:00Z', to: '2030-10-01T00:00:00Z' },
+  ])('rejects invalid range %j', (query) => {
     expect(() => availabilityRange(query)).toThrow();
   });
 });

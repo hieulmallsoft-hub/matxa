@@ -35,8 +35,13 @@ describe('AuthService', () => {
     verifyOtp: jest.fn(),
   };
   const googleTokenVerifier = { verify: jest.fn() };
-  const emailOtp = { sendOtp: jest.fn(), verifyRegistration: jest.fn(), consumeVerifiedRegistration: jest.fn(),
-    verifyPasswordReset: jest.fn(), consumeVerifiedPasswordReset: jest.fn() };
+  const emailOtp = {
+    sendOtp: jest.fn(),
+    verifyRegistration: jest.fn(),
+    consumeVerifiedRegistration: jest.fn(),
+    verifyPasswordReset: jest.fn(),
+    consumeVerifiedPasswordReset: jest.fn(),
+  };
   const appleTokenVerifier = { verify: jest.fn() };
   const config = {
     get: jest.fn((key: string, fallback: unknown) => {
@@ -102,7 +107,10 @@ describe('AuthService', () => {
     await service.completeEmailRegistration('registration', 'password123', { deviceId: 'device' });
     const data = transaction.userIdentity.create.mock.calls[0][0].data;
     expect(data.passwordHash).not.toBe('password123');
-    prisma.userIdentity.findUnique.mockResolvedValue({ ...data, user: { id: 'user-id', status: 'ACTIVE', identities: [data] } });
+    prisma.userIdentity.findUnique.mockResolvedValue({
+      ...data,
+      user: { id: 'user-id', status: 'ACTIVE', identities: [data] },
+    });
     await expect(service.loginWithEmail('user@example.com', 'password123', {})).resolves.toHaveProperty('accessToken');
     await expect(service.loginWithEmail('user@example.com', 'wrong-password', {})).rejects.toThrow();
   });
@@ -110,20 +118,33 @@ describe('AuthService', () => {
   it('rejects duplicate email registration', async () => {
     emailOtp.consumeVerifiedRegistration.mockResolvedValue('user@example.com');
     transaction.userIdentity.findUnique.mockResolvedValue({ id: 'existing' });
-    await expect(service.completeEmailRegistration('registration', 'password123', { deviceId: 'device' })).rejects.toThrow('Email da duoc dang ky');
+    await expect(
+      service.completeEmailRegistration('registration', 'password123', { deviceId: 'device' }),
+    ).rejects.toThrow('Email da duoc dang ky');
     expect(prisma.session.create).not.toHaveBeenCalled();
   });
 
   it('resets the password and revokes existing sessions', async () => {
     emailOtp.consumeVerifiedPasswordReset.mockResolvedValue('user@example.com');
     transaction.userIdentity.update.mockResolvedValue({ userId: 'user-id' });
-    await expect(service.completePasswordReset('reset', 'new-password123', 'device')).resolves.toEqual({ completed: true });
-    expect(transaction.session.updateMany).toHaveBeenCalledWith({ where: { userId: 'user-id', revokedAt: null }, data: { revokedAt: expect.any(Date) } });
+    await expect(service.completePasswordReset('reset', 'new-password123', 'device')).resolves.toEqual({
+      completed: true,
+    });
+    expect(transaction.session.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'user-id', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
   });
 
   function refreshSession() {
-    return { id: 'session', userId: 'user-id', refreshTokenHash: createHmac('sha256', 'a'.repeat(32)).update('secret').digest('hex'),
-      expiresAt: new Date(Date.now() + 60000), revokedAt: null, user: { id: 'user-id', status: 'ACTIVE', identities: [] } };
+    return {
+      id: 'session',
+      userId: 'user-id',
+      refreshTokenHash: createHmac('sha256', 'a'.repeat(32)).update('secret').digest('hex'),
+      expiresAt: new Date(Date.now() + 60000),
+      revokedAt: null,
+      user: { id: 'user-id', status: 'ACTIVE', identities: [] },
+    };
   }
 
   it('rotates refresh tokens and rejects replay, expiry, wrong secret and malformed input', async () => {
@@ -145,9 +166,15 @@ describe('AuthService', () => {
     prisma.user.findUnique.mockResolvedValue(null);
     await expect(service.getCurrentUser('missing')).rejects.toThrow();
     await service.logout('session', 'user-id');
-    expect(prisma.session.updateMany).toHaveBeenLastCalledWith({ where: { id: 'session', userId: 'user-id', revokedAt: null }, data: { revokedAt: expect.any(Date) } });
+    expect(prisma.session.updateMany).toHaveBeenLastCalledWith({
+      where: { id: 'session', userId: 'user-id', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
     await service.logoutAll('user-id');
-    expect(prisma.session.updateMany).toHaveBeenLastCalledWith({ where: { userId: 'user-id', revokedAt: null }, data: { revokedAt: expect.any(Date) } });
+    expect(prisma.session.updateMany).toHaveBeenLastCalledWith({
+      where: { userId: 'user-id', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
   });
 
   it('creates a local session after a valid Google login', async () => {
@@ -165,8 +192,7 @@ describe('AuthService', () => {
     expect(result.refreshToken).toContain('.');
     expect(result.user.id).toBe('user-id');
     expect(prisma.session.create).toHaveBeenCalledTimes(1);
-    expect(prisma.session.create.mock.calls[0][0].data.refreshTokenHash)
-      .toMatch(/^[a-f0-9]{64}$/);
+    expect(prisma.session.create.mock.calls[0][0].data.refreshTokenHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('keeps the Matxa profile when an existing user logs in with Google again', async () => {
@@ -217,17 +243,11 @@ describe('AuthService', () => {
       ],
     });
 
-    const result = await service.loginWithApple(
-      'apple-identity-token',
-      'raw-nonce',
-      'Thu Huong',
-      { deviceId: 'ios-device-1' },
-    );
+    const result = await service.loginWithApple('apple-identity-token', 'raw-nonce', 'Thu Huong', {
+      deviceId: 'ios-device-1',
+    });
 
-    expect(appleTokenVerifier.verify).toHaveBeenCalledWith(
-      'apple-identity-token',
-      'raw-nonce',
-    );
+    expect(appleTokenVerifier.verify).toHaveBeenCalledWith('apple-identity-token', 'raw-nonce');
     expect(result.user.provider).toBe('apple.com');
     expect(prisma.session.create).toHaveBeenCalledTimes(1);
   });
@@ -240,7 +260,11 @@ describe('AuthService', () => {
   });
 
   it('does not link Apple using an unverified email', async () => {
-    appleTokenVerifier.verify.mockResolvedValue({ subject: 'apple-user', email: 'user@example.com', emailVerified: false });
+    appleTokenVerifier.verify.mockResolvedValue({
+      subject: 'apple-user',
+      email: 'user@example.com',
+      emailVerified: false,
+    });
     await service.loginWithApple('token', 'nonce', undefined, {});
     expect(transaction.userIdentity.findFirst).not.toHaveBeenCalled();
   });
@@ -248,7 +272,9 @@ describe('AuthService', () => {
   it('does not issue a session for a blocked Apple user', async () => {
     appleTokenVerifier.verify.mockResolvedValue({ subject: 'apple-user', emailVerified: false });
     transaction.user.update.mockResolvedValueOnce({ id: 'user-id', status: 'BLOCKED', identities: [] });
-    await expect(service.loginWithApple('token', 'nonce', undefined, {})).rejects.toThrow('Tai khoan khong con hoat dong');
+    await expect(service.loginWithApple('token', 'nonce', undefined, {})).rejects.toThrow(
+      'Tai khoan khong con hoat dong',
+    );
     expect(prisma.session.create).not.toHaveBeenCalled();
   });
 
@@ -260,13 +286,9 @@ describe('AuthService', () => {
   });
 
   it('rejects an invalid Google ID token', async () => {
-    googleTokenVerifier.verify.mockRejectedValue(
-      new Error('Google ID token khong hop le'),
-    );
+    googleTokenVerifier.verify.mockRejectedValue(new Error('Google ID token khong hop le'));
 
-    await expect(service.loginWithGoogle('firebase-token', {})).rejects.toThrow(
-      'Google ID token khong hop le',
-    );
+    await expect(service.loginWithGoogle('firebase-token', {})).rejects.toThrow('Google ID token khong hop le');
   });
 
   it('creates a local session after a valid Firebase Phone login', async () => {
@@ -298,27 +320,17 @@ describe('AuthService', () => {
       firebase: { sign_in_provider: 'phone' },
     });
 
-    await expect(
-      service.loginWithFirebasePhone('firebase-token', {}),
-    ).rejects.toThrow('Firebase token khong chua so dien thoai da xac minh');
+    await expect(service.loginWithFirebasePhone('firebase-token', {})).rejects.toThrow(
+      'Firebase token khong chua so dien thoai da xac minh',
+    );
   });
 
   it('links a verified phone to the current Google user', async () => {
     phoneOtp.verifyOtp.mockResolvedValue('+84901234567');
 
-    const result = await service.linkVerifiedPhone(
-      'user-id',
-      'challenge-id',
-      '123456',
-      'device-1',
-    );
+    const result = await service.linkVerifiedPhone('user-id', 'challenge-id', '123456', 'device-1');
 
-    expect(phoneOtp.verifyOtp).toHaveBeenCalledWith(
-      'challenge-id',
-      '123456',
-      'device-1',
-      'user-id',
-    );
+    expect(phoneOtp.verifyOtp).toHaveBeenCalledWith('challenge-id', '123456', 'device-1', 'user-id');
     expect(transaction.userIdentity.create).toHaveBeenCalledWith({
       data: {
         userId: 'user-id',
@@ -338,14 +350,9 @@ describe('AuthService', () => {
       providerSubject: '+84901234567',
     });
 
-    await expect(
-      service.linkVerifiedPhone(
-        'user-id',
-        'challenge-id',
-        '123456',
-        'device-1',
-      ),
-    ).rejects.toThrow('So dien thoai da lien ket voi tai khoan khac');
+    await expect(service.linkVerifiedPhone('user-id', 'challenge-id', '123456', 'device-1')).rejects.toThrow(
+      'So dien thoai da lien ket voi tai khoan khac',
+    );
   });
 
   it('replaces the current phone after a valid OTP for a new phone', async () => {

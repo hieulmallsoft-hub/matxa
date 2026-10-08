@@ -17,6 +17,11 @@ export class PlatformFeePolicyService {
   calculate(input: PlatformFeePolicyInput) {
     const grossServiceAmount = new Prisma.Decimal(input.grossServiceAmount);
     const platformFee = new Prisma.Decimal(0);
-    return { grossServiceAmount, platformFee, technicianEarning: grossServiceAmount.minus(platformFee), feePolicyVersion: 'ZERO_V1' };
+    return {
+      grossServiceAmount,
+      platformFee,
+      technicianEarning: grossServiceAmount.minus(platformFee),
+      feePolicyVersion: 'ZERO_V1',
+    };
   }
 }

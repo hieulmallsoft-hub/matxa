@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
@@ -39,7 +30,11 @@ import { ClientMetadata } from '../entities/auth-request.entity';
 import { AuthResponse, AuthUser } from '../entities/auth-user.entity';
 import { SendPhoneOtpResponse } from '../entities/phone-otp.entity';
 import { SendEmailOtpResponse, VerifyRegistrationOtpResponse } from '../entities/email-otp.entity';
-import { CompletePasswordResetResponse, StartPasswordResetResponse, VerifyPasswordResetResponse } from '../entities/password-reset.entity';
+import {
+  CompletePasswordResetResponse,
+  StartPasswordResetResponse,
+  VerifyPasswordResetResponse,
+} from '../entities/password-reset.entity';
 import { AuthService } from '../services/auth.service';
 
 @ApiTags('Authentication')
@@ -72,7 +67,8 @@ export class AuthController {
   @ApiOkResponse({ type: AuthResponse })
   completeRegistration(@Body() dto: CompleteRegistrationDto, @Req() request: Request): Promise<AuthResponse> {
     return this.authService.completeEmailRegistration(dto.registrationSessionId, dto.password, {
-      ...this.getClientMetadata(request, dto.deviceId), deviceId: dto.deviceId,
+      ...this.getClientMetadata(request, dto.deviceId),
+      deviceId: dto.deviceId,
     });
   }
 
@@ -118,10 +114,7 @@ export class AuthController {
   @ApiAcceptedResponse({ type: SendPhoneOtpResponse })
   @ApiBadRequestResponse({ description: 'So dien thoai khong hop le' })
   @ApiTooManyRequestsResponse({ description: 'Vuot gioi han gui OTP' })
-  sendPhoneOtp(
-    @Body() dto: SendPhoneOtpDto,
-    @Req() request: Request,
-  ): Promise<SendPhoneOtpResponse> {
+  sendPhoneOtp(@Body() dto: SendPhoneOtpDto, @Req() request: Request): Promise<SendPhoneOtpResponse> {
     return this.authService.sendPhoneOtp(
       dto.phoneNumber,
       dto.deviceId,
@@ -134,10 +127,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Xac minh OTP va dang nhap' })
   @ApiOkResponse({ type: AuthResponse })
   @ApiUnauthorizedResponse({ description: 'OTP sai, het han hoac da dung' })
-  verifyPhoneOtp(
-    @Body() dto: VerifyPhoneOtpDto,
-    @Req() request: Request,
-  ): Promise<AuthResponse> {
+  verifyPhoneOtp(@Body() dto: VerifyPhoneOtpDto, @Req() request: Request): Promise<AuthResponse> {
     return this.authService.verifyPhoneOtp(dto.challengeId, dto.code, {
       ...this.getClientMetadata(request, dto.deviceId),
       deviceId: dto.deviceId,
@@ -173,16 +163,8 @@ export class AuthController {
   @ApiOperation({ summary: 'Xac minh OTP va lien ket hoac thay doi so dien thoai' })
   @ApiOkResponse({ type: AuthUser })
   @ApiUnauthorizedResponse({ description: 'OTP hoac access token khong hop le' })
-  linkPhoneVerifyOtp(
-    @CurrentAuth() auth: AccessTokenPayload,
-    @Body() dto: VerifyPhoneOtpDto,
-  ): Promise<AuthUser> {
-    return this.authService.linkVerifiedPhone(
-      auth.sub,
-      dto.challengeId,
-      dto.code,
-      dto.deviceId,
-    );
+  linkPhoneVerifyOtp(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: VerifyPhoneOtpDto): Promise<AuthUser> {
+    return this.authService.linkVerifiedPhone(auth.sub, dto.challengeId, dto.code, dto.deviceId);
   }
 
   @HttpCode(HttpStatus.OK)
@@ -192,14 +174,8 @@ export class AuthController {
   @ApiUnauthorizedResponse({
     description: 'Firebase token khong hop le hoac khong phai Phone Auth',
   })
-  loginWithFirebasePhone(
-    @Body() dto: FirebaseLoginDto,
-    @Req() request: Request,
-  ): Promise<AuthResponse> {
-    return this.authService.loginWithFirebasePhone(
-      dto.idToken,
-      this.getClientMetadata(request, dto.deviceId),
-    );
+  loginWithFirebasePhone(@Body() dto: FirebaseLoginDto, @Req() request: Request): Promise<AuthResponse> {
+    return this.authService.loginWithFirebasePhone(dto.idToken, this.getClientMetadata(request, dto.deviceId));
   }
 
   @Post('google')
@@ -208,23 +184,24 @@ export class AuthController {
   @ApiOperation({ summary: 'Dang ky hoac dang nhap bang Google ID token' })
   @ApiOkResponse({ type: AuthResponse })
   @ApiUnauthorizedResponse({ description: 'Google ID token khong hop le' })
-  loginWithGoogle(
-    @Body() dto: FirebaseLoginDto,
-    @Req() request: Request,
-  ): Promise<AuthResponse> {
-    return this.authService.loginWithGoogle(
-      dto.idToken,
-      this.getClientMetadata(request, dto.deviceId),
-    );
+  loginWithGoogle(@Body() dto: FirebaseLoginDto, @Req() request: Request): Promise<AuthResponse> {
+    return this.authService.loginWithGoogle(dto.idToken, this.getClientMetadata(request, dto.deviceId));
   }
 
   @Post('apple/start')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Tao nonce dang nhap Apple, hieu luc 300 giay va chi dung mot lan' })
-  @ApiOkResponse({ schema: { type: 'object', required: ['nonce', 'expiresIn'], properties: {
-    nonce: { type: 'string' }, expiresIn: { type: 'integer', example: 300 },
-  } } })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['nonce', 'expiresIn'],
+      properties: {
+        nonce: { type: 'string' },
+        expiresIn: { type: 'integer', example: 300 },
+      },
+    },
+  })
   startAppleLogin() {
     return this.authService.startAppleLogin();
   }
@@ -235,10 +212,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Dang ky hoac dang nhap bang Apple identity token' })
   @ApiOkResponse({ type: AuthResponse })
   @ApiUnauthorizedResponse({ description: 'Apple identity token, audience hoac nonce khong hop le' })
-  loginWithApple(
-    @Body() dto: AppleLoginDto,
-    @Req() request: Request,
-  ): Promise<AuthResponse> {
+  loginWithApple(@Body() dto: AppleLoginDto, @Req() request: Request): Promise<AuthResponse> {
     return this.authService.loginWithApple(
       dto.idToken,
       dto.nonce,
@@ -253,14 +227,8 @@ export class AuthController {
   @ApiOperation({ summary: 'Xoay refresh token va lay cap token moi' })
   @ApiOkResponse({ type: AuthResponse })
   @ApiUnauthorizedResponse({ description: 'Refresh token khong hop le' })
-  refresh(
-    @Body() dto: RefreshTokenDto,
-    @Req() request: Request,
-  ): Promise<AuthResponse> {
-    return this.authService.refresh(
-      dto.refreshToken,
-      this.getClientMetadata(request),
-    );
+  refresh(@Body() dto: RefreshTokenDto, @Req() request: Request): Promise<AuthResponse> {
+    return this.authService.refresh(dto.refreshToken, this.getClientMetadata(request));
   }
 
   @Get('me')

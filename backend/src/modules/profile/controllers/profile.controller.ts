@@ -33,7 +33,7 @@ export class ProfileController {
   }
 
   @Patch('me')
-  @ApiOperation({ summary: 'Cap nhat ho ten, gioi tinh, quoc tich va avatar cua tai khoan' })
+  @ApiOperation({ summary: 'Cap nhat ho so, avatar va so dien thoai da duoc nguoi dung xac nhan tren Mobile' })
   @ApiOkResponse({ type: ProfileModel })
   updateMe(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: UpdateProfileDto) {
     return this.profile.updateMe(auth.sub, dto);

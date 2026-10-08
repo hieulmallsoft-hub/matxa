@@ -20,6 +20,15 @@ export class UpdateProfileDto {
   @MaxLength(100)
   nationality?: string;
 
+  @ApiPropertyOptional({
+    description: 'So dien thoai moi. Mobile phai yeu cau nguoi dung xac nhan lai so truoc khi gui request.',
+    example: '+84901234567',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  phoneNumber?: string;
+
   @ApiPropertyOptional({ description: 'mediaKey tra ve tu API avatar-upload-url' })
   @IsOptional()
   @IsString()

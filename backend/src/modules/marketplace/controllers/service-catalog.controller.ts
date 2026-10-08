@@ -1,4 +1,17 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -12,8 +25,11 @@ import { ServiceCatalogService } from '../services/service-catalog.service';
 @Controller('service-catalog')
 export class ServiceCatalogController {
   constructor(private readonly catalog: ServiceCatalogService) {}
-  @Get() @ApiOperation({ summary: 'Mobile lay catalog dich vu dang hoat dong cho OPEN booking' })
-  list(@Query() query: ServiceCatalogQueryDto) { return this.catalog.listPublic(query); }
+  @Get()
+  @ApiOperation({ summary: 'Mobile lay catalog dich vu dang hoat dong cho OPEN booking' })
+  list(@Query() query: ServiceCatalogQueryDto) {
+    return this.catalog.listPublic(query);
+  }
 }
 
 @ApiTags('Admin Service Catalog')
@@ -23,8 +39,16 @@ export class ServiceCatalogController {
 @Controller('admin/service-catalog')
 export class AdminServiceCatalogController {
   constructor(private readonly catalog: ServiceCatalogService) {}
-  @Get() list() { return this.catalog.listAdmin(); }
-  @Post() create(@Body() dto: CreateServiceCatalogDto) { return this.catalog.create(dto); }
-  @Patch(':id') update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateServiceCatalogDto) { return this.catalog.update(id, dto); }
-  @Delete(':id') @HttpCode(HttpStatus.NO_CONTENT) deactivate(@Param('id', ParseUUIDPipe) id: string) { return this.catalog.deactivate(id); }
+  @Get() list() {
+    return this.catalog.listAdmin();
+  }
+  @Post() create(@Body() dto: CreateServiceCatalogDto) {
+    return this.catalog.create(dto);
+  }
+  @Patch(':id') update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateServiceCatalogDto) {
+    return this.catalog.update(id, dto);
+  }
+  @Delete(':id') @HttpCode(HttpStatus.NO_CONTENT) deactivate(@Param('id', ParseUUIDPipe) id: string) {
+    return this.catalog.deactivate(id);
+  }
 }

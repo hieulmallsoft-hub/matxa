@@ -36,7 +36,8 @@ export function validateEnvironment(config: Record<string, unknown>) {
 
   if (config.VNPAY_TMN_CODE || config.VNPAY_HASH_SECRET || config.VNPAY_RETURN_URL) {
     for (const key of ['VNPAY_TMN_CODE', 'VNPAY_HASH_SECRET', 'VNPAY_RETURN_URL']) {
-      if (typeof config[key] !== 'string' || config[key].trim().length === 0) throw new Error(`${key} la bat buoc khi bat VNPAY`);
+      if (typeof config[key] !== 'string' || config[key].trim().length === 0)
+        throw new Error(`${key} la bat buoc khi bat VNPAY`);
     }
     if ((config.VNPAY_HASH_SECRET as string).length < 16) throw new Error('VNPAY_HASH_SECRET khong hop le');
   }
@@ -54,9 +55,7 @@ export function validateEnvironment(config: Record<string, unknown>) {
     OPEN_BOOKING_EXPIRATION_BATCH_SIZE: [100, 1, 500],
   } as const;
   const parsedSettings: Record<string, number> = {};
-  for (const [key, [fallback, minimum, maximum]] of Object.entries(
-    integerSettings,
-  )) {
+  for (const [key, [fallback, minimum, maximum]] of Object.entries(integerSettings)) {
     const value = Number(config[key] ?? fallback);
     if (!Number.isInteger(value) || value < minimum || value > maximum) {
       throw new Error(`${key} phai la so nguyen tu ${minimum} den ${maximum}`);

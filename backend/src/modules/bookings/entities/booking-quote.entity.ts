@@ -28,7 +28,8 @@ export class QuotePromotionResponse {
 
 export class BookingQuoteResponse {
   @ApiProperty() technicianId!: string;
-  @ApiProperty({ type: [String], description: 'TechnicianService IDs selected by the customer' }) technicianServiceIds!: string[];
+  @ApiProperty({ type: [String], description: 'TechnicianService IDs selected by the customer' })
+  technicianServiceIds!: string[];
   @ApiProperty({ type: [QuotedService] }) services!: QuotedService[];
   @ApiProperty({ enum: ['HOME', 'ONSITE', 'ONLINE'] }) mode!: string;
   @ApiProperty() serviceMode!: string;

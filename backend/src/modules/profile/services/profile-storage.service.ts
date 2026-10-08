@@ -1,7 +1,13 @@
 import { randomUUID } from 'crypto';
 import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CopyObjectCommand, DeleteObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  CopyObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { CreateAvatarUploadUrlDto } from '../dto/profile.dto';
 
@@ -19,8 +25,16 @@ export class ProfileStorageService {
       throw new ServiceUnavailableException('S3 chua duoc cau hinh');
     }
     const endpoint = this.config.get<string>('S3_ENDPOINT') || undefined;
-    return { bucket, client: new S3Client({ region, endpoint, forcePathStyle: Boolean(endpoint),
-      credentials: { accessKeyId, secretAccessKey }, maxAttempts: 2 }) };
+    return {
+      bucket,
+      client: new S3Client({
+        region,
+        endpoint,
+        forcePathStyle: Boolean(endpoint),
+        credentials: { accessKeyId, secretAccessKey },
+        maxAttempts: 2,
+      }),
+    };
   }
 
   // A separate stored key prevents an upload URL from overwriting a saved avatar.
@@ -34,25 +48,35 @@ export class ProfileStorageService {
         throw new BadRequestException('Anh phai la JPEG, PNG hoac WebP, toi da 5 MB');
       }
       const savedKey = `avatars/${userId}/saved/${randomUUID()}.${extension}`;
-      await client.send(new CopyObjectCommand({ Bucket: bucket, Key: savedKey,
-        CopySource: `${bucket}/${key.split('/').map(encodeURIComponent).join('/')}`,
-        CopySourceIfMatch: object.ETag,
-      }));
+      await client.send(
+        new CopyObjectCommand({
+          Bucket: bucket,
+          Key: savedKey,
+          CopySource: `${bucket}/${key.split('/').map(encodeURIComponent).join('/')}`,
+          CopySourceIfMatch: object.ETag,
+        }),
+      );
       return savedKey;
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
-      if (status === 404 || status === 412) throw new BadRequestException('Anh chua upload hoac da thay doi, vui long upload lai');
+      if (status === 404 || status === 412)
+        throw new BadRequestException('Anh chua upload hoac da thay doi, vui long upload lai');
       throw new ServiceUnavailableException('Khong the kiem tra va luu anh tren S3');
-    } finally { client.destroy(); }
+    } finally {
+      client.destroy();
+    }
   }
 
   async deleteAvatar(userId: string, key: string | null | undefined): Promise<void> {
     if (!key?.startsWith(`avatars/${userId}/`)) return;
     try {
       const { bucket, client } = this.connection();
-      try { await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })); }
-      finally { client.destroy(); }
+      try {
+        await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+      } finally {
+        client.destroy();
+      }
     } catch {
       // Cleanup failure must not turn a committed profile update into an error.
       this.logger.warn('Khong the don anh cu tren S3; can kiem tra quyen DeleteObject');
@@ -78,12 +102,16 @@ export class ProfileStorageService {
       credentials: { accessKeyId, secretAccessKey },
     });
     const expiresIn = 300;
-    const uploadUrl = await getSignedUrl(client, new PutObjectCommand({
-      Bucket: bucket,
-      Key: mediaKey,
-      ContentType: dto.contentType,
-      ContentLength: dto.size,
-    }), { expiresIn });
+    const uploadUrl = await getSignedUrl(
+      client,
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: mediaKey,
+        ContentType: dto.contentType,
+        ContentLength: dto.size,
+      }),
+      { expiresIn },
+    );
     const publicBaseUrl = this.config.get<string>('S3_PUBLIC_BASE_URL')?.replace(/\/$/, '');
     const mediaUrl = publicBaseUrl
       ? `${publicBaseUrl}/${mediaKey}`
@@ -95,8 +123,6 @@ export class ProfileStorageService {
     const bucket = this.config.getOrThrow<string>('S3_BUCKET');
     const region = this.config.getOrThrow<string>('S3_REGION');
     const publicBaseUrl = this.config.get<string>('S3_PUBLIC_BASE_URL')?.replace(/\/$/, '');
-    return publicBaseUrl
-      ? `${publicBaseUrl}/${mediaKey}`
-      : `https://${bucket}.s3.${region}.amazonaws.com/${mediaKey}`;
+    return publicBaseUrl ? `${publicBaseUrl}/${mediaKey}` : `https://${bucket}.s3.${region}.amazonaws.com/${mediaKey}`;
   }
 }

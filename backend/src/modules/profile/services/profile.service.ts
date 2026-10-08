@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { PrismaService } from '../../../database/prisma.service';
 import { UpdateProfileDto } from '../dto/profile.dto';
 import { ProfileStorageService } from './profile-storage.service';
@@ -28,18 +29,30 @@ export class ProfileService {
   }
 
   async updateMe(userId: string, dto: UpdateProfileDto) {
-    if (dto.displayName !== undefined && !dto.displayName.trim()) throw new BadRequestException('Ten hien thi khong duoc de trong');
+    if (dto.displayName !== undefined && !dto.displayName.trim())
+      throw new BadRequestException('Ten hien thi khong duoc de trong');
     const data: Record<string, string | undefined> = {
       displayName: dto.displayName?.trim(),
       gender: dto.gender,
       nationality: dto.nationality?.trim(),
     };
+    const phoneNumber = dto.phoneNumber === undefined ? undefined : this.normalizePhoneNumber(dto.phoneNumber);
+    if (phoneNumber) {
+      const owner = await this.prisma.userIdentity.findFirst({
+        where: { provider: 'PHONE', providerSubject: phoneNumber, userId: { not: userId } },
+        select: { id: true },
+      });
+      if (owner) throw new ConflictException('So dien thoai da duoc lien ket voi tai khoan khac');
+    }
     let previousKey: string | null = null;
     let savedKey: string | undefined;
     if (dto.avatarKey !== undefined) {
       const prefix = `avatars/${userId}/`;
-      if (typeof dto.avatarKey !== 'string' || !dto.avatarKey.startsWith(prefix)
-        || !/^[0-9a-f-]{36}\.(jpg|png|webp)$/i.test(dto.avatarKey.slice(prefix.length))) {
+      if (
+        typeof dto.avatarKey !== 'string' ||
+        !dto.avatarKey.startsWith(prefix) ||
+        !/^[0-9a-f-]{36}\.(jpg|png|webp)$/i.test(dto.avatarKey.slice(prefix.length))
+      ) {
         throw new BadRequestException('Avatar key khong hop le');
       }
       const current = await this.prisma.user.findUnique({ where: { id: userId }, select: { avatarKey: true } });
@@ -53,10 +66,10 @@ export class ProfileService {
     let user;
     try {
       user = await this.prisma.user.update({
-      where: { id: userId, ...(savedKey ? { avatarKey: previousKey } : {}) },
-      data,
-      select: profileSelect,
-    });
+        where: { id: userId, ...(savedKey ? { avatarKey: previousKey } : {}) },
+        data,
+        select: profileSelect,
+      });
     } catch (error) {
       if (savedKey) await this.storage.deleteAvatar(userId, savedKey);
       if (savedKey && (error as { code?: string }).code === 'P2025') {
@@ -64,11 +77,42 @@ export class ProfileService {
       }
       throw error;
     }
+    if (phoneNumber) {
+      const existingPhoneIdentity = await this.prisma.userIdentity.findFirst({
+        where: { userId, provider: 'PHONE' },
+        select: { id: true },
+      });
+      try {
+        if (existingPhoneIdentity) {
+          await this.prisma.userIdentity.update({
+            where: { id: existingPhoneIdentity.id },
+            data: { providerSubject: phoneNumber, phoneNumber, emailVerified: true },
+          });
+        } else {
+          await this.prisma.userIdentity.create({
+            data: { userId, provider: 'PHONE', providerSubject: phoneNumber, phoneNumber, emailVerified: true },
+          });
+        }
+      } catch (error) {
+        if ((error as { code?: string }).code === 'P2002')
+          throw new ConflictException('So dien thoai da duoc lien ket voi tai khoan khac');
+        throw error;
+      }
+    }
     if (savedKey) {
       await this.storage.deleteAvatar(userId, previousKey);
       await this.storage.deleteAvatar(userId, dto.avatarKey);
     }
+    if (phoneNumber) return this.getMe(userId);
     return this.toProfile(user);
+  }
+
+  private normalizePhoneNumber(input: string) {
+    const compact = input.trim().replace(/[\s().-]/g, '');
+    const phone = parsePhoneNumberFromString(compact, 'VN');
+    if (!phone?.isValid() || phone.country !== 'VN')
+      throw new BadRequestException('So dien thoai Viet Nam khong hop le');
+    return phone.number;
   }
 
   private toProfile(user: {

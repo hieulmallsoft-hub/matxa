@@ -1,12 +1,38 @@
-import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
 import { ListNotificationsDto } from '../dto/list-notifications.dto';
 import { RegisterDeviceTokenDto, RemoveDeviceTokenDto } from '../dto/register-device-token.dto';
 import { TestPushDto } from '../dto/test-push.dto';
-import { DeviceTokenResponse, NotificationItem, NotificationListResponse, PushResultResponse } from '../entities/notification.entity';
+import {
+  DeviceTokenResponse,
+  NotificationItem,
+  NotificationListResponse,
+  PushResultResponse,
+} from '../entities/notification.entity';
 import { NotificationsService } from '../services/notifications.service';
 
 @ApiTags('Notifications')

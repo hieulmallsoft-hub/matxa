@@ -12,22 +12,22 @@ Content-Type: application/json
 
 ## 1. Hai giai đoạn
 
-| Giai đoạn | Role tài khoản | Nhóm API dùng |
-|---|---|---|
-| Đăng ký KTV | `CUSTOMER` | `/technician/application/*` |
-| Đã được duyệt | `TECHNICIAN` | `/technician/profile`, `/technician/services`, `/technician/availability` |
+| Giai đoạn     | Role tài khoản | Nhóm API dùng                                                             |
+| ------------- | -------------- | ------------------------------------------------------------------------- |
+| Đăng ký KTV   | `CUSTOMER`     | `/technician/application/*`                                               |
+| Đã được duyệt | `TECHNICIAN`   | `/technician/profile`, `/technician/services`, `/technician/availability` |
 
 Gửi hồ sơ chỉ chuyển status sang `SUBMITTED`; không tự đổi role. Chỉ Admin approve mới tạo/cập nhật `TechnicianProfile`, đặt `isVerified=true` và đổi role thành `TECHNICIAN`.
 
 ## 2. Application status
 
-| Status | Mobile hiển thị | Người dùng được làm gì |
-|---|---|---|
-| `DRAFT` | Hồ sơ nháp | Sửa, upload/xóa gallery, upload KYC, submit |
-| `SUBMITTED` | Đã gửi, chờ xử lý | Chỉ đọc, chờ Admin review |
-| `UNDER_REVIEW` | Admin đang xét duyệt | Chỉ đọc |
-| `REJECTED` | Cần bổ sung | Hiển thị `rejectionReason`, cho sửa và submit lại |
-| `APPROVED` | Đã là KTV | Dùng API Technician Management |
+| Status         | Mobile hiển thị      | Người dùng được làm gì                            |
+| -------------- | -------------------- | ------------------------------------------------- |
+| `DRAFT`        | Hồ sơ nháp           | Sửa, upload/xóa gallery, upload KYC, submit       |
+| `SUBMITTED`    | Đã gửi, chờ xử lý    | Chỉ đọc, chờ Admin review                         |
+| `UNDER_REVIEW` | Admin đang xét duyệt | Chỉ đọc                                           |
+| `REJECTED`     | Cần bổ sung          | Hiển thị `rejectionReason`, cho sửa và submit lại |
+| `APPROVED`     | Đã là KTV            | Dùng API Technician Management                    |
 
 ## 3. Tạo/lấy/cập nhật hồ sơ đăng ký
 
@@ -90,16 +90,16 @@ PATCH /technician/application
 
 Field hợp lệ:
 
-| Field | Rule |
-|---|---|
-| `displayName` | Tối đa 100 ký tự, không rỗng nếu gửi |
-| `gender` | `MALE`, `FEMALE`, `OTHER` |
-| `applicationType` | Tối đa 50 ký tự |
-| `city`, `district` | Tối đa 100 ký tự |
-| `supportedModes` | Mảng `HOME`, `ONSITE`, `ONLINE` |
-| `facility` | Tối đa 150 ký tự |
-| `address` | Tối đa 300 ký tự |
-| `bio` | Tối đa 2.000 ký tự |
+| Field              | Rule                                 |
+| ------------------ | ------------------------------------ |
+| `displayName`      | Tối đa 100 ký tự, không rỗng nếu gửi |
+| `gender`           | `MALE`, `FEMALE`, `OTHER`            |
+| `applicationType`  | Tối đa 50 ký tự                      |
+| `city`, `district` | Tối đa 100 ký tự                     |
+| `supportedModes`   | Mảng `HOME`, `ONSITE`, `ONLINE`      |
+| `facility`         | Tối đa 150 ký tự                     |
+| `address`          | Tối đa 300 ký tự                     |
+| `bio`              | Tối đa 2.000 ký tự                   |
 
 Nếu `supportedModes` có `ONSITE`, bắt buộc có cả `facility` và `address`; sai rule trả `400`.
 
@@ -317,13 +317,13 @@ Thời gian phải là ISO-8601 có timezone, dùng UTC `Z` để tránh lệch 
 
 ## 11. Error handling
 
-| HTTP | Ý nghĩa | Mobile xử lý |
-|---|---|---|
-| `400` | Dữ liệu sai, thiếu KYC, sai mode hoặc sai ONSITE | Hiển thị `message` gần field liên quan |
-| `401` | Token hết hạn/thiếu token | Refresh token hoặc yêu cầu đăng nhập lại |
-| `403` | Chưa là TECHNICIAN hoặc không có quyền | Hiển thị trạng thái chờ duyệt, không mở màn quản lý KTV |
-| `404` | Service/gallery/availability không tồn tại hoặc không thuộc owner | Refresh dữ liệu, không retry mù quáng |
-| `409` | Hồ sơ đang chờ duyệt hoặc đã duyệt | Chuyển UI sang read-only và load lại application |
+| HTTP  | Ý nghĩa                                                           | Mobile xử lý                                            |
+| ----- | ----------------------------------------------------------------- | ------------------------------------------------------- |
+| `400` | Dữ liệu sai, thiếu KYC, sai mode hoặc sai ONSITE                  | Hiển thị `message` gần field liên quan                  |
+| `401` | Token hết hạn/thiếu token                                         | Refresh token hoặc yêu cầu đăng nhập lại                |
+| `403` | Chưa là TECHNICIAN hoặc không có quyền                            | Hiển thị trạng thái chờ duyệt, không mở màn quản lý KTV |
+| `404` | Service/gallery/availability không tồn tại hoặc không thuộc owner | Refresh dữ liệu, không retry mù quáng                   |
+| `409` | Hồ sơ đang chờ duyệt hoặc đã duyệt                                | Chuyển UI sang read-only và load lại application        |
 
 ## 12. Mobile không được làm
 

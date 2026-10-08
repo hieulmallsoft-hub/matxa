@@ -46,8 +46,7 @@ export class PhoneOtpService {
     this.phoneLimit = config.get<number>('OTP_PHONE_LIMIT_PER_HOUR', 5);
     this.ipLimit = config.get<number>('OTP_IP_LIMIT_PER_HOUR', 20);
     this.deviceLimit = config.get<number>('OTP_DEVICE_LIMIT_PER_HOUR', 10);
-    this.isDevelopmentSms =
-      config.get('SMS_PROVIDER', 'development') === 'development';
+    this.isDevelopmentSms = config.get('SMS_PROVIDER', 'development') === 'development';
     this.developmentCode = config.get('SMS_DEV_CODE', '123456');
 
     if (!/^\d{6}$/.test(this.developmentCode)) {
@@ -66,11 +65,10 @@ export class PhoneOtpService {
     const deviceHash = this.hmac(`device:${deviceId}`);
     const ipHash = this.hmac(`ip:${ipAddress}`);
 
-    const cooldownCreated = await this.redis.client.set(
-      `otp:cooldown:${phoneHash}`,
-      '1',
-      { EX: this.resendSeconds, NX: true },
-    );
+    const cooldownCreated = await this.redis.client.set(`otp:cooldown:${phoneHash}`, '1', {
+      EX: this.resendSeconds,
+      NX: true,
+    });
     if (!cooldownCreated) {
       this.tooManyRequests('Vui long cho truoc khi gui lai ma');
     }
@@ -82,9 +80,7 @@ export class PhoneOtpService {
     ]);
 
     const challengeId = randomUUID();
-    const code = this.isDevelopmentSms
-      ? this.developmentCode
-      : randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const code = this.isDevelopmentSms ? this.developmentCode : randomInt(0, 1_000_000).toString().padStart(6, '0');
     const challenge: OtpChallenge = {
       phoneNumber,
       phoneHash,
@@ -103,10 +99,7 @@ export class PhoneOtpService {
       await this.smsProvider.sendOtp(phoneNumber, code);
     } catch {
       await this.redis.client.del(challengeKey);
-      throw new HttpException(
-        'Khong the gui ma xac minh luc nay',
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
+      throw new HttpException('Khong the gui ma xac minh luc nay', HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     return {
@@ -117,12 +110,7 @@ export class PhoneOtpService {
     };
   }
 
-  async verifyOtp(
-    challengeId: string,
-    code: string,
-    deviceId: string,
-    binding?: string,
-  ): Promise<string> {
+  async verifyOtp(challengeId: string, code: string, deviceId: string, binding?: string): Promise<string> {
     const challengeKey = `otp:challenge:${challengeId}`;
     const rawChallenge = await this.redis.client.get(challengeKey);
     if (!rawChallenge) {

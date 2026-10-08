@@ -28,9 +28,9 @@ Quote không yêu cầu xác thực số điện thoại. Create Booking mới y
 
 ## 4. Endpoint
 
-| Method | Endpoint | Auth | Chức năng |
-|---|---|---|---|
-| POST | `/api/bookings/quote` | Bắt buộc | Kiểm tra khả dụng và tính giá trước khi đặt |
+| Method | Endpoint              | Auth     | Chức năng                                   |
+| ------ | --------------------- | -------- | ------------------------------------------- |
+| POST   | `/api/bookings/quote` | Bắt buộc | Kiểm tra khả dụng và tính giá trước khi đặt |
 
 ## 5. Request body
 
@@ -39,10 +39,7 @@ Contract hiện tại dùng các tên `serviceIds`, `mode`, `scheduledStart`.
 ```json
 {
   "technicianId": "5d361f30-7ab2-4193-b2fb-f17bc60ee5ce",
-  "serviceIds": [
-    "7280f0f3-a6b1-4c5b-8204-ca56d74a9c31",
-    "d218c90a-14a5-4b80-b3c3-698b1b410065"
-  ],
+  "serviceIds": ["7280f0f3-a6b1-4c5b-8204-ca56d74a9c31", "d218c90a-14a5-4b80-b3c3-698b1b410065"],
   "mode": "HOME",
   "scheduledStart": "2026-10-01T01:00:00.000Z",
   "addressId": "094e5c0b-1f5a-4563-ae2e-ece07b8cc431",
@@ -50,24 +47,24 @@ Contract hiện tại dùng các tên `serviceIds`, `mode`, `scheduledStart`.
 }
 ```
 
-| Field | Bắt buộc | Mô tả |
-|---|---:|---|
-| `technicianId` | Có | `TechnicianProfile.id`, không phải `User.id`. |
-| `serviceIds` | Có | Mảng 1–10 `TechnicianService.id` từ màn Technician Detail. Tên field cũ là `serviceIds`, nhưng giá trị phải là ID dịch vụ của KTV; không phải `categoryId` hay master service ID. |
-| `mode` | Có | `HOME`, `ONSITE` hoặc `ONLINE`. |
-| `scheduledStart` | Có | ISO-8601 có `Z` hoặc timezone offset, phải ở tương lai. Nên giữ nguyên `startAt` từ Availability. |
-| `addressId` | HOME: Có | ID Address của tài khoản hiện tại. Không gửi field này với `ONSITE`/`ONLINE`. |
-| `promotionCode` | Không | Chuỗi tối đa 50 ký tự. Backend tự chuẩn hóa, kiểm tra và tính giảm giá. |
+| Field            | Bắt buộc | Mô tả                                                                                                                                                                             |
+| ---------------- | -------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `technicianId`   |       Có | `TechnicianProfile.id`, không phải `User.id`.                                                                                                                                     |
+| `serviceIds`     |       Có | Mảng 1–10 `TechnicianService.id` từ màn Technician Detail. Tên field cũ là `serviceIds`, nhưng giá trị phải là ID dịch vụ của KTV; không phải `categoryId` hay master service ID. |
+| `mode`           |       Có | `HOME`, `ONSITE` hoặc `ONLINE`.                                                                                                                                                   |
+| `scheduledStart` |       Có | ISO-8601 có `Z` hoặc timezone offset, phải ở tương lai. Nên giữ nguyên `startAt` từ Availability.                                                                                 |
+| `addressId`      | HOME: Có | ID Address của tài khoản hiện tại. Không gửi field này với `ONSITE`/`ONLINE`.                                                                                                     |
+| `promotionCode`  |    Không | Chuỗi tối đa 50 ký tự. Backend tự chuẩn hóa, kiểm tra và tính giảm giá.                                                                                                           |
 
 `2026-10-01T01:00:00.000Z` tương ứng 08:00 tại `Asia/Ho_Chi_Minh`.
 
 ## 6. HOME / ONSITE / ONLINE
 
-| Mode | `addressId` | Phí dịch vụ |
-|---|---|---:|
-| `HOME` | Bắt buộc, thuộc user hiện tại | `HOME_SERVICE_FEE` từ cấu hình backend; mặc định 100000 VND |
-| `ONSITE` | Không được gửi | 0 |
-| `ONLINE` | Không được gửi | 0 |
+| Mode     | `addressId`                   |                                                 Phí dịch vụ |
+| -------- | ----------------------------- | ----------------------------------------------------------: |
+| `HOME`   | Bắt buộc, thuộc user hiện tại | `HOME_SERVICE_FEE` từ cấu hình backend; mặc định 100000 VND |
+| `ONSITE` | Không được gửi                |                                                           0 |
+| `ONLINE` | Không được gửi                |                                                           0 |
 
 Backend lấy nội dung, tọa độ địa chỉ từ database. Mobile không gửi address text, latitude hay longitude trong Quote.
 
@@ -76,10 +73,7 @@ Backend lấy nội dung, tọa độ địa chỉ từ database. Mobile không 
 ```json
 {
   "technicianId": "5d361f30-7ab2-4193-b2fb-f17bc60ee5ce",
-  "technicianServiceIds": [
-    "7280f0f3-a6b1-4c5b-8204-ca56d74a9c31",
-    "d218c90a-14a5-4b80-b3c3-698b1b410065"
-  ],
+  "technicianServiceIds": ["7280f0f3-a6b1-4c5b-8204-ca56d74a9c31", "d218c90a-14a5-4b80-b3c3-698b1b410065"],
   "services": [
     {
       "id": "7280f0f3-a6b1-4c5b-8204-ca56d74a9c31",
@@ -144,17 +138,17 @@ Project trả error theo NestJS, thường có dạng:
 { "statusCode": 400, "message": "Khung gio da co nguoi dat", "error": "Bad Request" }
 ```
 
-| HTTP | Message/code | Mobile xử lý |
-|---:|---|---|
-| 400 | `Khung gio da co nguoi dat` hoặc `Ky thuat vien khong ranh trong khung gio nay` | Báo giờ vừa hết, refresh Availability. |
-| 400 | `Thoi gian dat lich phai o tuong lai` | Chọn lại giờ. |
-| 400 | `Dat tai nha can chon dia chi` / `Dia chi khong hop le` | Mở hoặc reload Addresses. |
-| 400 | `Chi gui addressId khi dat tai nha` | Bỏ `addressId` với ONSITE/ONLINE. |
-| 400 | `Ma khuyen mai khong hop le hoac da het han`, `Don hang chua dat gia tri toi thieu`, `Ma khuyen mai da het luot su dung` | Bỏ voucher khỏi UI và cho nhập lại. |
-| 400 | `Co dich vu khong hop le...` / `Dich vu khong ho tro hinh thuc da chon` | Tải lại Technician Detail, chọn lại dịch vụ/mode. |
-| 401 | Unauthorized | Điều hướng đăng nhập/làm mới token. |
-| 403 | `PHONE_VERIFICATION_REQUIRED` | Chỉ xảy ra lúc Create Booking: điều hướng xác thực số điện thoại. |
-| 409 | Dữ liệu booking thay đổi | Tải lại quote/Availability trước khi thử lại. |
+| HTTP | Message/code                                                                                                             | Mobile xử lý                                                      |
+| ---: | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+|  400 | `Khung gio da co nguoi dat` hoặc `Ky thuat vien khong ranh trong khung gio nay`                                          | Báo giờ vừa hết, refresh Availability.                            |
+|  400 | `Thoi gian dat lich phai o tuong lai`                                                                                    | Chọn lại giờ.                                                     |
+|  400 | `Dat tai nha can chon dia chi` / `Dia chi khong hop le`                                                                  | Mở hoặc reload Addresses.                                         |
+|  400 | `Chi gui addressId khi dat tai nha`                                                                                      | Bỏ `addressId` với ONSITE/ONLINE.                                 |
+|  400 | `Ma khuyen mai khong hop le hoac da het han`, `Don hang chua dat gia tri toi thieu`, `Ma khuyen mai da het luot su dung` | Bỏ voucher khỏi UI và cho nhập lại.                               |
+|  400 | `Co dich vu khong hop le...` / `Dich vu khong ho tro hinh thuc da chon`                                                  | Tải lại Technician Detail, chọn lại dịch vụ/mode.                 |
+|  401 | Unauthorized                                                                                                             | Điều hướng đăng nhập/làm mới token.                               |
+|  403 | `PHONE_VERIFICATION_REQUIRED`                                                                                            | Chỉ xảy ra lúc Create Booking: điều hướng xác thực số điện thoại. |
+|  409 | Dữ liệu booking thay đổi                                                                                                 | Tải lại quote/Availability trước khi thử lại.                     |
 
 ## 10. UI states
 

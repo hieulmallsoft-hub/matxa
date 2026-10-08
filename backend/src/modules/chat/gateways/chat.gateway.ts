@@ -1,11 +1,25 @@
 import { Logger, UsePipes, ValidationPipe } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { ConnectedSocket, MessageBody, OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage, WebSocketGateway, WebSocketServer, WsException } from '@nestjs/websockets';
+import {
+  ConnectedSocket,
+  MessageBody,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
+  WsException,
+} from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { PrismaService } from '../../../database/prisma.service';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
 import { ChatService } from '../services/chat.service';
-import { SocketConversationDto, SocketEditMessageDto, SocketMessageActionDto, SocketSendMessageDto } from '../dto/chat.dto';
+import {
+  SocketConversationDto,
+  SocketEditMessageDto,
+  SocketMessageActionDto,
+  SocketSendMessageDto,
+} from '../dto/chat.dto';
 
 type AuthSocket = Socket & { data: { userId?: string; activeConversationId?: string } };
 
@@ -27,7 +41,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (!token) throw new Error('missing token');
       const payload = await this.jwt.verifyAsync<AccessTokenPayload>(token);
       const session = await this.prisma.session.findFirst({
-        where: { id: payload.sid, userId: payload.sub, revokedAt: null, expiresAt: { gt: new Date() }, user: { status: 'ACTIVE' } },
+        where: {
+          id: payload.sid,
+          userId: payload.sub,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+          user: { status: 'ACTIVE' },
+        },
         select: { id: true },
       });
       if (!session) throw new Error('invalid session');
@@ -73,7 +93,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     for (const recipientId of recipients) {
       const sockets = await this.server.in(`user:${recipientId}`).fetchSockets();
       recipientOnline ||= sockets.length > 0;
-      recipientViewingConversation ||= sockets.some((socket) => socket.data.activeConversationId === dto.conversationId);
+      recipientViewingConversation ||= sockets.some(
+        (socket) => socket.data.activeConversationId === dto.conversationId,
+      );
     }
     if (recipientOnline) await this.chat.markDelivered(message.id);
     this.chat.notifyInBackground(userId, dto.conversationId, message.id, dto, !recipientViewingConversation);
@@ -102,7 +124,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async read(@ConnectedSocket() client: AuthSocket, @MessageBody() dto: SocketConversationDto) {
     const userId = this.userId(client);
     const result = await this.chat.markRead(userId, dto.conversationId);
-    this.server.to(`conversation:${dto.conversationId}`).emit('message.read', { conversationId: dto.conversationId, userId, ...result });
+    this.server
+      .to(`conversation:${dto.conversationId}`)
+      .emit('message.read', { conversationId: dto.conversationId, userId, ...result });
     return { event: 'message.read.ack', data: result };
   }
 
@@ -111,7 +135,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async typingStart(@ConnectedSocket() client: AuthSocket, @MessageBody() dto: SocketConversationDto) {
     const userId = this.userId(client);
     await this.chat.ensureMember(userId, dto.conversationId);
-    client.to(`conversation:${dto.conversationId}`).emit('typing.started', { conversationId: dto.conversationId, userId });
+    client
+      .to(`conversation:${dto.conversationId}`)
+      .emit('typing.started', { conversationId: dto.conversationId, userId });
   }
 
   @SubscribeMessage('typing.stop')
@@ -119,7 +145,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async typingStop(@ConnectedSocket() client: AuthSocket, @MessageBody() dto: SocketConversationDto) {
     const userId = this.userId(client);
     await this.chat.ensureMember(userId, dto.conversationId);
-    client.to(`conversation:${dto.conversationId}`).emit('typing.stopped', { conversationId: dto.conversationId, userId });
+    client
+      .to(`conversation:${dto.conversationId}`)
+      .emit('typing.stopped', { conversationId: dto.conversationId, userId });
   }
 
   private userId(client: AuthSocket) {

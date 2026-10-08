@@ -60,7 +60,10 @@ export class ChatService {
         include: { members: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } } },
       });
     }
-    await this.prisma.conversationMember.updateMany({ where: { conversationId: conversation.id }, data: { hiddenAt: null } });
+    await this.prisma.conversationMember.updateMany({
+      where: { conversationId: conversation.id },
+      data: { hiddenAt: null },
+    });
     return conversation;
   }
 
@@ -71,20 +74,30 @@ export class ChatService {
       include: {
         conversation: {
           include: {
-            members: { where: { userId: { not: userId } }, include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } },
+            members: {
+              where: { userId: { not: userId } },
+              include: { user: { select: { id: true, displayName: true, avatarUrl: true } } },
+            },
             messages: { orderBy: { createdAt: 'desc' }, take: 1 },
           },
         },
       },
     });
     const conversationIds = memberships.map(({ conversation }) => conversation.id);
-    const unreadMessages = conversationIds.length === 0 ? [] : await this.prisma.message.findMany({
-      where: { conversationId: { in: conversationIds }, senderId: { not: userId }, recalledAt: null },
-      select: { conversationId: true, createdAt: true },
-    });
+    const unreadMessages =
+      conversationIds.length === 0
+        ? []
+        : await this.prisma.message.findMany({
+            where: { conversationId: { in: conversationIds }, senderId: { not: userId }, recalledAt: null },
+            select: { conversationId: true, createdAt: true },
+          });
     const unreadByConversation = new Map<string, number>();
     for (const membership of memberships) {
-      const count = unreadMessages.filter((message) => message.conversationId === membership.conversation.id && (!membership.lastReadAt || message.createdAt > membership.lastReadAt)).length;
+      const count = unreadMessages.filter(
+        (message) =>
+          message.conversationId === membership.conversation.id &&
+          (!membership.lastReadAt || message.createdAt > membership.lastReadAt),
+      ).length;
       unreadByConversation.set(membership.conversation.id, count);
     }
     const visible = [] as Array<Record<string, unknown>>;
@@ -115,16 +128,29 @@ export class ChatService {
       ...(access.member?.hiddenAt ? { createdAt: { gt: access.member.hiddenAt } } : {}),
     };
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.message.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (query.page - 1) * query.limit, take: query.limit }),
+      this.prisma.message.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
       this.prisma.message.count({ where }),
     ]);
-    return { items: await Promise.all(items.map((item) => this.withSignedMediaUrl(item))), total, page: query.page, limit: query.limit };
+    return {
+      items: await Promise.all(items.map((item) => this.withSignedMediaUrl(item))),
+      total,
+      page: query.page,
+      limit: query.limit,
+    };
   }
 
   async sendMessage(userId: string, conversationId: string, dto: SendMessageDto, notify = true) {
     await this.ensureMember(userId, conversationId);
     this.validateMessage(conversationId, userId, dto);
-    const conversation = await this.prisma.conversation.findUniqueOrThrow({ where: { id: conversationId }, select: { bookingId: true } });
+    const conversation = await this.prisma.conversation.findUniqueOrThrow({
+      where: { id: conversationId },
+      select: { bookingId: true },
+    });
     const now = new Date();
     const message = await this.prisma.$transaction(async (tx) => {
       const created = await tx.message.create({
@@ -170,7 +196,15 @@ export class ChatService {
     await this.ownEditableMessage(userId, messageId);
     return this.prisma.message.update({
       where: { id: messageId },
-      data: { recalledAt: new Date(), text: null, mediaUrl: null, mediaKey: null, latitude: null, longitude: null, address: null },
+      data: {
+        recalledAt: new Date(),
+        text: null,
+        mediaUrl: null,
+        mediaKey: null,
+        latitude: null,
+        longitude: null,
+        address: null,
+      },
     });
   }
 
@@ -230,7 +264,8 @@ export class ChatService {
     if (!['TEXT', 'IMAGE', 'LOCATION'].includes(dto.type)) {
       throw new BadRequestException('Mobile khong duoc gui system message');
     }
-    if (dto.type === 'TEXT' && !dto.text?.trim()) throw new BadRequestException('Noi dung tin nhan khong duoc de trong');
+    if (dto.type === 'TEXT' && !dto.text?.trim())
+      throw new BadRequestException('Noi dung tin nhan khong duoc de trong');
     if (dto.type === 'IMAGE' && !dto.mediaKey?.startsWith(`chat/${conversationId}/${userId}/`)) {
       throw new BadRequestException('Anh khong hop le hoac khong thuoc cuoc tro chuyen');
     }
@@ -264,7 +299,10 @@ export class ChatService {
     if (!isCustomer && !isAssignedTechnician) {
       throw new ForbiddenException('Ban khong co quyen chat cho don nay');
     }
-    if (booking.assignmentMode === 'OPEN_MARKETPLACE' && !booking.applications.some((item) => item.technicianProfileId === booking.technicianId)) {
+    if (
+      booking.assignmentMode === 'OPEN_MARKETPLACE' &&
+      !booking.applications.some((item) => item.technicianProfileId === booking.technicianId)
+    ) {
       throw new ForbiddenException('KTV chua duoc chon cho don nay');
     }
     return booking;
@@ -275,33 +313,52 @@ export class ChatService {
     if (!message) throw new NotFoundException('Tin nhan khong ton tai');
     if (message.senderId !== userId) throw new ForbiddenException('Chi nguoi gui moi co the thay doi tin nhan');
     if (message.recalledAt) throw new BadRequestException('Tin nhan da duoc thu hoi');
-    if (Date.now() - message.createdAt.getTime() > EDIT_WINDOW_MS) throw new BadRequestException('Da qua 15 phut de sua hoac thu hoi');
+    if (Date.now() - message.createdAt.getTime() > EDIT_WINDOW_MS)
+      throw new BadRequestException('Da qua 15 phut de sua hoac thu hoi');
     return message;
   }
 
   notifyInBackground(senderId: string, conversationId: string, messageId: string, dto: SendMessageDto, push: boolean) {
     void this.notifyRecipients(senderId, conversationId, messageId, dto, push).catch((error: unknown) => {
-      this.logger.warn(`Khong the tao thong bao cho tin nhan ${messageId}: ${error instanceof Error ? error.message : 'unknown'}`);
+      this.logger.warn(
+        `Khong the tao thong bao cho tin nhan ${messageId}: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
     });
   }
 
-  private async notifyRecipients(senderId: string, conversationId: string, messageId: string, dto: SendMessageDto, push: boolean) {
+  private async notifyRecipients(
+    senderId: string,
+    conversationId: string,
+    messageId: string,
+    dto: SendMessageDto,
+    push: boolean,
+  ) {
     const [sender, recipients, conversation] = await Promise.all([
       this.prisma.user.findUnique({ where: { id: senderId }, select: { displayName: true } }),
       this.recipientIds(senderId, conversationId),
       this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { bookingId: true } }),
     ]);
     const title = sender?.displayName ?? 'Ban co tin nhan moi';
-    const body = dto.type === 'TEXT' ? dto.text!.trim().slice(0, 200) : dto.type === 'IMAGE' ? 'Da gui mot hinh anh' : 'Da gui vi tri';
-    await Promise.all(recipients.map(async (recipientId) => {
-      const actionUrl = conversation?.bookingId
-        ? `matxa://chat/${conversationId}?bookingId=${conversation.bookingId}`
-        : `matxa://chat/${conversationId}`;
-      await this.notifications.create(recipientId, 'CHAT_MESSAGE_RECEIVED', title, body, actionUrl);
-      if (push) await this.notifications.sendPush(recipientId, title, body, {
-        type: 'CHAT_MESSAGE_RECEIVED', conversationId, messageId,
-        ...(conversation?.bookingId ? { bookingId: conversation.bookingId } : {}),
-      });
-    }));
+    const body =
+      dto.type === 'TEXT'
+        ? dto.text!.trim().slice(0, 200)
+        : dto.type === 'IMAGE'
+          ? 'Da gui mot hinh anh'
+          : 'Da gui vi tri';
+    await Promise.all(
+      recipients.map(async (recipientId) => {
+        const actionUrl = conversation?.bookingId
+          ? `matxa://chat/${conversationId}?bookingId=${conversation.bookingId}`
+          : `matxa://chat/${conversationId}`;
+        await this.notifications.create(recipientId, 'CHAT_MESSAGE_RECEIVED', title, body, actionUrl);
+        if (push)
+          await this.notifications.sendPush(recipientId, title, body, {
+            type: 'CHAT_MESSAGE_RECEIVED',
+            conversationId,
+            messageId,
+            ...(conversation?.bookingId ? { bookingId: conversation.bookingId } : {}),
+          });
+      }),
+    );
   }
 }

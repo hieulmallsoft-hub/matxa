@@ -15,6 +15,11 @@ describe('ProfileService', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    userIdentity: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
   };
   const storage = { publicUrlFor: jest.fn(), prepareAvatar: jest.fn(), deleteAvatar: jest.fn() };
   const service = new ProfileService(prisma as never, storage as never);
@@ -23,12 +28,20 @@ describe('ProfileService', () => {
 
   it('returns profile and completed onboarding status', async () => {
     prisma.user.findUnique.mockResolvedValue(user);
-    await expect(service.getMe(user.id)).resolves.toEqual({ ...user, status: 'ACTIVE', email: null, phone: null, phoneVerified: false, onboardingCompleted: true });
+    await expect(service.getMe(user.id)).resolves.toEqual({
+      ...user,
+      status: 'ACTIVE',
+      email: null,
+      phone: null,
+      phoneVerified: false,
+      onboardingCompleted: true,
+    });
   });
 
   it('only accepts an avatar key belonging to the current user', async () => {
-    await expect(service.updateMe(user.id, { avatarKey: 'avatars/another-user/file.jpg' }))
-      .rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.updateMe(user.id, { avatarKey: 'avatars/another-user/file.jpg' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 
   it('rejects a blank display name', async () => {
@@ -45,9 +58,11 @@ describe('ProfileService', () => {
 
     await service.updateMe(user.id, { avatarKey });
 
-    expect(prisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ avatarKey, avatarUrl: 'https://cdn.example.com/' + avatarKey }),
-    }));
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ avatarKey, avatarUrl: 'https://cdn.example.com/' + avatarKey }),
+      }),
+    );
   });
 
   it('does not update the profile when the uploaded object is missing', async () => {
@@ -64,16 +79,22 @@ describe('ProfileService', () => {
     storage.prepareAvatar.mockResolvedValue('saved-new');
     prisma.user.update.mockResolvedValue(user);
     await service.updateMe(user.id, { avatarKey: `avatars/${user.id}/${user.id}.jpg` });
-    expect(prisma.user.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: user.id, avatarKey: old } }));
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: user.id, avatarKey: old } }),
+    );
     expect(storage.deleteAvatar).toHaveBeenCalledWith(user.id, old);
-    expect(storage.deleteAvatar.mock.invocationCallOrder[0]).toBeGreaterThan(prisma.user.update.mock.invocationCallOrder[0]);
+    expect(storage.deleteAvatar.mock.invocationCallOrder[0]).toBeGreaterThan(
+      prisma.user.update.mock.invocationCallOrder[0],
+    );
   });
 
   it('cleans only the new copy if a concurrent update wins', async () => {
     prisma.user.findUnique.mockResolvedValue({ avatarKey: 'old' });
     storage.prepareAvatar.mockResolvedValue('saved-new');
     prisma.user.update.mockRejectedValue({ code: 'P2025' });
-    await expect(service.updateMe(user.id, { avatarKey: `avatars/${user.id}/${user.id}.jpg` })).rejects.toMatchObject({ status: 409 });
+    await expect(service.updateMe(user.id, { avatarKey: `avatars/${user.id}/${user.id}.jpg` })).rejects.toMatchObject({
+      status: 409,
+    });
     expect(storage.deleteAvatar).toHaveBeenCalledTimes(1);
     expect(storage.deleteAvatar).toHaveBeenCalledWith(user.id, 'saved-new');
   });
@@ -82,5 +103,33 @@ describe('ProfileService', () => {
     for (const avatarKey of [null, `avatars/${user.id}/saved/${user.id}.jpg`]) {
       await expect(service.updateMe(user.id, { avatarKey } as never)).rejects.toBeInstanceOf(BadRequestException);
     }
+  });
+
+  it('updates a confirmed Vietnamese phone directly without an OTP challenge', async () => {
+    prisma.userIdentity.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    prisma.user.update.mockResolvedValue(user);
+    prisma.user.findUnique.mockResolvedValue({
+      ...user,
+      identities: [{ provider: 'PHONE', phoneNumber: '+84901234567', email: null, emailVerified: true }],
+    });
+
+    await expect(service.updateMe(user.id, { phoneNumber: '0901 234 567' })).resolves.toMatchObject({
+      phone: '+84901234567',
+      phoneVerified: true,
+    });
+    expect(prisma.userIdentity.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: user.id,
+        provider: 'PHONE',
+        providerSubject: '+84901234567',
+        phoneNumber: '+84901234567',
+      }),
+    });
+  });
+
+  it('rejects a phone already linked to another account', async () => {
+    prisma.userIdentity.findFirst.mockResolvedValueOnce({ id: 'other-phone' });
+    await expect(service.updateMe(user.id, { phoneNumber: '0901234567' })).rejects.toMatchObject({ status: 409 });
+    expect(prisma.user.update).not.toHaveBeenCalled();
   });
 });

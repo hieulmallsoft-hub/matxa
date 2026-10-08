@@ -68,10 +68,10 @@ Endpoint trả `403` trước khi KTV nhận đơn. Nút chat dùng `customer.id
 
 ## Error states
 
-| HTTP | Mobile xử lý |
-|---|---|
-| 401 | Refresh token hoặc yêu cầu đăng nhập lại. |
-| 403 | Chưa là KTV đã duyệt, hoặc chưa nhận đơn nhưng cố lấy số khách. |
-| 404 | Đơn không thuộc KTV / khách chưa xác thực số điện thoại. |
-| 400 | Sai trạng thái, ví dụ hoàn thành trước giờ kết thúc. |
-| 409 | Đơn vừa bị hủy hoặc xử lý từ thiết bị khác; refresh Job Inbox. |
+| HTTP | Mobile xử lý                                                    |
+| ---- | --------------------------------------------------------------- |
+| 401  | Refresh token hoặc yêu cầu đăng nhập lại.                       |
+| 403  | Chưa là KTV đã duyệt, hoặc chưa nhận đơn nhưng cố lấy số khách. |
+| 404  | Đơn không thuộc KTV / khách chưa xác thực số điện thoại.        |
+| 400  | Sai trạng thái, ví dụ hoàn thành trước giờ kết thúc.            |
+| 409  | Đơn vừa bị hủy hoặc xử lý từ thiết bị khác; refresh Job Inbox.  |

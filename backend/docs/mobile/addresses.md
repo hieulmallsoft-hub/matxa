@@ -16,15 +16,15 @@ Không gửi `userId`; backend lấy current user từ token.
 
 ## 3. Danh sách Endpoint
 
-| Method | Endpoint | Chức năng | Auth |
-| --- | --- | --- | --- |
-| GET | `/api/addresses` | Lấy address còn hiệu lực của current user | Bearer |
-| POST | `/api/addresses` | Tạo address | Bearer |
-| PATCH | `/api/addresses/:id` | Sửa address hoặc đặt default | Bearer |
-| DELETE | `/api/addresses/:id` | Soft-delete address | Bearer |
-| POST | `/api/bookings/quote` | Kiểm tra HOME address và xem snapshot dự kiến | Bearer |
-| POST | `/api/bookings` | Tạo booking, lưu snapshot address | Bearer |
-| GET | `/api/bookings`, `/api/bookings/:id` | History/detail có snapshot address | Bearer |
+| Method | Endpoint                             | Chức năng                                     | Auth   |
+| ------ | ------------------------------------ | --------------------------------------------- | ------ |
+| GET    | `/api/addresses`                     | Lấy address còn hiệu lực của current user     | Bearer |
+| POST   | `/api/addresses`                     | Tạo address                                   | Bearer |
+| PATCH  | `/api/addresses/:id`                 | Sửa address hoặc đặt default                  | Bearer |
+| DELETE | `/api/addresses/:id`                 | Soft-delete address                           | Bearer |
+| POST   | `/api/bookings/quote`                | Kiểm tra HOME address và xem snapshot dự kiến | Bearer |
+| POST   | `/api/bookings`                      | Tạo booking, lưu snapshot address             | Bearer |
+| GET    | `/api/bookings`, `/api/bookings/:id` | History/detail có snapshot address            | Bearer |
 
 ## 4. Lấy danh sách địa chỉ
 
@@ -132,11 +132,11 @@ Không gửi address text, lat/lng snapshot hoặc `userId`. Backend tự đọc
 
 ## 10. HOME / ONSITE / ONLINE
 
-| Mode | `addressId` |
-| --- | --- |
-| HOME | Bắt buộc |
-| ONSITE | Không gửi |
-| ONLINE | Không gửi |
+| Mode   | `addressId` |
+| ------ | ----------- |
+| HOME   | Bắt buộc    |
+| ONSITE | Không gửi   |
+| ONLINE | Không gửi   |
 
 ONSITE/ONLINE gửi `addressId` trả `400`, message `Chi gui addressId khi dat tai nha`.
 
@@ -159,14 +159,14 @@ Sửa/xóa Address không đổi booking cũ. Dựng history/detail bằng `book
 
 ## 12. Error Codes
 
-| HTTP | Message/code thực tế | Mobile nên làm gì |
-| --- | --- | --- |
-| 401 | `Access token khong hop le hoac da het han` | Refresh token hoặc login lại. |
-| 404 | `Dia chi khong ton tai` | Refetch addresses, bỏ selection cũ. |
-| 400 | `Dat tai nha can chon dia chi` | Bắt user chọn address HOME. |
-| 400 | `Dia chi khong hop le` | Address không thuộc user hoặc đã xóa; refetch và chọn lại. |
-| 400 | `Chi gui addressId khi dat tai nha` | Bỏ addressId cho ONSITE/ONLINE. |
-| 403 | `PHONE_VERIFICATION_REQUIRED` khi create | Điều hướng xác thực số điện thoại. |
+| HTTP | Message/code thực tế                        | Mobile nên làm gì                                          |
+| ---- | ------------------------------------------- | ---------------------------------------------------------- |
+| 401  | `Access token khong hop le hoac da het han` | Refresh token hoặc login lại.                              |
+| 404  | `Dia chi khong ton tai`                     | Refetch addresses, bỏ selection cũ.                        |
+| 400  | `Dat tai nha can chon dia chi`              | Bắt user chọn address HOME.                                |
+| 400  | `Dia chi khong hop le`                      | Address không thuộc user hoặc đã xóa; refetch và chọn lại. |
+| 400  | `Chi gui addressId khi dat tai nha`         | Bỏ addressId cho ONSITE/ONLINE.                            |
+| 403  | `PHONE_VERIFICATION_REQUIRED` khi create    | Điều hướng xác thực số điện thoại.                         |
 
 ## 13. UI State
 

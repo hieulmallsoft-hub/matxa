@@ -19,12 +19,12 @@ GET /api/bookings/:id
 
 ## 4. Booking status
 
-| Backend | Hiển thị gợi ý |
-| --- | --- |
-| `PENDING` | Đang chờ kỹ thuật viên xác nhận |
-| `CONFIRMED` | Đã xác nhận / sắp diễn ra |
-| `COMPLETED` | Hoàn thành |
-| `CANCELLED` | Đã hủy |
+| Backend     | Hiển thị gợi ý                  |
+| ----------- | ------------------------------- |
+| `PENDING`   | Đang chờ kỹ thuật viên xác nhận |
+| `CONFIRMED` | Đã xác nhận / sắp diễn ra       |
+| `COMPLETED` | Hoàn thành                      |
+| `CANCELLED` | Đã hủy                          |
 
 Không tạo status riêng như `WAITING_TECHNICIAN`. Backend hiện chưa có `expiresAt` hoặc tự động hủy pending, vì vậy Mobile không tự hardcode countdown hay tự đổi status.
 
@@ -32,21 +32,25 @@ Không tạo status riêng như `WAITING_TECHNICIAN`. Backend hiện chưa có `
 
 ```json
 {
-  "items": [{
-    "id": "booking-uuid",
-    "status": "PENDING",
-    "technician": { "technicianId": "profile-uuid", "displayName": "Kim Nguyễn", "avatarUrl": "https://..." },
-    "service": { "name": "Massage chân", "price": 500000, "durationMinutes": 60 },
-    "items": [{ "technicianServiceId": "service-uuid", "name": "Massage chân", "price": 500000, "durationMinutes": 60 }],
-    "mode": "HOME",
-    "startAt": "2026-10-01T01:00:00.000Z",
-    "endAt": "2026-10-01T02:00:00.000Z",
-    "total": 600000,
-    "paymentMethod": "CASH",
-    "canCancel": true,
-    "canReview": false,
-    "createdAt": "2026-09-29T08:00:00.000Z"
-  }],
+  "items": [
+    {
+      "id": "booking-uuid",
+      "status": "PENDING",
+      "technician": { "technicianId": "profile-uuid", "displayName": "Kim Nguyễn", "avatarUrl": "https://..." },
+      "service": { "name": "Massage chân", "price": 500000, "durationMinutes": 60 },
+      "items": [
+        { "technicianServiceId": "service-uuid", "name": "Massage chân", "price": 500000, "durationMinutes": 60 }
+      ],
+      "mode": "HOME",
+      "startAt": "2026-10-01T01:00:00.000Z",
+      "endAt": "2026-10-01T02:00:00.000Z",
+      "total": 600000,
+      "paymentMethod": "CASH",
+      "canCancel": true,
+      "canReview": false,
+      "createdAt": "2026-09-29T08:00:00.000Z"
+    }
+  ],
   "total": 1,
   "page": 1,
   "limit": 20

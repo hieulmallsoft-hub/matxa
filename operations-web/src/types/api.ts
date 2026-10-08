@@ -14,5 +14,12 @@ export interface AuthResponse {
   user: AuthUser;
 }
 
-export interface Category { id: string; name: string; slug: string; }
-export interface ApiError { statusCode?: number; message?: string | string[]; }
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+}
+export interface ApiError {
+  statusCode?: number;
+  message?: string | string[];
+}

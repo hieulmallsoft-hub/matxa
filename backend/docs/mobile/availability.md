@@ -10,9 +10,9 @@ Availability là public, không cần Bearer token. Mobile vẫn có thể gửi
 
 ## 3. Endpoint
 
-| Method | Endpoint | Chức năng | Auth |
-| --- | --- | --- | --- |
-| GET | `/api/marketplace/technicians/:id/availability` | Working schedule legacy hoặc computed bookable slots | Public |
+| Method | Endpoint                                        | Chức năng                                            | Auth   |
+| ------ | ----------------------------------------------- | ---------------------------------------------------- | ------ |
+| GET    | `/api/marketplace/technicians/:id/availability` | Working schedule legacy hoặc computed bookable slots | Public |
 
 `:id` là **TechnicianProfile.id**, không phải User.id.
 
@@ -24,14 +24,14 @@ Computed slots cần:
 GET /api/marketplace/technicians/<TechnicianProfile.id>/availability?date=2026-10-01&technicianServiceIds=<TechnicianService.id-1>,<TechnicianService.id-2>&mode=HOME
 ```
 
-| Query | Validation | Ý nghĩa |
-| --- | --- | --- |
-| `date` | `YYYY-MM-DD` | Ngày local theo Asia/Ho_Chi_Minh; exclusive với from/to |
-| `technicianServiceIds` | UUID v4, 1–10, comma/repeated | Preferred ID service đúng contract booking |
-| `serviceIds` | UUID v4, 1–10 | Alias cũ của technicianServiceIds; không gửi cả hai |
-| `mode` | HOME/ONSITE/ONLINE | Bắt buộc khi lấy computed slots |
-| `stepMinutes` | integer 5–120, default 30 | Khoảng chia slot, neo từ start của working interval |
-| `from`, `to` | ISO có Z hoặc offset | Legacy range, gửi đủ cả hai, max 31 ngày |
+| Query                  | Validation                    | Ý nghĩa                                                 |
+| ---------------------- | ----------------------------- | ------------------------------------------------------- |
+| `date`                 | `YYYY-MM-DD`                  | Ngày local theo Asia/Ho_Chi_Minh; exclusive với from/to |
+| `technicianServiceIds` | UUID v4, 1–10, comma/repeated | Preferred ID service đúng contract booking              |
+| `serviceIds`           | UUID v4, 1–10                 | Alias cũ của technicianServiceIds; không gửi cả hai     |
+| `mode`                 | HOME/ONSITE/ONLINE            | Bắt buộc khi lấy computed slots                         |
+| `stepMinutes`          | integer 5–120, default 30     | Khoảng chia slot, neo từ start của working interval     |
+| `from`, `to`           | ISO có Z hoặc offset          | Legacy range, gửi đủ cả hai, max 31 ngày                |
 
 Mọi selected service phải thuộc KTV, active, category active, KTV public/verified và hỗ trợ `mode`. Backend tự đọc duration từ database, không nhận duration từ mobile.
 
@@ -86,17 +86,17 @@ Availability không giữ slot. Không dùng response này như guarantee giữa
 
 ## 9. Error Codes và xử lý
 
-| HTTP | Message/code thực tế | Mobile xử lý |
-| --- | --- | --- |
-| 400 | `Can date hoac ca from va to` | Gửi date hoặc đủ from/to. |
-| 400 | `Chi truyen date hoac from/to` | Không gửi date cùng from/to. |
-| 400 | `Khoang ngay khong hop le, toi da 31 ngay` | Sửa date/range. |
-| 400 | `Can serviceIds va mode de lay slot trong` | Chọn service và mode trước. |
-| 400 | `Can mode de lay slot trong` | Gửi mode hợp lệ. |
-| 400 | `Chi gui serviceIds hoac technicianServiceIds` | Chỉ dùng một field ID service. |
-| 400 | `Co dich vu khong hop le hoac ky thuat vien khong con hoat dong` | Refetch Detail, bỏ service cũ. |
-| 400 | `Dich vu khong ho tro hinh thuc da chon` | Đổi mode hoặc service. |
-| 404 | `Ky thuat vien khong ton tai` | Quay lại List và refetch. |
+| HTTP | Message/code thực tế                                             | Mobile xử lý                   |
+| ---- | ---------------------------------------------------------------- | ------------------------------ |
+| 400  | `Can date hoac ca from va to`                                    | Gửi date hoặc đủ from/to.      |
+| 400  | `Chi truyen date hoac from/to`                                   | Không gửi date cùng from/to.   |
+| 400  | `Khoang ngay khong hop le, toi da 31 ngay`                       | Sửa date/range.                |
+| 400  | `Can serviceIds va mode de lay slot trong`                       | Chọn service và mode trước.    |
+| 400  | `Can mode de lay slot trong`                                     | Gửi mode hợp lệ.               |
+| 400  | `Chi gui serviceIds hoac technicianServiceIds`                   | Chỉ dùng một field ID service. |
+| 400  | `Co dich vu khong hop le hoac ky thuat vien khong con hoat dong` | Refetch Detail, bỏ service cũ. |
+| 400  | `Dich vu khong ho tro hinh thuc da chon`                         | Đổi mode hoặc service.         |
+| 404  | `Ky thuat vien khong ton tai`                                    | Quay lại List và refetch.      |
 
 ## 10. Ví dụ request hoàn chỉnh
 

@@ -10,8 +10,8 @@ Người dùng phải đăng nhập và đã xác thực số điện thoại. M
 
 ## 3. Endpoint
 
-| Method | Endpoint | Auth |
-| --- | --- | --- |
+| Method | Endpoint        | Auth                    |
+| ------ | --------------- | ----------------------- |
 | `POST` | `/api/bookings` | `Bearer <access_token>` |
 
 ## 4. Request body
@@ -56,13 +56,15 @@ Quote không giữ slot. Create Booking luôn kiểm tra lại kỹ thuật viê
     "displayName": "Kim Nguyễn",
     "avatarUrl": "https://..."
   },
-  "items": [{
-    "technicianServiceId": "22222222-2222-4222-8222-222222222222",
-    "serviceId": "22222222-2222-4222-8222-222222222222",
-    "name": "Massage chân",
-    "price": 500000,
-    "durationMinutes": 60
-  }],
+  "items": [
+    {
+      "technicianServiceId": "22222222-2222-4222-8222-222222222222",
+      "serviceId": "22222222-2222-4222-8222-222222222222",
+      "name": "Massage chân",
+      "price": 500000,
+      "durationMinutes": 60
+    }
+  ],
   "mode": "HOME",
   "startAt": "2026-10-01T01:00:00.000Z",
   "endAt": "2026-10-01T02:00:00.000Z",
@@ -86,13 +88,13 @@ Quote không giữ slot. Create Booking luôn kiểm tra lại kỹ thuật viê
 
 ## 7. Error handling
 
-| HTTP / code | Mobile xử lý |
-| --- | --- |
-| `401` | Đưa về đăng nhập hoặc refresh token theo luồng app. |
-| `403`, `PHONE_VERIFICATION_REQUIRED` | Điều hướng xác thực số điện thoại, sau đó tạo lại từ Quote. |
-| `400` | Hiển thị message: service/mode/address/voucher/thời gian không hợp lệ. Với voucher, bỏ voucher và quote lại. |
-| `409`, `SLOT_UNAVAILABLE` | Đóng loading, báo slot vừa được đặt, gọi lại Availability, cho chọn giờ mới và Quote lại. |
-| `409` khác | Tải lại dữ liệu booking/quote trước khi thử lại. |
+| HTTP / code                          | Mobile xử lý                                                                                                 |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `401`                                | Đưa về đăng nhập hoặc refresh token theo luồng app.                                                          |
+| `403`, `PHONE_VERIFICATION_REQUIRED` | Điều hướng xác thực số điện thoại, sau đó tạo lại từ Quote.                                                  |
+| `400`                                | Hiển thị message: service/mode/address/voucher/thời gian không hợp lệ. Với voucher, bỏ voucher và quote lại. |
+| `409`, `SLOT_UNAVAILABLE`            | Đóng loading, báo slot vừa được đặt, gọi lại Availability, cho chọn giờ mới và Quote lại.                    |
+| `409` khác                           | Tải lại dữ liệu booking/quote trước khi thử lại.                                                             |
 
 ## 8. UI states
 

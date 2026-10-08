@@ -6,11 +6,12 @@ describe('RolesGuard', () => {
   const reflector = { getAllAndOverride: jest.fn() };
   const user = { findFirst: jest.fn() };
   const guard = new RolesGuard(reflector as never, { user } as never);
-  const context = (auth?: { sub: string }) => ({
-    getHandler: () => undefined,
-    getClass: () => undefined,
-    switchToHttp: () => ({ getRequest: () => ({ auth }) }),
-  }) as unknown as ExecutionContext;
+  const context = (auth?: { sub: string }) =>
+    ({
+      getHandler: () => undefined,
+      getClass: () => undefined,
+      switchToHttp: () => ({ getRequest: () => ({ auth }) }),
+    }) as unknown as ExecutionContext;
 
   beforeEach(() => jest.clearAllMocks());
 

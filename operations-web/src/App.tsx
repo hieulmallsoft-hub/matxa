@@ -5,18 +5,40 @@ import { Notice } from './components/Notice';
 import { AdminDashboard } from './pages/AdminDashboard';
 import type { AuthResponse, AuthUser, Category } from './types/api';
 import {
-  Sparkles, LogOut, Shield, UserCircle,
-  LayoutDashboard, Users, CalendarCheck, UserCheck,
-  FolderTree, Image as ImageIcon, TicketPercent, ClipboardCheck, DollarSign,
-  RefreshCw
+  Sparkles,
+  LogOut,
+  Shield,
+  UserCircle,
+  LayoutDashboard,
+  Users,
+  CalendarCheck,
+  UserCheck,
+  FolderTree,
+  Image as ImageIcon,
+  TicketPercent,
+  ClipboardCheck,
+  DollarSign,
+  RefreshCw,
 } from 'lucide-react';
 
 const storedUser = () => {
-  try { return JSON.parse(localStorage.getItem('matxa.operations.user') || 'null') as AuthUser | null; }
-  catch { return null; }
+  try {
+    return JSON.parse(localStorage.getItem('matxa.operations.user') || 'null') as AuthUser | null;
+  } catch {
+    return null;
+  }
 };
 
-type TabKey = 'overview' | 'users' | 'bookings' | 'applications' | 'technicians' | 'pricing' | 'categories' | 'banners' | 'promotions';
+type TabKey =
+  | 'overview'
+  | 'users'
+  | 'bookings'
+  | 'applications'
+  | 'technicians'
+  | 'pricing'
+  | 'categories'
+  | 'banners'
+  | 'promotions';
 
 const TAB_LABELS: Record<TabKey, string> = {
   overview: 'Tổng quan',
@@ -37,23 +59,35 @@ export default function App() {
   const [tab, setTab] = useState<TabKey>('overview');
   const [refreshKey, setRefreshKey] = useState(0);
   const notify = useCallback((message: string, error = false) => setNotice({ message, error }), []);
-  const refreshCategories = useCallback(async () => { await request<Category[]>('/marketplace/categories').catch(() => undefined); }, []);
+  const refreshCategories = useCallback(async () => {
+    await request<Category[]>('/marketplace/categories').catch(() => undefined);
+  }, []);
 
-  useEffect(() => { const timer = setInterval(() => setCurrentTime(new Date().toLocaleTimeString('vi-VN')), 1000); return () => clearInterval(timer); }, []);
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date().toLocaleTimeString('vi-VN')), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   async function login(auth: AuthResponse) {
     setAccessToken(auth.accessToken);
     try {
       const currentUser = await request<AuthUser>('/auth/me');
-      localStorage.setItem('matxa.operations.user', JSON.stringify(currentUser)); setUser(currentUser);
+      localStorage.setItem('matxa.operations.user', JSON.stringify(currentUser));
+      setUser(currentUser);
       notify(`Xin chào, ${currentUser.name || currentUser.email || 'Quản trị viên'}!`);
     } catch {
-      localStorage.setItem('matxa.operations.user', JSON.stringify(auth.user)); setUser(auth.user);
+      localStorage.setItem('matxa.operations.user', JSON.stringify(auth.user));
+      setUser(auth.user);
       notify(`Xin chào, ${auth.user.name || auth.user.email || 'Quản trị viên'}!`);
     }
   }
 
-  function logout() { setAccessToken(null); localStorage.removeItem('matxa.operations.user'); setUser(null); setNotice(null); }
+  function logout() {
+    setAccessToken(null);
+    localStorage.removeItem('matxa.operations.user');
+    setUser(null);
+    setNotice(null);
+  }
 
   const userInitial = user?.name?.slice(0, 1) ?? user?.email?.slice(0, 1) ?? '?';
 
@@ -73,43 +107,49 @@ export default function App() {
     { key: 'promotions', label: 'Khuyến mãi', icon: <TicketPercent size={17} /> },
   ];
 
-  if (!user) return (
-    <>
-      <Notice message={notice?.message || null} error={notice?.error} onClose={() => setNotice(null)} />
-      <LoginForm onSuccess={login} />
-    </>
-  );
+  if (!user)
+    return (
+      <>
+        <Notice message={notice?.message || null} error={notice?.error} onClose={() => setNotice(null)} />
+        <LoginForm onSuccess={login} />
+      </>
+    );
 
-  if (user.role !== 'ADMIN') return (
-    <>
-      <Notice message={notice?.message || null} error={notice?.error} onClose={() => setNotice(null)} />
-      <div className="login-container">
-        <section className="login-card">
-          <div className="login-header">
-            <div className="login-logo" style={{ background: 'linear-gradient(135deg, #ef4444, #991b1b)' }}>
-              <Shield size={32} />
+  if (user.role !== 'ADMIN')
+    return (
+      <>
+        <Notice message={notice?.message || null} error={notice?.error} onClose={() => setNotice(null)} />
+        <div className="login-container">
+          <section className="login-card">
+            <div className="login-header">
+              <div className="login-logo" style={{ background: 'linear-gradient(135deg, #ef4444, #991b1b)' }}>
+                <Shield size={32} />
+              </div>
+              <p className="eyebrow" style={{ justifyContent: 'center', color: '#dc2626' }}>
+                TRUY CẬP BỊ TỪ CHỐI
+              </p>
+              <h1>Không có quyền truy cập</h1>
+              <p>Cổng Operations chỉ dành cho Quản trị viên. KTV quản lý hồ sơ và nhận đơn trên ứng dụng Mobile.</p>
             </div>
-            <p className="eyebrow" style={{ justifyContent: 'center', color: '#dc2626' }}>TRUY CẬP BỊ TỪ CHỐI</p>
-            <h1>Không có quyền truy cập</h1>
-            <p>Cổng Operations chỉ dành cho Quản trị viên. KTV quản lý hồ sơ và nhận đơn trên ứng dụng Mobile.</p>
-          </div>
-          <button onClick={logout} className="secondary" style={{ width: '100%', marginTop: '8px' }}>
-            <LogOut size={16} />Đăng xuất
-          </button>
-        </section>
-      </div>
-    </>
-  );
+            <button onClick={logout} className="secondary" style={{ width: '100%', marginTop: '8px' }}>
+              <LogOut size={16} />
+              Đăng xuất
+            </button>
+          </section>
+        </div>
+      </>
+    );
 
   return (
     <>
       <Notice message={notice?.message || null} error={notice?.error} onClose={() => setNotice(null)} />
       <div className="app-layout">
-
         {/* ── Sidebar ── */}
         <aside className="sidebar">
           <div className="sidebar-logo">
-            <div className="sidebar-logo-icon"><Sparkles size={22} /></div>
+            <div className="sidebar-logo-icon">
+              <Sparkles size={22} />
+            </div>
             <div className="sidebar-logo-text">
               <div className="sidebar-logo-name">Matxa Ops</div>
               <div className="sidebar-logo-sub">Operations Portal</div>
@@ -119,23 +159,17 @@ export default function App() {
           <nav className="sidebar-nav">
             <div className="sidebar-section-label">Quản lý</div>
             {navMain.map(({ key, label, icon }) => (
-              <button
-                key={key}
-                className={`sidebar-item ${tab === key ? 'active' : ''}`}
-                onClick={() => setTab(key)}
-              >
+              <button key={key} className={`sidebar-item ${tab === key ? 'active' : ''}`} onClick={() => setTab(key)}>
                 <span className="sidebar-item-icon">{icon}</span>
                 {label}
               </button>
             ))}
 
-            <div className="sidebar-section-label" style={{ marginTop: '8px' }}>Nội dung</div>
+            <div className="sidebar-section-label" style={{ marginTop: '8px' }}>
+              Nội dung
+            </div>
             {navContent.map(({ key, label, icon }) => (
-              <button
-                key={key}
-                className={`sidebar-item ${tab === key ? 'active' : ''}`}
-                onClick={() => setTab(key)}
-              >
+              <button key={key} className={`sidebar-item ${tab === key ? 'active' : ''}`} onClick={() => setTab(key)}>
                 <span className="sidebar-item-icon">{icon}</span>
                 {label}
               </button>
@@ -171,7 +205,7 @@ export default function App() {
               </div>
               <button
                 className="topbar-refresh-btn"
-                onClick={() => setRefreshKey(k => k + 1)}
+                onClick={() => setRefreshKey((k) => k + 1)}
                 title="Làm mới dữ liệu"
               >
                 <RefreshCw size={14} />

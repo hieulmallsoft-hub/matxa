@@ -39,6 +39,7 @@ profile ID distinct from user ID, mode union, active service/category filtering,
 Prisma is mocked (including a query-aware detail fixture); real database execution is not claimed.
 
 Swagger/Postman:
+
 - GET /api/marketplace/technicians/{TechnicianProfile.id}, no Authorization => public detail.
 - Repeat with a valid Bearer token after adding favorite => isFavorite=true.
 - Add ?latitude=10.77&longitude=106.69 => distance; no coords => distanceKm=null.

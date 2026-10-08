@@ -18,17 +18,17 @@ Code hiện tại cho phép chat với user ACTIVE được truyền vào `parti
 
 ## 4. Endpoints thực tế
 
-| Method | Endpoint | Mục đích |
-|---|---|---|
-| POST | `/api/conversations` | Tạo hoặc mở conversation 1–1 |
-| GET | `/api/conversations` | Danh sách conversation của user |
-| GET | `/api/conversations/{id}/messages?page=1&limit=30` | Lịch sử message |
-| POST | `/api/conversations/{id}/messages` | Gửi message |
-| PATCH | `/api/conversations/{id}/read` | Mark message của đối phương đã đọc |
-| POST | `/api/conversations/{id}/image-upload-url` | Lấy presigned URL upload ảnh |
-| DELETE | `/api/conversations/{id}` | Ẩn conversation ở phía user hiện tại |
-| PATCH | `/api/conversations/messages/{messageId}` | Sửa message text của mình trong 15 phút |
-| DELETE | `/api/conversations/messages/{messageId}/recall` | Thu hồi message của mình trong 15 phút |
+| Method | Endpoint                                           | Mục đích                                |
+| ------ | -------------------------------------------------- | --------------------------------------- |
+| POST   | `/api/conversations`                               | Tạo hoặc mở conversation 1–1            |
+| GET    | `/api/conversations`                               | Danh sách conversation của user         |
+| GET    | `/api/conversations/{id}/messages?page=1&limit=30` | Lịch sử message                         |
+| POST   | `/api/conversations/{id}/messages`                 | Gửi message                             |
+| PATCH  | `/api/conversations/{id}/read`                     | Mark message của đối phương đã đọc      |
+| POST   | `/api/conversations/{id}/image-upload-url`         | Lấy presigned URL upload ảnh            |
+| DELETE | `/api/conversations/{id}`                          | Ẩn conversation ở phía user hiện tại    |
+| PATCH  | `/api/conversations/messages/{messageId}`          | Sửa message text của mình trong 15 phút |
+| DELETE | `/api/conversations/messages/{messageId}/recall`   | Thu hồi message của mình trong 15 phút  |
 
 ## 5. Conversation list
 

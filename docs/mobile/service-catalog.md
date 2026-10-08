@@ -7,7 +7,13 @@ Each item has `id`, `category`, `name`, `supportedModes`, `pricingTemplate`, and
 Create an OPEN booking with the selected catalog service and option IDs:
 
 ```json
-{ "items": [{ "catalogServiceId": "uuid", "priceOptionId": "uuid" }], "mode": "HOME", "city": "HN", "scheduledStart": "2026-10-03T08:00:00Z", "paymentMethod": "CASH" }
+{
+  "items": [{ "catalogServiceId": "uuid", "priceOptionId": "uuid" }],
+  "mode": "HOME",
+  "city": "HN",
+  "scheduledStart": "2026-10-03T08:00:00Z",
+  "paymentMethod": "CASH"
+}
 ```
 
 Never send `TechnicianService.id` to `/bookings/open`.

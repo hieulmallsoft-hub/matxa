@@ -14,6 +14,13 @@ import { BookingVnpayController, VnpayController } from './controllers/vnpay.con
 @Module({
   imports: [AuthModule, NotificationsModule],
   controllers: [BookingsController, TechnicianJobsController, VnpayController, BookingVnpayController],
-  providers: [BookingsService, VnpayService, BookingCancellationStorageService, TechnicianBookingCancellationService, OpenBookingExpirationService, PlatformFeePolicyService],
+  providers: [
+    BookingsService,
+    VnpayService,
+    BookingCancellationStorageService,
+    TechnicianBookingCancellationService,
+    OpenBookingExpirationService,
+    PlatformFeePolicyService,
+  ],
 })
 export class BookingsModule {}

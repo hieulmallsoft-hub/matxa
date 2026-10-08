@@ -11,10 +11,14 @@ export function setAccessToken(value: string | null) {
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`/api${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), ...init.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      ...init.headers,
+    },
   });
   if (response.status === 204) return undefined as T;
-  const body = await response.json().catch(() => null) as ApiError | T | null;
+  const body = (await response.json().catch(() => null)) as ApiError | T | null;
   if (!response.ok) {
     const rawMessage = (body as ApiError | null)?.message;
     const message = Array.isArray(rawMessage) ? rawMessage.join(', ') : rawMessage;

@@ -6,10 +6,7 @@ import { SMS_PROVIDER, SmsProvider } from './sms-provider.interface';
 export const smsProviderFactory: Provider = {
   provide: SMS_PROVIDER,
   inject: [ConfigService, DevelopmentSmsProvider],
-  useFactory: (
-    config: ConfigService,
-    developmentProvider: DevelopmentSmsProvider,
-  ): SmsProvider => {
+  useFactory: (config: ConfigService, developmentProvider: DevelopmentSmsProvider): SmsProvider => {
     const provider = config.get<string>('SMS_PROVIDER', 'development');
     const environment = config.get<string>('NODE_ENV', 'development');
 

@@ -18,10 +18,18 @@ export class AppleTokenVerifierService {
   private readonly signingKeys = new Map<string, KeyObject>();
   private keysExpireAt = 0;
 
-  constructor(private readonly config: ConfigService, private readonly redis: RedisService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly redis: RedisService,
+  ) {}
 
   async startLogin(): Promise<{ nonce: string; expiresIn: number }> {
-    if (!this.config.get<string>('APPLE_CLIENT_IDS')?.split(',').some((value) => value.trim())) {
+    if (
+      !this.config
+        .get<string>('APPLE_CLIENT_IDS')
+        ?.split(',')
+        .some((value) => value.trim())
+    ) {
       throw new ServiceUnavailableException('Apple Sign In chua duoc cau hinh');
     }
     const nonce = randomBytes(32).toString('hex');
@@ -31,7 +39,8 @@ export class AppleTokenVerifierService {
   }
 
   async verify(idToken: string, rawNonce: string): Promise<AppleIdentity> {
-    const audiences = this.config.get<string>('APPLE_CLIENT_IDS')
+    const audiences = this.config
+      .get<string>('APPLE_CLIENT_IDS')
       ?.split(',')
       .map((value) => value.trim())
       .filter(Boolean);
@@ -40,7 +49,7 @@ export class AppleTokenVerifierService {
     }
     const [primaryAudience, ...additionalAudiences] = audiences;
     const audience = additionalAudiences.length
-      ? [primaryAudience, ...additionalAudiences] as [string, ...string[]]
+      ? ([primaryAudience, ...additionalAudiences] as [string, ...string[]])
       : primaryAudience;
 
     try {
@@ -61,7 +70,7 @@ export class AppleTokenVerifierService {
       const expectedNonce = createHash('sha256').update(rawNonce).digest('hex');
       if (payload.nonce !== expectedNonce) throw new Error('Apple nonce khong khop');
       // Atomic consumption prevents concurrent requests from reusing a challenge.
-      if (await this.redis.client.getDel(`auth:apple:nonce:${expectedNonce}`) !== '1') {
+      if ((await this.redis.client.getDel(`auth:apple:nonce:${expectedNonce}`)) !== '1') {
         throw new Error('Apple nonce het han hoac da su dung');
       }
 
@@ -83,7 +92,7 @@ export class AppleTokenVerifierService {
       signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) throw new Error('Khong lay duoc Apple JWKS');
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       keys?: Array<JsonWebKey & { kid?: string; kty?: string }>;
     };
     if (!Array.isArray(body.keys)) throw new Error('Apple JWKS khong hop le');

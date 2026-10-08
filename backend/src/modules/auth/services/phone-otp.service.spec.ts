@@ -40,25 +40,17 @@ describe('PhoneOtpService', () => {
   });
 
   it('normalizes a Vietnamese phone and returns only a development OTP', async () => {
-    const response = await service.sendOtp(
-      '0394 338 212',
-      'android-device-1',
-      '127.0.0.1',
-    );
+    const response = await service.sendOtp('0394 338 212', 'android-device-1', '127.0.0.1');
 
     expect(smsProvider.sendOtp).toHaveBeenCalledWith('+84394338212', '123456');
     expect(response.debugOtp).toBe('123456');
-    const challengeCall = redisClient.set.mock.calls.find(([key]) =>
-      String(key).startsWith('otp:challenge:'),
-    );
+    const challengeCall = redisClient.set.mock.calls.find(([key]) => String(key).startsWith('otp:challenge:'));
     expect(challengeCall?.[1]).not.toContain('"otpHash":"123456"');
   });
 
   it('rejects resend during the cooldown window', async () => {
     redisClient.set.mockResolvedValueOnce(null);
 
-    await expect(
-      service.sendOtp('0394338212', 'android-device-1', '127.0.0.1'),
-    ).rejects.toMatchObject({ status: 429 });
+    await expect(service.sendOtp('0394338212', 'android-device-1', '127.0.0.1')).rejects.toMatchObject({ status: 429 });
   });
 });

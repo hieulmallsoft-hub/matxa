@@ -4,13 +4,8 @@
   "userId": "22222222-2222-4222-8222-222222222222",
   "bio": "Massage specialist",
   "gender": "FEMALE",
-  "tags": [
-    "massage"
-  ],
-  "serviceModes": [
-    "HOME",
-    "ONSITE"
-  ],
+  "tags": ["massage"],
+  "serviceModes": ["HOME", "ONSITE"],
   "latitude": "10.7700000",
   "longitude": "106.6900000",
   "city": "HCM",
@@ -30,10 +25,7 @@
   },
   "displayName": "Lan",
   "avatarUrl": null,
-  "supportedModes": [
-    "HOME",
-    "ONSITE"
-  ],
+  "supportedModes": ["HOME", "ONSITE"],
   "nextAvailableAt": null,
   "isFavorite": false,
   "distanceKm": null,
@@ -57,14 +49,8 @@
       "description": null,
       "price": 150000,
       "durationMinutes": 60,
-      "modes": [
-        "HOME",
-        "ONSITE"
-      ],
-      "supportedModes": [
-        "HOME",
-        "ONSITE"
-      ],
+      "modes": ["HOME", "ONSITE"],
+      "supportedModes": ["HOME", "ONSITE"],
       "isActive": true,
       "createdAt": "2026-09-24T08:00:00.000Z",
       "updatedAt": "2026-09-24T08:00:00.000Z",

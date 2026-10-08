@@ -5,7 +5,16 @@ import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
 import { BookingsService } from '../services/bookings.service';
-import { BookingHistoryQueryDto, CancelBookingDto, CreateBookingDto, CreateOpenBookingDto, CreateReviewDto, QuoteBookingDto, SelectTechnicianDto, UpdateBookingStatusDto } from '../dto/booking.dto';
+import {
+  BookingHistoryQueryDto,
+  CancelBookingDto,
+  CreateBookingDto,
+  CreateOpenBookingDto,
+  CreateReviewDto,
+  QuoteBookingDto,
+  SelectTechnicianDto,
+  UpdateBookingStatusDto,
+} from '../dto/booking.dto';
 
 @ApiTags('Bookings')
 @ApiBearerAuth('access-token')
@@ -35,7 +44,11 @@ export class BookingsController {
 
   @Post(':id/select-technician')
   @ApiOperation({ summary: 'Khach chon mot KTV da ung tuyen cho don OPEN' })
-  selectTechnician(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SelectTechnicianDto) {
+  selectTechnician(
+    @CurrentAuth() auth: AccessTokenPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SelectTechnicianDto,
+  ) {
     return this.bookings.selectTechnician(auth.sub, id, dto.applicationId);
   }
 
@@ -53,19 +66,31 @@ export class BookingsController {
 
   @Patch(':id/cancel')
   @ApiOperation({ summary: 'Huy lich dat' })
-  cancel(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CancelBookingDto) {
+  cancel(
+    @CurrentAuth() auth: AccessTokenPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CancelBookingDto,
+  ) {
     return this.bookings.cancel(auth.sub, id, dto);
   }
 
   @Patch(':id/status')
   @ApiOperation({ summary: 'Ky thuat vien xac nhan/hoan thanh lich' })
-  status(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateBookingStatusDto) {
+  status(
+    @CurrentAuth() auth: AccessTokenPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateBookingStatusDto,
+  ) {
     return this.bookings.updateStatus(auth.sub, id, dto);
   }
 
   @Post(':id/review')
   @ApiOperation({ summary: 'Khach hang danh gia lich da hoan thanh' })
-  review(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateReviewDto) {
+  review(
+    @CurrentAuth() auth: AccessTokenPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateReviewDto,
+  ) {
     return this.bookings.review(auth.sub, id, dto);
   }
 }

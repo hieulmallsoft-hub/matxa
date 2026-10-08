@@ -6,15 +6,15 @@ Base URL: `/api`. All endpoints require `Authorization: Bearer <accessToken>`.
 
 `bookingStatus` is the booking lifecycle. `applicationStatus` belongs to the current KTV and must be used for the KTV UI.
 
-| Booking | Application | UI |
-| --- | --- | --- |
-| `OPEN` | `null` | Don phu hop; hien Apply / Decline |
-| `OPEN` | `APPLIED` | Dang cho khach xac nhan; hien Withdraw |
-| `EXPIRED` | `EXPIRED` | Don da het han; khong con thao tac |
-| `CONFIRMED` | `SELECTED` | Da duoc chon; duoc contact va complete |
-| `CONFIRMED` | `NOT_SELECTED` | Khach da chon KTV khac |
-| `CANCELLED` | any | Don da huy |
-| `COMPLETED` | `SELECTED` | Da hoan thanh |
+| Booking     | Application    | UI                                     |
+| ----------- | -------------- | -------------------------------------- |
+| `OPEN`      | `null`         | Don phu hop; hien Apply / Decline      |
+| `OPEN`      | `APPLIED`      | Dang cho khach xac nhan; hien Withdraw |
+| `EXPIRED`   | `EXPIRED`      | Don da het han; khong con thao tac     |
+| `CONFIRMED` | `SELECTED`     | Da duoc chon; duoc contact va complete |
+| `CONFIRMED` | `NOT_SELECTED` | Khach da chon KTV khac                 |
+| `CANCELLED` | any            | Don da huy                             |
+| `COMPLETED` | `SELECTED`     | Da hoan thanh                          |
 
 Do not infer an application state from `bookingStatus`, and never allow Mobile to choose a technician.
 
@@ -47,14 +47,14 @@ For an OPEN job the response deliberately omits exact customer address/contact. 
 
 ## Detail and application actions
 
-| Action | Endpoint | Result |
-| --- | --- | --- |
-| Detail | `GET /technician/jobs/:bookingId` | Safe job detail and permissions |
-| Apply | `POST /technician/jobs/:bookingId/apply` | Creates `APPLIED`; repeated request is idempotent while applied |
-| Decline | `POST /technician/jobs/:bookingId/decline` | Creates terminal `DECLINED`, so the job is hidden |
-| Withdraw | `POST /technician/jobs/:bookingId/withdraw` | Changes `APPLIED` to `WITHDRAWN` while booking remains OPEN |
-| Contact | `GET /technician/jobs/:bookingId/contact` | Only a SELECTED KTV on CONFIRMED/COMPLETED booking |
-| Complete | `POST /technician/jobs/:bookingId/complete` | Only assigned KTV after scheduled end |
+| Action   | Endpoint                                    | Result                                                          |
+| -------- | ------------------------------------------- | --------------------------------------------------------------- |
+| Detail   | `GET /technician/jobs/:bookingId`           | Safe job detail and permissions                                 |
+| Apply    | `POST /technician/jobs/:bookingId/apply`    | Creates `APPLIED`; repeated request is idempotent while applied |
+| Decline  | `POST /technician/jobs/:bookingId/decline`  | Creates terminal `DECLINED`, so the job is hidden               |
+| Withdraw | `POST /technician/jobs/:bookingId/withdraw` | Changes `APPLIED` to `WITHDRAWN` while booking remains OPEN     |
+| Contact  | `GET /technician/jobs/:bookingId/contact`   | Only a SELECTED KTV on CONFIRMED/COMPLETED booking              |
+| Complete | `POST /technician/jobs/:bookingId/complete` | Only assigned KTV after scheduled end                           |
 
 There is no price/bid field in apply. Price is the backend snapshot created with the open booking.
 

@@ -59,14 +59,14 @@ Request body:
 
 ## Lỗi và cách xử lý
 
-| HTTP | Trường hợp | Mobile xử lý |
-|---|---|---|
-| 400 | Rating ngoài 1–5; booking chưa COMPLETED; booking đã được đánh giá | Hiển thị lỗi; với đã đánh giá thì tải lại chi tiết và hiển thị review hiện có |
-| 401 | Thiếu hoặc access token hết hạn | Refresh token hoặc yêu cầu đăng nhập lại |
-| 404 | Booking không tồn tại hoặc không thuộc khách hàng | Không hiển thị form, tải lại danh sách |
-| 409 | Xung đột cập nhật đồng thời | Tải lại booking rồi cho phép thử lại |
-| 429 | Vượt rate limit | Chờ theo `Retry-After` rồi thử lại |
-| 5xx | Lỗi hệ thống | Hiển thị thử lại sau, không xóa dữ liệu form |
+| HTTP | Trường hợp                                                         | Mobile xử lý                                                                  |
+| ---- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| 400  | Rating ngoài 1–5; booking chưa COMPLETED; booking đã được đánh giá | Hiển thị lỗi; với đã đánh giá thì tải lại chi tiết và hiển thị review hiện có |
+| 401  | Thiếu hoặc access token hết hạn                                    | Refresh token hoặc yêu cầu đăng nhập lại                                      |
+| 404  | Booking không tồn tại hoặc không thuộc khách hàng                  | Không hiển thị form, tải lại danh sách                                        |
+| 409  | Xung đột cập nhật đồng thời                                        | Tải lại booking rồi cho phép thử lại                                          |
+| 429  | Vượt rate limit                                                    | Chờ theo `Retry-After` rồi thử lại                                            |
+| 5xx  | Lỗi hệ thống                                                       | Hiển thị thử lại sau, không xóa dữ liệu form                                  |
 
 ## Không được làm
 

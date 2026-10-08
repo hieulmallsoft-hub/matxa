@@ -1,4 +1,11 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, randomInt, randomUUID } from 'node:crypto';
 import { RedisService } from '../../../redis/redis.service';
@@ -17,7 +24,10 @@ export class EmailOtpService {
   private readonly transporter?: Transporter;
   private readonly from?: string;
 
-  constructor(private readonly redis: RedisService, config: ConfigService) {
+  constructor(
+    private readonly redis: RedisService,
+    config: ConfigService,
+  ) {
     this.secret = config.getOrThrow<string>('OTP_SECRET');
     this.ttl = config.get<number>('OTP_TTL_SECONDS', 300);
     this.development = config.get('EMAIL_PROVIDER', 'development') === 'development';
@@ -35,7 +45,11 @@ export class EmailOtpService {
     }
   }
 
-  async sendOtp(input: string, deviceId: string, purpose: EmailOtpPurpose = 'registration'): Promise<SendEmailOtpResponse> {
+  async sendOtp(
+    input: string,
+    deviceId: string,
+    purpose: EmailOtpPurpose = 'registration',
+  ): Promise<SendEmailOtpResponse> {
     const email = input.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new BadRequestException('Email khong hop le');
     const limitKey = `email-otp:limit:${this.hash(email)}`;
@@ -45,7 +59,13 @@ export class EmailOtpService {
 
     const challengeId = randomUUID();
     const code = this.development ? '123456' : randomInt(100000, 1000000).toString();
-    const challenge: EmailChallenge = { email, deviceId, otpHash: this.hash(`${challengeId}:${code}`), attempts: 0, purpose };
+    const challenge: EmailChallenge = {
+      email,
+      deviceId,
+      otpHash: this.hash(`${challengeId}:${code}`),
+      attempts: 0,
+      purpose,
+    };
     await this.redis.client.set(`email-otp:challenge:${challengeId}`, JSON.stringify(challenge), { EX: this.ttl });
 
     if (this.development) {
@@ -75,7 +95,10 @@ export class EmailOtpService {
     const challenge = JSON.parse(raw) as EmailChallenge;
     if (challenge.deviceId !== deviceId) throw new UnauthorizedException('Thiet bi xac minh khong hop le');
     if (challenge.purpose !== purpose) throw new UnauthorizedException('Phien OTP khong dung muc dich');
-    if (challenge.attempts >= 5) { await this.redis.client.del(key); throw new UnauthorizedException('Da vuot so lan nhap OTP'); }
+    if (challenge.attempts >= 5) {
+      await this.redis.client.del(key);
+      throw new UnauthorizedException('Da vuot so lan nhap OTP');
+    }
     if (challenge.otpHash !== this.hash(`${challengeId}:${code}`)) {
       challenge.attempts += 1;
       await this.redis.client.set(key, JSON.stringify(challenge), { KEEPTTL: true });
@@ -88,11 +111,9 @@ export class EmailOtpService {
   async verifyRegistration(sessionId: string, code: string, deviceId: string): Promise<number> {
     const email = await this.verifyOtp(sessionId, code, deviceId, 'registration');
     const ttl = 600;
-    await this.redis.client.set(
-      `email-registration:verified:${sessionId}`,
-      JSON.stringify({ email, deviceId }),
-      { EX: ttl },
-    );
+    await this.redis.client.set(`email-registration:verified:${sessionId}`, JSON.stringify({ email, deviceId }), {
+      EX: ttl,
+    });
     return ttl;
   }
 
@@ -108,11 +129,9 @@ export class EmailOtpService {
   async verifyPasswordReset(sessionId: string, code: string, deviceId: string): Promise<number> {
     const email = await this.verifyOtp(sessionId, code, deviceId, 'password-reset');
     const ttl = 600;
-    await this.redis.client.set(
-      `email-password-reset:verified:${sessionId}`,
-      JSON.stringify({ email, deviceId }),
-      { EX: ttl },
-    );
+    await this.redis.client.set(`email-password-reset:verified:${sessionId}`, JSON.stringify({ email, deviceId }), {
+      EX: ttl,
+    });
     return ttl;
   }
 
@@ -124,5 +143,7 @@ export class EmailOtpService {
     return session.email;
   }
 
-  private hash(value: string): string { return createHmac('sha256', this.secret).update(value).digest('hex'); }
+  private hash(value: string): string {
+    return createHmac('sha256', this.secret).update(value).digest('hex');
+  }
 }

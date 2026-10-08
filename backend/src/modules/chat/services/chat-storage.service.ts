@@ -33,12 +33,16 @@ export class ChatStorageService {
       credentials: { accessKeyId, secretAccessKey },
     });
     const expiresIn = 300;
-    const uploadUrl = await getSignedUrl(client, new PutObjectCommand({
-      Bucket: bucket,
-      Key: mediaKey,
-      ContentType: dto.contentType,
-      ContentLength: dto.size,
-    }), { expiresIn });
+    const uploadUrl = await getSignedUrl(
+      client,
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: mediaKey,
+        ContentType: dto.contentType,
+        ContentLength: dto.size,
+      }),
+      { expiresIn },
+    );
     const mediaUrl = await getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: mediaKey }), { expiresIn });
     return { uploadUrl, mediaUrl, mediaKey, expiresIn };
   }
@@ -52,7 +56,12 @@ export class ChatStorageService {
       throw new ServiceUnavailableException('S3 chua duoc cau hinh');
     }
     const endpoint = this.config.get<string>('S3_ENDPOINT');
-    const client = new S3Client({ region, endpoint, forcePathStyle: Boolean(endpoint), credentials: { accessKeyId, secretAccessKey } });
+    const client = new S3Client({
+      region,
+      endpoint,
+      forcePathStyle: Boolean(endpoint),
+      credentials: { accessKeyId, secretAccessKey },
+    });
     return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: mediaKey }), { expiresIn: 300 });
   }
 }

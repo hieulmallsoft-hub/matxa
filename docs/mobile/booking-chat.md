@@ -7,9 +7,9 @@ Base URL: `/api`. All endpoints require `Authorization: Bearer <accessToken>`.
 Mobile must not decide whether a user is selected. It may offer the chat button only
 for a booking returned as assigned, but the backend always makes the final check.
 
-| Booking type | Customer | Technician |
-| --- | --- | --- |
-| `DIRECT` | Only the assigned technician | Only when `booking.technicianId` is their profile |
+| Booking type       | Customer                              | Technician                                                                          |
+| ------------------ | ------------------------------------- | ----------------------------------------------------------------------------------- |
+| `DIRECT`           | Only the assigned technician          | Only when `booking.technicianId` is their profile                                   |
 | `OPEN_MARKETPLACE` | Only the selected/assigned technician | Only when they are both `Booking.technicianId` and application status is `SELECTED` |
 
 Applicants in `APPLIED`, `NOT_SELECTED`, `WITHDRAWN`, `DECLINED`, and `EXPIRED`

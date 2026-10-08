@@ -26,12 +26,8 @@ export function Notice({ message, error, onClose }: NoticeProps) {
   return (
     <div className="notice-toast-container">
       <div className={`notice-toast ${error ? 'error' : ''}`}>
-        <div className="notice-icon-box">
-          {error ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
-        </div>
-        <div style={{ flex: 1, fontWeight: 500 }}>
-          {message}
-        </div>
+        <div className="notice-icon-box">{error ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}</div>
+        <div style={{ flex: 1, fontWeight: 500 }}>{message}</div>
         <button
           className="quiet"
           style={{ padding: '4px', borderRadius: '8px', marginLeft: '8px' }}

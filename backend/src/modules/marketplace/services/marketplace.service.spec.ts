@@ -7,9 +7,12 @@ describe('MarketplaceService', () => {
   const promotion = { findMany: jest.fn(), count: jest.fn() };
   const $queryRaw = jest.fn();
   const tx = { technicianProfile, favorite, promotion, $queryRaw };
-  const prisma = { ...tx, $transaction: jest.fn(async (operation: unknown) => Array.isArray(operation)
-    ? Promise.all(operation)
-    : (operation as (client: typeof tx) => unknown)(tx)) };
+  const prisma = {
+    ...tx,
+    $transaction: jest.fn(async (operation: unknown) =>
+      Array.isArray(operation) ? Promise.all(operation) : (operation as (client: typeof tx) => unknown)(tx),
+    ),
+  };
   const service = new MarketplaceService(prisma as never);
 
   beforeEach(() => {
@@ -19,38 +22,102 @@ describe('MarketplaceService', () => {
   });
 
   it('requires latitude and longitude together', async () => {
-    await expect(service.searchTechnicians({ latitude: 21, page: 1, limit: 20 })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.searchTechnicians({ latitude: 21, page: 1, limit: 20 })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 
   it('lists only active promotions and derives per-user usage status', async () => {
-    promotion.findMany.mockResolvedValue([{
-      id: 'p1', code: 'WELCOME50', name: 'Welcome', type: 'FIXED', value: '50000',
-      minOrderAmount: '300000', maxDiscount: null, usageLimit: 10, usedCount: 2,
-      perUserLimit: 1, startsAt: new Date(), endsAt: new Date(), isActive: true,
-      usages: [{ id: 'usage-1' }],
-    }]);
+    promotion.findMany.mockResolvedValue([
+      {
+        id: 'p1',
+        code: 'WELCOME50',
+        name: 'Welcome',
+        type: 'FIXED',
+        value: '50000',
+        minOrderAmount: '300000',
+        maxDiscount: null,
+        usageLimit: 10,
+        usedCount: 2,
+        perUserLimit: 1,
+        startsAt: new Date(),
+        endsAt: new Date(),
+        isActive: true,
+        usages: [{ id: 'usage-1' }],
+      },
+    ]);
     promotion.count.mockResolvedValue(1);
     const result = await service.promotions('user-1', { page: 1, limit: 20 });
-    expect(result.items[0]).toMatchObject({ code: 'WELCOME50', value: 50000, minOrderAmount: 300000, availabilityStatus: 'USAGE_EXHAUSTED', isEligible: false, ineligibilityReason: 'USAGE_EXHAUSTED' });
-    expect(promotion.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ isActive: true }), skip: 0, take: 20 }));
+    expect(result.items[0]).toMatchObject({
+      code: 'WELCOME50',
+      value: 50000,
+      minOrderAmount: 300000,
+      availabilityStatus: 'USAGE_EXHAUSTED',
+      isEligible: false,
+      ineligibilityReason: 'USAGE_EXHAUSTED',
+    });
+    expect(promotion.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ isActive: true }), skip: 0, take: 20 }),
+    );
   });
 
   it('requires coordinates for explicit distance sort', async () => {
-    await expect(service.searchTechnicians({ page: 1, limit: 20, sort: 'distance' })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.searchTechnicians({ page: 1, limit: 20, sort: 'distance' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
     expect($queryRaw).not.toHaveBeenCalled();
   });
 
-  it.each(['rating', 'availability'] as const)('supports explicit %s sorting with stable ties', async sort => {
+  it.each(['rating', 'availability'] as const)('supports explicit %s sorting with stable ties', async (sort) => {
     await service.searchTechnicians({ page: 1, limit: 20, sort });
-    expect($queryRaw.mock.calls[0][0].text).toContain(sort === 'rating'
-      ? 'average_rating DESC, is_available DESC, id ASC' : 'is_available DESC, average_rating DESC, id ASC');
+    expect($queryRaw.mock.calls[0][0].text).toContain(
+      sort === 'rating'
+        ? 'average_rating DESC, is_available DESC, id ASC'
+        : 'is_available DESC, average_rating DESC, id ASC',
+    );
   });
 
   it('sorts technicians by distance from the customer', async () => {
-    $queryRaw.mockResolvedValue([{ total: 2n, ranked: [{ id: 'near', distance: 1.112 }, { id: 'far', distance: 22.24 }] }]);
+    $queryRaw.mockResolvedValue([
+      {
+        total: 2n,
+        ranked: [
+          { id: 'near', distance: 1.112 },
+          { id: 'far', distance: 22.24 },
+        ],
+      },
+    ]);
     technicianProfile.findMany.mockResolvedValue([
-      { id: 'far', userId: 'u2', user: {}, tags: [], serviceModes: [], isVerified: true, isAvailable: true, averageRating: 5, reviewCount: 1, city: 'Ha Noi', services: [], latitude: 21.2, longitude: 105.8 },
-      { id: 'near', userId: 'u1', user: {}, tags: [], serviceModes: [], isVerified: true, isAvailable: true, averageRating: 4, reviewCount: 1, city: 'Ha Noi', services: [], latitude: 21.01, longitude: 105.8 },
+      {
+        id: 'far',
+        userId: 'u2',
+        user: {},
+        tags: [],
+        serviceModes: [],
+        isVerified: true,
+        isAvailable: true,
+        averageRating: 5,
+        reviewCount: 1,
+        city: 'Ha Noi',
+        services: [],
+        latitude: 21.2,
+        longitude: 105.8,
+      },
+      {
+        id: 'near',
+        userId: 'u1',
+        user: {},
+        tags: [],
+        serviceModes: [],
+        isVerified: true,
+        isAvailable: true,
+        averageRating: 4,
+        reviewCount: 1,
+        city: 'Ha Noi',
+        services: [],
+        latitude: 21.01,
+        longitude: 105.8,
+      },
     ]);
     const result = await service.searchTechnicians({ latitude: 21, longitude: 105.8, page: 1, limit: 20 });
     expect(result.items.map((item) => item.id)).toEqual(['near', 'far']);
@@ -63,9 +130,18 @@ describe('MarketplaceService', () => {
 
   it('keeps empty-page totals and parameterizes filters with a single service predicate', async () => {
     $queryRaw.mockResolvedValue([{ total: 25n, ranked: [] }]);
-    const result = await service.searchTechnicians({ page: 4, limit: 10, keyword: "O'Brien%", available: false,
-      gender: 'FEMALE', tag: 'legacy', tags: ['massage'], categoryId: '10000000-0000-4000-8000-000000000001',
-      serviceId: '10000000-0000-4000-8000-000000000002', mode: 'HOME' });
+    const result = await service.searchTechnicians({
+      page: 4,
+      limit: 10,
+      keyword: "O'Brien%",
+      available: false,
+      gender: 'FEMALE',
+      tag: 'legacy',
+      tags: ['massage'],
+      categoryId: '10000000-0000-4000-8000-000000000001',
+      serviceId: '10000000-0000-4000-8000-000000000002',
+      mode: 'HOME',
+    });
     expect(result).toEqual({ items: [], total: 25, page: 4, limit: 10 });
     const sql = $queryRaw.mock.calls[0][0];
     expect(sql.text).not.toContain("O'Brien");
@@ -83,20 +159,49 @@ describe('MarketplaceService', () => {
 
   it('scopes favorites to the authenticated user and orders matching services by price', async () => {
     $queryRaw.mockResolvedValue([{ total: 1n, ranked: [{ id: 't1', distance: null }] }]);
-    technicianProfile.findMany.mockResolvedValue([{ id: 't1', userId: 'u1', user: { displayName: 'Name', avatarUrl: null },
-      gender: null, tags: [], serviceModes: ['HOME'], isVerified: true, isAvailable: true, averageRating: 4,
-      reviewCount: 2, city: null, services: [{ price: '150000', modes: ['HOME'] }] }]);
+    technicianProfile.findMany.mockResolvedValue([
+      {
+        id: 't1',
+        userId: 'u1',
+        user: { displayName: 'Name', avatarUrl: null },
+        gender: null,
+        tags: [],
+        serviceModes: ['HOME'],
+        isVerified: true,
+        isAvailable: true,
+        averageRating: 4,
+        reviewCount: 2,
+        city: null,
+        services: [{ price: '150000', modes: ['HOME'] }],
+      },
+    ]);
     favorite.findMany.mockResolvedValue([{ technicianId: 't1' }]);
     const result = await service.searchTechnicians({ page: 1, limit: 20, mode: 'HOME' }, 'customer');
-    expect(result.items[0]).toMatchObject({ id: 't1', technicianId: 't1', isFavorite: true, startingPrice: 150000, distanceKm: null, rating: 4, supportedModes: ['HOME'], nextAvailableAt: null });
-    expect(favorite.findMany).toHaveBeenCalledWith({ where: { userId: 'customer', technicianId: { in: ['t1'] } }, select: { technicianId: true } });
+    expect(result.items[0]).toMatchObject({
+      id: 't1',
+      technicianId: 't1',
+      isFavorite: true,
+      startingPrice: 150000,
+      distanceKm: null,
+      rating: 4,
+      supportedModes: ['HOME'],
+      nextAvailableAt: null,
+    });
+    expect(favorite.findMany).toHaveBeenCalledWith({
+      where: { userId: 'customer', technicianId: { in: ['t1'] } },
+      select: { technicianId: true },
+    });
     expect(technicianProfile.findMany.mock.calls[0][0].include.services).toMatchObject({
-      where: { isActive: true, category: { isActive: true }, modes: { has: 'HOME' } }, orderBy: [{ price: 'asc' }, { id: 'asc' }], select: { price: true, modes: true },
+      where: { isActive: true, category: { isActive: true }, modes: { has: 'HOME' } },
+      orderBy: [{ price: 'asc' }, { id: 'asc' }],
+      select: { price: true, modes: true },
     });
   });
 
   it('rejects invalid coordinates before querying', async () => {
-    await expect(service.searchTechnicians({ page: 1, limit: 20, latitude: NaN, longitude: 0 })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.searchTechnicians({ page: 1, limit: 20, latitude: NaN, longitude: 0 })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
     expect($queryRaw).not.toHaveBeenCalled();
   });
 

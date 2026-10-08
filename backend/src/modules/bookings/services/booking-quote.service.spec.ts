@@ -3,38 +3,71 @@ import { QuoteBookingDto } from '../dto/booking.dto';
 
 describe('Quote and create share pricing/validation; address snapshots are immutable', () => {
   const db = {
-    technicianService: { findMany: jest.fn() }, availabilitySlot: { findFirst: jest.fn() },
+    technicianService: { findMany: jest.fn() },
+    availabilitySlot: { findFirst: jest.fn() },
     booking: { findFirst: jest.fn(), create: jest.fn(), findUnique: jest.fn(), findMany: jest.fn() },
-    address: { findFirst: jest.fn() }, promotion: { findFirst: jest.fn(), update: jest.fn() },
-    promotionUsage: { count: jest.fn() }, userIdentity: { findFirst: jest.fn() }, user: { findUnique: jest.fn() },
+    address: { findFirst: jest.fn() },
+    promotion: { findFirst: jest.fn(), update: jest.fn() },
+    promotionUsage: { count: jest.fn() },
+    userIdentity: { findFirst: jest.fn() },
+    user: { findUnique: jest.fn() },
   };
   const prisma = { ...db, $transaction: jest.fn(async (fn: (client: typeof db) => unknown) => fn(db)) };
   const config = { get: jest.fn((_key: string, fallback: unknown) => fallback) };
   const notifications = { create: jest.fn(), sendPush: jest.fn() };
-  const service = new BookingsService(prisma as never, config as never, notifications as never, { createPaymentUrl: jest.fn(), verify: jest.fn() } as never);
-  const dto = (): QuoteBookingDto => ({ technicianId: 't1', serviceIds: ['s1'], mode: 'HOME',
-    scheduledStart: new Date(Date.now() + 3600000).toISOString(), addressId: 'a1' });
+  const service = new BookingsService(
+    prisma as never,
+    config as never,
+    notifications as never,
+    { createPaymentUrl: jest.fn(), verify: jest.fn() } as never,
+  );
+  const dto = (): QuoteBookingDto => ({
+    technicianId: 't1',
+    serviceIds: ['s1'],
+    mode: 'HOME',
+    scheduledStart: new Date(Date.now() + 3600000).toISOString(),
+    addressId: 'a1',
+  });
   const originalAddress = { id: 'a1', address: 'Original street', label: 'Home', latitude: 10, longitude: 106 };
 
   beforeEach(() => {
     jest.resetAllMocks();
     prisma.$transaction.mockImplementation(async (fn) => fn(db));
     config.get.mockImplementation((_key, fallback) => fallback);
-    db.technicianService.findMany.mockResolvedValue([{ id: 's1', name: 'Massage', durationMinutes: 60, price: 500000, modes: ['HOME', 'ONSITE', 'ONLINE'] }]);
+    db.technicianService.findMany.mockResolvedValue([
+      { id: 's1', name: 'Massage', durationMinutes: 60, price: 500000, modes: ['HOME', 'ONSITE', 'ONLINE'] },
+    ]);
     db.availabilitySlot.findFirst.mockResolvedValue({ id: 'window' });
     db.booking.findFirst.mockResolvedValue(null);
     db.address.findFirst.mockResolvedValue({ ...originalAddress });
     db.userIdentity.findFirst.mockResolvedValue({ id: 'phone' });
     db.user.findUnique.mockResolvedValue({ role: 'CUSTOMER' });
     db.promotionUsage.count.mockResolvedValue(0);
-    db.booking.create.mockImplementation(async ({ data }) => ({ ...data, id: 'b1', technician: { userId: 'tech' }, address: { ...originalAddress }, status: 'PENDING' }));
+    db.booking.create.mockImplementation(async ({ data }) => ({
+      ...data,
+      id: 'b1',
+      technician: { userId: 'tech' },
+      address: { ...originalAddress },
+      status: 'PENDING',
+    }));
   });
 
   it('quotes without reserving or mutating, using backend amounts and durations', async () => {
     const result = await service.quote('customer', { ...dto(), totalAmount: 1, price: 1 } as QuoteBookingDto);
-    expect(result).toMatchObject({ subtotal: 500000, serviceFee: 100000, homeServiceFee: 100000, totalAmount: 600000, total: 600000,
-      discount: 0, durationMinutes: 60, totalDuration: 60, totalDurationMinutes: 60, technicianServiceIds: ['s1'],
-      serviceMode: 'HOME', services: [{ id: 's1', serviceId: 's1', technicianServiceId: 's1', price: 500000 }] });
+    expect(result).toMatchObject({
+      subtotal: 500000,
+      serviceFee: 100000,
+      homeServiceFee: 100000,
+      totalAmount: 600000,
+      total: 600000,
+      discount: 0,
+      durationMinutes: 60,
+      totalDuration: 60,
+      totalDurationMinutes: 60,
+      technicianServiceIds: ['s1'],
+      serviceMode: 'HOME',
+      services: [{ id: 's1', serviceId: 's1', technicianServiceId: 's1', price: 500000 }],
+    });
     expect(+result.endAt - +result.startAt).toBe(3600000);
     expect(result.addressSnapshot).toMatchObject({ addressText: 'Original street', latitude: 10, longitude: 106 });
     expect(db.booking.create).not.toHaveBeenCalled();
@@ -48,12 +81,20 @@ describe('Quote and create share pricing/validation; address snapshots are immut
     const expected = await service.quote('customer', input);
     const created = await service.create('customer', { ...input, paymentMethod: 'CASH' });
     const saved = db.booking.create.mock.calls[0][0].data;
-    expect(saved).toMatchObject({ subtotal: expected.subtotal, totalAmount: expected.totalAmount, addressSnapshot: expected.addressSnapshot,
-      items: { create: [{ serviceId: 's1', serviceName: 'Massage', durationMinutes: 60, unitPrice: 500000 }] } });
+    expect(saved).toMatchObject({
+      subtotal: expected.subtotal,
+      totalAmount: expected.totalAmount,
+      addressSnapshot: expected.addressSnapshot,
+      items: { create: [{ serviceId: 's1', serviceName: 'Massage', durationMinutes: 60, unitPrice: 500000 }] },
+    });
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'Serializable' });
     expect(created.address).toEqual(expected.addressSnapshot);
     // Simulate a later edit/deletion of the mutable Address relation.
-    const stored = { ...created, customerId: 'customer', address: { ...originalAddress, address: 'New street', deletedAt: new Date() } };
+    const stored = {
+      ...created,
+      customerId: 'customer',
+      address: { ...originalAddress, address: 'New street', deletedAt: new Date() },
+    };
     db.booking.findUnique.mockResolvedValue(stored);
     db.booking.findMany.mockResolvedValue([stored]);
     expect((await service.detail('customer', 'b1')).address).toMatchObject({ addressText: 'Original street' });
@@ -81,11 +122,24 @@ describe('Quote and create share pricing/validation; address snapshots are immut
   });
 
   it('uses a safe live-address fallback only for legacy HOME bookings without snapshots', async () => {
-    const legacy = { id: 'legacy', customerId: 'customer', mode: 'HOME', addressSnapshot: null,
-      address: { ...originalAddress, userId: 'customer', deletedAt: new Date() }, technician: { userId: 'tech' } };
+    const legacy = {
+      id: 'legacy',
+      customerId: 'customer',
+      mode: 'HOME',
+      addressSnapshot: null,
+      address: { ...originalAddress, userId: 'customer', deletedAt: new Date() },
+      technician: { userId: 'tech' },
+    };
     db.booking.findUnique.mockResolvedValue(legacy);
     const result = await service.detail('customer', 'legacy');
-    expect(result.address).toEqual({ id: 'a1', addressText: 'Original street', address: 'Original street', latitude: 10, longitude: 106, label: 'Home' });
+    expect(result.address).toEqual({
+      id: 'a1',
+      addressText: 'Original street',
+      address: 'Original street',
+      latitude: 10,
+      longitude: 106,
+      label: 'Home',
+    });
     expect(result.address).not.toHaveProperty('userId');
     expect(result.address).not.toHaveProperty('deletedAt');
   });
@@ -95,7 +149,9 @@ describe('Quote and create share pricing/validation; address snapshots are immut
     await expect(service.quote('customer', dto())).rejects.toThrow('khong hop le');
     db.technicianService.findMany.mockResolvedValueOnce([{ id: 's1', modes: ['ONLINE'], durationMinutes: 60 }]);
     await expect(service.quote('customer', dto())).rejects.toThrow('hinh thuc');
-    await expect(service.quote('customer', { ...dto(), scheduledStart: new Date(0).toISOString() })).rejects.toThrow('tuong lai');
+    await expect(service.quote('customer', { ...dto(), scheduledStart: new Date(0).toISOString() })).rejects.toThrow(
+      'tuong lai',
+    );
     db.availabilitySlot.findFirst.mockResolvedValueOnce(null);
     await expect(service.quote('customer', dto())).rejects.toThrow('khong ranh');
     db.booking.findFirst.mockResolvedValueOnce({ id: 'occupied' });
@@ -104,7 +160,10 @@ describe('Quote and create share pricing/validation; address snapshots are immut
   });
 
   it('sums services once and avoids floating-point subtotal errors', async () => {
-    db.technicianService.findMany.mockResolvedValue([{ id: 's2', price: 0.2, durationMinutes: 30, modes: ['ONSITE'] }, { id: 's1', price: 0.1, durationMinutes: 60, modes: ['ONSITE'] }]);
+    db.technicianService.findMany.mockResolvedValue([
+      { id: 's2', price: 0.2, durationMinutes: 30, modes: ['ONSITE'] },
+      { id: 's1', price: 0.1, durationMinutes: 60, modes: ['ONSITE'] },
+    ]);
     const { addressId: _addressId, ...onsite } = { ...dto(), mode: 'ONSITE' as const, serviceIds: ['s1', 's2', 's1'] };
     const result = await service.quote('customer', onsite);
     expect(result.subtotal).toBe(0.3);
@@ -113,7 +172,17 @@ describe('Quote and create share pricing/validation; address snapshots are immut
   });
 
   it('validates promotion, caps discount and never consumes it during quote', async () => {
-    const promo = { id: 'promo', code: 'SALE', type: 'PERCENT', value: 50, minOrderAmount: 0, maxDiscount: 100000, perUserLimit: 1, usageLimit: 10, usedCount: 0 };
+    const promo = {
+      id: 'promo',
+      code: 'SALE',
+      type: 'PERCENT',
+      value: 50,
+      minOrderAmount: 0,
+      maxDiscount: 100000,
+      perUserLimit: 1,
+      usageLimit: 10,
+      usedCount: 0,
+    };
     db.promotion.findFirst.mockResolvedValue(promo);
     const result = await service.quote('customer', { ...dto(), promotionCode: ' sale ' });
     expect(result).toMatchObject({ discountAmount: 100000, totalAmount: 500000, promotionCode: 'SALE' });
@@ -127,10 +196,24 @@ describe('Quote and create share pricing/validation; address snapshots are immut
   });
 
   it('supports fixed promotions and caps any discount at the full payable amount', async () => {
-    db.promotion.findFirst.mockResolvedValue({ id: 'promo', code: 'FREE', type: 'FIXED', value: 9999999,
-      minOrderAmount: 0, maxDiscount: null, perUserLimit: 1, usageLimit: null, usedCount: 0 });
+    db.promotion.findFirst.mockResolvedValue({
+      id: 'promo',
+      code: 'FREE',
+      type: 'FIXED',
+      value: 9999999,
+      minOrderAmount: 0,
+      maxDiscount: null,
+      perUserLimit: 1,
+      usageLimit: null,
+      usedCount: 0,
+    });
     const result = await service.quote('customer', { ...dto(), promotionCode: 'FREE' });
-    expect(result).toMatchObject({ discountAmount: 600000, discount: 600000, totalAmount: 0, total: 0,
-      promotion: { id: 'promo', code: 'FREE', discount: 600000 } });
+    expect(result).toMatchObject({
+      discountAmount: 600000,
+      discount: 600000,
+      totalAmount: 0,
+      total: 0,
+      promotion: { id: 'promo', code: 'FREE', discount: 600000 },
+    });
   });
 });

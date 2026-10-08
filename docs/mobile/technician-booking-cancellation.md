@@ -15,14 +15,14 @@ Base URL: `/api`. Tất cả API dưới đây cần `Authorization: Bearer <acc
 
 Mobile map mã sang nhãn tiếng Việt. Không dùng nhãn làm business key.
 
-| reasonCode | Ảnh minh chứng |
-| --- | --- |
-| `CUSTOMER_NO_SHOW` | Bắt buộc, ít nhất một ảnh |
-| `UNSAFE_SITUATION` | Bắt buộc, ít nhất một ảnh |
-| `INAPPROPRIATE_REQUEST` | Bắt buộc, ít nhất một ảnh |
-| `SERVICE_LOCATION_UNAVAILABLE` | Không bắt buộc |
-| `CUSTOMER_REQUESTED_CANCEL` | Không bắt buộc |
-| `OTHER` | `reasonText` bắt buộc |
+| reasonCode                     | Ảnh minh chứng            |
+| ------------------------------ | ------------------------- |
+| `CUSTOMER_NO_SHOW`             | Bắt buộc, ít nhất một ảnh |
+| `UNSAFE_SITUATION`             | Bắt buộc, ít nhất một ảnh |
+| `INAPPROPRIATE_REQUEST`        | Bắt buộc, ít nhất một ảnh |
+| `SERVICE_LOCATION_UNAVAILABLE` | Không bắt buộc            |
+| `CUSTOMER_REQUESTED_CANCEL`    | Không bắt buộc            |
+| `OTHER`                        | `reasonText` bắt buộc     |
 
 Tối đa 5 ảnh, mỗi ảnh JPEG/PNG/WebP, tối đa 10 MiB.
 
@@ -56,9 +56,7 @@ Mobile `PUT` byte ảnh trực tiếp tới `uploadUrl`, dùng đúng `Content-T
 ```json
 {
   "reasonCode": "INAPPROPRIATE_REQUEST",
-  "evidenceStorageKeys": [
-    "booking-cancellation/{bookingId}/{currentUserId}/...jpg"
-  ]
+  "evidenceStorageKeys": ["booking-cancellation/{bookingId}/{currentUserId}/...jpg"]
 }
 ```
 
@@ -102,4 +100,3 @@ Nếu mất mạng sau khi gửi request, tải lại booking trước khi retry
 ## Riêng tư
 
 Ảnh nằm trong private storage, không nằm trong marketplace/open job list/technician card. API hủy không trả URL ảnh. Hiện chỉ chuẩn bị quyền đọc cho uploader và admin ở phase tiếp theo; quyền để customer xem evidence chưa được chốt.
-

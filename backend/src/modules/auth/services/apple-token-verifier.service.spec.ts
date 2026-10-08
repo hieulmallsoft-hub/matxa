@@ -7,14 +7,19 @@ import { AppleTokenVerifierService } from './apple-token-verifier.service';
 describe('AppleTokenVerifierService', () => {
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
   const entries = new Map<string, string>();
-  const redis = { client: {
-    set: jest.fn(async (key: string, value: string) => { entries.set(key, value); return 'OK'; }),
-    getDel: jest.fn(async (key: string) => {
-      const value = entries.get(key) ?? null;
-      entries.delete(key);
-      return value;
-    }),
-  } };
+  const redis = {
+    client: {
+      set: jest.fn(async (key: string, value: string) => {
+        entries.set(key, value);
+        return 'OK';
+      }),
+      getDel: jest.fn(async (key: string) => {
+        const value = entries.get(key) ?? null;
+        entries.delete(key);
+        return value;
+      }),
+    },
+  };
   let service: AppleTokenVerifierService;
   let fetchMock: jest.SpyInstance;
 
@@ -34,10 +39,14 @@ describe('AppleTokenVerifierService', () => {
 
   function token(nonce: string, overrides: Record<string, unknown> = {}) {
     const payload: Record<string, unknown> = {
-      sub: 'apple-user', iss: 'https://appleid.apple.com', aud: 'com.matxa.test',
+      sub: 'apple-user',
+      iss: 'https://appleid.apple.com',
+      aud: 'com.matxa.test',
       exp: Math.floor(Date.now() / 1000) + 300,
       nonce: createHash('sha256').update(nonce).digest('hex'),
-      email: 'user@example.com', email_verified: 'true', ...overrides,
+      email: 'user@example.com',
+      email_verified: 'true',
+      ...overrides,
     };
     if (payload.exp === undefined) delete payload.exp;
     return sign(payload, privateKey, { algorithm: 'RS256', keyid: 'test-key' });
@@ -64,7 +73,10 @@ describe('AppleTokenVerifierService', () => {
     const { nonce } = await service.startLogin();
     await expect(service.verify(token(nonce, overrides), nonce)).rejects.toThrow();
     expect(redis.client.getDel).not.toHaveBeenCalled();
-    await expect(service.verify(token(nonce), nonce)).resolves.toMatchObject({ subject: 'apple-user', emailVerified: true });
+    await expect(service.verify(token(nonce), nonce)).resolves.toMatchObject({
+      subject: 'apple-user',
+      emailVerified: true,
+    });
   });
 
   it('rejects a token with a forged signature', async () => {
@@ -83,7 +95,10 @@ describe('AppleTokenVerifierService', () => {
   });
 
   it('rejects missing configuration', async () => {
-    service = new AppleTokenVerifierService({ get: () => '' } as unknown as ConfigService, redis as unknown as RedisService);
+    service = new AppleTokenVerifierService(
+      { get: () => '' } as unknown as ConfigService,
+      redis as unknown as RedisService,
+    );
     await expect(service.startLogin()).rejects.toThrow('Apple Sign In chua duoc cau hinh');
     await expect(service.verify('token', 'nonce')).rejects.toThrow('Apple Sign In chua duoc cau hinh');
   });

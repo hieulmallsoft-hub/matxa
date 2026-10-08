@@ -59,14 +59,14 @@ GET /api/wallet/topups/:transactionId
 
 ## Status mapping
 
-| API status | Mobile screen |
-|---|---|
-| `PENDING_PAYMENT` | Bank transfer instruction |
-| `PROCESSING` | Processing |
-| `SUCCESS` | Top-up success, refresh wallet balance |
-| `FAILED` | Failed, create a new top-up to retry |
-| `EXPIRED` | Expired, create a new top-up |
-| `CANCELLED` | Cancelled |
+| API status        | Mobile screen                          |
+| ----------------- | -------------------------------------- |
+| `PENDING_PAYMENT` | Bank transfer instruction              |
+| `PROCESSING`      | Processing                             |
+| `SUCCESS`         | Top-up success, refresh wallet balance |
+| `FAILED`          | Failed, create a new top-up to retry   |
+| `EXPIRED`         | Expired, create a new top-up           |
+| `CANCELLED`       | Cancelled                              |
 
 ## Development simulation
 

@@ -1,59 +1,167 @@
 import { ApiProperty, ApiPropertyOptional, PartialType, PickType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsLatitude, IsLongitude, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, Matches } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsIn,
+  IsInt,
+  IsLatitude,
+  IsLongitude,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+  Matches,
+} from 'class-validator';
 
 export class SearchTechniciansDto {
-  @ApiPropertyOptional({ enum: ['recommended', 'distance', 'rating', 'availability'], default: 'recommended', description: 'distance requires latitude and longitude; recommended uses distance when provided, otherwise availability then rating' })
-  @IsOptional() @IsIn(['recommended', 'distance', 'rating', 'availability']) sort?: 'recommended' | 'distance' | 'rating' | 'availability';
+  @ApiPropertyOptional({
+    enum: ['recommended', 'distance', 'rating', 'availability'],
+    default: 'recommended',
+    description:
+      'distance requires latitude and longitude; recommended uses distance when provided, otherwise availability then rating',
+  })
+  @IsOptional()
+  @IsIn(['recommended', 'distance', 'rating', 'availability'])
+  sort?: 'recommended' | 'distance' | 'rating' | 'availability';
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) search?: string;
-  @ApiPropertyOptional({ description: 'Alias of search; search takes precedence' }) @IsOptional() @IsString() @MaxLength(100) keyword?: string;
-  @ApiPropertyOptional({ enum: ['MALE', 'FEMALE', 'OTHER'] }) @IsOptional() @IsIn(['MALE', 'FEMALE', 'OTHER']) gender?: 'MALE' | 'FEMALE' | 'OTHER';
+  @ApiPropertyOptional({ description: 'Alias of search; search takes precedence' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  keyword?: string;
+  @ApiPropertyOptional({ enum: ['MALE', 'FEMALE', 'OTHER'] }) @IsOptional() @IsIn(['MALE', 'FEMALE', 'OTHER']) gender?:
+    'MALE' | 'FEMALE' | 'OTHER';
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) tag?: string;
   @ApiPropertyOptional({ type: [String], description: 'Comma-separated or repeated tags; matches all tags' })
-  @IsOptional() @Transform(({ value }) => {
+  @IsOptional()
+  @Transform(({ value }) => {
     const tags = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : value;
-    return Array.isArray(tags) ? tags.map((tag) => typeof tag === 'string' ? tag.trim() : tag) : tags;
+    return Array.isArray(tags) ? tags.map((tag) => (typeof tag === 'string' ? tag.trim() : tag)) : tags;
   })
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @IsString({ each: true }) @MinLength(1, { each: true }) @MaxLength(50, { each: true }) tags?: string[];
-  @ApiPropertyOptional({ enum: ['HOME', 'ONSITE', 'ONLINE'] }) @IsOptional() @IsIn(['HOME', 'ONSITE', 'ONLINE']) mode?: 'HOME' | 'ONSITE' | 'ONLINE';
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MinLength(1, { each: true })
+  @MaxLength(50, { each: true })
+  tags?: string[];
+  @ApiPropertyOptional({ enum: ['HOME', 'ONSITE', 'ONLINE'] }) @IsOptional() @IsIn(['HOME', 'ONSITE', 'ONLINE']) mode?:
+    'HOME' | 'ONSITE' | 'ONLINE';
   @ApiPropertyOptional() @IsOptional() @IsUUID() categoryId?: string;
-  @ApiPropertyOptional({ description: 'TechnicianService ID, not category ID' }) @IsOptional() @IsUUID() serviceId?: string;
-  @ApiPropertyOptional() @IsOptional() @Transform(({ value }) => value === 'true' ? true : value === 'false' ? false : value) @IsBoolean() available?: boolean;
+  @ApiPropertyOptional({ description: 'TechnicianService ID, not category ID' })
+  @IsOptional()
+  @IsUUID()
+  serviceId?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  available?: boolean;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsLatitude() latitude?: number;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsLongitude() longitude?: number;
   @ApiPropertyOptional({ default: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
-  @ApiPropertyOptional({ default: 20, maximum: 100 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit = 20;
+  @ApiPropertyOptional({ default: 20, maximum: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit = 20;
 }
 
 export class MarketplaceHomeQueryDto extends PickType(SearchTechniciansDto, ['latitude', 'longitude'] as const) {}
 
 export class AvailabilityQueryDto {
   @ApiPropertyOptional({ example: '2026-10-01', description: 'Local date in Asia/Ho_Chi_Minh; exclusive with from/to' })
-  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) date?: string;
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsDateString({ strict: true })
+  date?: string;
   @ApiPropertyOptional({ description: 'ISO timestamp with Z or timezone offset; inclusive' })
-  @IsOptional() @IsDateString({ strict: true }) @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i) from?: string;
+  @IsOptional()
+  @IsDateString({ strict: true })
+  @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
+  from?: string;
   @ApiPropertyOptional({ description: 'ISO timestamp with timezone; exclusive, max 31-day range' })
-  @IsOptional() @IsDateString({ strict: true }) @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i) to?: string;
-  @ApiPropertyOptional({ type: [String], description: 'TechnicianService IDs, comma-separated or repeated. Required for computed slots.' })
-  @IsOptional() @Transform(({ value }) => typeof value === 'string' ? value.split(',').map((id) => id.trim()) : value)
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10) @IsUUID('4', { each: true }) serviceIds?: string[];
-  @ApiPropertyOptional({ type: [String], description: 'Preferred alias of serviceIds. These are TechnicianService IDs used by booking. Do not send both fields.' })
-  @IsOptional() @Transform(({ value }) => typeof value === 'string' ? value.split(',').map((id) => id.trim()) : value)
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10) @IsUUID('4', { each: true }) technicianServiceIds?: string[];
-  @ApiPropertyOptional({ type: [String], description: 'Price option IDs in the same order as serviceIds/technicianServiceIds.' })
-  @IsOptional() @Transform(({ value }) => typeof value === 'string' ? value.split(',').map((id) => id.trim()) : value)
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10) @IsUUID('4', { each: true }) priceOptionIds?: string[];
+  @IsOptional()
+  @IsDateString({ strict: true })
+  @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
+  to?: string;
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'TechnicianService IDs, comma-separated or repeated. Required for computed slots.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').map((id) => id.trim()) : value))
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(10)
+  @IsUUID('4', { each: true })
+  serviceIds?: string[];
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Preferred alias of serviceIds. These are TechnicianService IDs used by booking. Do not send both fields.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').map((id) => id.trim()) : value))
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(10)
+  @IsUUID('4', { each: true })
+  technicianServiceIds?: string[];
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Price option IDs in the same order as serviceIds/technicianServiceIds.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').map((id) => id.trim()) : value))
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(10)
+  @IsUUID('4', { each: true })
+  priceOptionIds?: string[];
   @ApiPropertyOptional({ enum: ['HOME', 'ONSITE', 'ONLINE'] })
-  @IsOptional() @IsIn(['HOME', 'ONSITE', 'ONLINE']) mode?: 'HOME' | 'ONSITE' | 'ONLINE';
-  @ApiPropertyOptional({ default: 30, minimum: 5, maximum: 120, description: 'Grid anchored to working interval start' })
-  @IsOptional() @Type(() => Number) @IsInt() @Min(5) @Max(120) stepMinutes = 30;
+  @IsOptional()
+  @IsIn(['HOME', 'ONSITE', 'ONLINE'])
+  mode?: 'HOME' | 'ONSITE' | 'ONLINE';
+  @ApiPropertyOptional({
+    default: 30,
+    minimum: 5,
+    maximum: 120,
+    description: 'Grid anchored to working interval start',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(5)
+  @Max(120)
+  stepMinutes = 30;
 }
 
 export class UpsertTechnicianProfileDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) bio?: string;
-  @ApiPropertyOptional({ enum: ['MALE', 'FEMALE', 'OTHER'] }) @IsOptional() @IsIn(['MALE', 'FEMALE', 'OTHER']) gender?: 'MALE' | 'FEMALE' | 'OTHER';
-  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) tags?: string[];
-  @ApiProperty({ enum: ['HOME', 'ONSITE', 'ONLINE'], isArray: true }) @IsArray() @ArrayMinSize(1) @IsIn(['HOME', 'ONSITE', 'ONLINE'], { each: true }) serviceModes!: ('HOME' | 'ONSITE' | 'ONLINE')[];
+  @ApiPropertyOptional({ enum: ['MALE', 'FEMALE', 'OTHER'] }) @IsOptional() @IsIn(['MALE', 'FEMALE', 'OTHER']) gender?:
+    'MALE' | 'FEMALE' | 'OTHER';
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  tags?: string[];
+  @ApiProperty({ enum: ['HOME', 'ONSITE', 'ONLINE'], isArray: true })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsIn(['HOME', 'ONSITE', 'ONLINE'], { each: true })
+  serviceModes!: ('HOME' | 'ONSITE' | 'ONLINE')[];
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsLatitude() latitude?: number;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsLongitude() longitude?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) city?: string;
@@ -67,7 +175,11 @@ export class CreateTechnicianServiceDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) description?: string;
   @ApiProperty() @Type(() => Number) @IsInt() @Min(15) @Max(720) durationMinutes!: number;
   @ApiProperty() @Type(() => Number) @IsNumber() @Min(0) price!: number;
-  @ApiProperty({ enum: ['HOME', 'ONSITE', 'ONLINE'], isArray: true }) @IsArray() @ArrayMinSize(1) @IsIn(['HOME', 'ONSITE', 'ONLINE'], { each: true }) modes!: ('HOME' | 'ONSITE' | 'ONLINE')[];
+  @ApiProperty({ enum: ['HOME', 'ONSITE', 'ONLINE'], isArray: true })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsIn(['HOME', 'ONSITE', 'ONLINE'], { each: true })
+  modes!: ('HOME' | 'ONSITE' | 'ONLINE')[];
 }
 
 export class UpdateTechnicianServiceDto extends PartialType(CreateTechnicianServiceDto) {
@@ -75,7 +187,11 @@ export class UpdateTechnicianServiceDto extends PartialType(CreateTechnicianServ
 }
 
 export class CreateTechnicianServicePriceOptionDto {
-  @ApiProperty({ example: '90_MINUTES', description: 'Stable code unique within one technician service' }) @IsString() @MinLength(1) @MaxLength(50) code!: string;
+  @ApiProperty({ example: '90_MINUTES', description: 'Stable code unique within one technician service' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(50)
+  code!: string;
   @ApiProperty({ example: 90 }) @Type(() => Number) @IsInt() @Min(15) @Max(720) durationMinutes!: number;
   @ApiProperty({ example: 350000 }) @Type(() => Number) @IsNumber() @Min(0) price!: number;
   @ApiPropertyOptional({ minimum: 0 }) @IsOptional() @Type(() => Number) @IsInt() @Min(0) sortOrder?: number;
@@ -91,7 +207,12 @@ export class CreateAvailabilityDto {
 
 export class CreateAddressDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) label?: string;
-  @ApiProperty() @Transform(({ value }) => typeof value === 'string' ? value.trim() : value) @IsString() @MinLength(1) @MaxLength(500) address!: string;
+  @ApiProperty()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MinLength(1)
+  @MaxLength(500)
+  address!: string;
   @ApiProperty() @Type(() => Number) @IsLatitude() latitude!: number;
   @ApiProperty() @Type(() => Number) @IsLongitude() longitude!: number;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isDefault?: boolean;
@@ -132,24 +253,46 @@ export class CreatePromotionDto {
 export class CreateTechnicianByAdminDto extends UpsertTechnicianProfileDto {
   @ApiProperty() @IsUUID() userId!: string;
   @ApiPropertyOptional({ description: 'Admin-only Marketplace visibility; defaults to true for new profiles' })
-  @IsOptional() @IsBoolean() isActive?: boolean;
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
 
 export class AdminPageDto {
-  @ApiPropertyOptional({ default: 1, type: Number, description: 'Trang bắt đầu từ 1' }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
-  @ApiPropertyOptional({ default: 20, type: Number, maximum: 100, description: 'Số bản ghi mỗi trang' }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit = 20;
+  @ApiPropertyOptional({ default: 1, type: Number, description: 'Trang bắt đầu từ 1' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page = 1;
+  @ApiPropertyOptional({ default: 20, type: Number, maximum: 100, description: 'Số bản ghi mỗi trang' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit = 20;
 }
 
 export class PromotionListQueryDto extends AdminPageDto {}
 
 export class AdminUsersQueryDto extends AdminPageDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) search?: string;
-  @ApiPropertyOptional({ enum: ['CUSTOMER', 'TECHNICIAN', 'ADMIN'] }) @IsOptional() @IsIn(['CUSTOMER', 'TECHNICIAN', 'ADMIN']) role?: 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN';
-  @ApiPropertyOptional({ enum: ['ACTIVE', 'BLOCKED', 'DELETED'] }) @IsOptional() @IsIn(['ACTIVE', 'BLOCKED', 'DELETED']) status?: 'ACTIVE' | 'BLOCKED' | 'DELETED';
+  @ApiPropertyOptional({ enum: ['CUSTOMER', 'TECHNICIAN', 'ADMIN'] })
+  @IsOptional()
+  @IsIn(['CUSTOMER', 'TECHNICIAN', 'ADMIN'])
+  role?: 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN';
+  @ApiPropertyOptional({ enum: ['ACTIVE', 'BLOCKED', 'DELETED'] })
+  @IsOptional()
+  @IsIn(['ACTIVE', 'BLOCKED', 'DELETED'])
+  status?: 'ACTIVE' | 'BLOCKED' | 'DELETED';
 }
 
 export class AdminBookingsQueryDto extends AdminPageDto {
-  @ApiPropertyOptional({ enum: ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'] }) @IsOptional() @IsIn(['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED']) status?: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+  @ApiPropertyOptional({ enum: ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'] })
+  @IsOptional()
+  @IsIn(['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'])
+  status?: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
 }
 
 export class UpdateUserStatusDto {
@@ -164,7 +307,10 @@ export class UpdateAdminTechnicianDto extends PartialType(UpsertTechnicianProfil
 /** Admin may change a selling price, but cannot alter the duration/template selected by the technician. */
 export class UpdateAdminTechnicianPriceOptionDto {
   @ApiProperty({ example: 500000, description: 'Giá bán bằng VND cho gói thời lượng hiện có.' })
-  @Type(() => Number) @IsNumber() @Min(0) price!: number;
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  price!: number;
 }
 
 export class UpdateCategoryDto extends PartialType(CreateCategoryDto) {

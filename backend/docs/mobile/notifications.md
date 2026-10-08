@@ -22,15 +22,17 @@ Response:
 
 ```json
 {
-  "items": [{
-    "id": "notification-id",
-    "type": "BOOKING_CONFIRMED",
-    "title": "Dat lich thanh cong",
-    "body": "Lich hen da duoc xac nhan.",
-    "actionUrl": "matxa://bookings/booking-id",
-    "readAt": null,
-    "createdAt": "2026-09-29T10:00:00.000Z"
-  }],
+  "items": [
+    {
+      "id": "notification-id",
+      "type": "BOOKING_CONFIRMED",
+      "title": "Dat lich thanh cong",
+      "body": "Lich hen da duoc xac nhan.",
+      "actionUrl": "matxa://bookings/booking-id",
+      "readAt": null,
+      "createdAt": "2026-09-29T10:00:00.000Z"
+    }
+  ],
   "unreadCount": 1,
   "total": 10,
   "page": 1,
@@ -87,14 +89,14 @@ FCM chỉ được gửi sau khi business event và notification DB đã hoàn t
 
 Mobile đọc `type` và các entity id trong data, sau đó tự map sang màn hình:
 
-| Type | Data field | Mobile action |
-|---|---|---|
-| `BOOKING_CREATED` | `bookingId` | Mở chi tiết booking cho KTV |
-| `BOOKING_CONFIRMED` | `bookingId` | Mở chi tiết booking |
-| `BOOKING_CANCELLED` | `bookingId` | Mở chi tiết booking |
-| `BOOKING_COMPLETED` | `bookingId` | Mở chi tiết booking/đánh giá |
-| `CHAT_MESSAGE` | `conversationId`, `messageId` | Mở cuộc trò chuyện |
-| `TEST` | `notificationId`, `actionUrl` | Mở notification |
+| Type                | Data field                    | Mobile action                |
+| ------------------- | ----------------------------- | ---------------------------- |
+| `BOOKING_CREATED`   | `bookingId`                   | Mở chi tiết booking cho KTV  |
+| `BOOKING_CONFIRMED` | `bookingId`                   | Mở chi tiết booking          |
+| `BOOKING_CANCELLED` | `bookingId`                   | Mở chi tiết booking          |
+| `BOOKING_COMPLETED` | `bookingId`                   | Mở chi tiết booking/đánh giá |
+| `CHAT_MESSAGE`      | `conversationId`, `messageId` | Mở cuộc trò chuyện           |
+| `TEST`              | `notificationId`, `actionUrl` | Mở notification              |
 
 Push không dùng Android route string làm contract; `actionUrl` chỉ là navigation data hiện có của notification record.
 

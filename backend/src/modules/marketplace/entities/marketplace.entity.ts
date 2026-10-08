@@ -8,8 +8,18 @@ export class TechnicianListItem {
   @ApiProperty({ type: String, nullable: true }) avatarUrl!: string | null;
   @ApiProperty() averageRating!: number;
   @ApiProperty({ description: 'Alias of averageRating' }) rating!: number;
-  @ApiProperty({ type: [String], enum: ['HOME', 'ONSITE', 'ONLINE'], description: 'Modes supported by profile and matching active services' }) supportedModes!: string[];
-  @ApiProperty({ type: String, nullable: true, description: 'Currently null: select services and use availability for bookable start times' }) nextAvailableAt!: string | null;
+  @ApiProperty({
+    type: [String],
+    enum: ['HOME', 'ONSITE', 'ONLINE'],
+    description: 'Modes supported by profile and matching active services',
+  })
+  supportedModes!: string[];
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Currently null: select services and use availability for bookable start times',
+  })
+  nextAvailableAt!: string | null;
   @ApiProperty() reviewCount!: number;
   @ApiProperty() isAvailable!: boolean;
   @ApiProperty({ type: Number, nullable: true }) distanceKm!: number | null;
@@ -19,7 +29,8 @@ export class TechnicianListItem {
   @ApiProperty() isVerified!: boolean;
   @ApiProperty() isFavorite!: boolean;
   @ApiProperty({ type: String, nullable: true }) city!: string | null;
-  @ApiProperty({ type: Number, nullable: true, description: 'Lowest matching active service price' }) startingPrice!: number | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'Lowest matching active service price' }) startingPrice!:
+    number | null;
 }
 
 export class TechnicianListResponse {
@@ -91,7 +102,10 @@ export class PublicTechnicianUser {
 
 export class TechnicianServiceResponse {
   @ApiProperty() id!: string;
-  @ApiProperty({ description: 'Legacy alias of technicianServiceId; no master service entity exists. Use in booking serviceIds.' }) serviceId!: string;
+  @ApiProperty({
+    description: 'Legacy alias of technicianServiceId; no master service entity exists. Use in booking serviceIds.',
+  })
+  serviceId!: string;
   @ApiProperty() technicianServiceId!: string;
   @ApiProperty() technicianId!: string;
   @ApiProperty() categoryId!: string;
@@ -106,7 +120,15 @@ export class TechnicianServiceResponse {
   @ApiProperty({ type: MarketplaceCategoryResponse }) category!: MarketplaceCategoryResponse;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
-  @ApiProperty({ type: [Object], description: 'Selectable duration/price packages for this service' }) priceOptions!: Array<{ id: string; code: string; durationMinutes: number; price: number; isActive: boolean; sortOrder: number }>;
+  @ApiProperty({ type: [Object], description: 'Selectable duration/price packages for this service' })
+  priceOptions!: Array<{
+    id: string;
+    code: string;
+    durationMinutes: number;
+    price: number;
+    isActive: boolean;
+    sortOrder: number;
+  }>;
 }
 
 export class TechnicianReviewResponse {
@@ -129,16 +151,27 @@ export class OnsiteLocationResponse {
 }
 
 export class TechnicianDetailResponse extends TechnicianListItem {
-  @ApiProperty({ type: [String], enum: ['HOME', 'ONSITE', 'ONLINE'], description: 'Union of all active service modes in active categories' }) declare supportedModes: string[];
+  @ApiProperty({
+    type: [String],
+    enum: ['HOME', 'ONSITE', 'ONLINE'],
+    description: 'Union of all active service modes in active categories',
+  })
+  declare supportedModes: string[];
   @ApiProperty({ type: PublicTechnicianUser }) user!: PublicTechnicianUser;
   @ApiProperty({ type: String, nullable: true }) bio!: string | null;
   @ApiProperty({ type: String, nullable: true }) address!: string | null;
-  @ApiProperty({ type: String, nullable: true, description: 'Legacy Decimal serialization; onsiteLocation has numeric coordinates' }) latitude!: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Legacy Decimal serialization; onsiteLocation has numeric coordinates',
+  })
+  latitude!: string | null;
   @ApiProperty({ type: String, nullable: true }) longitude!: string | null;
   @ApiProperty() isActive!: boolean;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
-  @ApiProperty({ type: [String], description: 'Current schema only provides the avatar; empty if none' }) images!: string[];
+  @ApiProperty({ type: [String], description: 'Current schema only provides the avatar; empty if none' })
+  images!: string[];
   @ApiProperty({ type: OnsiteLocationResponse, nullable: true }) onsiteLocation!: OnsiteLocationResponse | null;
   @ApiProperty({ type: [TechnicianServiceResponse] }) services!: TechnicianServiceResponse[];
   @ApiProperty({ type: [TechnicianReviewResponse] }) reviews!: TechnicianReviewResponse[];
@@ -153,8 +186,17 @@ export class ComputedAvailabilityResponse {
   @ApiProperty() technicianId!: string;
   @ApiProperty({ type: String, nullable: true, example: '2026-09-25' }) date!: string | null;
   @ApiProperty({ type: [String] }) serviceIds!: string[];
-  @ApiProperty({ type: [String], description: 'Preferred booking-compatible TechnicianService IDs; alias of serviceIds' }) technicianServiceIds!: string[];
-  @ApiProperty({ type: [String], nullable: true, description: 'Selected price option IDs in service order; null indicates legacy service pricing.' }) priceOptionIds!: Array<string | null>;
+  @ApiProperty({
+    type: [String],
+    description: 'Preferred booking-compatible TechnicianService IDs; alias of serviceIds',
+  })
+  technicianServiceIds!: string[];
+  @ApiProperty({
+    type: [String],
+    nullable: true,
+    description: 'Selected price option IDs in service order; null indicates legacy service pricing.',
+  })
+  priceOptionIds!: Array<string | null>;
   @ApiProperty({ enum: ['HOME', 'ONSITE', 'ONLINE'] }) mode!: string;
   @ApiProperty({ example: 'Asia/Ho_Chi_Minh' }) timezone!: string;
   @ApiProperty() from!: Date;

@@ -9,7 +9,12 @@ export function availabilityRange(query: { date?: string; from?: string; to?: st
   if (!query.date && (!query.from || !query.to)) throw new BadRequestException('Can date hoac ca from va to');
   const start = new Date(query.date ? `${query.date}T00:00:00+07:00` : query.from!);
   const end = query.date ? new Date(start.getTime() + 86_400_000) : new Date(query.to!);
-  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start || end.getTime() - start.getTime() > 31 * 86_400_000) {
+  if (
+    !Number.isFinite(start.getTime()) ||
+    !Number.isFinite(end.getTime()) ||
+    end <= start ||
+    end.getTime() - start.getTime() > 31 * 86_400_000
+  ) {
     throw new BadRequestException('Khoang ngay khong hop le, toi da 31 ngay');
   }
   return { start, end };
@@ -17,8 +22,12 @@ export function availabilityRange(query: { date?: string; from?: string; to?: st
 
 /** Subtract occupied half-open intervals, then enumerate starts on each working interval's grid. */
 export function buildAvailableSlots(
-  working: TimeInterval[], occupied: TimeInterval[], durationMinutes: number,
-  range: TimeInterval, now: Date, stepMinutes: number,
+  working: TimeInterval[],
+  occupied: TimeInterval[],
+  durationMinutes: number,
+  range: TimeInterval,
+  now: Date,
+  stepMinutes: number,
 ) {
   const duration = durationMinutes * MINUTE;
   const step = stepMinutes * MINUTE;

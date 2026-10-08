@@ -4,12 +4,12 @@ All routes below retain the `/api` prefix and existing response structure. Tabs,
 
 ## Endpoints
 
-| Method/path | Behavior |
-| --- | --- |
-| GET `/api/marketplace/home` | Active, currently effective banners; active categories; up to 10 eligible technicians. Optional latitude/longitude. |
-| GET `/api/marketplace/categories` | Active category IDs/names/slugs for tabs and filters. |
-| GET `/api/marketplace/technicians` | Search, filter, sort and paginate technician cards. |
-| GET `/api/marketplace/technicians/:id` | Existing detail format, now excludes inactive profiles/users and inactive services/categories. |
+| Method/path                                         | Behavior                                                                                                                                                                                     |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET `/api/marketplace/home`                         | Active, currently effective banners; active categories; up to 10 eligible technicians. Optional latitude/longitude.                                                                          |
+| GET `/api/marketplace/categories`                   | Active category IDs/names/slugs for tabs and filters.                                                                                                                                        |
+| GET `/api/marketplace/technicians`                  | Search, filter, sort and paginate technician cards.                                                                                                                                          |
+| GET `/api/marketplace/technicians/:id`              | Existing detail format, now excludes inactive profiles/users and inactive services/categories.                                                                                               |
 | GET `/api/marketplace/technicians/:id/availability` | Legacy from/to-only requests return working windows. With serviceIds and mode, returns computed future slots excluding PENDING/CONFIRMED bookings. Requires verified, active profiles/users. |
 
 Home and search allow guests. Without Authorization, `isFavorite` is false. With a Bearer token, the existing access-token/session validation runs and favorites are scoped to its authenticated user. Invalid, expired or revoked supplied credentials return 401; remove Authorization to browse as a guest. A client-supplied userId is never trusted.
@@ -18,21 +18,21 @@ Home and search allow guests. Without Authorization, `isFavorite` is false. With
 
 `SearchTechniciansDto` in `src/modules/marketplace/dto/marketplace.dto.ts`:
 
-| Query | Validation/meaning |
-| --- | --- |
-| search | Existing name search, up to 100 characters, case-insensitive literal substring |
-| keyword | Alias; search takes precedence if supplied |
-| gender | MALE / FEMALE / OTHER |
-| tag | Existing single tag, up to 50 characters |
-| tags | Comma-separated or repeated query values; 1–20 nonempty tags, each up to 50 characters; ALL requested tags must match |
-| categoryId | UUID of ServiceCategory |
-| serviceId | UUID of TechnicianService (a technician's own offering, not a global service type) |
-| mode | HOME / ONSITE / ONLINE; matching service and profile must support it |
-| available | Exactly true or false; false is no longer converted into true |
-| latitude / longitude | Numbers in [-90,90] / [-180,180]; supply both or neither |
-| sort | recommended (default), distance (requires coordinates), rating, availability; explicit sort overrides recommended ordering |
-| page | Integer >=1, default 1 |
-| limit | Integer 1–100, default 20 |
+| Query                | Validation/meaning                                                                                                         |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| search               | Existing name search, up to 100 characters, case-insensitive literal substring                                             |
+| keyword              | Alias; search takes precedence if supplied                                                                                 |
+| gender               | MALE / FEMALE / OTHER                                                                                                      |
+| tag                  | Existing single tag, up to 50 characters                                                                                   |
+| tags                 | Comma-separated or repeated query values; 1–20 nonempty tags, each up to 50 characters; ALL requested tags must match      |
+| categoryId           | UUID of ServiceCategory                                                                                                    |
+| serviceId            | UUID of TechnicianService (a technician's own offering, not a global service type)                                         |
+| mode                 | HOME / ONSITE / ONLINE; matching service and profile must support it                                                       |
+| available            | Exactly true or false; false is no longer converted into true                                                              |
+| latitude / longitude | Numbers in [-90,90] / [-180,180]; supply both or neither                                                                   |
+| sort                 | recommended (default), distance (requires coordinates), rating, availability; explicit sort overrides recommended ordering |
+| page                 | Integer >=1, default 1                                                                                                     |
+| limit                | Integer 1–100, default 20                                                                                                  |
 
 Home uses `MarketplaceHomeQueryDto` (latitude/longitude only) and always requests page 1, limit 10 internally.
 
@@ -147,7 +147,6 @@ Run `npm test -- --runInBand marketplace` for DTO/HTTP/optional-auth and query-c
 
 After applying migration to a test database, check active/blocked users, disabled profiles, inactive services/categories, combined category+mode matching, cheapest service, false availability, identical-distance ties, missing coordinates, empty pages, and favorites from two different accounts. Run home with and without a Bearer token and verify effective banner dates. No real customer data or demo fixtures are inserted by these tests.
 
-
 ## Publication policy update (2026-09-24)
 
 No schema change or migration is needed for this update: isVerified already exists.
@@ -169,6 +168,7 @@ the profile active/sort index with (isActive,isVerified,isAvailable DESC,average
 A user-status-only index is not automatically useful for the existing primary-key join.
 
 Swagger/Postman checks:
+
 1. GET /api/marketplace/home with no Authorization: effective banners, active categories, <=10 cards.
 2. GET /api/marketplace/technicians?mode=HOME&available=true&sort=rating&page=1&limit=10
 3. GET /api/marketplace/technicians?latitude=10.77&longitude=106.69&sort=distance

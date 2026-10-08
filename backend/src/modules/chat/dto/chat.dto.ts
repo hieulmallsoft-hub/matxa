@@ -1,6 +1,18 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsLatitude,
+  IsLongitude,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  ValidateIf,
+} from 'class-validator';
 
 export class CreateConversationDto {
   @ApiProperty() @IsUUID() participantId!: string;
@@ -8,7 +20,13 @@ export class CreateConversationDto {
 
 export class ListMessagesDto {
   @ApiPropertyOptional({ default: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
-  @ApiPropertyOptional({ default: 30, maximum: 100 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit = 30;
+  @ApiPropertyOptional({ default: 30, maximum: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit = 30;
 }
 
 export class SendMessageDto {
@@ -17,10 +35,22 @@ export class SendMessageDto {
   type!: 'TEXT' | 'IMAGE' | 'LOCATION';
 
   @ApiPropertyOptional() @ValidateIf((value) => value.type === 'TEXT') @IsString() @MaxLength(4000) text?: string;
-  @ApiPropertyOptional({ description: 'Presigned read URL is returned by server; never submit external URLs.' }) @IsOptional() @IsString() @MaxLength(2048) mediaUrl?: string;
+  @ApiPropertyOptional({ description: 'Presigned read URL is returned by server; never submit external URLs.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  mediaUrl?: string;
   @ApiPropertyOptional() @ValidateIf((value) => value.type === 'IMAGE') @IsString() @MaxLength(1024) mediaKey?: string;
-  @ApiPropertyOptional() @ValidateIf((value) => value.type === 'LOCATION') @Type(() => Number) @IsLatitude() latitude?: number;
-  @ApiPropertyOptional() @ValidateIf((value) => value.type === 'LOCATION') @Type(() => Number) @IsLongitude() longitude?: number;
+  @ApiPropertyOptional()
+  @ValidateIf((value) => value.type === 'LOCATION')
+  @Type(() => Number)
+  @IsLatitude()
+  latitude?: number;
+  @ApiPropertyOptional()
+  @ValidateIf((value) => value.type === 'LOCATION')
+  @Type(() => Number)
+  @IsLongitude()
+  longitude?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) address?: string;
   // Booking is derived from Conversation by the server. It must never be
   // supplied by Mobile when sending a message.

@@ -26,11 +26,11 @@ Lần đầu script tạo User `ADMIN` + email identity đã xác minh. Nếu em
 
 ## 2. Role được phép
 
-| Role | Gọi `/api/admin/marketplace/**` |
-|---|---|
-| `ADMIN` | Được phép |
-| `CUSTOMER` | `403 Forbidden` |
-| `TECHNICIAN` | `403 Forbidden` |
+| Role         | Gọi `/api/admin/marketplace/**` |
+| ------------ | ------------------------------- |
+| `ADMIN`      | Được phép                       |
+| `CUSTOMER`   | `403 Forbidden`                 |
+| `TECHNICIAN` | `403 Forbidden`                 |
 
 Backend là nguồn xác thực cuối cùng. Việc frontend ẩn menu không thay thế authorization của backend.
 
@@ -116,22 +116,22 @@ Do đó nếu account bị `BLOCKED` hoặc `DELETED`, session/token cũ bị `4
 
 ## 7. Status và xử lý Web
 
-| HTTP | Tình huống thực tế | Web xử lý |
-|---:|---|---|
-| 401 | Thiếu token, token sai/hết hạn, session revoked/hết hạn, hoặc account không ACTIVE | Thử refresh một lần; nếu không thành công, xóa session và về login. |
-| 403 | Đã đăng nhập nhưng không có role ADMIN | Chặn route, hiển thị không có quyền; không retry. |
-| 400 | DTO/validation không hợp lệ | Hiển thị lỗi theo field/form. |
+| HTTP | Tình huống thực tế                                                                 | Web xử lý                                                           |
+| ---: | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+|  401 | Thiếu token, token sai/hết hạn, session revoked/hết hạn, hoặc account không ACTIVE | Thử refresh một lần; nếu không thành công, xóa session và về login. |
+|  403 | Đã đăng nhập nhưng không có role ADMIN                                             | Chặn route, hiển thị không có quyền; không retry.                   |
+|  400 | DTO/validation không hợp lệ                                                        | Hiển thị lỗi theo field/form.                                       |
 
 ## 8. API Admin hiện có
 
 Tất cả endpoint sau đều yêu cầu `Authorization: Bearer <accessToken>` của ADMIN:
 
-| Method | Endpoint | Chức năng |
-|---|---|---|
-| POST | `/api/admin/marketplace/categories` | Tạo danh mục |
-| POST | `/api/admin/marketplace/banners` | Tạo banner |
-| POST | `/api/admin/marketplace/promotions` | Tạo mã khuyến mãi |
-| POST | `/api/admin/marketplace/technicians` | Chuyển User thành KTV, tạo/xác minh TechnicianProfile |
+| Method | Endpoint                             | Chức năng                                             |
+| ------ | ------------------------------------ | ----------------------------------------------------- |
+| POST   | `/api/admin/marketplace/categories`  | Tạo danh mục                                          |
+| POST   | `/api/admin/marketplace/banners`     | Tạo banner                                            |
+| POST   | `/api/admin/marketplace/promotions`  | Tạo mã khuyến mãi                                     |
+| POST   | `/api/admin/marketplace/technicians` | Chuyển User thành KTV, tạo/xác minh TechnicianProfile |
 
 Ví dụ API bảo vệ:
 

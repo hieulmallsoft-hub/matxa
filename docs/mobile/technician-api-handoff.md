@@ -156,13 +156,13 @@ Then send the returned `mediaKey` in the application PATCH. Never send a public 
 
 ## 4. Application states
 
-| State | Mobile behavior |
-|---|---|
-| `DRAFT` | Editable; show Continue/Submit |
-| `SUBMITTED` | Read-only; waiting for Admin |
-| `UNDER_REVIEW` | Read-only; Admin is reviewing |
-| `APPROVED` | Enable technician services and availability |
-| `REJECTED` | Show `rejectionReason`; allow edit and resubmit |
+| State          | Mobile behavior                                 |
+| -------------- | ----------------------------------------------- |
+| `DRAFT`        | Editable; show Continue/Submit                  |
+| `SUBMITTED`    | Read-only; waiting for Admin                    |
+| `UNDER_REVIEW` | Read-only; Admin is reviewing                   |
+| `APPROVED`     | Enable technician services and availability     |
+| `REJECTED`     | Show `rejectionReason`; allow edit and resubmit |
 
 KYC states: `NOT_STARTED`, `ID_UPLOADED`, `FACE_UPLOADED`, `PENDING_VERIFICATION`, `VERIFIED`, `REJECTED`.
 

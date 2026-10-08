@@ -2,7 +2,20 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../../../database/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
 import { TechnicianListResponse } from '../entities/marketplace.entity';
-import { AvailabilityQueryDto, CreateAddressDto, CreateAvailabilityDto, CreateTechnicianServiceDto, CreateTechnicianServicePriceOptionDto, MarketplaceHomeQueryDto, PromotionListQueryDto, SearchTechniciansDto, UpdateAddressDto, UpdateTechnicianServiceDto, UpdateTechnicianServicePriceOptionDto, UpsertTechnicianProfileDto } from '../dto/marketplace.dto';
+import {
+  AvailabilityQueryDto,
+  CreateAddressDto,
+  CreateAvailabilityDto,
+  CreateTechnicianServiceDto,
+  CreateTechnicianServicePriceOptionDto,
+  MarketplaceHomeQueryDto,
+  PromotionListQueryDto,
+  SearchTechniciansDto,
+  UpdateAddressDto,
+  UpdateTechnicianServiceDto,
+  UpdateTechnicianServicePriceOptionDto,
+  UpsertTechnicianProfileDto,
+} from '../dto/marketplace.dto';
 import { applyPriceOptions, loadBookableServices, publicTechnicianWhere } from './technician-selection';
 import { availabilityRange, BOOKING_TIMEZONE, buildAvailableSlots } from './availability-slots';
 
@@ -14,7 +27,13 @@ export class MarketplaceService {
     const now = new Date();
     const [banners, categories, technicians] = await Promise.all([
       this.prisma.homeBanner.findMany({
-        where: { isActive: true, AND: [{ OR: [{ startsAt: null }, { startsAt: { lte: now } }] }, { OR: [{ endsAt: null }, { endsAt: { gte: now } }] }] },
+        where: {
+          isActive: true,
+          AND: [
+            { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+            { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
+          ],
+        },
         orderBy: { sortOrder: 'asc' },
       }),
       this.categories(),
@@ -24,22 +43,41 @@ export class MarketplaceService {
   }
 
   categories() {
-    return this.prisma.serviceCategory.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] });
+    return this.prisma.serviceCategory.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
   }
 
   async promotions(userId: string, query: PromotionListQueryDto) {
     const now = new Date();
     const where = { isActive: true, startsAt: { lte: now }, endsAt: { gte: now } };
     const [promotions, total] = await this.prisma.$transaction([
-      this.prisma.promotion.findMany({ where, orderBy: [{ endsAt: 'asc' }, { createdAt: 'desc' }], skip: (query.page - 1) * query.limit, take: query.limit, include: { usages: { where: { userId }, select: { id: true } } } }),
+      this.prisma.promotion.findMany({
+        where,
+        orderBy: [{ endsAt: 'asc' }, { createdAt: 'desc' }],
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+        include: { usages: { where: { userId }, select: { id: true } } },
+      }),
       this.prisma.promotion.count({ where }),
     ]);
     return {
       items: promotions.map(({ usages, usedCount, usageLimit, ...promotion }: any) => {
         const exhausted = (usageLimit !== null && usedCount >= usageLimit) || usages.length >= promotion.perUserLimit;
-        return { ...promotion, value: Number(promotion.value), minOrderAmount: Number(promotion.minOrderAmount), maxDiscount: promotion.maxDiscount === null ? null : Number(promotion.maxDiscount), availabilityStatus: exhausted ? 'USAGE_EXHAUSTED' : 'AVAILABLE', isEligible: !exhausted, ineligibilityReason: exhausted ? 'USAGE_EXHAUSTED' : null };
+        return {
+          ...promotion,
+          value: Number(promotion.value),
+          minOrderAmount: Number(promotion.minOrderAmount),
+          maxDiscount: promotion.maxDiscount === null ? null : Number(promotion.maxDiscount),
+          availabilityStatus: exhausted ? 'USAGE_EXHAUSTED' : 'AVAILABLE',
+          isEligible: !exhausted,
+          ineligibilityReason: exhausted ? 'USAGE_EXHAUSTED' : null,
+        };
       }),
-      total, page: query.page, limit: query.limit,
+      total,
+      page: query.page,
+      limit: query.limit,
     };
   }
 
@@ -48,13 +86,26 @@ export class MarketplaceService {
       throw new BadRequestException('Can gui ca latitude va longitude');
     }
     const hasLocation = query.latitude !== undefined && query.longitude !== undefined;
-    if (query.sort === 'distance' && !hasLocation) throw new BadRequestException('Sap xep khoang cach can latitude va longitude');
-    if (hasLocation && (!Number.isFinite(query.latitude) || !Number.isFinite(query.longitude) || Math.abs(query.latitude!) > 90 || Math.abs(query.longitude!) > 180)) {
+    if (query.sort === 'distance' && !hasLocation)
+      throw new BadRequestException('Sap xep khoang cach can latitude va longitude');
+    if (
+      hasLocation &&
+      (!Number.isFinite(query.latitude) ||
+        !Number.isFinite(query.longitude) ||
+        Math.abs(query.latitude!) > 90 ||
+        Math.abs(query.longitude!) > 180)
+    ) {
       throw new BadRequestException('Toa do khong hop le');
     }
     const keyword = (query.search ?? query.keyword)?.trim();
-    const tags = [...new Set([...(query.tags ?? []), ...(query.tag ? [query.tag] : [])].map((tag) => tag.trim()).filter(Boolean))];
-    const conditions = [Prisma.sql`p.is_active = true`, Prisma.sql`p.is_verified = true`, Prisma.sql`u.status = 'ACTIVE'`];
+    const tags = [
+      ...new Set([...(query.tags ?? []), ...(query.tag ? [query.tag] : [])].map((tag) => tag.trim()).filter(Boolean)),
+    ];
+    const conditions = [
+      Prisma.sql`p.is_active = true`,
+      Prisma.sql`p.is_verified = true`,
+      Prisma.sql`u.status = 'ACTIVE'`,
+    ];
     if (keyword) {
       // Escape LIKE wildcards so search text remains literal, and bind it as a parameter.
       const pattern = `%${keyword.replace(/[\\%_]/g, '\\$&')}%`;
@@ -64,28 +115,42 @@ export class MarketplaceService {
     if (tags.length) conditions.push(Prisma.sql`p.tags @> ARRAY[${Prisma.join(tags)}]::text[]`);
     if (query.available !== undefined) conditions.push(Prisma.sql`p.is_available = ${query.available}`);
     if (query.mode) conditions.push(Prisma.sql`${query.mode} = ANY(p.service_modes::text[])`);
-    const serviceConditions = [Prisma.sql`s.technician_id = p.id`, Prisma.sql`s.is_active = true`, Prisma.sql`c.is_active = true`];
+    const serviceConditions = [
+      Prisma.sql`s.technician_id = p.id`,
+      Prisma.sql`s.is_active = true`,
+      Prisma.sql`c.is_active = true`,
+    ];
     if (query.categoryId) serviceConditions.push(Prisma.sql`s.category_id = ${query.categoryId}::uuid`);
     if (query.serviceId) serviceConditions.push(Prisma.sql`s.id = ${query.serviceId}::uuid`);
     if (query.mode) serviceConditions.push(Prisma.sql`${query.mode} = ANY(s.modes::text[])`);
     // All service filters must match the same active service, not different services on one profile.
-    conditions.push(Prisma.sql`EXISTS (SELECT 1 FROM technician_services s JOIN service_categories c ON c.id = s.category_id WHERE ${Prisma.join(serviceConditions, ' AND ')})`);
-    const distance = hasLocation ? Prisma.sql`
+    conditions.push(
+      Prisma.sql`EXISTS (SELECT 1 FROM technician_services s JOIN service_categories c ON c.id = s.category_id WHERE ${Prisma.join(serviceConditions, ' AND ')})`,
+    );
+    const distance = hasLocation
+      ? Prisma.sql`
       CASE WHEN p.latitude IS NULL OR p.longitude IS NULL THEN NULL ELSE
         6371.0 * 2 * ASIN(SQRT(LEAST(1.0, GREATEST(0.0,
           POWER(SIN(RADIANS(p.latitude::double precision - ${query.latitude!}::double precision) / 2), 2)
           + COS(RADIANS(${query.latitude!}::double precision)) * COS(RADIANS(p.latitude::double precision))
           * POWER(SIN(RADIANS(p.longitude::double precision - ${query.longitude!}::double precision) / 2), 2)
-        )))) END` : Prisma.sql`NULL::double precision`;
-    const order = query.sort === 'rating' ? Prisma.sql`average_rating DESC, is_available DESC, id ASC`
-      : query.sort === 'availability' ? Prisma.sql`is_available DESC, average_rating DESC, id ASC`
-      : hasLocation
-      ? Prisma.sql`distance ASC NULLS LAST, is_available DESC, average_rating DESC, id ASC`
-      : Prisma.sql`is_available DESC, average_rating DESC, id ASC`;
+        )))) END`
+      : Prisma.sql`NULL::double precision`;
+    const order =
+      query.sort === 'rating'
+        ? Prisma.sql`average_rating DESC, is_available DESC, id ASC`
+        : query.sort === 'availability'
+          ? Prisma.sql`is_available DESC, average_rating DESC, id ASC`
+          : hasLocation
+            ? Prisma.sql`distance ASC NULLS LAST, is_available DESC, average_rating DESC, id ASC`
+            : Prisma.sql`is_available DESC, average_rating DESC, id ASC`;
 
-    return this.prisma.$transaction(async (tx) => {
-      // Count and page share the same filter. Empty pages still return the correct total.
-      const [result] = await tx.$queryRaw<Array<{ total: bigint; ranked: Array<{ id: string; distance: number | null }> }>>(Prisma.sql`
+    return this.prisma.$transaction(
+      async (tx) => {
+        // Count and page share the same filter. Empty pages still return the correct total.
+        const [result] = await tx.$queryRaw<
+          Array<{ total: bigint; ranked: Array<{ id: string; distance: number | null }> }>
+        >(Prisma.sql`
         WITH filtered AS (
           SELECT p.id, p.is_available, p.average_rating, ${distance} AS distance
           FROM technician_profiles p JOIN users u ON u.id = p.user_id
@@ -98,72 +163,138 @@ export class MarketplaceService {
           COALESCE(jsonb_agg(jsonb_build_object('id', id, 'distance', distance) ORDER BY ${order}), '[]'::jsonb) AS ranked
         FROM page
       `);
-      const ids = result.ranked.map((row) => row.id);
-      if (!ids.length) return { items: [], total: Number(result.total), page: query.page, limit: query.limit };
-      const profiles = await tx.technicianProfile.findMany({
-        where: { id: { in: ids } },
-        include: {
-          user: { select: { id: true, displayName: true, avatarUrl: true } },
-          services: {
-            where: { isActive: true, category: { isActive: true },
-              ...(query.categoryId ? { categoryId: query.categoryId } : {}),
-              ...(query.serviceId ? { id: query.serviceId } : {}),
-              ...(query.mode ? { modes: { has: query.mode } } : {}),
+        const ids = result.ranked.map((row) => row.id);
+        if (!ids.length) return { items: [], total: Number(result.total), page: query.page, limit: query.limit };
+        const profiles = await tx.technicianProfile.findMany({
+          where: { id: { in: ids } },
+          include: {
+            user: { select: { id: true, displayName: true, avatarUrl: true } },
+            services: {
+              where: {
+                isActive: true,
+                category: { isActive: true },
+                ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+                ...(query.serviceId ? { id: query.serviceId } : {}),
+                ...(query.mode ? { modes: { has: query.mode } } : {}),
+              },
+              select: { price: true, modes: true },
+              orderBy: [{ price: 'asc' }, { id: 'asc' }],
             },
-            select: { price: true, modes: true }, orderBy: [{ price: 'asc' }, { id: 'asc' }],
           },
-        },
-      });
-      const favorites = userId ? await tx.favorite.findMany({ where: { userId, technicianId: { in: ids } }, select: { technicianId: true } }) : [];
-      const favoriteIds = new Set(favorites.map((favorite) => favorite.technicianId));
-      const byId = new Map(profiles.map((profile) => [profile.id, profile]));
-      const items = result.ranked.map(({ id, distance }) => {
-        const profile = byId.get(id)!;
-        return this.technicianCard(profile, favoriteIds.has(id), distance === null ? null : Math.round(distance * 10) / 10);
-      });
-      return { items, total: Number(result.total), page: query.page, limit: query.limit };
-    }, { isolationLevel: 'RepeatableRead' });
+        });
+        const favorites = userId
+          ? await tx.favorite.findMany({ where: { userId, technicianId: { in: ids } }, select: { technicianId: true } })
+          : [];
+        const favoriteIds = new Set(favorites.map((favorite) => favorite.technicianId));
+        const byId = new Map(profiles.map((profile) => [profile.id, profile]));
+        const items = result.ranked.map(({ id, distance }) => {
+          const profile = byId.get(id)!;
+          return this.technicianCard(
+            profile,
+            favoriteIds.has(id),
+            distance === null ? null : Math.round(distance * 10) / 10,
+          );
+        });
+        return { items, total: Number(result.total), page: query.page, limit: query.limit };
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
   }
 
   async technicianDetail(id: string, location: MarketplaceHomeQueryDto = {}, userId?: string) {
-    if ((location.latitude === undefined) !== (location.longitude === undefined)) throw new BadRequestException('Can gui ca latitude va longitude');
-    if (location.latitude !== undefined && (!Number.isFinite(location.latitude) || !Number.isFinite(location.longitude)
-      || Math.abs(location.latitude) > 90 || Math.abs(location.longitude!) > 180)) throw new BadRequestException('Toa do khong hop le');
+    if ((location.latitude === undefined) !== (location.longitude === undefined))
+      throw new BadRequestException('Can gui ca latitude va longitude');
+    if (
+      location.latitude !== undefined &&
+      (!Number.isFinite(location.latitude) ||
+        !Number.isFinite(location.longitude) ||
+        Math.abs(location.latitude) > 90 ||
+        Math.abs(location.longitude!) > 180)
+    )
+      throw new BadRequestException('Toa do khong hop le');
     const profile = await this.prisma.technicianProfile.findUnique({
       where: { id, ...publicTechnicianWhere },
       select: {
-        id: true, userId: true, bio: true, gender: true, tags: true, serviceModes: true,
-         latitude: true, longitude: true, city: true, district: true, facility: true, address: true, isVerified: true,
-        isActive: true, isAvailable: true, averageRating: true, reviewCount: true,
-        createdAt: true, updatedAt: true,
+        id: true,
+        userId: true,
+        bio: true,
+        gender: true,
+        tags: true,
+        serviceModes: true,
+        latitude: true,
+        longitude: true,
+        city: true,
+        district: true,
+        facility: true,
+        address: true,
+        isVerified: true,
+        isActive: true,
+        isAvailable: true,
+        averageRating: true,
+        reviewCount: true,
+        createdAt: true,
+        updatedAt: true,
         user: { select: { id: true, displayName: true, avatarUrl: true } },
-         services: { where: { isActive: true, category: { isActive: true } }, include: { category: true, priceOptions: { where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }] } }, orderBy: { price: 'asc' } },
-        reviews: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20 },
+        services: {
+          where: { isActive: true, category: { isActive: true } },
+          include: {
+            category: true,
+            priceOptions: { where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }] },
+          },
+          orderBy: { price: 'asc' },
+        },
+        reviews: {
+          include: { user: { select: { id: true, displayName: true, avatarUrl: true } } },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 20,
+        },
       },
     });
     if (!profile) throw new NotFoundException('Ky thuat vien khong ton tai');
     const supportedModes = [...new Set(profile.services.flatMap((service) => service.modes))];
-    const favorite = userId ? await this.prisma.favorite.findUnique({ where: { userId_technicianId: { userId, technicianId: id } }, select: { technicianId: true } }) : null;
+    const favorite = userId
+      ? await this.prisma.favorite.findUnique({
+          where: { userId_technicianId: { userId, technicianId: id } },
+          select: { technicianId: true },
+        })
+      : null;
     let distanceKm: number | null = null;
-    if (location.latitude !== undefined && location.longitude !== undefined && profile.latitude !== null && profile.longitude !== null) {
-      const rad = (value: number) => value * Math.PI / 180;
-      const a = Math.sin(rad(Number(profile.latitude) - location.latitude) / 2) ** 2
-        + Math.cos(rad(location.latitude)) * Math.cos(rad(Number(profile.latitude)))
-        * Math.sin(rad(Number(profile.longitude) - location.longitude) / 2) ** 2;
+    if (
+      location.latitude !== undefined &&
+      location.longitude !== undefined &&
+      profile.latitude !== null &&
+      profile.longitude !== null
+    ) {
+      const rad = (value: number) => (value * Math.PI) / 180;
+      const a =
+        Math.sin(rad(Number(profile.latitude) - location.latitude) / 2) ** 2 +
+        Math.cos(rad(location.latitude)) *
+          Math.cos(rad(Number(profile.latitude))) *
+          Math.sin(rad(Number(profile.longitude) - location.longitude) / 2) ** 2;
       distanceKm = Math.round(6371 * 2 * Math.asin(Math.sqrt(Math.min(1, Math.max(0, a)))) * 10) / 10;
     }
     return {
-      ...profile, ...this.technicianCard(profile, Boolean(favorite), distanceKm),
+      ...profile,
+      ...this.technicianCard(profile, Boolean(favorite), distanceKm),
       supportedModes,
       images: profile.user.avatarUrl ? [profile.user.avatarUrl] : [],
-      onsiteLocation: supportedModes.includes('ONSITE') ? {
-        address: profile.address, city: profile.city,
-        latitude: profile.latitude === null ? null : Number(profile.latitude),
-        longitude: profile.longitude === null ? null : Number(profile.longitude),
-      } : null,
-       services: profile.services.map((service) => ({ ...service, serviceId: service.id, technicianServiceId: service.id,
-         categoryName: service.category.name, supportedModes: service.modes, price: Number(service.price),
-         priceOptions: (service.priceOptions ?? []).map((option) => ({ ...option, price: Number(option.price) })) })),
+      onsiteLocation: supportedModes.includes('ONSITE')
+        ? {
+            address: profile.address,
+            city: profile.city,
+            latitude: profile.latitude === null ? null : Number(profile.latitude),
+            longitude: profile.longitude === null ? null : Number(profile.longitude),
+          }
+        : null,
+      services: profile.services.map((service) => ({
+        ...service,
+        serviceId: service.id,
+        technicianServiceId: service.id,
+        categoryName: service.category.name,
+        supportedModes: service.modes,
+        price: Number(service.price),
+        priceOptions: (service.priceOptions ?? []).map((option) => ({ ...option, price: Number(option.price) })),
+      })),
     };
   }
 
@@ -192,15 +323,38 @@ export class MarketplaceService {
         orderBy: { startAt: 'asc' },
       }),
       this.prisma.booking.findMany({
-        where: { technicianId: id, status: { in: ['PENDING', 'CONFIRMED'] }, scheduledStart: { lt: end }, scheduledEnd: { gt: start } },
-        select: { scheduledStart: true, scheduledEnd: true }, orderBy: { scheduledStart: 'asc' },
+        where: {
+          technicianId: id,
+          status: { in: ['PENDING', 'CONFIRMED'] },
+          scheduledStart: { lt: end },
+          scheduledEnd: { gt: start },
+        },
+        select: { scheduledStart: true, scheduledEnd: true },
+        orderBy: { scheduledStart: 'asc' },
       }),
     ]);
     const technicianServiceIds = services.map((service) => service.id);
-    return { technicianId: id, date: query.date ?? null, serviceIds: technicianServiceIds, technicianServiceIds, priceOptionIds: services.map((service) => service.priceOptionId), mode: query.mode,
-      timezone: BOOKING_TIMEZONE, from: start, to: end, durationMinutes, totalDurationMinutes: durationMinutes, stepMinutes: query.stepMinutes,
-      slots: buildAvailableSlots(working, occupied.map((booking) => ({ startAt: booking.scheduledStart, endAt: booking.scheduledEnd })),
-        durationMinutes, { startAt: start, endAt: end }, new Date(), query.stepMinutes),
+    return {
+      technicianId: id,
+      date: query.date ?? null,
+      serviceIds: technicianServiceIds,
+      technicianServiceIds,
+      priceOptionIds: services.map((service) => service.priceOptionId),
+      mode: query.mode,
+      timezone: BOOKING_TIMEZONE,
+      from: start,
+      to: end,
+      durationMinutes,
+      totalDurationMinutes: durationMinutes,
+      stepMinutes: query.stepMinutes,
+      slots: buildAvailableSlots(
+        working,
+        occupied.map((booking) => ({ startAt: booking.scheduledStart, endAt: booking.scheduledEnd })),
+        durationMinutes,
+        { startAt: start, endAt: end },
+        new Date(),
+        query.stepMinutes,
+      ),
     };
   }
 
@@ -208,10 +362,18 @@ export class MarketplaceService {
     const rows = await this.prisma.favorite.findMany({
       where: { userId, technician: publicTechnicianWhere },
       orderBy: { createdAt: 'desc' },
-      include: { technician: { include: {
-        user: { select: { id: true, displayName: true, avatarUrl: true } },
-        services: { where: { isActive: true, category: { isActive: true } }, select: { price: true, modes: true }, orderBy: { price: 'asc' } },
-      } } },
+      include: {
+        technician: {
+          include: {
+            user: { select: { id: true, displayName: true, avatarUrl: true } },
+            services: {
+              where: { isActive: true, category: { isActive: true } },
+              select: { price: true, modes: true },
+              orderBy: { price: 'asc' },
+            },
+          },
+        },
+      },
     });
     return rows.map(({ technician }) => {
       const { services, ...profile } = technician;
@@ -224,7 +386,8 @@ export class MarketplaceService {
     try {
       return await this.prisma.favorite.upsert({
         where: { userId_technicianId: { userId, technicianId } },
-        create: { userId, technicianId }, update: {},
+        create: { userId, technicianId },
+        update: {},
       });
     } catch (error) {
       // Prisma may emulate an upsert; concurrent adds must still be idempotent.
@@ -248,14 +411,19 @@ export class MarketplaceService {
 
   async createMyService(userId: string, dto: CreateTechnicianServiceDto) {
     const profile = await this.myProfile(userId);
-    if (dto.modes.some((mode) => !profile.serviceModes.includes(mode))) throw new BadRequestException('Noi phuc vu cua dich vu phai nam trong noi phuc vu cua ho so KTV');
+    if (dto.modes.some((mode) => !profile.serviceModes.includes(mode)))
+      throw new BadRequestException('Noi phuc vu cua dich vu phai nam trong noi phuc vu cua ho so KTV');
     return this.prisma.technicianService.create({ data: { technicianId: profile.id, ...dto } });
   }
 
   async updateMyService(userId: string, serviceId: string, dto: UpdateTechnicianServiceDto) {
     const profile = await this.myProfile(userId);
-    if (dto.modes && dto.modes.some((mode) => !profile.serviceModes.includes(mode))) throw new BadRequestException('Noi phuc vu cua dich vu phai nam trong noi phuc vu cua ho so KTV');
-    const result = await this.prisma.technicianService.updateMany({ where: { id: serviceId, technicianId: profile.id }, data: dto });
+    if (dto.modes && dto.modes.some((mode) => !profile.serviceModes.includes(mode)))
+      throw new BadRequestException('Noi phuc vu cua dich vu phai nam trong noi phuc vu cua ho so KTV');
+    const result = await this.prisma.technicianService.updateMany({
+      where: { id: serviceId, technicianId: profile.id },
+      data: dto,
+    });
     if (!result.count) throw new NotFoundException('Dich vu khong ton tai');
     return this.prisma.technicianService.findUniqueOrThrow({ where: { id: serviceId } });
   }
@@ -263,21 +431,41 @@ export class MarketplaceService {
   async listMyServicePriceOptions(userId: string, serviceId: string) {
     const profile = await this.myProfile(userId);
     await this.requireOwnedService(profile.id, serviceId);
-    return this.prisma.technicianServicePriceOption.findMany({ where: { technicianServiceId: serviceId }, orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }] });
+    return this.prisma.technicianServicePriceOption.findMany({
+      where: { technicianServiceId: serviceId },
+      orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }],
+    });
   }
 
   async createMyServicePriceOption(userId: string, serviceId: string, dto: CreateTechnicianServicePriceOptionDto) {
     const profile = await this.myProfile(userId);
     const service = await this.requireOwnedService(profile.id, serviceId);
     this.validatePriceTemplate(service.category.slug, dto.durationMinutes);
-    return this.prisma.technicianServicePriceOption.create({ data: { technicianServiceId: serviceId, code: dto.code.trim().toUpperCase(), durationMinutes: dto.durationMinutes, price: dto.price, sortOrder: dto.sortOrder ?? 0, isActive: dto.isActive ?? true } });
+    return this.prisma.technicianServicePriceOption.create({
+      data: {
+        technicianServiceId: serviceId,
+        code: dto.code.trim().toUpperCase(),
+        durationMinutes: dto.durationMinutes,
+        price: dto.price,
+        sortOrder: dto.sortOrder ?? 0,
+        isActive: dto.isActive ?? true,
+      },
+    });
   }
 
-  async updateMyServicePriceOption(userId: string, serviceId: string, optionId: string, dto: UpdateTechnicianServicePriceOptionDto) {
+  async updateMyServicePriceOption(
+    userId: string,
+    serviceId: string,
+    optionId: string,
+    dto: UpdateTechnicianServicePriceOptionDto,
+  ) {
     const profile = await this.myProfile(userId);
     const service = await this.requireOwnedService(profile.id, serviceId);
     if (dto.durationMinutes !== undefined) this.validatePriceTemplate(service.category.slug, dto.durationMinutes);
-    const result = await this.prisma.technicianServicePriceOption.updateMany({ where: { id: optionId, technicianServiceId: serviceId }, data: { ...dto, code: dto.code?.trim().toUpperCase() } });
+    const result = await this.prisma.technicianServicePriceOption.updateMany({
+      where: { id: optionId, technicianServiceId: serviceId },
+      data: { ...dto, code: dto.code?.trim().toUpperCase() },
+    });
     if (!result.count) throw new NotFoundException('Goi gia khong ton tai');
     return this.prisma.technicianServicePriceOption.findUniqueOrThrow({ where: { id: optionId } });
   }
@@ -285,7 +473,9 @@ export class MarketplaceService {
   async removeMyServicePriceOption(userId: string, serviceId: string, optionId: string) {
     const profile = await this.myProfile(userId);
     await this.requireOwnedService(profile.id, serviceId);
-    const result = await this.prisma.technicianServicePriceOption.deleteMany({ where: { id: optionId, technicianServiceId: serviceId } });
+    const result = await this.prisma.technicianServicePriceOption.deleteMany({
+      where: { id: optionId, technicianServiceId: serviceId },
+    });
     if (!result.count) throw new NotFoundException('Goi gia khong ton tai');
   }
 
@@ -293,8 +483,11 @@ export class MarketplaceService {
     const profile = await this.myProfile(userId);
     const startAt = new Date(dto.startAt);
     const endAt = new Date(dto.endAt);
-    if (endAt <= startAt || startAt <= new Date()) throw new BadRequestException('Khung gio phai o tuong lai va co thoi gian hop le');
-    const overlap = await this.prisma.availabilitySlot.findFirst({ where: { technicianId: profile.id, startAt: { lt: endAt }, endAt: { gt: startAt } } });
+    if (endAt <= startAt || startAt <= new Date())
+      throw new BadRequestException('Khung gio phai o tuong lai va co thoi gian hop le');
+    const overlap = await this.prisma.availabilitySlot.findFirst({
+      where: { technicianId: profile.id, startAt: { lt: endAt }, endAt: { gt: startAt } },
+    });
     if (overlap) throw new BadRequestException('Khung gio bi trung');
     return this.prisma.availabilitySlot.create({ data: { technicianId: profile.id, startAt, endAt } });
   }
@@ -306,13 +499,19 @@ export class MarketplaceService {
   }
 
   addresses(userId: string) {
-    return this.prisma.address.findMany({ where: { userId, deletedAt: null }, orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }] });
+    return this.prisma.address.findMany({
+      where: { userId, deletedAt: null },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+    });
   }
 
   async createAddress(userId: string, dto: CreateAddressDto) {
     return this.prisma.$transaction(async (tx) => {
       await this.lockAddressOwner(tx, userId);
-      const currentDefault = await tx.address.findFirst({ where: { userId, deletedAt: null, isDefault: true }, select: { id: true } });
+      const currentDefault = await tx.address.findFirst({
+        where: { userId, deletedAt: null, isDefault: true },
+        select: { id: true },
+      });
       const isDefault = dto.isDefault === true || !currentDefault;
       if (isDefault) await tx.address.updateMany({ where: { userId, deletedAt: null }, data: { isDefault: false } });
       return tx.address.create({ data: { userId, ...dto, isDefault } });
@@ -324,13 +523,21 @@ export class MarketplaceService {
       await this.lockAddressOwner(tx, userId);
       const found = await tx.address.findFirst({ where: { id, userId, deletedAt: null } });
       if (!found) throw new NotFoundException('Dia chi khong ton tai');
-      if (dto.isDefault) await tx.address.updateMany({ where: { userId, deletedAt: null }, data: { isDefault: false } });
+      if (dto.isDefault)
+        await tx.address.updateMany({ where: { userId, deletedAt: null }, data: { isDefault: false } });
       // Explicitly unsetting the current default selects another address if available.
       let nextDefault: { id: string } | null = null;
       if (found.isDefault && dto.isDefault === false) {
-        nextDefault = await tx.address.findFirst({ where: { userId, deletedAt: null, id: { not: id } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], select: { id: true } });
+        nextDefault = await tx.address.findFirst({
+          where: { userId, deletedAt: null, id: { not: id } },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          select: { id: true },
+        });
       }
-      const updated = await tx.address.update({ where: { id }, data: { ...dto, ...(found.isDefault && dto.isDefault === false && !nextDefault ? { isDefault: true } : {}) } });
+      const updated = await tx.address.update({
+        where: { id },
+        data: { ...dto, ...(found.isDefault && dto.isDefault === false && !nextDefault ? { isDefault: true } : {}) },
+      });
       if (nextDefault) await tx.address.update({ where: { id: nextDefault.id }, data: { isDefault: true } });
       return updated;
     });
@@ -343,7 +550,11 @@ export class MarketplaceService {
       if (!found) throw new NotFoundException('Dia chi khong ton tai');
       await tx.address.update({ where: { id }, data: { deletedAt: new Date(), isDefault: false } });
       if (found.isDefault) {
-        const replacement = await tx.address.findFirst({ where: { userId, deletedAt: null }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], select: { id: true } });
+        const replacement = await tx.address.findFirst({
+          where: { userId, deletedAt: null },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          select: { id: true },
+        });
         if (replacement) await tx.address.update({ where: { id: replacement.id }, data: { isDefault: true } });
       }
     });
@@ -354,18 +565,38 @@ export class MarketplaceService {
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId}::uuid FOR UPDATE`;
   }
 
-  private technicianCard(profile: Prisma.TechnicianProfileGetPayload<{ include: {
-    user: { select: { id: true; displayName: true; avatarUrl: true } }; services: { select: { price: true; modes: true } };
-  } }>, isFavorite: boolean, distanceKm: number | null = null) {
-    return { id: profile.id, technicianId: profile.id, userId: profile.userId,
-      displayName: profile.user.displayName, avatarUrl: profile.user.avatarUrl,
-      averageRating: Number(profile.averageRating), reviewCount: profile.reviewCount,
+  private technicianCard(
+    profile: Prisma.TechnicianProfileGetPayload<{
+      include: {
+        user: { select: { id: true; displayName: true; avatarUrl: true } };
+        services: { select: { price: true; modes: true } };
+      };
+    }>,
+    isFavorite: boolean,
+    distanceKm: number | null = null,
+  ) {
+    return {
+      id: profile.id,
+      technicianId: profile.id,
+      userId: profile.userId,
+      displayName: profile.user.displayName,
+      avatarUrl: profile.user.avatarUrl,
+      averageRating: Number(profile.averageRating),
+      reviewCount: profile.reviewCount,
       rating: Number(profile.averageRating),
-      supportedModes: profile.serviceModes.filter((mode) => profile.services.some((service) => service.modes.includes(mode))),
+      supportedModes: profile.serviceModes.filter((mode) =>
+        profile.services.some((service) => service.modes.includes(mode)),
+      ),
       // A card has no chosen services/duration, so it cannot promise a bookable start time.
       nextAvailableAt: null,
-      tags: profile.tags, gender: profile.gender, city: profile.city, serviceModes: profile.serviceModes,
-      isVerified: profile.isVerified, isAvailable: profile.isAvailable, isFavorite, distanceKm,
+      tags: profile.tags,
+      gender: profile.gender,
+      city: profile.city,
+      serviceModes: profile.serviceModes,
+      isVerified: profile.isVerified,
+      isAvailable: profile.isAvailable,
+      isFavorite,
+      distanceKm,
       startingPrice: profile.services[0] ? Number(profile.services[0].price) : null,
     };
   }
@@ -377,7 +608,10 @@ export class MarketplaceService {
   }
 
   private async requireOwnedService(technicianId: string, serviceId: string) {
-    const service = await this.prisma.technicianService.findFirst({ where: { id: serviceId, technicianId }, include: { category: { select: { slug: true } } } });
+    const service = await this.prisma.technicianService.findFirst({
+      where: { id: serviceId, technicianId },
+      include: { category: { select: { slug: true } } },
+    });
     if (!service) throw new NotFoundException('Dich vu khong ton tai');
     return service;
   }
@@ -387,15 +621,22 @@ export class MarketplaceService {
     const groupA = ['massage', 'gian-co', 'fitness', 'pt', 'yoga', 'pilates'];
     const groupB = ['coaching', 'co-van', 'tham-van'];
     const groupC = ['hen-ho', 'dating'];
-    const allowed = groupA.some((item) => slug.includes(item)) ? [60, 90, 120]
-      : groupB.some((item) => slug.includes(item)) ? [60]
-      : groupC.some((item) => slug.includes(item)) ? [120, 240, 360]
-      : null;
-    if (allowed && !allowed.includes(durationMinutes)) throw new BadRequestException(`Danh muc nay chi ho tro goi ${allowed.join(', ')} phut`);
+    const allowed = groupA.some((item) => slug.includes(item))
+      ? [60, 90, 120]
+      : groupB.some((item) => slug.includes(item))
+        ? [60]
+        : groupC.some((item) => slug.includes(item))
+          ? [120, 240, 360]
+          : null;
+    if (allowed && !allowed.includes(durationMinutes))
+      throw new BadRequestException(`Danh muc nay chi ho tro goi ${allowed.join(', ')} phut`);
   }
 
   private async requireTechnician(id: string) {
-    const technician = await this.prisma.technicianProfile.findUnique({ where: { id, ...publicTechnicianWhere }, select: { id: true } });
+    const technician = await this.prisma.technicianProfile.findUnique({
+      where: { id, ...publicTechnicianWhere },
+      select: { id: true },
+    });
     if (!technician) throw new NotFoundException('Ky thuat vien khong ton tai');
   }
 
@@ -403,5 +644,4 @@ export class MarketplaceService {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     if (!user || !roles.includes(user.role)) throw new ForbiddenException('Ban khong co quyen thuc hien thao tac nay');
   }
-
 }

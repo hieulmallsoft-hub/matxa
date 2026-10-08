@@ -31,16 +31,32 @@ async function main() {
     const user = await prisma.$transaction(async (tx) => {
       if (!identity) {
         const created = await tx.user.create({ data: { displayName, role: 'ADMIN', status: 'ACTIVE' } });
-        await tx.userIdentity.create({ data: { userId: created.id, provider: AuthProvider.EMAIL, providerSubject: email, email, emailVerified: true, passwordHash: passwordHash! } });
+        await tx.userIdentity.create({
+          data: {
+            userId: created.id,
+            provider: AuthProvider.EMAIL,
+            providerSubject: email,
+            email,
+            emailVerified: true,
+            passwordHash: passwordHash!,
+          },
+        });
         return created;
       }
-      const updated = await tx.user.update({ where: { id: identity.userId }, data: { role: 'ADMIN', status: 'ACTIVE', displayName } });
-      if (passwordHash) await tx.userIdentity.update({ where: { id: identity.id }, data: { passwordHash, emailVerified: true } });
+      const updated = await tx.user.update({
+        where: { id: identity.userId },
+        data: { role: 'ADMIN', status: 'ACTIVE', displayName },
+      });
+      if (passwordHash)
+        await tx.userIdentity.update({ where: { id: identity.id }, data: { passwordHash, emailVerified: true } });
       return updated;
     });
     console.info(`Admin da san sang: ${email} (${user.id})`);
-    if (identity && !resetPassword) console.info('Mat khau hien tai duoc giu nguyen. Dat ADMIN_RESET_PASSWORD=true neu can reset.');
-  } finally { await prisma.$disconnect(); }
+    if (identity && !resetPassword)
+      console.info('Mat khau hien tai duoc giu nguyen. Dat ADMIN_RESET_PASSWORD=true neu can reset.');
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 function required(key: 'DATABASE_URL' | 'ADMIN_EMAIL' | 'ADMIN_PASSWORD'): string {
@@ -49,4 +65,7 @@ function required(key: 'DATABASE_URL' | 'ADMIN_EMAIL' | 'ADMIN_PASSWORD'): strin
   return value;
 }
 
-void main().catch((error: unknown) => { console.error(error); process.exitCode = 1; });
+void main().catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
+});

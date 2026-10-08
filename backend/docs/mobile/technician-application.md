@@ -5,10 +5,10 @@
 1. `POST /api/technician/application` tạo hồ sơ đăng ký lần đầu.
 2. `GET /api/technician/application` lấy hồ sơ hiện tại.
 3. `PATCH /api/technician/application` chỉnh sửa thông tin nháp.
-3. Gọi `POST /api/technician/application/document-upload-url` ba lần với `ID_CARD_FRONT`, `ID_CARD_BACK`, `FACE`.
-4. Upload file trực tiếp lên S3 bằng `uploadUrl`.
-5. PATCH lại hồ sơ với ba `...Key` trả về.
-6. `POST /api/technician/application/submit` gửi Admin duyệt.
+4. Gọi `POST /api/technician/application/document-upload-url` ba lần với `ID_CARD_FRONT`, `ID_CARD_BACK`, `FACE`.
+5. Upload file trực tiếp lên S3 bằng `uploadUrl`.
+6. PATCH lại hồ sơ với ba `...Key` trả về.
+7. `POST /api/technician/application/submit` gửi Admin duyệt.
 
 Ảnh CCCD/khuôn mặt lưu private trên S3, không trả public URL.
 

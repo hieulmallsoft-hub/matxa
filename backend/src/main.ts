@@ -11,26 +11,26 @@ async function bootstrap(): Promise<void> {
   // Keep the operations portal on the API origin so browser requests do not
   // require a broad CORS policy.
   app.use('/admin', serveStatic(join(process.cwd(), '..', 'operations-web', 'dist')));
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, transform: true }),
-  );
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Matxa API · Mobile & Operations')
-    .setDescription([
-      '# Matxa API Documentation',
-      'Tài liệu tích hợp chính thức cho Mobile App và Operations Web.',
-      '',
-      '## Quy ước tích hợp',
-      '- **Base URL:** `/api` · mọi request/response dùng JSON.',
-      '- **Authentication:** API có biểu tượng khóa yêu cầu `Authorization: Bearer <accessToken>`.',
-      '- **Token:** lấy từ API đăng nhập; khi hết hạn gọi `POST /auth/refresh`.',
-      '- **Date & time:** gửi ISO-8601 có timezone, ưu tiên UTC `Z`.',
-      '- **Validation:** request sai trả HTTP 400; không gửi field ngoài schema.',
-      '- **OpenAPI JSON:** `/api/docs-json` để generate client.',
-      '',
-      '> Hãy bấm **Authorize** một lần để Swagger tự gắn access token cho các request cần đăng nhập.',
-    ].join('\n'))
+    .setDescription(
+      [
+        '# Matxa API Documentation',
+        'Tài liệu tích hợp chính thức cho Mobile App và Operations Web.',
+        '',
+        '## Quy ước tích hợp',
+        '- **Base URL:** `/api` · mọi request/response dùng JSON.',
+        '- **Authentication:** API có biểu tượng khóa yêu cầu `Authorization: Bearer <accessToken>`.',
+        '- **Token:** lấy từ API đăng nhập; khi hết hạn gọi `POST /auth/refresh`.',
+        '- **Date & time:** gửi ISO-8601 có timezone, ưu tiên UTC `Z`.',
+        '- **Validation:** request sai trả HTTP 400; không gửi field ngoài schema.',
+        '- **OpenAPI JSON:** `/api/docs-json` để generate client.',
+        '',
+        '> Hãy bấm **Authorize** một lần để Swagger tự gắn access token cho các request cần đăng nhập.',
+      ].join('\n'),
+    )
     .setVersion('1.0')
     .addTag('Authentication', 'Đăng ký, đăng nhập, OTP và phiên đăng nhập.')
     .addTag('Profile', 'Tài khoản, hồ sơ cá nhân và avatar.')
@@ -44,18 +44,14 @@ async function bootstrap(): Promise<void> {
     .addTag('Technician Management', 'Dịch vụ, lịch làm việc và hồ sơ KTV đã duyệt.')
     .addTag('Admin - Technician Applications', 'Admin duyệt hồ sơ đăng ký KTV.')
     .addTag('Admin Marketplace', 'Admin quản lý user, banner, danh mục, voucher và booking.')
-    .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'access-token',
-    )
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
     .build();
   const swaggerDocument = () =>
     SwaggerModule.createDocument(app, swaggerConfig, {
       // Every operation is explicitly tagged. Disable Nest's controller-name tag
       // so Technician endpoints are not rendered a second time under "Technician".
       autoTagControllers: false,
-      operationIdFactory: (controllerKey, methodKey) =>
-        `${controllerKey}_${methodKey}`,
+      operationIdFactory: (controllerKey, methodKey) => `${controllerKey}_${methodKey}`,
     });
   SwaggerModule.setup('docs', app, swaggerDocument, {
     useGlobalPrefix: true,

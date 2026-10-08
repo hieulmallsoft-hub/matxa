@@ -1,11 +1,37 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
 import { ChatStorageService } from '../services/chat-storage.service';
 import { ChatService } from '../services/chat.service';
-import { CreateConversationDto, CreateUploadUrlDto, EditMessageDto, ListMessagesDto, SendMessageDto } from '../dto/chat.dto';
+import {
+  CreateConversationDto,
+  CreateUploadUrlDto,
+  EditMessageDto,
+  ListMessagesDto,
+  SendMessageDto,
+} from '../dto/chat.dto';
 import { ConversationModel, MessageListModel, MessageModel, UploadUrlModel } from '../entities/chat.entity';
 
 @ApiTags('Chat')
@@ -42,7 +68,11 @@ export class ChatController {
   @Get(':id/messages')
   @ApiOperation({ summary: 'Lay lich su tin nhan; ADMIN co the tra cuu khieu nai' })
   @ApiOkResponse({ type: MessageListModel })
-  messages(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Query() query: ListMessagesDto) {
+  messages(
+    @CurrentAuth() auth: AccessTokenPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ListMessagesDto,
+  ) {
     return this.chat.listMessages(auth.sub, id, query);
   }
 
@@ -56,7 +86,11 @@ export class ChatController {
   @Post(':id/image-upload-url')
   @ApiOperation({ summary: 'Tao presigned URL de mobile upload anh truc tiep len S3' })
   @ApiCreatedResponse({ type: UploadUrlModel })
-  async uploadUrl(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateUploadUrlDto) {
+  async uploadUrl(
+    @CurrentAuth() auth: AccessTokenPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateUploadUrlDto,
+  ) {
     await this.chat.ensureMember(auth.sub, id);
     return this.storage.createUploadUrl(id, auth.sub, dto);
   }
@@ -78,7 +112,11 @@ export class ChatController {
   @Patch('messages/:messageId')
   @ApiOperation({ summary: 'Sua tin nhan text cua minh trong 15 phut' })
   @ApiOkResponse({ type: MessageModel })
-  edit(@CurrentAuth() auth: AccessTokenPayload, @Param('messageId', ParseUUIDPipe) messageId: string, @Body() dto: EditMessageDto) {
+  edit(
+    @CurrentAuth() auth: AccessTokenPayload,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+    @Body() dto: EditMessageDto,
+  ) {
     return this.chat.editMessage(auth.sub, messageId, dto);
   }
 
