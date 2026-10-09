@@ -25,7 +25,9 @@ export class ChatStorageService {
     };
     const extension = extensionByType[dto.contentType];
     const mediaKey = `chat/${conversationId}/${userId}/${randomUUID()}.${extension}`;
-    const endpoint = this.config.get<string>('S3_ENDPOINT');
+    // An empty S3_ENDPOINT means AWS S3's regional endpoint. Passing an empty
+    // string to the SDK makes presigned chat-image URLs invalid.
+    const endpoint = this.config.get<string>('S3_ENDPOINT') || undefined;
     const client = new S3Client({
       region,
       endpoint,
@@ -55,7 +57,7 @@ export class ChatStorageService {
     if (!bucket || !region || !accessKeyId || !secretAccessKey) {
       throw new ServiceUnavailableException('S3 chua duoc cau hinh');
     }
-    const endpoint = this.config.get<string>('S3_ENDPOINT');
+    const endpoint = this.config.get<string>('S3_ENDPOINT') || undefined;
     const client = new S3Client({
       region,
       endpoint,
