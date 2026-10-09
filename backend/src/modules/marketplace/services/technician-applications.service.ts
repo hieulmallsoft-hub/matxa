@@ -179,14 +179,23 @@ export class TechnicianApplicationsService {
         reviewedAt: new Date(),
       },
     });
-    if (status === 'REJECTED')
+    if (status === 'REJECTED') {
+      const type = 'TECHNICIAN_KYC_REJECTED';
+      const title = 'KYC can bo sung';
+      const actionUrl = 'matxa://technician/application';
       await this.notifications.create(
         app.userId,
-        'TECHNICIAN_KYC_REJECTED',
-        'KYC can bo sung',
+        type,
+        title,
         reason!.trim(),
-        'matxa://technician/application',
+        actionUrl,
       );
+      await this.notifications.sendPush(app.userId, title, reason!.trim(), {
+        type,
+        applicationId: id,
+        actionUrl,
+      });
+    }
     return kyc;
   }
   async startReview(adminId: string, id: string) {
@@ -240,13 +249,18 @@ export class TechnicianApplicationsService {
         data: { status: 'APPROVED', reviewedBy: adminId, reviewedAt: now, approvedAt: now, rejectionReason: null },
       });
     });
+    const type = 'TECHNICIAN_APPLICATION_APPROVED';
+    const title = 'Ho so KTV da duoc duyet';
+    const body = 'Ban da co the bat dau cau hinh dich vu va lich lam viec.';
+    const actionUrl = 'matxa://technician/application';
     await this.notifications.create(
       app.userId,
-      'TECHNICIAN_APPLICATION_APPROVED',
-      'Ho so KTV da duoc duyet',
-      'Ban da co the bat dau cau hinh dich vu va lich lam viec.',
-      'matxa://technician/application',
+      type,
+      title,
+      body,
+      actionUrl,
     );
+    await this.notifications.sendPush(app.userId, title, body, { type, applicationId: id, actionUrl });
     return result;
   }
   async reject(adminId: string, id: string, reason: string) {
@@ -269,13 +283,18 @@ export class TechnicianApplicationsService {
       where: { applicationId: id },
       data: { status: 'REJECTED', rejectionReason: reason.trim(), reviewedBy: adminId, reviewedAt: now },
     });
+    const type = 'TECHNICIAN_APPLICATION_REJECTED';
+    const title = 'Ho so KTV can bo sung';
+    const body = reason.trim();
+    const actionUrl = 'matxa://technician/application';
     await this.notifications.create(
       app.userId,
-      'TECHNICIAN_APPLICATION_REJECTED',
-      'Ho so KTV can bo sung',
-      reason.trim(),
-      'matxa://technician/application',
+      type,
+      title,
+      body,
+      actionUrl,
     );
+    await this.notifications.sendPush(app.userId, title, body, { type, applicationId: id, actionUrl });
     return result;
   }
 }

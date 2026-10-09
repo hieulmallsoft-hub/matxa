@@ -37,4 +37,51 @@ describe('TechnicianApplicationsService.getMine', () => {
     );
     expect(storage.createPrivateViewUrl).toHaveBeenCalledTimes(3);
   });
+
+  it('sends an FCM push when KYC needs more information', async () => {
+    const prisma: any = {
+      technicianApplication: { findUnique: jest.fn().mockResolvedValue({ id: 'application-1', userId: 'user-1' }) },
+      technicianKyc: { upsert: jest.fn().mockResolvedValue({ id: 'kyc-1', status: 'REJECTED' }) },
+    };
+    const notifications = { create: jest.fn(), sendPush: jest.fn().mockResolvedValue({ successCount: 1 }) };
+    const service = new TechnicianApplicationsService(prisma, {} as any, notifications as any);
+
+    await service.reviewKyc('admin-1', 'application-1', 'REJECTED', 'Anh giay to chua ro');
+
+    expect(notifications.sendPush).toHaveBeenCalledWith(
+      'user-1',
+      'KYC can bo sung',
+      'Anh giay to chua ro',
+      expect.objectContaining({
+        type: 'TECHNICIAN_KYC_REJECTED',
+        applicationId: 'application-1',
+        actionUrl: 'matxa://technician/application',
+      }),
+    );
+  });
+
+  it('sends an FCM push when an application is rejected', async () => {
+    const prisma: any = {
+      technicianApplication: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'application-1', userId: 'user-1', status: 'SUBMITTED' }),
+        update: jest.fn().mockResolvedValue({ id: 'application-1', status: 'REJECTED' }),
+      },
+      technicianKyc: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    };
+    const notifications = { create: jest.fn(), sendPush: jest.fn().mockResolvedValue({ successCount: 1 }) };
+    const service = new TechnicianApplicationsService(prisma, {} as any, notifications as any);
+
+    await service.reject('admin-1', 'application-1', 'Can bo sung thong tin');
+
+    expect(notifications.sendPush).toHaveBeenCalledWith(
+      'user-1',
+      'Ho so KTV can bo sung',
+      'Can bo sung thong tin',
+      expect.objectContaining({
+        type: 'TECHNICIAN_APPLICATION_REJECTED',
+        applicationId: 'application-1',
+        actionUrl: 'matxa://technician/application',
+      }),
+    );
+  });
 });
