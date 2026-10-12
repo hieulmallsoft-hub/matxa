@@ -53,6 +53,9 @@ export function validateEnvironment(config: Record<string, unknown>) {
     OPEN_BOOKING_APPLICATION_TTL_MINUTES: [60, 5, 10080],
     OPEN_BOOKING_EXPIRATION_INTERVAL_SECONDS: [60, 15, 3600],
     OPEN_BOOKING_EXPIRATION_BATCH_SIZE: [100, 1, 500],
+    BOOKING_AUTO_COMPLETE_AFTER_HOURS: [24, 1, 168],
+    BOOKING_AUTO_COMPLETE_INTERVAL_SECONDS: [60, 15, 3600],
+    BOOKING_AUTO_COMPLETE_BATCH_SIZE: [100, 1, 500],
   } as const;
   const parsedSettings: Record<string, number> = {};
   for (const [key, [fallback, minimum, maximum]] of Object.entries(integerSettings)) {

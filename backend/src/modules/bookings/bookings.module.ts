@@ -8,6 +8,7 @@ import { VnpayService } from './services/vnpay.service';
 import { BookingCancellationStorageService } from './services/booking-cancellation-storage.service';
 import { TechnicianBookingCancellationService } from './services/technician-booking-cancellation.service';
 import { OpenBookingExpirationService } from './services/open-booking-expiration.service';
+import { BookingAutoCompletionService } from './services/booking-auto-completion.service';
 import { PlatformFeePolicyService } from './services/platform-fee-policy.service';
 import { BookingVnpayController, VnpayController } from './controllers/vnpay.controller';
 
@@ -20,6 +21,7 @@ import { BookingVnpayController, VnpayController } from './controllers/vnpay.con
     BookingCancellationStorageService,
     TechnicianBookingCancellationService,
     OpenBookingExpirationService,
+    BookingAutoCompletionService,
     PlatformFeePolicyService,
   ],
 })
