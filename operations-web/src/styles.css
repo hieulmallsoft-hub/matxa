@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    MATXA LUXURY OPERATIONS — PREMIUM DARK SIDEBAR LAYOUT
    ========================================================================== */
 
@@ -1100,6 +1100,7 @@ button.quiet { background: #f4faf6; border: 1px solid #d5e7db; color: #236342; }
 .list-item-card { border: 1px solid #e1eee5; border-radius: 14px; padding: 16px 18px; background: #fcfefd; }
 .list-item-card:hover { border-color: #a8d8b7; box-shadow: 0 5px 16px rgba(22, 101, 52, .06); }
 .item-name { font-weight: 800; color: #173d29; }
+.item-category { margin-top: 3px; color: #31845a; font-size: 12px; font-weight: 700; }
 .item-subtext { color: #789486; font-size: 12px; line-height: 1.5; }
 .kpi-card { border-radius: 16px; border: 1px solid #dfebe3; box-shadow: 0 6px 20px rgba(28, 74, 50, .06); }
 @media (max-width: 900px) {
