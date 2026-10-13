@@ -53,7 +53,13 @@ export class PayosService {
     const payload = (await response.json()) as {
       code?: string;
       desc?: string;
-      data?: { checkoutUrl?: string; paymentLinkId?: string };
+      data?: {
+        checkoutUrl?: string;
+        paymentLinkId?: string;
+        qrCode?: string;
+        accountNumber?: string;
+        accountName?: string;
+      };
     };
     if (!response.ok || payload.code !== '00' || !payload.data?.checkoutUrl)
       throw new BadRequestException(payload.desc || 'Khong tao duoc lien ket PayOS');

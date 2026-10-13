@@ -306,6 +306,9 @@ export class BookingsService {
       expiresAt,
       paymentUrl: data.checkoutUrl,
       paymentLinkId: data.paymentLinkId,
+      qrCode: data.qrCode ?? null,
+      accountNumber: data.accountNumber ?? null,
+      accountName: data.accountName ?? null,
     };
   }
 

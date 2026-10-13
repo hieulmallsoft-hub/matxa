@@ -13,7 +13,12 @@ POST /api/bookings/{bookingId}/payos-payment
 Authorization: Bearer <access-token>
 ```
 
-Response trả `paymentUrl`; mở URL này bằng browser/webview. Chỉ webhook PayOS mới chuyển payment sang `PAID`.
+Response trả `paymentUrl` và có thể có `qrCode`.
+
+- Cách đơn giản: mở `paymentUrl` bằng browser/WebView; PayOS tự hiển thị QR.
+- Nếu muốn giao diện QR riêng: Mobile dùng `qrCode` với thư viện QR code để render.
+
+Chỉ webhook PayOS mới chuyển payment sang `PAID`.
 
 Webhook phải cấu hình trên PayOS:
 
