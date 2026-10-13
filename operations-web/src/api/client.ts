@@ -1,4 +1,4 @@
-import type { ApiError } from '../types/api';
+﻿import type { ApiError } from '../types/api';
 
 let accessToken: string | null = localStorage.getItem('matxa.operations.token');
 
@@ -22,7 +22,9 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   if (!response.ok) {
     const rawMessage = (body as ApiError | null)?.message;
     const message = Array.isArray(rawMessage) ? rawMessage.join(', ') : rawMessage;
-    throw new Error(message || `Yêu cầu thất bại (${response.status})`);
+    const detail = message || `Yêu cầu thất bại (${response.status})`;
+    throw new Error(`${detail} · ${init.method || 'GET'} /api${path}`);
   }
   return body as T;
 }
+
