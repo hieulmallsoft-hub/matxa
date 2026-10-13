@@ -3,6 +3,7 @@ import { request } from '../api/client';
 import { Card } from '../components/Card';
 import { FormCard } from '../components/Form';
 import { TechnicianPricingPanel } from '../components/TechnicianPricingPanel';
+import { ServiceCatalogPanel } from '../components/ServiceCatalogPanel';
 import {
   CalendarCheck,
   ClipboardCheck,
@@ -23,6 +24,7 @@ type TabKey =
   | 'technicians'
   | 'pricing'
   | 'categories'
+  | 'catalog'
   | 'banners'
   | 'promotions';
 
@@ -495,6 +497,7 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
 
       {/* ── PRICING ── */}
       {tab === 'pricing' && <TechnicianPricingPanel technicians={technicians?.items ?? []} notify={notify} />}
+      {tab === 'catalog' && <ServiceCatalogPanel categories={categories} notify={notify} />}
 
       {/* ── USERS ── */}
       {tab === 'users' && (

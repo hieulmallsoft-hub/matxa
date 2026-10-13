@@ -37,6 +37,7 @@ type TabKey =
   | 'technicians'
   | 'pricing'
   | 'categories'
+  | 'catalog'
   | 'banners'
   | 'promotions';
 
@@ -48,6 +49,7 @@ const TAB_LABELS: Record<TabKey, string> = {
   pricing: 'Bảng giá KTV',
   applications: 'Duyệt KTV',
   categories: 'Danh mục',
+  catalog: 'Catalog dịch vụ',
   banners: 'Banner',
   promotions: 'Khuyến mãi',
 };
@@ -103,6 +105,7 @@ export default function App() {
 
   const navContent: { key: TabKey; label: string; icon: ReactNode }[] = [
     { key: 'categories', label: 'Danh mục', icon: <FolderTree size={17} /> },
+    { key: 'catalog', label: 'Catalog dịch vụ', icon: <FolderTree size={17} /> },
     { key: 'banners', label: 'Banner', icon: <ImageIcon size={17} /> },
     { key: 'promotions', label: 'Khuyến mãi', icon: <TicketPercent size={17} /> },
   ];
