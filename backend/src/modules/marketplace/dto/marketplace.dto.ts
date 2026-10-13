@@ -193,19 +193,12 @@ export class UpsertTechnicianProfileDto {
 }
 
 export class CreateTechnicianServiceDto {
-  @ApiProperty() @IsUUID() categoryId!: string;
-  @ApiProperty() @IsString() @MaxLength(150) name!: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) description?: string;
-  @ApiProperty() @Type(() => Number) @IsInt() @Min(15) @Max(720) durationMinutes!: number;
-  @ApiProperty() @Type(() => Number) @IsNumber() @Min(0) price!: number;
-  @ApiProperty({ enum: ['HOME', 'ONSITE', 'ONLINE'], isArray: true })
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsIn(['HOME', 'ONSITE', 'ONLINE'], { each: true })
-  modes!: ('HOME' | 'ONSITE' | 'ONLINE')[];
+  @ApiProperty({ description: 'ID dịch vụ do Admin tạo trong service catalog' })
+  @IsUUID()
+  catalogServiceId!: string;
 }
 
-export class UpdateTechnicianServiceDto extends PartialType(CreateTechnicianServiceDto) {
+export class UpdateTechnicianServiceDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Boolean) @IsBoolean() isActive?: boolean;
 }
 

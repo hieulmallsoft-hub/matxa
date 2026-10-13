@@ -444,15 +444,40 @@ export class MarketplaceService {
 
   async createMyService(userId: string, dto: CreateTechnicianServiceDto) {
     const profile = await this.myProfile(userId);
-    if (dto.modes.some((mode) => !profile.serviceModes.includes(mode)))
-      throw new BadRequestException('Noi phuc vu cua dich vu phai nam trong noi phuc vu cua ho so KTV');
-    return this.prisma.technicianService.create({ data: { technicianId: profile.id, ...dto } });
+    const catalog = await this.prisma.serviceCatalogItem.findFirst({
+      where: { id: dto.catalogServiceId, isActive: true, category: { isActive: true } },
+      include: { priceOptions: { where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }] } },
+    });
+    if (!catalog) throw new NotFoundException('Dich vu catalog khong ton tai hoac da bi an');
+    if (catalog.modes.some((mode) => !profile.serviceModes.includes(mode)))
+      throw new BadRequestException('Dich vu khong phu hop voi noi phuc vu cua ho so KTV');
+    if (!catalog.priceOptions.length) throw new BadRequestException('Dich vu chua co goi gia hoat dong');
+    const primary = catalog.priceOptions[0];
+    return this.prisma.technicianService.create({
+      data: {
+        technicianId: profile.id,
+        categoryId: catalog.categoryId,
+        name: catalog.name,
+        description: catalog.description,
+        durationMinutes: primary.durationMinutes,
+        price: primary.price,
+        modes: catalog.modes,
+        priceOptions: {
+          create: catalog.priceOptions.map((option) => ({
+            code: option.code,
+            durationMinutes: option.durationMinutes,
+            price: option.price,
+            sortOrder: option.sortOrder,
+            isActive: option.isActive,
+          })),
+        },
+      },
+      include: { priceOptions: true },
+    });
   }
 
   async updateMyService(userId: string, serviceId: string, dto: UpdateTechnicianServiceDto) {
     const profile = await this.myProfile(userId);
-    if (dto.modes && dto.modes.some((mode) => !profile.serviceModes.includes(mode)))
-      throw new BadRequestException('Noi phuc vu cua dich vu phai nam trong noi phuc vu cua ho so KTV');
     const result = await this.prisma.technicianService.updateMany({
       where: { id: serviceId, technicianId: profile.id },
       data: dto,
@@ -471,19 +496,8 @@ export class MarketplaceService {
   }
 
   async createMyServicePriceOption(userId: string, serviceId: string, dto: CreateTechnicianServicePriceOptionDto) {
-    const profile = await this.myProfile(userId);
-    const service = await this.requireOwnedService(profile.id, serviceId);
-    this.validatePriceTemplate(service.category.slug, dto.durationMinutes);
-    return this.prisma.technicianServicePriceOption.create({
-      data: {
-        technicianServiceId: serviceId,
-        code: dto.code.trim().toUpperCase(),
-        durationMinutes: dto.durationMinutes,
-        price: dto.price,
-        sortOrder: dto.sortOrder ?? 0,
-        isActive: dto.isActive ?? true,
-      },
-    });
+    void userId; void serviceId; void dto;
+    throw new ForbiddenException('Goi gia do Admin quan ly; KTV chi duoc chon goi gia tu catalog');
   }
 
   async updateMyServicePriceOption(
@@ -492,24 +506,13 @@ export class MarketplaceService {
     optionId: string,
     dto: UpdateTechnicianServicePriceOptionDto,
   ) {
-    const profile = await this.myProfile(userId);
-    const service = await this.requireOwnedService(profile.id, serviceId);
-    if (dto.durationMinutes !== undefined) this.validatePriceTemplate(service.category.slug, dto.durationMinutes);
-    const result = await this.prisma.technicianServicePriceOption.updateMany({
-      where: { id: optionId, technicianServiceId: serviceId },
-      data: { ...dto, code: dto.code?.trim().toUpperCase() },
-    });
-    if (!result.count) throw new NotFoundException('Goi gia khong ton tai');
-    return this.prisma.technicianServicePriceOption.findUniqueOrThrow({ where: { id: optionId } });
+    void userId; void serviceId; void optionId; void dto;
+    throw new ForbiddenException('Goi gia do Admin quan ly; KTV khong duoc sua gia');
   }
 
   async removeMyServicePriceOption(userId: string, serviceId: string, optionId: string) {
-    const profile = await this.myProfile(userId);
-    await this.requireOwnedService(profile.id, serviceId);
-    const result = await this.prisma.technicianServicePriceOption.deleteMany({
-      where: { id: optionId, technicianServiceId: serviceId },
-    });
-    if (!result.count) throw new NotFoundException('Goi gia khong ton tai');
+    void userId; void serviceId; void optionId;
+    throw new ForbiddenException('Goi gia do Admin quan ly; KTV khong duoc xoa gia');
   }
 
   async createAvailability(userId: string, dto: CreateAvailabilityDto) {
