@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiCreatedResponse, ApiFoundResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
@@ -13,18 +13,21 @@ export class PayosWebhookController {
 
   @Post('webhook')
   @ApiOperation({ summary: 'PayOS webhook; chi PayOS duoc phep goi' })
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true, description: 'Ket qua xu ly webhook' } })
   webhook(@Body() body: Record<string, unknown>) {
     return this.bookings.processPayosWebhook(body);
   }
 
   @Get('return')
   @ApiOperation({ summary: 'PayOS redirect sau khi thanh toan; chi dieu huong ve mobile' })
+  @ApiFoundResponse({ description: 'Redirect ve deep link mobile' })
   returned(@Query() query: Record<string, string | undefined>, @Res() response: Response) {
     return response.redirect(this.bookings.payosMobileRedirect('return', query));
   }
 
   @Get('cancel')
   @ApiOperation({ summary: 'PayOS redirect khi khach huy; chi dieu huong ve mobile' })
+  @ApiFoundResponse({ description: 'Redirect ve deep link mobile' })
   cancelled(@Query() query: Record<string, string | undefined>, @Res() response: Response) {
     return response.redirect(this.bookings.payosMobileRedirect('cancel', query));
   }

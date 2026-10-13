@@ -84,6 +84,7 @@ export class MarketplaceController {
 
   @Get('categories')
   @ApiOperation({ summary: 'Danh sach danh muc dich vu' })
+  @ApiOkResponse({ schema: { type: 'array', items: { type: 'object', additionalProperties: true } } })
   categories() {
     return this.marketplace.categories();
   }
@@ -128,10 +129,14 @@ export class MarketplaceController {
 @Controller('locations')
 export class LocationsController {
   constructor(private readonly locations: LocationService) {}
-  @Get('cities') @ApiOperation({ summary: 'Danh sach thanh pho hoat dong' }) cities() {
+  @Get('cities') @ApiOperation({ summary: 'Danh sach thanh pho hoat dong' })
+  @ApiOkResponse({ schema: { type: 'array', items: { type: 'object', additionalProperties: true } } })
+  cities() {
     return this.locations.cities();
   }
-  @Get('cities/:cityCode/districts') @ApiOperation({ summary: 'Danh sach quan/huyen theo thanh pho' }) districts(
+  @Get('cities/:cityCode/districts') @ApiOperation({ summary: 'Danh sach quan/huyen theo thanh pho' })
+  @ApiOkResponse({ schema: { type: 'array', items: { type: 'object', additionalProperties: true } } })
+  districts(
     @Param('cityCode') cityCode: string,
   ) {
     return this.locations.districts(cityCode);
@@ -152,6 +157,7 @@ export class FavoritesController {
   }
   @Post(':technicianId')
   @ApiOperation({ summary: 'Them vao yeu thich' })
+  @ApiCreatedResponse({ schema: { type: 'object', additionalProperties: true, description: 'Ky thuat vien da duoc them vao yeu thich' } })
   add(@CurrentAuth() auth: AccessTokenPayload, @Param('technicianId', ParseUUIDPipe) id: string) {
     return this.marketplace.addFavorite(auth.sub, id);
   }
@@ -216,18 +222,21 @@ export class TechnicianController {
   @Post('application/gallery-upload-url')
   @ApiTags('Technician Application')
   @ApiOperation({ summary: 'Tao URL upload anh gallery KTV private' })
+  @ApiCreatedResponse({ schema: { type: 'object', additionalProperties: true, description: 'Presigned upload URL va media key' } })
   galleryUpload(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: TechnicianGalleryUploadDto) {
     return this.applications.galleryUploadUrl(auth.sub, dto);
   }
   @Post('application/gallery')
   @ApiTags('Technician Application')
   @ApiOperation({ summary: 'Luu anh gallery da upload, toi da 6 anh' })
+  @ApiCreatedResponse({ schema: { type: 'object', additionalProperties: true, description: 'Anh gallery da duoc luu' } })
   addGallery(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: AddTechnicianGalleryImageDto) {
     return this.applications.addGalleryImage(auth.sub, dto.storageKey, dto.sortOrder);
   }
   @Delete('application/gallery/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiTags('Technician Application')
+  @ApiNoContentResponse()
   @ApiOperation({ summary: 'Xoa anh gallery cua chinh minh' })
   removeGallery(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.applications.removeGalleryImage(auth.sub, id);
@@ -246,18 +255,21 @@ export class TechnicianController {
   @Patch('profile')
   @ApiTags('Technician Management')
   @ApiOperation({ summary: 'Cap nhat ho so ky thuat vien cua minh' })
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true, description: 'Ho so KTV sau cap nhat' } })
   profile(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: UpsertTechnicianProfileDto) {
     return this.marketplace.upsertMyProfile(auth.sub, dto);
   }
   @Post('services')
   @ApiTags('Technician Management')
   @ApiOperation({ summary: 'Them dich vu va bang gia' })
+  @ApiCreatedResponse({ schema: { type: 'object', additionalProperties: true, description: 'Dich vu da tao' } })
   service(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateTechnicianServiceDto) {
     return this.marketplace.createMyService(auth.sub, dto);
   }
   @Patch('services/:id')
   @ApiTags('Technician Management')
   @ApiOperation({ summary: 'Sua dich vu va bang gia' })
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true, description: 'Dich vu sau cap nhat' } })
   updateService(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -342,6 +354,7 @@ export class TechnicianController {
   @Delete('services/:id/price-options/:optionId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiTags('Technician Management')
+  @ApiNoContentResponse()
   @ApiOperation({ summary: 'Xoa goi gia cua dich vu' })
   removePriceOption(
     @CurrentAuth() auth: AccessTokenPayload,
@@ -353,12 +366,14 @@ export class TechnicianController {
   @Post('availability')
   @ApiTags('Technician Management')
   @ApiOperation({ summary: 'Them khung gio lam viec' })
+  @ApiCreatedResponse({ schema: { type: 'object', additionalProperties: true, description: 'Khung gio da tao' } })
   availability(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateAvailabilityDto) {
     return this.marketplace.createAvailability(auth.sub, dto);
   }
   @Delete('availability/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiTags('Technician Management')
+  @ApiNoContentResponse()
   @ApiOperation({ summary: 'Xoa khung gio lam viec' })
   removeAvailability(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.marketplace.removeAvailability(auth.sub, id);
@@ -373,16 +388,19 @@ export class AddressesController {
   constructor(private readonly marketplace: MarketplaceService) {}
   @Get()
   @ApiOperation({ summary: 'Danh sach dia chi cua tai khoan' })
+  @ApiOkResponse({ schema: { type: 'array', items: { type: 'object', additionalProperties: true } } })
   list(@CurrentAuth() auth: AccessTokenPayload) {
     return this.marketplace.addresses(auth.sub);
   }
   @Post()
   @ApiOperation({ summary: 'Them dia chi' })
+  @ApiCreatedResponse({ schema: { type: 'object', additionalProperties: true, description: 'Dia chi da tao' } })
   create(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateAddressDto) {
     return this.marketplace.createAddress(auth.sub, dto);
   }
   @Patch(':id')
   @ApiOperation({ summary: 'Sua dia chi' })
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true, description: 'Dia chi sau cap nhat' } })
   update(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -393,6 +411,7 @@ export class AddressesController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Xoa dia chi' })
+  @ApiNoContentResponse()
   remove(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.marketplace.removeAddress(auth.sub, id);
   }

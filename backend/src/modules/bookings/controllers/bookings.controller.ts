@@ -169,6 +169,7 @@ export class BookingsController {
 
   @Post(':id/review')
   @ApiOperation({ summary: 'Khach hang danh gia lich da hoan thanh' })
+  @ApiCreatedResponse({ schema: { type: 'object', additionalProperties: true, description: 'Danh gia da duoc ghi nhan' } })
   review(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,

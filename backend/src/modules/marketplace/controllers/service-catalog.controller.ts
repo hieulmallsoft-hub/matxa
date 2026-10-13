@@ -12,7 +12,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
@@ -86,7 +86,8 @@ export class AdminServiceCatalogController {
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateServiceCatalogDto) {
     return this.catalog.update(id, dto);
   }
-  @Delete(':id') @HttpCode(HttpStatus.NO_CONTENT) deactivate(@Param('id', ParseUUIDPipe) id: string) {
+  @Delete(':id') @HttpCode(HttpStatus.NO_CONTENT) @ApiNoContentResponse()
+  deactivate(@Param('id', ParseUUIDPipe) id: string) {
     return this.catalog.deactivate(id);
   }
 }

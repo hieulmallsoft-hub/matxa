@@ -51,6 +51,7 @@ export class NotificationsController {
 
   @Delete('devices')
   @ApiOperation({ summary: 'Go FCM token khi dang xuat khoi thiet bi' })
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true, description: 'Da go token' } })
   removeDevice(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: RemoveDeviceTokenDto) {
     return this.notifications.removeDevice(auth.sub, dto.token);
   }
@@ -72,6 +73,7 @@ export class NotificationsController {
 
   @Patch('read-all')
   @ApiOperation({ summary: 'Danh dau tat ca thong bao da doc' })
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true, description: 'Da danh dau thong bao' } })
   markAllRead(@CurrentAuth() auth: AccessTokenPayload) {
     return this.notifications.markAllRead(auth.sub);
   }
@@ -85,6 +87,7 @@ export class NotificationsController {
 
   @Delete()
   @ApiOperation({ summary: 'Xoa tat ca thong bao' })
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true, description: 'Da xoa thong bao' } })
   removeAll(@CurrentAuth() auth: AccessTokenPayload) {
     return this.notifications.removeAll(auth.sub);
   }

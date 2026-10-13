@@ -1,5 +1,5 @@
 import { Controller, Get, Ip, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
@@ -12,11 +12,13 @@ export class VnpayController {
   constructor(private readonly bookings: BookingsService) {}
   @Get('ipn')
   @ApiOperation({ summary: 'VNPAY IPN callback; do not call from Mobile' })
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true, description: 'Ket qua xu ly IPN' } })
   ipn(@Query() query: Record<string, string | undefined>) {
     return this.bookings.processVnpayIpn(query);
   }
   @Get('return')
   @ApiOperation({ summary: 'VNPAY return URL after customer completes payment' })
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true, description: 'Ket qua thanh toan' } })
   returned(@Query() query: Record<string, string | undefined>) {
     return this.bookings.vnpayReturn(query);
   }
@@ -30,6 +32,7 @@ export class BookingVnpayController {
   constructor(private readonly bookings: BookingsService) {}
   @Post(':id/vnpay-payment')
   @ApiOperation({ summary: 'Tao VNPAY payment URL cho booking ONLINE cua khach hang' })
+  @ApiCreatedResponse({ schema: { type: 'object', additionalProperties: true, description: 'Payment URL va thong tin giao dich' } })
   create(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Ip() ip: string) {
     return this.bookings.createVnpayPayment(auth.sub, id, ip);
   }

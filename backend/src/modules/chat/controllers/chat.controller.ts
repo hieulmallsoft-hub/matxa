@@ -97,6 +97,7 @@ export class ChatController {
 
   @Patch(':id/read')
   @ApiOperation({ summary: 'Danh dau cac tin cua doi phuong la da doc' })
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true, description: 'So tin da danh dau da doc' } })
   markRead(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.chat.markRead(auth.sub, id);
   }

@@ -101,6 +101,7 @@ export class TechnicianJobsController {
   }
   @Post(':id/cancellation-evidence-upload-url')
   @ApiOperation({ summary: 'Tao URL upload anh minh chung huy don private' })
+  @ApiCreatedResponse({ schema: { type: 'object', additionalProperties: true, description: 'Presigned upload URL va media key' } })
   cancellationEvidenceUploadUrl(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -110,6 +111,7 @@ export class TechnicianJobsController {
   }
   @Post(':id/cancel')
   @ApiOperation({ summary: 'KTV assigned/SELECTED huy don, co ly do va anh minh chung neu bat buoc' })
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true, description: 'Don sau khi huy' } })
   cancel(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -136,16 +138,19 @@ export class TechnicianJobsController {
   }
   @Post(':id/withdraw')
   @ApiOperation({ summary: 'KTV rut ung tuyen khi don con OPEN' })
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true, description: 'Don sau khi rut ung tuyen' } })
   withdraw(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.bookings.withdrawOpenJobApplication(auth.sub, id);
   }
   @Post(':id/accept')
   @ApiOperation({ summary: 'KTV nhan don moi: PENDING sang CONFIRMED' })
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true, description: 'Don sau khi chap nhan' } })
   accept(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.bookings.acceptTechnicianJob(auth.sub, id);
   }
   @Post(':id/decline')
   @ApiOperation({ summary: 'KTV tu choi don moi va thong bao cho khach' })
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true, description: 'Don sau khi tu choi' } })
   decline(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -155,6 +160,7 @@ export class TechnicianJobsController {
   }
   @Post(':id/complete')
   @ApiOperation({ summary: 'KTV hoan thanh don da nhan sau gio ket thuc' })
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true, description: 'Don sau khi hoan thanh' } })
   complete(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.bookings.completeTechnicianJob(auth.sub, id);
   }
