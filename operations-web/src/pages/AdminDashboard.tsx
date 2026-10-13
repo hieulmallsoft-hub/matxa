@@ -3,6 +3,7 @@ import { request } from '../api/client';
 import { Card } from '../components/Card';
 import { FormCard } from '../components/Form';
 import { TechnicianPricingPanel } from '../components/TechnicianPricingPanel';
+import { CourseManagementPanel } from '../components/CourseManagementPanel';
 import { ServiceCatalogPanel } from '../components/ServiceCatalogPanel';
 import {
   CalendarCheck,
@@ -26,7 +27,8 @@ type TabKey =
   | 'categories'
   | 'catalog'
   | 'banners'
-  | 'promotions';
+  | 'promotions'
+  | 'courses';
 
 type Props = {
   notify: (message: string, error?: boolean) => void;
@@ -509,6 +511,7 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
       {/* ── PRICING ── */}
       {tab === 'pricing' && <TechnicianPricingPanel technicians={technicians?.items ?? []} notify={notify} />}
       {tab === 'catalog' && <ServiceCatalogPanel categories={categories} notify={notify} />}
+      {tab === 'courses' && <CourseManagementPanel notify={notify} />}
 
       {/* ── USERS ── */}
       {tab === 'users' && (

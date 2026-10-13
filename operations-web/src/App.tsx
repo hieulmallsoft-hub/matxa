@@ -39,7 +39,8 @@ type TabKey =
   | 'categories'
   | 'catalog'
   | 'banners'
-  | 'promotions';
+  | 'promotions'
+  | 'courses';
 
 const TAB_LABELS: Record<TabKey, string> = {
   overview: 'Tổng quan',
@@ -52,6 +53,7 @@ const TAB_LABELS: Record<TabKey, string> = {
   catalog: 'Catalog dịch vụ',
   banners: 'Banner',
   promotions: 'Khuyến mãi',
+  courses: 'Khóa học',
 };
 
 export default function App() {
@@ -108,6 +110,7 @@ export default function App() {
     { key: 'catalog', label: 'Catalog dịch vụ', icon: <FolderTree size={17} /> },
     { key: 'banners', label: 'Banner', icon: <ImageIcon size={17} /> },
     { key: 'promotions', label: 'Khuyến mãi', icon: <TicketPercent size={17} /> },
+    { key: 'courses', label: 'Khóa học', icon: <ImageIcon size={17} /> },
   ];
 
   if (!user)
