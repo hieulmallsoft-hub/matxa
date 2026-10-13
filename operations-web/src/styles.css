@@ -1014,6 +1014,39 @@ button.review-btn:hover {
   padding-right: 2px;
 }
 
+.catalog-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.catalog-toolbar input {
+  flex: 1;
+  min-width: 0;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.check-row input { width: auto; }
+
+.status-pill {
+  display: inline-flex;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #fff2df;
+  color: #9a5b13;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .item-list::-webkit-scrollbar {
   width: 4px;
 }
