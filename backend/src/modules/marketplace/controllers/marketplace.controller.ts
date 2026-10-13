@@ -268,12 +268,45 @@ export class TechnicianController {
   @Get('services/:id/price-options')
   @ApiTags('Technician Management')
   @ApiOperation({ summary: 'Danh sach goi gia cua dich vu cua minh' })
+  @ApiOkResponse({
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          technicianServiceId: { type: 'string' },
+          code: { type: 'string', example: '60_MINUTES' },
+          durationMinutes: { type: 'number', example: 60 },
+          price: { type: 'number', example: 500000 },
+          isActive: { type: 'boolean' },
+          sortOrder: { type: 'number' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+    },
+  })
   priceOptions(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.marketplace.listMyServicePriceOptions(auth.sub, id);
   }
   @Post('services/:id/price-options')
   @ApiTags('Technician Management')
   @ApiOperation({ summary: 'Them goi gia/thoi luong cho dich vu' })
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        technicianServiceId: { type: 'string' },
+        code: { type: 'string' },
+        durationMinutes: { type: 'number' },
+        price: { type: 'number' },
+        isActive: { type: 'boolean' },
+        sortOrder: { type: 'number' },
+      },
+    },
+  })
   createPriceOption(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -284,6 +317,20 @@ export class TechnicianController {
   @Patch('services/:id/price-options/:optionId')
   @ApiTags('Technician Management')
   @ApiOperation({ summary: 'Sua goi gia/thoi luong cua dich vu' })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        technicianServiceId: { type: 'string' },
+        code: { type: 'string' },
+        durationMinutes: { type: 'number' },
+        price: { type: 'number' },
+        isActive: { type: 'boolean' },
+        sortOrder: { type: 'number' },
+      },
+    },
+  })
   updatePriceOption(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
