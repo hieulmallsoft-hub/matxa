@@ -1,3 +1,4 @@
+import { ApiActionResponseDto, ApiListResponseDto } from '../../../common/dtos/api-response.dto';
 import {
   Body,
   Controller,
@@ -57,7 +58,7 @@ export class AdminMarketplaceController {
     summary: 'Danh sách hồ sơ KTV chờ duyệt',
     description: 'Admin lọc theo trạng thái và phân trang hồ sơ đăng ký.',
   })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   applicationsList(@Query() query: AdminTechnicianApplicationQueryDto) {
     return this.applications.list(query);
   }
@@ -67,7 +68,7 @@ export class AdminMarketplaceController {
     summary: 'Duyệt hồ sơ KTV',
     description: 'Chuyển user thành TECHNICIAN và tạo/kích hoạt TechnicianProfile.',
   })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   approveApplication(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.applications.approve(auth.sub, id);
   }
@@ -77,7 +78,7 @@ export class AdminMarketplaceController {
     summary: 'Từ chối hồ sơ KTV',
     description: 'Bắt buộc nhập lý do để Mobile hiển thị và chỉnh sửa hồ sơ.',
   })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   rejectApplication(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -88,21 +89,21 @@ export class AdminMarketplaceController {
   @Get('technician-applications/:id')
   @ApiTags('Admin - Technician Applications')
   @ApiOperation({ summary: 'Chi tiet ho so va KYC private cua KTV' })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   applicationDetail(@Param('id', ParseUUIDPipe) id: string) {
     return this.applications.detail(id);
   }
   @Post('technician-applications/:id/review')
   @ApiTags('Admin - Technician Applications')
   @ApiOperation({ summary: 'Nhan ho so vao trang thai dang review' })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   reviewApplication(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.applications.startReview(auth.sub, id);
   }
   @Post('technician-applications/:id/kyc-review')
   @ApiTags('Admin - Technician Applications')
   @ApiOperation({ summary: 'Duyet hoac tu choi KYC cua ho so KTV' })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   reviewKyc(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -112,19 +113,19 @@ export class AdminMarketplaceController {
   }
   @Get('dashboard')
   @ApiOperation({ summary: 'So lieu van hanh thuc te cho Admin dashboard' })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   dashboard() {
     return this.admin.dashboard();
   }
   @Get('users')
   @ApiOperation({ summary: 'Danh sach user de tim va quan ly trang thai' })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   users(@Query() query: AdminUsersQueryDto) {
     return this.admin.users(query);
   }
   @Patch('users/:id/status')
   @ApiOperation({ summary: 'Khoa hoac mo khoa user' })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   userStatus(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -134,25 +135,25 @@ export class AdminMarketplaceController {
   }
   @Get('bookings')
   @ApiOperation({ summary: 'Danh sach booking cho van hanh' })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   bookings(@Query() query: AdminBookingsQueryDto) {
     return this.admin.bookings(query);
   }
   @Get('technicians')
   @ApiOperation({ summary: 'Danh sach va trang thai ky thuat vien' })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   technicians(@Query() query: AdminPageDto) {
     return this.admin.technicians(query);
   }
   @Patch('technicians/:id')
   @ApiOperation({ summary: 'Cap nhat xac minh va ho so KTV' })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   updateTechnician(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateAdminTechnicianDto) {
     return this.admin.updateTechnician(id, dto);
   }
   @Get('technicians/:id/services')
   @ApiOperation({ summary: 'Danh sach dich vu va goi gia cua mot KTV de Admin dieu chinh gia' })
-  @ApiOkResponse({ schema: { type: 'array', items: { type: 'object', additionalProperties: true } } })
+  @ApiOkResponse({ type: ApiListResponseDto })
   technicianServices(@Param('id', ParseUUIDPipe) id: string) {
     return this.admin.technicianServices(id);
   }
@@ -161,7 +162,7 @@ export class AdminMarketplaceController {
     summary: 'Admin cap nhat gia mot goi dich vu cua KTV',
     description: 'Chi sua price. Thoi luong va code goi gia giu theo template da cau hinh.',
   })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   updateTechnicianPriceOption(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('serviceId', ParseUUIDPipe) serviceId: string,
@@ -173,19 +174,19 @@ export class AdminMarketplaceController {
 
   @Get('categories')
   @ApiOperation({ summary: 'Danh sach category ke ca inactive' })
-  @ApiOkResponse({ schema: { type: 'array', items: { type: 'object', additionalProperties: true } } })
+  @ApiOkResponse({ type: ApiListResponseDto })
   categories() {
     return this.admin.categories();
   }
   @Post('categories')
   @ApiOperation({ summary: 'Admin tao danh muc dich vu' })
-  @ApiCreatedResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiCreatedResponse({ type: ApiActionResponseDto })
   category(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateCategoryDto) {
     return this.admin.createCategory(auth.sub, dto);
   }
   @Patch('categories/:id')
   @ApiOperation({ summary: 'Sua hoac an category' })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   updateCategory(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateCategoryDto) {
     return this.admin.updateCategory(id, dto);
   }
@@ -199,19 +200,19 @@ export class AdminMarketplaceController {
 
   @Get('banners')
   @ApiOperation({ summary: 'Danh sach banner ke ca inactive' })
-  @ApiOkResponse({ schema: { type: 'array', items: { type: 'object', additionalProperties: true } } })
+  @ApiOkResponse({ type: ApiListResponseDto })
   banners() {
     return this.admin.banners();
   }
   @Post('banners')
   @ApiOperation({ summary: 'Admin tao banner trang chu' })
-  @ApiCreatedResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiCreatedResponse({ type: ApiActionResponseDto })
   banner(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateBannerDto) {
     return this.admin.createBanner(auth.sub, dto);
   }
   @Patch('banners/:id')
   @ApiOperation({ summary: 'Sua hoac an banner' })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   updateBanner(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateBannerDto) {
     return this.admin.updateBanner(id, dto);
   }
@@ -225,25 +226,25 @@ export class AdminMarketplaceController {
 
   @Get('promotions')
   @ApiOperation({ summary: 'Danh sach voucher ke ca inactive' })
-  @ApiOkResponse({ schema: { type: 'array', items: { type: 'object', additionalProperties: true } } })
+  @ApiOkResponse({ type: ApiListResponseDto })
   promotions() {
     return this.admin.promotions();
   }
   @Post('promotions')
   @ApiOperation({ summary: 'Admin tao ma khuyen mai' })
-  @ApiCreatedResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiCreatedResponse({ type: ApiActionResponseDto })
   promotion(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreatePromotionDto) {
     return this.admin.createPromotion(auth.sub, dto);
   }
   @Patch('promotions/:id')
   @ApiOperation({ summary: 'Sua hoac bat tat voucher' })
-  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiOkResponse({ type: ApiActionResponseDto })
   updatePromotion(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdatePromotionDto) {
     return this.admin.updatePromotion(id, dto);
   }
   @Post('technicians')
   @ApiOperation({ summary: 'Admin chuyen user thanh ky thuat vien va tao ho so' })
-  @ApiCreatedResponse({ schema: { type: 'object', additionalProperties: true } })
+  @ApiCreatedResponse({ type: ApiActionResponseDto })
   technician(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateTechnicianByAdminDto) {
     return this.admin.createTechnician(auth.sub, dto);
   }

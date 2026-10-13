@@ -1,3 +1,4 @@
+import { ApiActionResponseDto, ApiListResponseDto } from '../../../common/dtos/api-response.dto';
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { BookingQuoteResponse } from '../entities/booking-quote.entity';
@@ -169,7 +170,7 @@ export class BookingsController {
 
   @Post(':id/review')
   @ApiOperation({ summary: 'Khach hang danh gia lich da hoan thanh' })
-  @ApiCreatedResponse({ schema: { type: 'object', additionalProperties: true, description: 'Danh gia da duoc ghi nhan' } })
+  @ApiCreatedResponse({ type: ApiActionResponseDto })
   review(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
