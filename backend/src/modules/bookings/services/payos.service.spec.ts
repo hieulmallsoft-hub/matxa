@@ -31,4 +31,12 @@ describe('PayosService', () => {
       new PayosService(config).verifyWebhook({ signature: 'invalid', data: { amount: 50000, orderCode: 123 } }),
     ).toThrow();
   });
+
+  it('builds a mobile redirect without trusting a caller supplied URL', () => {
+    const url = new PayosService(new ConfigService({ PAYOS_APP_RETURN_URL: 'psyocore://payment/payos/success' })).mobileRedirect('return', {
+      code: '00',
+      orderCode: '123',
+    });
+    expect(url).toBe('psyocore://payment/payos/success?code=00&orderCode=123');
+  });
 });

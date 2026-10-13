@@ -335,6 +335,11 @@ export class BookingsService {
     return { code: '00', desc: 'success' };
   }
 
+  payosMobileRedirect(kind: 'return' | 'cancel', query: Record<string, string | undefined>) {
+    if (!this.payos) throw new BadRequestException('PayOS chua duoc cau hinh');
+    return this.payos.mobileRedirect(kind, query);
+  }
+
   async processVnpayIpn(params: Record<string, string | undefined>) {
     if (!this.vnpay.verify(params)) return { RspCode: '97', Message: 'Invalid signature' };
     if (params.vnp_TmnCode !== this.config.get<string>('VNPAY_TMN_CODE'))

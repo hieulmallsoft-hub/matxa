@@ -1,6 +1,6 @@
-import { Body, Controller, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Request } from 'express';
+import { Response } from 'express';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
@@ -15,6 +15,18 @@ export class PayosWebhookController {
   @ApiOperation({ summary: 'PayOS webhook; chi PayOS duoc phep goi' })
   webhook(@Body() body: Record<string, unknown>) {
     return this.bookings.processPayosWebhook(body);
+  }
+
+  @Get('return')
+  @ApiOperation({ summary: 'PayOS redirect sau khi thanh toan; chi dieu huong ve mobile' })
+  returned(@Query() query: Record<string, string | undefined>, @Res() response: Response) {
+    return response.redirect(this.bookings.payosMobileRedirect('return', query));
+  }
+
+  @Get('cancel')
+  @ApiOperation({ summary: 'PayOS redirect khi khach huy; chi dieu huong ve mobile' })
+  cancelled(@Query() query: Record<string, string | undefined>, @Res() response: Response) {
+    return response.redirect(this.bookings.payosMobileRedirect('cancel', query));
   }
 }
 

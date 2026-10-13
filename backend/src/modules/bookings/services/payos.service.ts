@@ -72,6 +72,21 @@ export class PayosService {
     return payload.data;
   }
 
+  mobileRedirect(kind: 'return' | 'cancel', query: Record<string, string | undefined>) {
+    const target = this.config.get<string>(kind === 'return' ? 'PAYOS_APP_RETURN_URL' : 'PAYOS_APP_CANCEL_URL');
+    if (!target) throw new BadRequestException('PayOS mobile redirect chua duoc cau hinh');
+    let url: URL;
+    try {
+      url = new URL(target);
+    } catch {
+      throw new BadRequestException('PayOS mobile redirect URL khong hop le');
+    }
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined) url.searchParams.set(key, value);
+    }
+    return url.toString();
+  }
+
   private sign(data: PayosData, key: string) {
     const canonical = Object.keys(data)
       .filter((name) => data[name] !== undefined && data[name] !== null)
