@@ -13,6 +13,7 @@ import { MarketplaceModule } from './modules/marketplace/marketplace.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { WalletModule } from './modules/wallet/wallet.module';
+import { CoursesModule } from './modules/courses/courses.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { WalletModule } from './modules/wallet/wallet.module';
     BookingsModule,
     ProfileModule,
     WalletModule,
+    CoursesModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

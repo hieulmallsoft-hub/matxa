@@ -118,6 +118,17 @@ enum WalletPaymentMethod {
   BANK_TRANSFER
 }
 
+enum CourseAccess {
+  FREE
+  VIP
+}
+
+enum CourseMediaType {
+  VIDEO
+  IMAGE
+  PDF
+}
+
 enum PromotionType {
   PERCENT
   FIXED
@@ -177,6 +188,54 @@ model User {
   bookingCancellations  BookingCancellation[] @relation("BookingCancellationActor")
 
   @@map("users")
+}
+
+model Course {
+  id          String       @id @default(uuid()) @db.Uuid
+  title       String
+  slug        String       @unique
+  description String?
+  coverKey    String?      @map("cover_key")
+  access      CourseAccess @default(FREE)
+  isPublished Boolean      @default(false) @map("is_published")
+  sortOrder   Int          @default(0) @map("sort_order")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  lessons     CourseLesson[]
+  @@index([isPublished, sortOrder])
+  @@map("courses")
+}
+
+model CourseLesson {
+  id              String        @id @default(uuid()) @db.Uuid
+  courseId        String        @map("course_id") @db.Uuid
+  title           String
+  description     String?
+  access          CourseAccess  @default(FREE)
+  durationSeconds Int?          @map("duration_seconds")
+  sortOrder       Int           @default(0) @map("sort_order")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  course          Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  media           CourseMedia[]
+  @@index([courseId, sortOrder])
+  @@map("course_lessons")
+}
+
+model CourseMedia {
+  id           String          @id @default(uuid()) @db.Uuid
+  lessonId     String          @map("lesson_id") @db.Uuid
+  type         CourseMediaType
+  title        String?
+  storageKey   String          @map("storage_key")
+  contentType  String          @map("content_type")
+  fileSize     Int?            @map("file_size")
+  durationSecs Int?            @map("duration_seconds")
+  sortOrder    Int             @default(0) @map("sort_order")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  lesson       CourseLesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  @@index([lessonId, sortOrder])
+  @@map("course_media")
 }
 
 model TechnicianApplication {
