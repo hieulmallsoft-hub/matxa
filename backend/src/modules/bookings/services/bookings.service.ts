@@ -651,7 +651,7 @@ export class BookingsService {
         items: true,
         payment: true,
         address: true,
-        customer: { select: { id: true, displayName: true, avatarUrl: true } },
+        customer: { select: { id: true, displayName: true, avatarUrl: true, gender: true, nationality: true } },
         technician: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } },
         review: true,
       },
@@ -675,7 +675,9 @@ export class BookingsService {
         address: true,
         promotion: true,
         review: true,
-        customer: { select: { id: true, displayName: true, avatarUrl: true, role: true } },
+        customer: {
+          select: { id: true, displayName: true, avatarUrl: true, gender: true, nationality: true, role: true },
+        },
         technician: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } },
       },
     });
@@ -718,7 +720,7 @@ export class BookingsService {
           items: { include: { catalogService: true } },
           payment: true,
           address: true,
-          customer: { select: { id: true, displayName: true, avatarUrl: true } },
+          customer: { select: { id: true, displayName: true, avatarUrl: true, gender: true, nationality: true } },
           technician: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } },
           review: true,
           applications: { where: { technicianProfileId: profile.id } },
@@ -1110,14 +1112,15 @@ export class BookingsService {
         durationMinutes: item.durationMinutes,
         price: Number(item.unitPrice),
       })),
-      customer:
-        selected && booking.customer
-          ? {
-              id: booking.customer.id,
-              displayName: booking.customer.displayName,
-              avatarUrl: booking.customer.avatarUrl,
-            }
-          : null,
+      customer: booking.customer
+        ? {
+            id: booking.customer.id,
+            displayName: booking.customer.displayName,
+            avatarUrl: booking.customer.avatarUrl,
+            gender: booking.customer.gender ?? null,
+            nationality: booking.customer.nationality ?? null,
+          }
+        : null,
       address: selected ? (booking.addressSnapshot ?? null) : null,
       canApply,
       canDecline: canApply,
@@ -1278,7 +1281,13 @@ export class BookingsService {
       canDecline: booking.status === 'PENDING',
       canComplete: booking.status === 'CONFIRMED' && new Date(booking.scheduledEnd) <= new Date(),
       customer: booking.customer
-        ? { id: booking.customer.id, displayName: booking.customer.displayName, avatarUrl: booking.customer.avatarUrl }
+        ? {
+            id: booking.customer.id,
+            displayName: booking.customer.displayName,
+            avatarUrl: booking.customer.avatarUrl,
+            gender: booking.customer.gender ?? null,
+            nationality: booking.customer.nationality ?? null,
+          }
         : null,
       pricing: this.technicianPricing(booking),
     };
