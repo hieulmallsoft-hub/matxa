@@ -23,6 +23,29 @@ import {
 
 export class SearchTechniciansDto {
   @ApiPropertyOptional({
+    description:
+      'Thoi diem bat dau muon dat (ISO timestamp). Khi gui ca hai moc, chi tra KTV co slot bao phu ca khung gio.',
+  })
+  @IsOptional()
+  @IsDateString({ strict: true })
+  availableFrom?: string;
+  @ApiPropertyOptional({ description: 'Thoi diem ket thuc muon dat (ISO timestamp)' })
+  @IsOptional()
+  @IsDateString({ strict: true })
+  availableTo?: string;
+  @ApiPropertyOptional({
+    minimum: 0.1,
+    maximum: 100,
+    default: 25,
+    description: 'Ban kinh toi da (km) tu vi tri khach hang',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.1)
+  @Max(100)
+  radiusKm?: number;
+  @ApiPropertyOptional({
     enum: ['recommended', 'distance', 'rating', 'availability'],
     default: 'recommended',
     description:

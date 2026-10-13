@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { MarketplaceModule } from '../marketplace/marketplace.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { BookingsController } from './controllers/bookings.controller';
 import { TechnicianJobsController } from './controllers/technician-jobs.controller';
@@ -11,10 +12,19 @@ import { OpenBookingExpirationService } from './services/open-booking-expiration
 import { BookingAutoCompletionService } from './services/booking-auto-completion.service';
 import { PlatformFeePolicyService } from './services/platform-fee-policy.service';
 import { BookingVnpayController, VnpayController } from './controllers/vnpay.controller';
+import { BookingPayosController, PayosWebhookController } from './controllers/payos.controller';
+import { PayosService } from './services/payos.service';
 
 @Module({
-  imports: [AuthModule, NotificationsModule],
-  controllers: [BookingsController, TechnicianJobsController, VnpayController, BookingVnpayController],
+  imports: [AuthModule, NotificationsModule, MarketplaceModule],
+  controllers: [
+    BookingsController,
+    TechnicianJobsController,
+    VnpayController,
+    BookingVnpayController,
+    PayosWebhookController,
+    BookingPayosController,
+  ],
   providers: [
     BookingsService,
     VnpayService,
@@ -23,6 +33,7 @@ import { BookingVnpayController, VnpayController } from './controllers/vnpay.con
     OpenBookingExpirationService,
     BookingAutoCompletionService,
     PlatformFeePolicyService,
+    PayosService,
   ],
 })
 export class BookingsModule {}

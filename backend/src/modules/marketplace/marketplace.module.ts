@@ -16,6 +16,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { LocationService } from './services/location.service';
 import { ServiceCatalogController, AdminServiceCatalogController } from './controllers/service-catalog.controller';
 import { ServiceCatalogService } from './services/service-catalog.service';
+import { MarketplaceGateway } from './gateways/marketplace.gateway';
+import { MarketplaceRealtimeService } from './services/marketplace-realtime.service';
 
 @Module({
   imports: [AuthModule, NotificationsModule],
@@ -36,7 +38,9 @@ import { ServiceCatalogService } from './services/service-catalog.service';
     TechnicianApplicationStorageService,
     LocationService,
     ServiceCatalogService,
+    MarketplaceGateway,
+    MarketplaceRealtimeService,
   ],
-  exports: [MarketplaceService],
+  exports: [MarketplaceService, MarketplaceRealtimeService],
 })
 export class MarketplaceModule {}

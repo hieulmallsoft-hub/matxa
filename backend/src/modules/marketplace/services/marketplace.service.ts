@@ -18,10 +18,14 @@ import {
 } from '../dto/marketplace.dto';
 import { applyPriceOptions, loadBookableServices, publicTechnicianWhere } from './technician-selection';
 import { availabilityRange, BOOKING_TIMEZONE, buildAvailableSlots } from './availability-slots';
+import { MarketplaceRealtimeService } from './marketplace-realtime.service';
 
 @Injectable()
 export class MarketplaceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtime?: MarketplaceRealtimeService,
+  ) {}
 
   async home(latitude?: number, longitude?: number, userId?: string) {
     const now = new Date();
@@ -86,6 +90,21 @@ export class MarketplaceService {
       throw new BadRequestException('Can gui ca latitude va longitude');
     }
     const hasLocation = query.latitude !== undefined && query.longitude !== undefined;
+    if ((query.availableFrom === undefined) !== (query.availableTo === undefined)) {
+      throw new BadRequestException('Can gui ca availableFrom va availableTo');
+    }
+    const requestedFrom = query.availableFrom ? new Date(query.availableFrom) : undefined;
+    const requestedTo = query.availableTo ? new Date(query.availableTo) : undefined;
+    if (
+      requestedFrom &&
+      requestedTo &&
+      (!Number.isFinite(+requestedFrom) || !Number.isFinite(+requestedTo) || requestedTo <= requestedFrom)
+    ) {
+      throw new BadRequestException('Khoang thoi gian tim KTV khong hop le');
+    }
+    if ((query.radiusKm !== undefined || requestedFrom) && !hasLocation) {
+      throw new BadRequestException('Can gui latitude va longitude khi loc theo thoi gian/khoang cach');
+    }
     if (query.sort === 'distance' && !hasLocation)
       throw new BadRequestException('Sap xep khoang cach can latitude va longitude');
     if (
@@ -136,6 +155,20 @@ export class MarketplaceService {
           * POWER(SIN(RADIANS(p.longitude::double precision - ${query.longitude!}::double precision) / 2), 2)
         )))) END`
       : Prisma.sql`NULL::double precision`;
+    if (query.radiusKm !== undefined) conditions.push(Prisma.sql`(${distance}) <= ${query.radiusKm}`);
+    if (requestedFrom && requestedTo) {
+      conditions.push(Prisma.sql`EXISTS (
+        SELECT 1 FROM availability_slots av
+        WHERE av.technician_id = p.id AND av.is_available = true
+          AND av.start_at <= ${requestedFrom} AND av.end_at >= ${requestedTo}
+      )`);
+      conditions.push(Prisma.sql`NOT EXISTS (
+        SELECT 1 FROM bookings b
+        WHERE b.technician_id = p.id
+          AND b.status IN ('PENDING', 'CONFIRMED')
+          AND b.scheduled_start < ${requestedTo} AND b.scheduled_end > ${requestedFrom}
+      )`);
+    }
     const order =
       query.sort === 'rating'
         ? Prisma.sql`average_rating DESC, is_available DESC, id ASC`
@@ -489,13 +522,16 @@ export class MarketplaceService {
       where: { technicianId: profile.id, startAt: { lt: endAt }, endAt: { gt: startAt } },
     });
     if (overlap) throw new BadRequestException('Khung gio bi trung');
-    return this.prisma.availabilitySlot.create({ data: { technicianId: profile.id, startAt, endAt } });
+    const slot = await this.prisma.availabilitySlot.create({ data: { technicianId: profile.id, startAt, endAt } });
+    this.realtime?.broadcastAvailabilityChanged(profile.id);
+    return slot;
   }
 
   async removeAvailability(userId: string, slotId: string) {
     const profile = await this.myProfile(userId);
     const result = await this.prisma.availabilitySlot.deleteMany({ where: { id: slotId, technicianId: profile.id } });
     if (!result.count) throw new NotFoundException('Khung gio khong ton tai');
+    this.realtime?.broadcastAvailabilityChanged(profile.id);
   }
 
   addresses(userId: string) {

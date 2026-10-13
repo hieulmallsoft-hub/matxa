@@ -41,6 +41,25 @@ export function validateEnvironment(config: Record<string, unknown>) {
     }
     if ((config.VNPAY_HASH_SECRET as string).length < 16) throw new Error('VNPAY_HASH_SECRET khong hop le');
   }
+  if (
+    config.PAYOS_CLIENT_ID ||
+    config.PAYOS_API_KEY ||
+    config.PAYOS_CHECKSUM_KEY ||
+    config.PAYOS_RETURN_URL ||
+    config.PAYOS_CANCEL_URL
+  ) {
+    for (const key of [
+      'PAYOS_CLIENT_ID',
+      'PAYOS_API_KEY',
+      'PAYOS_CHECKSUM_KEY',
+      'PAYOS_RETURN_URL',
+      'PAYOS_CANCEL_URL',
+    ]) {
+      if (typeof config[key] !== 'string' || config[key].trim().length === 0)
+        throw new Error(`${key} la bat buoc khi bat PayOS`);
+    }
+    if ((config.PAYOS_CHECKSUM_KEY as string).length < 16) throw new Error('PAYOS_CHECKSUM_KEY khong hop le');
+  }
 
   const integerSettings = {
     OTP_TTL_SECONDS: [300, 60, 600],
@@ -56,6 +75,7 @@ export function validateEnvironment(config: Record<string, unknown>) {
     BOOKING_AUTO_COMPLETE_AFTER_HOURS: [24, 1, 168],
     BOOKING_AUTO_COMPLETE_INTERVAL_SECONDS: [60, 15, 3600],
     BOOKING_AUTO_COMPLETE_BATCH_SIZE: [100, 1, 500],
+    PAYOS_PAYMENT_TTL_MINUTES: [15, 1, 60],
   } as const;
   const parsedSettings: Record<string, number> = {};
   for (const [key, [fallback, minimum, maximum]] of Object.entries(integerSettings)) {

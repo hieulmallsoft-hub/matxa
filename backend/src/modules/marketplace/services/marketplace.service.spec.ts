@@ -157,6 +157,25 @@ describe('MarketplaceService', () => {
     expect(technicianProfile.findMany).not.toHaveBeenCalled();
   });
 
+  it('filters technicians by a complete requested time window and radius', async () => {
+    $queryRaw.mockResolvedValue([{ total: 0n, ranked: [] }]);
+    await service.searchTechnicians({
+      latitude: 21.0285,
+      longitude: 105.8542,
+      radiusKm: 10,
+      availableFrom: '2030-10-01T10:00:00+07:00',
+      availableTo: '2030-10-01T11:00:00+07:00',
+      page: 1,
+      limit: 20,
+    });
+    const sql = $queryRaw.mock.calls[0][0].text;
+    expect(sql).toContain('EXISTS (');
+    expect(sql).toContain('availability_slots');
+    expect(sql).toContain('NOT EXISTS (');
+    expect(sql).toContain('bookings');
+    expect(sql).toContain("b.status IN ('PENDING', 'CONFIRMED')");
+  });
+
   it('scopes favorites to the authenticated user and orders matching services by price', async () => {
     $queryRaw.mockResolvedValue([{ total: 1n, ranked: [{ id: 't1', distance: null }] }]);
     technicianProfile.findMany.mockResolvedValue([

@@ -10,8 +10,11 @@ import { PrismaService } from '../../../database/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
 import { applyPriceOptions, loadBookableServices } from '../../marketplace/services/technician-selection';
 import { NotificationsService } from '../../notifications/services/notifications.service';
+import { MarketplaceRealtimeService } from '../../marketplace/services/marketplace-realtime.service';
 import { VnpayService } from './vnpay.service';
 import { PlatformFeePolicyService } from './platform-fee-policy.service';
+import { PayosService } from './payos.service';
+import { Optional } from '@nestjs/common';
 import {
   BookingHistoryQueryDto,
   CancelBookingDto,
@@ -31,6 +34,8 @@ export class BookingsService {
     private readonly notifications: NotificationsService,
     private readonly vnpay: VnpayService,
     private readonly feePolicy: PlatformFeePolicyService = new PlatformFeePolicyService(),
+    @Optional() private readonly payos?: PayosService,
+    private readonly realtime?: MarketplaceRealtimeService,
   ) {}
 
   async quote(userId: string, dto: QuoteBookingDto, db: Prisma.TransactionClient = this.prisma) {
@@ -219,6 +224,7 @@ export class BookingsService {
         { isolationLevel: 'Serializable' },
       );
       this.notifyBookingCreated(userId, booking.technician!.userId, booking.id).catch(() => undefined);
+      if (booking.technicianId) this.realtime?.broadcastAvailabilityChanged(booking.technicianId);
       return this.createdBookingResponse(this.withHistoricalAddress(booking));
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
@@ -269,6 +275,64 @@ export class BookingsService {
         expiresAt,
       }),
     };
+  }
+
+  async createPayosPayment(userId: string, bookingId: string) {
+    if (!this.payos?.isConfigured()) throw new BadRequestException('PayOS chua duoc cau hinh');
+    const payment = await this.prisma.payment.findFirst({ where: { bookingId, booking: { customerId: userId } } });
+    if (!payment) throw new NotFoundException('Thanh toan khong ton tai');
+    if (payment.method !== 'ONLINE') throw new BadRequestException('Booking khong dung thanh toan online');
+    if (payment.status === 'PAID') return { bookingId, paymentId: payment.id, status: 'PAID', paymentUrl: null };
+    const expiresAt = new Date(Date.now() + Number(this.config.get('PAYOS_PAYMENT_TTL_MINUTES', 15)) * 60_000);
+    const orderCode = Number(
+      `${Date.now()}${Math.floor(Math.random() * 1000)
+        .toString()
+        .padStart(3, '0')}`,
+    );
+    const data = await this.payos.createPaymentLink({
+      orderCode,
+      amount: Number(payment.amount),
+      description: `MATXA ${bookingId.slice(0, 8)}`,
+      reference: payment.id,
+    });
+    await this.prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: 'PENDING', provider: 'PAYOS', providerRef: String(orderCode), expiresAt },
+    });
+    return {
+      bookingId,
+      paymentId: payment.id,
+      status: 'PENDING',
+      expiresAt,
+      paymentUrl: data.checkoutUrl,
+      paymentLinkId: data.paymentLinkId,
+    };
+  }
+
+  async processPayosWebhook(body: Record<string, unknown>) {
+    if (!this.payos) throw new BadRequestException('PayOS chua duoc cau hinh');
+    const data = this.payos.verifyWebhook({
+      signature: body.signature as string | undefined,
+      data: body.data as Record<string, string | number | boolean | null | undefined> | undefined,
+    });
+    const orderCode = String(data.orderCode ?? '');
+    const payment = await this.prisma.payment.findFirst({ where: { provider: 'PAYOS', providerRef: orderCode } });
+    if (!payment) throw new NotFoundException('Khong tim thay payment PayOS');
+    if (Number(data.amount) !== Number(payment.amount))
+      throw new BadRequestException('So tien webhook PayOS khong khop');
+    const success = String(body.code ?? '') === '00' && body.success === true;
+    const status = success ? 'PAID' : 'FAILED';
+    await this.prisma.payment.updateMany({
+      where: { id: payment.id, status: { in: ['PENDING', 'UNPAID'] } },
+      data: {
+        status,
+        providerTransactionNo: data.reference ? String(data.reference) : null,
+        responseCode: String(body.code ?? ''),
+        ipnReceivedAt: new Date(),
+        ...(success ? { paidAt: new Date() } : {}),
+      },
+    });
+    return { code: '00', desc: 'success' };
   }
 
   async processVnpayIpn(params: Record<string, string | undefined>) {
@@ -548,6 +612,7 @@ export class BookingsService {
       'Ban da duoc chon',
       'Khach hang da chon ban cho don dich vu.',
     );
+    this.realtime?.broadcastAvailabilityChanged(result.booking.technicianId);
     for (const userId of result.loserUserIds)
       void this.notifyStatus(
         userId,
