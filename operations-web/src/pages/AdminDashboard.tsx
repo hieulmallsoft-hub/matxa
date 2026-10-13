@@ -237,6 +237,17 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
 
   return (
     <div>
+      <div className="workspace-head">
+        <div>
+          <p className="workspace-kicker">Operations workspace</p>
+          <h1>{tab === 'catalog' ? 'Catalog dịch vụ' : tab === 'pricing' ? 'Bảng giá KTV' : tab === 'applications' ? 'Duyệt hồ sơ KTV' : tab === 'overview' ? 'Tổng quan vận hành' : 'Quản lý ' + tab}</h1>
+          <p className="workspace-description">Tập trung các thao tác quan trọng ở một nơi, cập nhật trực tiếp từ hệ thống.</p>
+        </div>
+        <div className="workspace-actions">
+          <button className="quiet" onClick={() => void load()}>Làm mới dữ liệu</button>
+          <button onClick={() => setTab('catalog')}>Quản lý catalog</button>
+        </div>
+      </div>
       {/* ── Application Detail Modal ── */}
       {applicationDetail && (
         <div className="modal-backdrop" onClick={() => setApplicationDetail(null)}>
