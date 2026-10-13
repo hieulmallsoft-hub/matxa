@@ -1748,6 +1748,10 @@ body { background: #070b14; color: #e8eef8; }
 .pricing-option span { color: #d5deeb !important; }
 .topbar-page-label, .workspace-description, .card-subtitle { color: #a6b4c8 !important; }
 .notice-toast, .notice-toast * { color: #e8eef8; }
+.notice-toast.error { background: #2a1118; border-color: #7f1d2d; border-left-color: #fb7185; color: #ffe4e6; }
+.notice-toast.error > div:nth-child(2) { color: #ffe4e6 !important; }
+.notice-toast.error .notice-icon-box { background: rgba(244,63,94,.18); color: #fda4af; }
+.notice-toast .quiet { color: #cbd5e1 !important; background: transparent; border-color: rgba(148,163,184,.25); box-shadow: none; }
 .course-admin-grid { display: grid; grid-template-columns: minmax(280px, .8fr) minmax(360px, 1.2fr); gap: 18px; }
 .course-admin-grid > .card:last-child { grid-column: 1 / -1; }
 .course-list-item { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 13px 15px; text-align: left; background: rgba(15,23,42,.62); border: 1px solid rgba(148,163,184,.16); }
