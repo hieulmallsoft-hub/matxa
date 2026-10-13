@@ -1026,6 +1026,13 @@ button.review-btn:hover {
   min-width: 0;
 }
 
+.catalog-header-actions { display: flex; gap: 8px; }
+.catalog-page > .card { width: 100%; }
+.catalog-editor { width: min(680px, 100%); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+.empty-state { padding: 36px 12px; color: var(--text-muted); text-align: center; }
+@media (max-width: 620px) { .catalog-header-actions { flex-direction: column; } .catalog-toolbar { align-items: stretch; flex-direction: column; } .list-item-card { align-items: flex-start; flex-direction: column; } .button-row { width: 100%; } .button-row button { flex: 1; } }
+
 .workspace-head {
   display: flex;
   align-items: flex-end;
