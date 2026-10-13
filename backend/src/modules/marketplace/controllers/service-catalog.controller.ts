@@ -56,6 +56,11 @@ export class ServiceCatalogController {
 @Controller('admin/service-catalog')
 export class AdminServiceCatalogController {
   constructor(private readonly catalog: ServiceCatalogService) {}
+  @Post('seed-defaults')
+  @ApiCreatedResponse({ schema: { type: 'object', properties: { created: { type: 'number' }, total: { type: 'number' } } } })
+  seedDefaults() {
+    return this.catalog.seedDefaults();
+  }
   @Get()
   @ApiOkResponse({ schema: { type: 'array', items: { type: 'object' } } })
   list() {

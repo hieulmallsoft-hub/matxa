@@ -38,6 +38,39 @@ export class ServiceCatalogService {
     });
   }
 
+  async seedDefaults() {
+    const groups = [
+      { slug: 'massage-gian-co', name: 'Massage - Giãn cơ' },
+      { slug: 'pt-fitness', name: 'PT / Fitness' },
+      { slug: 'yoga-pilates', name: 'Yoga - Pilates' },
+    ];
+    const categories = new Map<string, string>();
+    for (const group of groups) {
+      const category = await this.prisma.serviceCategory.upsert({ where: { slug: group.slug }, update: { isActive: true }, create: group });
+      categories.set(group.slug, category.id);
+    }
+    const defaults = [
+      ['massage-co-vai-gay', 'Massage Cổ - vai - gáy', 'massage-gian-co'], ['massage-chan', 'Massage Chân', 'massage-gian-co'],
+      ['massage-khong-dau', 'Massage Không đau', 'massage-gian-co'], ['massage-thai', 'Massage Thái', 'massage-gian-co'],
+      ['massage-dau', 'Massage Đầu', 'massage-gian-co'], ['massage-the-thao', 'Massage thể thao', 'massage-gian-co'],
+      ['stretching-tai-nha', 'Stretching tại nhà', 'massage-gian-co'], ['tap-tai-nha', 'Tập tại nhà', 'pt-fitness'],
+      ['tap-tai-phong-gym', 'Tập tại phòng gym', 'pt-fitness'], ['phuc-hoi-van-dong', 'Phục hồi vận động', 'pt-fitness'],
+      ['pt-online', 'PT online', 'pt-fitness'], ['yoga-pilates', 'Yoga - Pilates', 'yoga-pilates'],
+    ] as const;
+    let created = 0;
+    for (const [slug, name, categorySlug] of defaults) {
+      const exists = await this.prisma.serviceCatalogItem.findUnique({ where: { slug } });
+      if (exists) continue;
+      await this.create({ categoryId: categories.get(categorySlug)!, slug, name, pricingTemplate: 'STANDARD_60_90_120', modes: ['HOME'], priceOptions: [
+        { code: '60_MINUTES', durationMinutes: 60, price: 500000, sortOrder: 0 },
+        { code: '90_MINUTES', durationMinutes: 90, price: 600000, sortOrder: 1 },
+        { code: '120_MINUTES', durationMinutes: 120, price: 700000, sortOrder: 2 },
+      ] });
+      created++;
+    }
+    return { created, total: defaults.length };
+  }
+
   async create(dto: CreateServiceCatalogDto) {
     await this.category(dto.categoryId);
     this.validateTemplate(dto.pricingTemplate, dto.priceOptions);

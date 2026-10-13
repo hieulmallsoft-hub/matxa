@@ -41,10 +41,14 @@ export function ServiceCatalogPanel({ categories, notify }: { categories: Catego
     try { await request('/admin/service-catalog/' + item.id, { method: 'DELETE' }); await load(); }
     catch (e) { notify(e instanceof Error ? e.message : 'Không ẩn được dịch vụ', true); }
   }
+  async function seedDefaults() {
+    try { const result = await request<{ created: number; total: number }>('/admin/service-catalog/seed-defaults', { method: 'POST' }); notify('Đã tạo ' + result.created + ' dịch vụ mẫu'); await load(); }
+    catch (e) { notify(e instanceof Error ? e.message : 'Không tạo được bộ dịch vụ mẫu', true); }
+  }
   const durations = templates[template];
   const visibleItems = items.filter((item) => (!activeOnly || item.isActive) && (!search.trim() || (item.name + ' ' + item.slug).toLowerCase().includes(search.trim().toLowerCase())));
   return <div className="grid two">
-    <Card title="Catalog dịch vụ" subtitle="KTV chỉ được chọn dịch vụ và giá từ danh sách này.">
+    <Card title="Catalog dịch vụ" subtitle="KTV chỉ được chọn dịch vụ và giá từ danh sách này." headerAction={<button className="quiet" type="button" onClick={() => void seedDefaults()}>Tạo bộ mẫu</button>}>
       <FormCard onSubmit={create}>
         <label>Danh mục<select name="categoryId" required><option value="">Chọn danh mục</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
         <label>Tên dịch vụ<input name="name" required maxLength={150} /></label>
