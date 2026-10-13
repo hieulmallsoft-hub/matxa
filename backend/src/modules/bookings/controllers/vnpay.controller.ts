@@ -1,4 +1,4 @@
-import { ApiActionResponseDto, ApiListResponseDto } from '../../../common/dtos/api-response.dto';
+import { PaymentCallbackResponseDto } from './bookings-response.dto';
 import { Controller, Get, Ip, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
@@ -13,13 +13,13 @@ export class VnpayController {
   constructor(private readonly bookings: BookingsService) {}
   @Get('ipn')
   @ApiOperation({ summary: 'VNPAY IPN callback; do not call from Mobile' })
-  @ApiOkResponse({ type: ApiActionResponseDto })
+  @ApiOkResponse({ type: PaymentCallbackResponseDto })
   ipn(@Query() query: Record<string, string | undefined>) {
     return this.bookings.processVnpayIpn(query);
   }
   @Get('return')
   @ApiOperation({ summary: 'VNPAY return URL after customer completes payment' })
-  @ApiOkResponse({ type: ApiActionResponseDto })
+  @ApiOkResponse({ type: PaymentCallbackResponseDto })
   returned(@Query() query: Record<string, string | undefined>) {
     return this.bookings.vnpayReturn(query);
   }
@@ -33,7 +33,7 @@ export class BookingVnpayController {
   constructor(private readonly bookings: BookingsService) {}
   @Post(':id/vnpay-payment')
   @ApiOperation({ summary: 'Tao VNPAY payment URL cho booking ONLINE cua khach hang' })
-  @ApiCreatedResponse({ type: ApiActionResponseDto })
+  @ApiCreatedResponse({ type: PaymentCallbackResponseDto })
   create(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Ip() ip: string) {
     return this.bookings.createVnpayPayment(auth.sub, id, ip);
   }

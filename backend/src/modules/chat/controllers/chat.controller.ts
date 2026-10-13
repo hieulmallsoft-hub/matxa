@@ -1,4 +1,4 @@
-import { ApiActionResponseDto, ApiListResponseDto } from '../../../common/dtos/api-response.dto';
+import { ChatReadResponseDto } from './chat-action-response.dto';
 import {
   Body,
   Controller,
@@ -98,7 +98,7 @@ export class ChatController {
 
   @Patch(':id/read')
   @ApiOperation({ summary: 'Danh dau cac tin cua doi phuong la da doc' })
-  @ApiOkResponse({ type: ApiActionResponseDto })
+  @ApiOkResponse({ type: ChatReadResponseDto })
   markRead(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.chat.markRead(auth.sub, id);
   }

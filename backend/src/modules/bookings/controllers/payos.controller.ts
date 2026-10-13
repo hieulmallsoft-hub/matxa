@@ -1,4 +1,4 @@
-import { ApiActionResponseDto, ApiListResponseDto } from '../../../common/dtos/api-response.dto';
+import { PaymentCallbackResponseDto } from './bookings-response.dto';
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiCreatedResponse, ApiFoundResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -14,7 +14,7 @@ export class PayosWebhookController {
 
   @Post('webhook')
   @ApiOperation({ summary: 'PayOS webhook; chi PayOS duoc phep goi' })
-  @ApiOkResponse({ type: ApiActionResponseDto })
+  @ApiOkResponse({ type: PaymentCallbackResponseDto })
   webhook(@Body() body: Record<string, unknown>) {
     return this.bookings.processPayosWebhook(body);
   }

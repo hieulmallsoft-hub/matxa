@@ -1,4 +1,10 @@
-import { ApiActionResponseDto, ApiListResponseDto } from '../../common/dtos/api-response.dto';
+import {
+  WalletBalanceResponseDto,
+  WalletTopupCreateResponseDto,
+  WalletTopupDetailResponseDto,
+  WalletTopupItemResponseDto,
+  WalletTopupListResponseDto,
+} from './wallet-response.dto';
 import { Body, Controller, Get, Param, ParseIntPipe, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AccessTokenGuard } from '../auth/guards/access-token.guard';
@@ -14,18 +20,18 @@ import { WalletService } from './wallet.service';
 @Controller('wallet')
 export class WalletController {
   constructor(private readonly wallet: WalletService) {}
-  @Get() @ApiOkResponse({ type: ApiActionResponseDto })
+  @Get() @ApiOkResponse({ type: WalletBalanceResponseDto })
   balance(@CurrentAuth() auth: AccessTokenPayload) {
     return this.wallet.balance(auth.sub);
   }
-  @Post('topups') @ApiCreatedResponse({ type: ApiActionResponseDto })
+  @Post('topups') @ApiCreatedResponse({ type: WalletTopupCreateResponseDto })
   create(
     @CurrentAuth() auth: AccessTokenPayload,
     @Body() body: { amount: number; paymentMethod?: string },
   ) {
     return this.wallet.create(auth.sub, body.amount, body.paymentMethod);
   }
-  @Get('topups') @ApiOkResponse({ type: ApiActionResponseDto })
+  @Get('topups') @ApiOkResponse({ type: WalletTopupListResponseDto })
   list(
     @CurrentAuth() auth: AccessTokenPayload,
     @Query('page') page = '1',
@@ -33,7 +39,7 @@ export class WalletController {
   ) {
     return this.wallet.list(auth.sub, Number(page), Number(limit));
   }
-  @Get('topups/:id') @ApiOkResponse({ type: ApiActionResponseDto })
+  @Get('topups/:id') @ApiOkResponse({ type: WalletTopupDetailResponseDto })
   detail(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.wallet.detail(auth.sub, id);
   }
@@ -46,7 +52,7 @@ export class WalletController {
 @Controller('admin/wallet')
 export class AdminWalletController {
   constructor(private readonly wallet: WalletService) {}
-  @Get('topups') @ApiOkResponse({ type: ApiActionResponseDto })
+  @Get('topups') @ApiOkResponse({ type: WalletTopupListResponseDto })
   list(
     @Query('status') status?: string,
     @Query('userId') userId?: string,
@@ -56,25 +62,25 @@ export class AdminWalletController {
   ) {
     return this.wallet.adminList({ status, userId, referenceCode, page: Number(page), limit: Number(limit) });
   }
-  @Get('topups/:id') @ApiOkResponse({ type: ApiActionResponseDto })
+  @Get('topups/:id') @ApiOkResponse({ type: WalletTopupDetailResponseDto })
   detail(@Param('id', ParseUUIDPipe) id: string) {
     return this.wallet.adminDetail(id);
   }
-  @Post('topups/:id/simulate-processing') @ApiOkResponse({ type: ApiActionResponseDto })
+  @Post('topups/:id/simulate-processing') @ApiOkResponse({ type: WalletTopupItemResponseDto })
   processing(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.wallet.simulateProcessing(auth.sub, id);
   }
-  @Post('topups/:id/simulate-success') @ApiOkResponse({ type: ApiActionResponseDto })
+  @Post('topups/:id/simulate-success') @ApiOkResponse({ type: WalletTopupItemResponseDto })
   success(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.wallet.simulate(auth.sub, id, true);
   }
-  @Post('topups/:id/simulate-failure') @ApiOkResponse({ type: ApiActionResponseDto })
+  @Post('topups/:id/simulate-failure') @ApiOkResponse({ type: WalletTopupItemResponseDto })
   failure(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,

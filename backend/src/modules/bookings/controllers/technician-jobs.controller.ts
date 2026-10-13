@@ -1,4 +1,4 @@
-import { ApiActionResponseDto, ApiListResponseDto } from '../../../common/dtos/api-response.dto';
+import { TechnicianJobActionResponseDto } from './bookings-response.dto';
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
@@ -102,7 +102,7 @@ export class TechnicianJobsController {
   }
   @Post(':id/cancellation-evidence-upload-url')
   @ApiOperation({ summary: 'Tao URL upload anh minh chung huy don private' })
-  @ApiCreatedResponse({ type: ApiActionResponseDto })
+  @ApiCreatedResponse({ type: TechnicianJobActionResponseDto })
   cancellationEvidenceUploadUrl(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -112,7 +112,7 @@ export class TechnicianJobsController {
   }
   @Post(':id/cancel')
   @ApiOperation({ summary: 'KTV assigned/SELECTED huy don, co ly do va anh minh chung neu bat buoc' })
-  @ApiOkResponse({ type: ApiActionResponseDto })
+  @ApiOkResponse({ type: TechnicianJobActionResponseDto })
   cancel(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -139,19 +139,19 @@ export class TechnicianJobsController {
   }
   @Post(':id/withdraw')
   @ApiOperation({ summary: 'KTV rut ung tuyen khi don con OPEN' })
-  @ApiOkResponse({ type: ApiActionResponseDto })
+  @ApiOkResponse({ type: TechnicianJobActionResponseDto })
   withdraw(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.bookings.withdrawOpenJobApplication(auth.sub, id);
   }
   @Post(':id/accept')
   @ApiOperation({ summary: 'KTV nhan don moi: PENDING sang CONFIRMED' })
-  @ApiOkResponse({ type: ApiActionResponseDto })
+  @ApiOkResponse({ type: TechnicianJobActionResponseDto })
   accept(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.bookings.acceptTechnicianJob(auth.sub, id);
   }
   @Post(':id/decline')
   @ApiOperation({ summary: 'KTV tu choi don moi va thong bao cho khach' })
-  @ApiOkResponse({ type: ApiActionResponseDto })
+  @ApiOkResponse({ type: TechnicianJobActionResponseDto })
   decline(
     @CurrentAuth() auth: AccessTokenPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -161,7 +161,7 @@ export class TechnicianJobsController {
   }
   @Post(':id/complete')
   @ApiOperation({ summary: 'KTV hoan thanh don da nhan sau gio ket thuc' })
-  @ApiOkResponse({ type: ApiActionResponseDto })
+  @ApiOkResponse({ type: TechnicianJobActionResponseDto })
   complete(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.bookings.completeTechnicianJob(auth.sub, id);
   }
