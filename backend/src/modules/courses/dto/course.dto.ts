@@ -26,6 +26,10 @@ export class CreateMediaUploadUrlDto {
   @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(180) fileName!: string;
   @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(180) contentType!: string;
 }
+export class CreateCoverUploadUrlDto {
+  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(180) fileName!: string;
+  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(180) contentType!: string;
+}
 export class CreateMediaDto {
   @ApiProperty({ enum: CourseMediaTypeDto }) @IsEnum(CourseMediaTypeDto) type!: CourseMediaTypeDto;
   @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(180) storageKey!: string;

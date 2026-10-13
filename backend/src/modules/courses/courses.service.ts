@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PrismaService } from '../../database/prisma.service';
-import { CreateCourseDto, CreateLessonDto, CreateMediaDto, CreateMediaUploadUrlDto, UpdateCourseDto, UpdateLessonDto } from './dto/course.dto';
+import { CreateCourseDto, CreateCoverUploadUrlDto, CreateLessonDto, CreateMediaDto, CreateMediaUploadUrlDto, UpdateCourseDto, UpdateLessonDto } from './dto/course.dto';
 
 @Injectable()
 export class CoursesService {
@@ -20,6 +20,8 @@ export class CoursesService {
   async get(id: string) { const course = await this.prisma.course.findUnique({ where: { id }, include: { lessons: { orderBy: { sortOrder: 'asc' }, include: { media: { orderBy: { sortOrder: 'asc' } } } } } }); if (!course) throw new NotFoundException('Không tìm thấy khóa học'); return course; }
   create(dto: CreateCourseDto) { return this.prisma.course.create({ data: { ...dto, access: dto.access ?? 'FREE' }, include: { lessons: true } }); }
   async update(id: string, dto: UpdateCourseDto) { await this.get(id); return this.prisma.course.update({ where: { id }, data: dto }); }
+  async coverUploadUrl(courseId: string, dto: CreateCoverUploadUrlDto) { await this.get(courseId); const { bucket, client } = this.storage(); const ext = dto.fileName.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin'; const storageKey = `courses/${courseId}/cover/${randomUUID()}.${ext}`; const uploadUrl = await getSignedUrl(client, new PutObjectCommand({ Bucket: bucket, Key: storageKey, ContentType: dto.contentType }), { expiresIn: 600 }); return { uploadUrl, storageKey, expiresIn: 600 }; }
+  async setCover(id: string, coverKey: string) { await this.get(id); if (!coverKey.startsWith(`courses/${id}/cover/`)) throw new BadRequestException('Ảnh bìa không thuộc khóa học'); return this.prisma.course.update({ where: { id }, data: { coverKey } }); }
   async remove(id: string) { await this.get(id); return this.prisma.course.update({ where: { id }, data: { isPublished: false } }); }
   async createLesson(courseId: string, dto: CreateLessonDto) { await this.get(courseId); return this.prisma.courseLesson.create({ data: { ...dto, courseId, access: dto.access ?? 'FREE' }, include: { media: true } }); }
   async updateLesson(id: string, dto: UpdateLessonDto) { const lesson = await this.prisma.courseLesson.findUnique({ where: { id } }); if (!lesson) throw new NotFoundException('Không tìm thấy bài học'); return this.prisma.courseLesson.update({ where: { id }, data: dto }); }

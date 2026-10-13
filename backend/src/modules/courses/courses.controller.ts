@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AccessTokenGuard } from '../auth/guards/access-token.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { CreateCourseDto, CreateLessonDto, CreateMediaDto, CreateMediaUploadUrlDto, UpdateCourseDto, UpdateLessonDto } from './dto/course.dto';
+import { CreateCourseDto, CreateCoverUploadUrlDto, CreateLessonDto, CreateMediaDto, CreateMediaUploadUrlDto, UpdateCourseDto, UpdateLessonDto } from './dto/course.dto';
 import { CoursesService } from './courses.service';
 
 @ApiTags('Courses')
@@ -27,6 +27,8 @@ export class AdminCoursesController {
   @Get(':id') get(@Param('id', ParseUUIDPipe) id: string) { return this.courses.get(id); }
   @Patch(':id') update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateCourseDto) { return this.courses.update(id, dto); }
   @Delete(':id') remove(@Param('id', ParseUUIDPipe) id: string) { return this.courses.remove(id); }
+  @Post(':id/cover-upload-url') coverUploadUrl(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateCoverUploadUrlDto) { return this.courses.coverUploadUrl(id, dto); }
+  @Patch(':id/cover') setCover(@Param('id', ParseUUIDPipe) id: string, @Body('coverKey') coverKey: string) { return this.courses.setCover(id, coverKey); }
   @Post(':id/lessons') lesson(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateLessonDto) { return this.courses.createLesson(id, dto); }
   @Patch('lessons/:id') updateLesson(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateLessonDto) { return this.courses.updateLesson(id, dto); }
   @Delete('lessons/:id') removeLesson(@Param('id', ParseUUIDPipe) id: string) { return this.courses.removeLesson(id); }
