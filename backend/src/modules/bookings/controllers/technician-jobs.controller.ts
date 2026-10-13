@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
@@ -27,16 +27,75 @@ export class TechnicianJobsController {
 
   @Get()
   @ApiOperation({ summary: 'KTV xem don duoc giao trong tab Nhan viec' })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              bookingId: { type: 'string' },
+              bookingStatus: { type: 'string' },
+              customer: {
+                type: 'object',
+                properties: {
+                  displayName: { type: 'string', nullable: true },
+                  gender: { type: 'string', nullable: true },
+                  nationality: { type: 'string', nullable: true },
+                  avatarUrl: { type: 'string', nullable: true },
+                },
+              },
+              scheduledStart: { type: 'string', format: 'date-time' },
+              scheduledEnd: { type: 'string', format: 'date-time' },
+              items: { type: 'array', items: { type: 'object' } },
+              canApply: { type: 'boolean' },
+              canDecline: { type: 'boolean' },
+            },
+          },
+        },
+        total: { type: 'number' },
+        page: { type: 'number' },
+        limit: { type: 'number' },
+      },
+    },
+  })
   list(@CurrentAuth() auth: AccessTokenPayload, @Query() query: TechnicianJobQueryDto) {
     return this.bookings.listTechnicianJobs(auth.sub, query);
   }
   @Get(':id')
   @ApiOperation({ summary: 'KTV xem chi tiet don cua minh' })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        bookingId: { type: 'string' },
+        bookingStatus: { type: 'string' },
+        customer: { type: 'object' },
+        scheduledStart: { type: 'string', format: 'date-time' },
+        scheduledEnd: { type: 'string', format: 'date-time' },
+        items: { type: 'array', items: { type: 'object' } },
+        canApply: { type: 'boolean' },
+        canContact: { type: 'boolean' },
+      },
+    },
+  })
   detail(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.bookings.technicianJobDetail(auth.sub, id);
   }
   @Get(':id/contact')
   @ApiOperation({ summary: 'KTV lay so lien he cua khach sau khi da nhan don' })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        bookingId: { type: 'string' },
+        displayName: { type: 'string', nullable: true },
+        phoneNumber: { type: 'string' },
+      },
+    },
+  })
   contact(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.bookings.technicianJobContact(auth.sub, id);
   }
@@ -60,6 +119,18 @@ export class TechnicianJobsController {
   }
   @Post(':id/apply')
   @ApiOperation({ summary: 'KTV ung tuyen don OPEN marketplace' })
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        bookingId: { type: 'string' },
+        technicianProfileId: { type: 'string' },
+        status: { type: 'string', example: 'APPLIED' },
+        appliedAt: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
   apply(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.bookings.applyToOpenJob(auth.sub, id);
   }

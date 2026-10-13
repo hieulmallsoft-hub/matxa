@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
@@ -39,6 +39,21 @@ export class BookingPayosController {
 
   @Post(':id/payos-payment')
   @ApiOperation({ summary: 'Tao PayOS payment URL cho booking ONLINE' })
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        bookingId: { type: 'string' },
+        paymentId: { type: 'string' },
+        status: { type: 'string', example: 'PENDING' },
+        paymentUrl: { type: 'string', format: 'uri' },
+        qrCode: { type: 'string', nullable: true },
+        accountNumber: { type: 'string', nullable: true },
+        accountName: { type: 'string', nullable: true },
+        expiresAt: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
   create(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.bookings.createPayosPayment(auth.sub, id);
   }

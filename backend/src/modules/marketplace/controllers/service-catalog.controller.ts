@@ -12,7 +12,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
@@ -27,6 +27,23 @@ export class ServiceCatalogController {
   constructor(private readonly catalog: ServiceCatalogService) {}
   @Get()
   @ApiOperation({ summary: 'Mobile lay catalog dich vu dang hoat dong cho OPEN booking' })
+  @ApiOkResponse({
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string' },
+          description: { type: 'string', nullable: true },
+          category: { type: 'object' },
+          modes: { type: 'array', items: { type: 'string' } },
+          pricingTemplate: { type: 'string' },
+          priceOptions: { type: 'array', items: { type: 'object' } },
+        },
+      },
+    },
+  })
   list(@Query() query: ServiceCatalogQueryDto) {
     return this.catalog.listPublic(query);
   }
@@ -39,13 +56,34 @@ export class ServiceCatalogController {
 @Controller('admin/service-catalog')
 export class AdminServiceCatalogController {
   constructor(private readonly catalog: ServiceCatalogService) {}
-  @Get() list() {
+  @Get()
+  @ApiOkResponse({ schema: { type: 'array', items: { type: 'object' } } })
+  list() {
     return this.catalog.listAdmin();
   }
-  @Post() create(@Body() dto: CreateServiceCatalogDto) {
+  @Post()
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        name: { type: 'string' },
+        isActive: { type: 'boolean' },
+        priceOptions: { type: 'array', items: { type: 'object' } },
+      },
+    },
+  })
+  create(@Body() dto: CreateServiceCatalogDto) {
     return this.catalog.create(dto);
   }
-  @Patch(':id') update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateServiceCatalogDto) {
+  @Patch(':id')
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { id: { type: 'string' }, name: { type: 'string' }, isActive: { type: 'boolean' } },
+    },
+  })
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateServiceCatalogDto) {
     return this.catalog.update(id, dto);
   }
   @Delete(':id') @HttpCode(HttpStatus.NO_CONTENT) deactivate(@Param('id', ParseUUIDPipe) id: string) {
