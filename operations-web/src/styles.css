@@ -1759,6 +1759,8 @@ body { background: #070b14; color: #e8eef8; }
 .course-list-item small, .course-lesson small { display: block; margin-top: 4px; color: #91a0b7; font-size: 11px; }
 .course-lesson { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 13px 0; border-bottom: 1px solid rgba(148,163,184,.12); }
 .course-lesson form { display: flex; align-items: center; gap: 8px; }
+.course-media-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.media-view-button { min-height: 30px; padding: 4px 9px; font-size: 11px; }
 @media (max-width: 800px) { .course-admin-grid { grid-template-columns: 1fr; } .course-admin-grid > .card:last-child { grid-column: auto; } .course-lesson { align-items: stretch; flex-direction: column; } .course-lesson form { flex-direction: column; align-items: stretch; } }
 .card, .kpi-card { background: linear-gradient(145deg,rgba(21,29,45,.88),rgba(12,18,31,.94)); border-color: rgba(148,163,184,.16); box-shadow: 0 20px 50px rgba(0,0,0,.2); }
 .card:hover, .kpi-card:hover { border-color: rgba(99,102,241,.45); box-shadow: 0 22px 58px rgba(0,0,0,.28), 0 0 28px rgba(99,102,241,.08); }
