@@ -1755,6 +1755,14 @@ body { background: #070b14; color: #e8eef8; }
 .course-admin-grid { display: grid; grid-template-columns: minmax(280px, .8fr) minmax(360px, 1.2fr); gap: 18px; }
 .course-admin-grid > .card:last-child { grid-column: 1 / -1; }
 .course-list-item { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 13px 15px; text-align: left; background: rgba(15,23,42,.62); border: 1px solid rgba(148,163,184,.16); }
+.course-list-select { flex: 1; display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 0; text-align: left; background: transparent; border: 0; color: inherit; }
+.course-list-actions { display: flex; gap: 6px; }
+.course-list-actions .danger, .form-actions .danger { color: #fb7185; }
+.form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.field-help { color: #91a0b7; font-size: 12px; margin: 6px 0 0; }
+.course-editor-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+.course-editor-toolbar .form-row { flex: 1; }
+.media-picker { display: grid; gap: 5px; color: #d7def0; font-size: 12px; }
 .course-list-item.selected { border-color: #818cf8; background: rgba(99,102,241,.16); }
 .course-list-item small, .course-lesson small { display: block; margin-top: 4px; color: #91a0b7; font-size: 11px; }
 .course-lesson { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 13px 0; border-bottom: 1px solid rgba(148,163,184,.12); }
