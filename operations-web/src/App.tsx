@@ -154,8 +154,8 @@ export default function App() {
               <Sparkles size={22} />
             </div>
             <div className="sidebar-logo-text">
-              <div className="sidebar-logo-name">Matxa Ops</div>
-              <div className="sidebar-logo-sub">Operations Portal</div>
+               <div className="sidebar-logo-name">Psyocore Ops</div>
+               <div className="sidebar-logo-sub">Trung tâm vận hành</div>
             </div>
           </div>
 
@@ -198,7 +198,7 @@ export default function App() {
           {/* Topbar */}
           <header className="topbar">
             <div className="topbar-left">
-              <span className="topbar-page-label">Matxa Spa &amp; Wellness Operations</span>
+              <span className="topbar-page-label">Psyocore Wellness Operations</span>
               <span className="topbar-page-title">{TAB_LABELS[tab]}</span>
             </div>
             <div className="topbar-right">
