@@ -1,0 +1,1 @@
+ALTER TYPE "WalletPaymentMethod" ADD VALUE IF NOT EXISTS 'PAYOS';

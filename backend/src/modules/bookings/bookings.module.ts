@@ -35,5 +35,6 @@ import { PayosService } from './services/payos.service';
     PlatformFeePolicyService,
     PayosService,
   ],
+  exports: [PayosService],
 })
 export class BookingsModule {}

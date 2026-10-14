@@ -68,11 +68,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
               <SettingsIcon className="w-5 h-5" />
             </div>
             <h1 className="text-2xl font-bold text-white tracking-wide">
-              Platform & Security Settings
+              Cấu hình hệ thống
             </h1>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Global access tokens, cryptographic 2FA enclaves, webhook endpoints, and telemetry preferences
+            Quản lý bảo mật tài khoản và các thiết lập vận hành Matxa
           </p>
         </div>
 
@@ -81,7 +81,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 via-indigo-500 to-violet-600 text-white text-xs font-semibold shadow-lg shadow-cyan-500/25 border border-white/20 transition-all cursor-pointer"
         >
           <Check className="w-4 h-4" />
-          <span>Save Changes</span>
+          <span>Lưu thay đổi</span>
         </button>
       </div>
 
@@ -90,11 +90,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         <div className="flex items-center gap-2">
           <Key className="w-4 h-4 text-cyan-400" />
           <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
-            Production API Credentials
+            Bảo mật tài khoản quản trị
           </h2>
         </div>
         <p className="text-xs text-slate-400">
-          Use this secret key to authenticate direct telemetry ingestion from automated trading agents and backend microservices.
+          Quản lý thông tin bảo mật dùng để truy cập khu vực quản trị.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -119,14 +119,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-mono text-slate-300 hover:text-white hover:bg-white/10 transition-all"
             >
               <Copy className="w-3.5 h-3.5" />
-              <span>Copy</span>
+              <span>Sao chép</span>
             </button>
             <button
               onClick={handleRollKey}
               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-xs font-mono text-cyan-400 hover:bg-cyan-500/20 transition-all"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Roll Key</span>
+              <span>Tạo lại mã</span>
             </button>
           </div>
         </div>
@@ -137,16 +137,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         <div className="flex items-center gap-2">
           <Shield className="w-4 h-4 text-emerald-400" />
           <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
-            Cryptographic Enclave & 2FA
+            Xác thực hai bước
           </h2>
         </div>
 
         <div className="divide-y divide-white/5 text-xs">
           <div className="py-3.5 flex items-center justify-between">
             <div>
-              <div className="font-semibold text-white">Hardware Key WebAuthn / FIDO2</div>
+              <div className="font-semibold text-white">Bảo vệ thao tác quan trọng</div>
               <div className="text-slate-400 text-[11px] mt-0.5">
-                Require physical YubiKey touch verification for large withdrawals
+                Yêu cầu xác thực bổ sung khi thực hiện thao tác quản trị nhạy cảm
               </div>
             </div>
             <button
@@ -165,13 +165,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
 
           <div className="py-3.5 flex items-center justify-between">
             <div>
-              <div className="font-semibold text-white">Automated Merkle Proof Notarization</div>
+              <div className="font-semibold text-white">Trạng thái bảo mật</div>
               <div className="text-slate-400 text-[11px] mt-0.5">
-                Commit hourly state root hashes to public Ethereum consensus layer
+                Hệ thống đang hoạt động và các phiên đăng nhập được theo dõi an toàn
               </div>
             </div>
             <span className="px-2.5 py-1 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              ACTIVE
+              ĐANG BẬT
             </span>
           </div>
         </div>
@@ -182,17 +182,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         <div className="flex items-center gap-2">
           <Globe className="w-4 h-4 text-violet-400" />
           <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
-            Real-Time Webhook Routing
+            Tùy chọn thông báo
           </h2>
         </div>
 
         <div>
           <label className="block text-xs font-mono text-slate-400 mb-1">
-            INGESTION ENDPOINT URL
+            KÊNH NHẬN THÔNG BÁO
           </label>
           <input
             type="text"
-            value={webhookUrl}
+            value="Thông báo trong hệ thống và email quản trị"
+            readOnly
             onChange={(e) => setWebhookUrl(e.target.value)}
             className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/10 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
           />

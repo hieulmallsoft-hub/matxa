@@ -17,6 +17,10 @@ export class WalletTopupCreateResponseDto {
   @ApiProperty() referenceCode!: string;
   @ApiProperty() transferContent!: string;
   @ApiProperty() expiresAt!: string;
+  @ApiPropertyOptional() checkoutUrl?: string;
+  @ApiPropertyOptional() qrCode?: string;
+  @ApiPropertyOptional() accountNumber?: string;
+  @ApiPropertyOptional() accountName?: string;
 }
 
 export class WalletTopupItemResponseDto {

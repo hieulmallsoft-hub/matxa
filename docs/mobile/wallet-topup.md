@@ -1,33 +1,18 @@
-# Wallet Top-up – Mobile API (Phase 1)
+﻿# Nạp ví bằng QR PayOS – Mobile API
 
-Phase 1 is a wallet foundation with bank-transfer instructions and Admin/development simulation. It does not integrate Napas or a real bank provider. Mobile must never mark a payment successful or add balance itself.
+Tất cả endpoint dùng `Authorization: Bearer <accessToken>`.
 
-All endpoints use `Authorization: Bearer <accessToken>`.
-
-## Flow
-
-```text
-POST /wallet/topups
-  -> show bank instruction and referenceCode
-  -> user transfers money
-GET /wallet/topups/:id (poll status)
-  -> SUCCESS: refresh GET /wallet
-  -> FAILED/EXPIRED: create a new top-up to retry
-```
-
-## Create top-up
+## Tạo giao dịch và QR
 
 ```http
 POST /api/wallet/topups
 ```
 
 ```json
-{ "amount": 50000, "paymentMethod": "BANK_TRANSFER" }
+{ "amount": 50000, "paymentMethod": "PAYOS" }
 ```
 
-Amount is an integer VND value. The server validates configured min/max limits and derives the user from the token.
-
-Response:
+Response thành công trả về:
 
 ```json
 {
@@ -35,64 +20,61 @@ Response:
   "amount": 50000,
   "currency": "VND",
   "status": "PENDING_PAYMENT",
-  "paymentMethod": "BANK_TRANSFER",
-  "bank": {
-    "bankName": "Vietcombank",
-    "accountName": "PSYCORE",
-    "accountNumber": "0123456789"
-  },
-  "transferContent": "NAP PSY ABC123",
-  "referenceCode": "ABC123",
-  "expiresAt": "2026-10-02T09:00:00.000Z"
+  "paymentMethod": "PAYOS",
+  "checkoutUrl": "https://pay.payos.vn/...",
+  "qrCode": "000201010212...",
+  "expiresAt": "2026-10-15T09:00:00.000Z"
 }
 ```
 
-## Wallet and history
+`qrCode` là chuỗi QR payload của PayOS; mobile dùng thư viện QR để render, hoặc mở `checkoutUrl`. Mobile không tự cộng số dư và không tự chuyển trạng thái.
+
+## Xác nhận thanh toán
+
+PayOS gọi webhook backend:
 
 ```http
-GET /api/wallet
-GET /api/wallet/topups?page=1&limit=20
+POST /api/payments/payos/wallet/webhook
+```
+
+Backend xác minh chữ ký, mã giao dịch và số tiền. Nếu hợp lệ, backend chuyển top-up sang `SUCCESS`, cộng ví đúng một lần và ghi ledger.
+
+Mobile kiểm tra trạng thái:
+
+```http
 GET /api/wallet/topups/:transactionId
+GET /api/wallet
 ```
 
-`GET /wallet` returns `balanceVnd`, `currency`, and wallet `type` (`ADVERTISING_CREDIT`). A user can only access their own wallet and top-ups.
+Chỉ hiển thị thành công khi `status` là `SUCCESS`.
 
-## Status mapping
+## Trạng thái
 
-| API status        | Mobile screen                          |
-| ----------------- | -------------------------------------- |
-| `PENDING_PAYMENT` | Bank transfer instruction              |
-| `PROCESSING`      | Processing                             |
-| `SUCCESS`         | Top-up success, refresh wallet balance |
-| `FAILED`          | Failed, create a new top-up to retry   |
-| `EXPIRED`         | Expired, create a new top-up           |
-| `CANCELLED`       | Cancelled                              |
+| Status | Mobile |
+|---|---|
+| `PENDING_PAYMENT` | Hiển thị QR, chờ thanh toán |
+| `PROCESSING` | Đang xác nhận |
+| `SUCCESS` | Báo thành công, tải lại số dư |
+| `FAILED` | Báo thất bại, cho phép tạo giao dịch mới |
+| `EXPIRED` | QR hết hạn, tạo giao dịch mới |
+| `CANCELLED` | Đã hủy |
 
-## Development simulation
+Mobile có thể gọi API chi tiết mỗi 3–5 giây trong lúc chờ hoặc gọi lại khi app được mở lại.
 
-Only Admin can call these endpoints and they are disabled when `NODE_ENV=production`:
+## Kiểm thử
 
-```http
-POST /api/admin/wallet/topups/:id/simulate-success
-POST /api/admin/wallet/topups/:id/simulate-failure
+1. Đăng nhập user và lấy access token.
+2. Gọi `POST /api/wallet/topups` với `paymentMethod: PAYOS`.
+3. Hiển thị QR/checkout URL trả về.
+4. Thanh toán trên môi trường PayOS test.
+5. Chờ webhook.
+6. Gọi `GET /api/wallet/topups/:transactionId`.
+7. Khi `SUCCESS`, gọi `GET /api/wallet` và kiểm tra số dư tăng đúng một lần.
+
+Nếu PayOS chưa gọi được webhook, kiểm tra URL webhook PayOS trỏ tới:
+
+```text
+http://149.28.156.66/api/payments/payos/wallet/webhook
 ```
 
-These endpoints are for local/integration testing only. Mobile must not call them.
-
-Success credits the wallet and writes exactly one immutable ledger entry. Repeating the success request is idempotent and cannot double-credit. Failure/expiry never credits the wallet.
-
-## Errors
-
-```json
-{
-  "statusCode": 400,
-  "message": "So tien phai la so nguyen duong",
-  "error": "Bad Request"
-}
-```
-
-Typical statuses: `400` validation, `401` invalid token, `403` Admin-only endpoint, `404` transaction not owned/not found, `409` invalid transition.
-
-## Phase 2 limitation
-
-There is currently no Napas/bank provider, signed webhook, provider signature verification, or production reconciliation. The Admin simulation stands in for provider confirmation during Phase 1. These must be implemented before production bank payments are enabled.
+Thời hạn giao dịch lấy từ `PAYOS_PAYMENT_TTL_MINUTES` (hiện là 15 phút). Webhook là nguồn xác nhận chính; redirect về app chỉ để đóng màn hình thanh toán, sau đó mobile vẫn phải đọc lại trạng thái giao dịch.

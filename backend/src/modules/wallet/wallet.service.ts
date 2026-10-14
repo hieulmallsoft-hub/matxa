@@ -7,12 +7,14 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
+import { PayosService } from '../bookings/services/payos.service';
 
 @Injectable()
 export class WalletService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly payos: PayosService,
   ) {}
 
   private bank() {
@@ -45,9 +47,12 @@ export class WalletService {
     const min = Number(this.config.get('WALLET_TOPUP_MIN_VND', 50000));
     const max = Number(this.config.get('WALLET_TOPUP_MAX_VND', 100000000));
     if (amount < min || amount > max) throw new BadRequestException(`So tien phai tu ${min} den ${max} VND`);
-    if (paymentMethod !== 'BANK_TRANSFER') throw new BadRequestException('Phuong thuc thanh toan chua ho tro');
+    if (!['BANK_TRANSFER', 'PAYOS'].includes(paymentMethod)) throw new BadRequestException('Phuong thuc thanh toan chua ho tro');
     const wallet = await this.wallet(userId);
-    const expiresAt = new Date(Date.now() + Number(this.config.get('WALLET_TOPUP_TTL_MINUTES', 30)) * 60_000);
+    const ttlMinutes = paymentMethod === 'PAYOS'
+      ? Number(this.config.get('PAYOS_PAYMENT_TTL_MINUTES', 15))
+      : Number(this.config.get('WALLET_TOPUP_TTL_MINUTES', 30));
+    const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
     let topUp: any;
     let referenceCode = '';
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -58,7 +63,8 @@ export class WalletService {
             walletId: wallet.id,
             userId,
             amountVnd: amount,
-            paymentMethod: 'BANK_TRANSFER',
+            paymentMethod: paymentMethod as any,
+            providerTransactionId: paymentMethod === 'PAYOS' ? `PENDING-${Date.now()}-${Math.floor(Math.random() * 1000)}` : undefined,
             referenceCode,
             expiresAt,
           },
@@ -69,17 +75,54 @@ export class WalletService {
       }
     }
     if (!topUp) throw new ConflictException('Khong the tao ma giao dich, vui long thu lai');
-    return {
+    const response: any = {
       transactionId: topUp.id,
       amount: amount,
       currency: 'VND',
       status: topUp.status,
       paymentMethod: topUp.paymentMethod,
-      bank: this.bank(),
+      bank: paymentMethod === 'BANK_TRANSFER' ? this.bank() : undefined,
       referenceCode,
       transferContent: `NAP PSY ${referenceCode}`,
       expiresAt: topUp.expiresAt,
     };
+    if (paymentMethod === 'PAYOS') {
+      if (!this.payos.isConfigured()) throw new BadRequestException('PayOS chua duoc cau hinh');
+      const orderCode = Date.now();
+      const data = await this.payos.createPaymentLink({ orderCode, amount, description: `Nap vi ${referenceCode}`, reference: referenceCode });
+      await this.prisma.topUpTransaction.update({ where: { id: topUp.id }, data: { providerTransactionId: String(orderCode) } });
+      response.checkoutUrl = data.checkoutUrl;
+      response.qrCode = data.qrCode ?? null;
+      response.paymentMethod = 'PAYOS';
+      response.accountNumber = data.accountNumber ?? null;
+      response.accountName = data.accountName ?? null;
+    }
+    return response;
+  }
+
+  async processPayosWebhook(body: Record<string, unknown>) {
+    const data: any = this.payos.verifyWebhook(body as any);
+    const orderCode = data.orderCode != null ? String(data.orderCode) : null;
+    if (!orderCode) throw new BadRequestException('Webhook PayOS thieu orderCode');
+    const topUp = await this.prisma.topUpTransaction.findFirst({ where: { providerTransactionId: orderCode, paymentMethod: 'PAYOS' } });
+    if (!topUp) throw new NotFoundException('Khong tim thay giao dich nap PayOS');
+    if (String(data.code ?? data.status ?? '').toUpperCase() !== '00' && String(data.status ?? '').toUpperCase() !== 'PAID') return { ok: true, status: topUp.status };
+    if (Number(data.amount) !== topUp.amountVnd)
+      throw new ConflictException('So tien webhook PayOS khong khop giao dich');
+    return this.simulateInternal(topUp.id);
+  }
+
+  private async simulateInternal(id: string) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const topUp = await tx.topUpTransaction.findUniqueOrThrow({ where: { id } });
+      if (topUp.status === 'SUCCESS') return topUp;
+      if (['FAILED', 'EXPIRED', 'CANCELLED'].includes(topUp.status)) throw new ConflictException('Giao dich khong the cap nhat');
+      const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: topUp.walletId } });
+      const updated = await tx.wallet.update({ where: { id: wallet.id }, data: { balanceVnd: { increment: topUp.amountVnd } } });
+      await tx.walletLedgerEntry.create({ data: { walletId: wallet.id, topUpId: topUp.id, type: 'TOP_UP', amountVnd: topUp.amountVnd, balanceBeforeVnd: wallet.balanceVnd, balanceAfterVnd: updated.balanceVnd, referenceType: 'TOP_UP', referenceId: topUp.id } });
+      return tx.topUpTransaction.update({ where: { id }, data: { status: 'SUCCESS', processedAt: new Date() } });
+    });
+    return result;
   }
   async list(userId: string, page = 1, limit = 20) {
     const where = { userId };

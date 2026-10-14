@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+﻿import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { CreateServiceCatalogDto, ServiceCatalogQueryDto, UpdateServiceCatalogDto } from '../dto/service-catalog.dto';
 
@@ -46,7 +46,7 @@ export class ServiceCatalogService {
     ];
     const categories = new Map<string, string>();
     for (const group of groups) {
-      const category = await this.prisma.serviceCategory.upsert({ where: { slug: group.slug }, update: { isActive: true }, create: group });
+      const category = await this.prisma.serviceCategory.upsert({ where: { slug: group.slug }, update: { name: group.name, isActive: true }, create: group });
       categories.set(group.slug, category.id);
     }
     const defaults = [
@@ -56,11 +56,10 @@ export class ServiceCatalogService {
       ['stretching-tai-nha', 'Stretching tại nhà', 'massage-gian-co'], ['tap-tai-nha', 'Tập tại nhà', 'pt-fitness'],
       ['tap-tai-phong-gym', 'Tập tại phòng gym', 'pt-fitness'], ['phuc-hoi-van-dong', 'Phục hồi vận động', 'pt-fitness'],
       ['pt-online', 'PT online', 'pt-fitness'], ['yoga-pilates', 'Yoga - Pilates', 'yoga-pilates'],
-    ] as const;
-    let created = 0;
+    ] as const;    let created = 0;
     for (const [slug, name, categorySlug] of defaults) {
       const exists = await this.prisma.serviceCatalogItem.findUnique({ where: { slug } });
-      if (exists) continue;
+      if (exists) { await this.prisma.serviceCatalogItem.update({ where: { id: exists.id }, data: { name } }); continue; }
       await this.create({ categoryId: categories.get(categorySlug)!, slug, name, pricingTemplate: 'STANDARD_60_90_120', modes: ['HOME'], priceOptions: [
         { code: '60_MINUTES', durationMinutes: 60, price: 500000, sortOrder: 0 },
         { code: '90_MINUTES', durationMinutes: 90, price: 600000, sortOrder: 1 },
@@ -188,3 +187,5 @@ export class ServiceCatalogService {
     };
   }
 }
+
+

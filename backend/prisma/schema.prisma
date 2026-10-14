@@ -116,6 +116,7 @@ enum WalletTransactionType {
 }
 enum WalletPaymentMethod {
   BANK_TRANSFER
+  PAYOS
 }
 
 enum CourseAccess {

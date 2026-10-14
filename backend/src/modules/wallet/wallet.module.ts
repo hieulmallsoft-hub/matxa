@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
-import { WalletController, AdminWalletController } from './wallet.controller';
+import { WalletController, AdminWalletController, WalletPayosWebhookController } from './wallet.controller';
 import { WalletService } from './wallet.service';
 import { AuthModule } from '../auth/auth.module';
+import { BookingsModule } from '../bookings/bookings.module';
 
 @Module({
-  imports: [AuthModule],
-  controllers: [WalletController, AdminWalletController],
+  imports: [AuthModule, BookingsModule],
+  controllers: [WalletController, AdminWalletController, WalletPayosWebhookController],
   providers: [WalletService],
   exports: [WalletService],
 })

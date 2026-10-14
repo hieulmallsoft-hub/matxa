@@ -45,6 +45,17 @@ export class WalletController {
   }
 }
 
+@ApiTags('PayOS Wallet')
+@Controller('payments/payos/wallet')
+export class WalletPayosWebhookController {
+  constructor(private readonly wallet: WalletService) {}
+  @Post('webhook')
+  @ApiOperation({ summary: 'PayOS webhook cho giao dich nap vi' })
+  webhook(@Body() body: Record<string, unknown>) {
+    return this.wallet.processPayosWebhook(body);
+  }
+}
+
 @ApiTags('Admin - Wallet')
 @ApiBearerAuth('access-token')
 @UseGuards(AccessTokenGuard, RolesGuard)
