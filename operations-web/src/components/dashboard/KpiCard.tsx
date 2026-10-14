@@ -26,24 +26,24 @@ const ICONS = {
 
 const ACCENT_STYLES = {
   blue: {
-    bgGlow: 'rgba(59, 130, 246, 0.15)',
-    iconBg: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-    gradientStroke: '#3B82F6',
+    bgGlow: 'rgba(56, 87, 35, 0.25)',
+    iconBg: 'bg-[#385723]/30 text-[#F9EDB2] border-[#385723]/60',
+    gradientStroke: '#385723',
   },
   cyan: {
-    bgGlow: 'rgba(6, 182, 212, 0.15)',
-    iconBg: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-    gradientStroke: '#06B6D4',
+    bgGlow: 'rgba(148, 171, 113, 0.25)',
+    iconBg: 'bg-[#94AB71]/25 text-[#FFFAF5] border-[#94AB71]/60',
+    gradientStroke: '#94AB71',
   },
   violet: {
-    bgGlow: 'rgba(139, 92, 246, 0.15)',
-    iconBg: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
-    gradientStroke: '#8B5CF6',
+    bgGlow: 'rgba(249, 237, 178, 0.25)',
+    iconBg: 'bg-[#F9EDB2]/20 text-[#F9EDB2] border-[#F9EDB2]/40',
+    gradientStroke: '#F9EDB2',
   },
   emerald: {
-    bgGlow: 'rgba(16, 185, 129, 0.15)',
-    iconBg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    gradientStroke: '#10B981',
+    bgGlow: 'rgba(199, 217, 181, 0.25)',
+    iconBg: 'bg-[#C7D9B5]/25 text-[#FFFAF5] border-[#C7D9B5]/60',
+    gradientStroke: '#C7D9B5',
   },
 };
 
@@ -71,7 +71,7 @@ const MiniSparkline: React.FC<{ data: number[]; color: string }> = ({ data, colo
       <svg width={width} height={height} className="overflow-visible">
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+            <stop offset="0%" stopColor={color} stopOpacity="0.4" />
             <stop offset="100%" stopColor={color} stopOpacity="0.0" />
           </linearGradient>
         </defs>
@@ -79,7 +79,7 @@ const MiniSparkline: React.FC<{ data: number[]; color: string }> = ({ data, colo
         <polyline
           fill="none"
           stroke={color}
-          strokeWidth="2"
+          strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
           points={points}
@@ -140,7 +140,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({ metric, index }) => {
     >
       <TiltCard
         glowColor={style.bgGlow}
-        className="p-5 sm:p-6 bg-[#0E1220]/80 backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all rounded-2xl"
+        className="p-5 sm:p-6 bg-[#001910]/90 backdrop-blur-xl border border-[#385723]/40 hover:border-[#94AB71]/60 transition-all rounded-2xl shadow-lg"
       >
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -148,10 +148,10 @@ export const KpiCard: React.FC<KpiCardProps> = ({ metric, index }) => {
               <Icon className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs font-medium text-slate-400 tracking-wide uppercase">
+              <span className="text-xs font-semibold text-[#C7D9B5]/80 tracking-wide uppercase">
                 {metric.title}
               </span>
-              <div className="text-2xl sm:text-3xl font-bold tracking-tight text-white mt-0.5">
+              <div className="text-2xl sm:text-3xl font-bold tracking-tight text-[#FFFAF5] mt-0.5">
                 {displayValue}
               </div>
             </div>
@@ -161,8 +161,8 @@ export const KpiCard: React.FC<KpiCardProps> = ({ metric, index }) => {
           <div
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-medium ${
               metric.isPositive
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                ? 'bg-[#385723]/40 text-[#C7D9B5] border border-[#94AB71]/40'
+                : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
             }`}
           >
             {metric.isPositive ? (
@@ -178,12 +178,12 @@ export const KpiCard: React.FC<KpiCardProps> = ({ metric, index }) => {
         </div>
 
         {/* Bottom row: Sparkline & Comparison Text */}
-        <div className="pt-2 border-t border-white/5 flex items-end justify-between">
+        <div className="pt-2 border-t border-[#385723]/30 flex items-end justify-between">
           <div className="space-y-0.5">
-            <div className="text-[11px] text-slate-400 font-mono">
+            <div className="text-[11px] text-[#C7D9B5]/80 font-mono">
               {metric.comparisonText}
             </div>
-            <div className="text-[10px] text-slate-500">
+            <div className="text-[10px] text-[#94AB71]/80">
               {metric.timeframe}
             </div>
           </div>

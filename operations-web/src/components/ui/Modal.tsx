@@ -47,7 +47,7 @@ export const Modal: React.FC<ModalProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/80 backdrop-blur-md"
+            className="fixed inset-0 bg-[#001910]/85 backdrop-blur-md"
           />
 
           {/* Modal Card */}
@@ -56,24 +56,24 @@ export const Modal: React.FC<ModalProps> = ({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 15 }}
             transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-            className={`relative w-full ${MAX_WIDTHS[maxWidth]} rounded-2xl bg-[#0D101C] border border-white/10 shadow-2xl shadow-cyan-950/40 overflow-hidden z-10 flex flex-col max-h-[90vh]`}
+            className={`relative w-full ${MAX_WIDTHS[maxWidth]} rounded-2xl bg-[#001910] border border-[#385723]/50 shadow-2xl shadow-[#001910]/95 overflow-hidden z-10 flex flex-col max-h-[90vh]`}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-slate-900/40">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#385723]/30 bg-[#001910]/80">
               <div>
-                <h3 className="text-base font-semibold text-white tracking-wide">{title}</h3>
-                {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+                <h3 className="text-base font-semibold text-[#FFFAF5] tracking-wide">{title}</h3>
+                {subtitle && <p className="text-xs text-[#C7D9B5]/80 mt-0.5">{subtitle}</p>}
               </div>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                className="p-1.5 rounded-lg text-[#C7D9B5]/70 hover:text-[#FFFAF5] hover:bg-[#385723]/25 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Scrollable Body */}
-            <div className="p-6 overflow-y-auto text-sm text-slate-300 space-y-4">
+            <div className="p-6 overflow-y-auto text-sm text-[#C7D9B5]/90 space-y-4">
               {children}
             </div>
           </motion.div>

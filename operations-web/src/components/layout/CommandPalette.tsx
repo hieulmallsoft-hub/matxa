@@ -107,6 +107,62 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       },
     },
     {
+      id: 'nav-technicians',
+      title: 'Quản lý Kỹ thuật viên',
+      subtitle: 'Danh bạ KTV, trạng thái hoạt động & đánh giá',
+      icon: <Users className="w-4 h-4 text-emerald-400" />,
+      category: 'Navigation',
+      shortcut: 'G T',
+      action: () => {
+        onNavigate('technicians');
+        onClose();
+      },
+    },
+    {
+      id: 'nav-applications',
+      title: 'Duyệt hồ sơ KTV',
+      subtitle: 'Xét duyệt hồ sơ ứng tuyển, ảnh KYC & xác thực',
+      icon: <FilePlus className="w-4 h-4 text-amber-400" />,
+      category: 'Navigation',
+      action: () => {
+        onNavigate('applications');
+        onClose();
+      },
+    },
+    {
+      id: 'nav-catalog',
+      title: 'Catalog & Bảng giá Dịch vụ',
+      subtitle: 'Danh mục trị liệu, thời lượng & cấu hình giá',
+      icon: <Layers className="w-4 h-4 text-teal-400" />,
+      category: 'Navigation',
+      action: () => {
+        onNavigate('catalog');
+        onClose();
+      },
+    },
+    {
+      id: 'nav-courses',
+      title: 'Khóa học Đào tạo',
+      subtitle: 'Quản lý bài giảng video, tài liệu PDF đào tạo',
+      icon: <Sparkles className="w-4 h-4 text-indigo-400" />,
+      category: 'Navigation',
+      action: () => {
+        onNavigate('courses');
+        onClose();
+      },
+    },
+    {
+      id: 'nav-promotions',
+      title: 'Khuyến mãi & Voucher',
+      subtitle: 'Mã giảm giá, chiến dịch banner khuyến mãi',
+      icon: <CreditCard className="w-4 h-4 text-rose-400" />,
+      category: 'Navigation',
+      action: () => {
+        onNavigate('promotions');
+        onClose();
+      },
+    },
+    {
       id: 'nav-payments',
       title: 'Go to Payments',
       subtitle: 'Stripe, Apple Pay & crypto settlement nodes',

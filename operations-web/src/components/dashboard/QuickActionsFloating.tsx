@@ -27,37 +27,37 @@ interface ActionButton {
 const ACTIONS: ActionButton[] = [
   {
     id: 'create-order',
-    label: 'Create Order',
+    label: 'Tạo Lịch / Đơn Mới',
     icon: ShoppingBag,
-    color: 'text-cyan-400',
-    bgGradient: 'from-cyan-500 to-blue-600',
+    color: 'text-[#F9EDB2]',
+    bgGradient: 'from-[#385723] to-[#4d7530]',
     delay: 0.05,
     offsetY: -70,
   },
   {
     id: 'add-product',
-    label: 'Add Product',
+    label: 'Thêm Gói Trị Liệu',
     icon: Layers,
-    color: 'text-amber-400',
-    bgGradient: 'from-amber-500 to-orange-600',
+    color: 'text-[#FFFAF5]',
+    bgGradient: 'from-[#94AB71] to-[#385723]',
     delay: 0.1,
     offsetY: -130,
   },
   {
     id: 'add-customer',
-    label: 'Add Customer',
+    label: 'Đăng Ký Hội Viên',
     icon: UserPlus,
-    color: 'text-violet-400',
-    bgGradient: 'from-violet-500 to-purple-600',
+    color: 'text-[#C7D9B5]',
+    bgGradient: 'from-[#2d481c] to-[#94AB71]',
     delay: 0.15,
     offsetY: -190,
   },
   {
     id: 'new-report',
-    label: 'Create Report',
+    label: 'Xuất Báo Cáo Doanh Thu',
     icon: FileText,
-    color: 'text-emerald-400',
-    bgGradient: 'from-emerald-500 to-teal-600',
+    color: 'text-[#F9EDB2]',
+    bgGradient: 'from-[#4d7530] to-[#203613]',
     delay: 0.2,
     offsetY: -250,
   },
@@ -80,7 +80,7 @@ export const QuickActionsFloating: React.FC<QuickActionsFloatingProps> = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-30"
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30"
             />
 
             {/* Floating Action Buttons */}
@@ -102,7 +102,7 @@ export const QuickActionsFloating: React.FC<QuickActionsFloatingProps> = ({
                     className="absolute bottom-0 right-0 flex items-center gap-3 whitespace-nowrap"
                   >
                     {/* Tooltip Label */}
-                    <div className="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-white/15 backdrop-blur-md text-white text-xs font-medium shadow-2xl">
+                    <div className="px-3 py-1.5 rounded-xl bg-[#001910]/95 border border-[#385723]/60 backdrop-blur-md text-[#FFFAF5] text-xs font-medium shadow-2xl">
                       {action.label}
                     </div>
 
@@ -114,7 +114,7 @@ export const QuickActionsFloating: React.FC<QuickActionsFloatingProps> = ({
                         onTriggerAction(action.id);
                         setIsOpen(false);
                       }}
-                      className={`w-12 h-12 rounded-2xl bg-gradient-to-tr ${action.bgGradient} flex items-center justify-center text-white shadow-xl shadow-indigo-950/60 border border-white/20`}
+                      className={`w-12 h-12 rounded-2xl bg-gradient-to-tr ${action.bgGradient} flex items-center justify-center text-[#FFFAF5] shadow-xl shadow-[#001910]/80 border border-[#F9EDB2]/30`}
                     >
                       <Icon className="w-5 h-5" />
                     </motion.button>
@@ -131,8 +131,8 @@ export const QuickActionsFloating: React.FC<QuickActionsFloatingProps> = ({
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.94 }}
         onClick={() => setIsOpen(!isOpen)}
-        className="relative z-40 w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-2xl shadow-cyan-500/30 border border-white/30 cursor-pointer"
-        title="Quick Actions"
+        className="relative z-40 w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#385723] via-[#4d7530] to-[#94AB71] flex items-center justify-center text-[#FFFAF5] shadow-2xl shadow-[#001910]/80 border border-[#F9EDB2]/40 cursor-pointer"
+        title="Tác vụ nhanh"
       >
         <motion.div
           animate={{ rotate: isOpen ? 45 : 0 }}

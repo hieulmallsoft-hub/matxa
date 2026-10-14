@@ -31,51 +31,51 @@ export const NewReportModal: React.FC<NewReportModalProps> = ({ isOpen, onClose 
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Generate Intelligence Report"
-      subtitle="Export cryptographic analytics data and executive metrics"
+      title="Xuất Báo Cáo Điều Hành Vận Hành"
+      subtitle="Tổng hợp dữ liệu doanh thu, kỹ thuật viên và liệu trình spa"
       maxWidth="lg"
     >
       <div className="space-y-4">
         {/* Report Types */}
         <div>
-          <label className="block text-xs font-mono text-slate-400 mb-2 uppercase">
-            Select Report Matrix
+          <label className="block text-xs font-mono text-[#C7D9B5] mb-2 uppercase">
+            Chọn Loại Báo Cáo
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {[
               {
                 id: 'executive',
-                title: 'Executive Financial Summary',
-                desc: 'Gross revenue, orders, and profit margins',
+                title: 'Tổng Hợp Tài Chính & Doanh Thu',
+                desc: 'Doanh số ròng, số lượt đặt và lợi nhuận gói',
               },
               {
                 id: 'regional',
-                title: 'Global Telemetry & Nodes',
-                desc: 'Latency, regional volume & edge routing',
+                title: 'Mạng Lưới Chi Nhánh & Khu Vực',
+                desc: 'Hiệu suất vận hành từng cơ sở và chi nhánh',
               },
               {
                 id: 'cohort',
-                title: 'Customer Cohorts & LTV',
-                desc: 'Retention curves, acquisition costs, NPS',
+                title: 'Hội Viên & Tỷ Lệ Quay Lại',
+                desc: 'Phân tích tệp khách VIP, tỷ lệ giữ chân & NPS',
               },
               {
                 id: 'inventory',
-                title: 'Hardware & Stock Matrix',
-                desc: 'DC allocation, units sold, replenishment',
+                title: 'Dược Liệu & Vật Tư Spa',
+                desc: 'Mức tiêu hao tinh dầu, thảo dược và bù đắp kho',
               },
             ].map((item) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setReportType(item.id)}
-                className={`p-3 rounded-xl text-left border transition-all ${
+                className={`p-3 rounded-xl text-left border transition-all cursor-pointer ${
                   reportType === item.id
-                    ? 'bg-gradient-to-br from-indigo-600/30 to-cyan-600/20 border-cyan-500/50 text-white'
-                    : 'bg-white/[0.02] border-white/10 text-slate-400 hover:text-white hover:bg-white/5'
+                    ? 'bg-[#385723]/35 border-[#94AB71]/60 text-[#FFFAF5]'
+                    : 'bg-[#001910] border-[#385723]/40 text-[#C7D9B5]/70 hover:text-[#FFFAF5] hover:bg-[#385723]/15'
                 }`}
               >
-                <div className="font-semibold text-xs text-white">{item.title}</div>
-                <div className="text-[11px] text-slate-400 mt-0.5">{item.desc}</div>
+                <div className="font-semibold text-xs text-[#FFFAF5]">{item.title}</div>
+                <div className="text-[11px] text-[#C7D9B5]/80 mt-0.5">{item.desc}</div>
               </button>
             ))}
           </div>
@@ -83,14 +83,14 @@ export const NewReportModal: React.FC<NewReportModalProps> = ({ isOpen, onClose 
 
         {/* Date Scope */}
         <div>
-          <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase">
-            Date Scope
+          <label className="block text-xs font-mono text-[#C7D9B5] mb-1.5 uppercase">
+            Khoảng Thời Gian
           </label>
           <div className="grid grid-cols-3 gap-2 text-xs font-medium">
-            {['Last 7 Days', 'Q3 2026', 'Year to Date'].map((d) => (
+            {['7 Ngày Qua', 'Quý Này', 'Từ Đầu Năm'].map((d) => (
               <div
                 key={d}
-                className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-center text-slate-300 font-mono text-[11px]"
+                className="p-2.5 rounded-xl bg-[#001910] border border-[#385723]/40 text-center text-[#C7D9B5] font-mono text-[11px]"
               >
                 {d}
               </div>
@@ -100,23 +100,23 @@ export const NewReportModal: React.FC<NewReportModalProps> = ({ isOpen, onClose 
 
         {/* Format */}
         <div>
-          <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase">
-            Export Format
+          <label className="block text-xs font-mono text-[#C7D9B5] mb-1.5 uppercase">
+            Định Dạng Xuất
           </label>
           <div className="flex gap-3">
             {[
-              { id: 'pdf', label: 'PDF Document (.pdf)' },
-              { id: 'csv', label: 'Raw Ledger (.csv)' },
-              { id: 'json', label: 'JSON Telemetry (.json)' },
+              { id: 'pdf', label: 'Tài liệu PDF (.pdf)' },
+              { id: 'csv', label: 'Bảng tính Excel (.csv)' },
+              { id: 'json', label: 'Dữ liệu JSON (.json)' },
             ].map((fmt) => (
               <button
                 key={fmt.id}
                 type="button"
                 onClick={() => setFormat(fmt.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-mono transition-all border ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-mono transition-all border cursor-pointer ${
                   format === fmt.id
-                    ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
-                    : 'bg-white/5 border-white/5 text-slate-400 hover:text-white'
+                    ? 'bg-[#385723]/40 border-[#94AB71]/60 text-[#FFFAF5] font-semibold'
+                    : 'bg-[#001910] border-[#385723]/30 text-[#C7D9B5]/70 hover:text-[#FFFAF5]'
                 }`}
               >
                 {fmt.label}
@@ -126,18 +126,18 @@ export const NewReportModal: React.FC<NewReportModalProps> = ({ isOpen, onClose 
         </div>
 
         {/* Action Button */}
-        <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
+        <div className="pt-3 border-t border-[#385723]/30 flex items-center justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white transition-colors"
+            className="px-4 py-2 rounded-xl text-xs text-[#C7D9B5]/80 hover:text-[#FFFAF5] transition-colors cursor-pointer"
           >
-            Cancel
+            Hủy
           </button>
 
           <button
             onClick={handleGenerate}
             disabled={isGenerating}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 text-white text-xs font-semibold shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 border border-white/20 transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-[#385723] via-[#4d7530] to-[#94AB71] text-[#FFFAF5] text-xs font-semibold shadow-lg shadow-[#385723]/40 border border-[#F9EDB2]/30 transition-all disabled:opacity-50 cursor-pointer"
           >
             {isGenerating ? (
               <>

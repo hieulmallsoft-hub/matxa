@@ -90,11 +90,11 @@ export const REVENUE_DATA: Record<string, RevenueDataPoint[]> = {
 };
 
 export const SALES_CHANNELS: SalesChannel[] = [
-  { name: 'Direct Sales', value: 42, revenue: 53940, color: '#3B82F6', growth: 14.8 },
-  { name: 'Marketplace', value: 26, revenue: 33391, color: '#8B5CF6', growth: 9.4 },
-  { name: 'Social Media', value: 16, revenue: 20548, color: '#06B6D4', growth: 22.1 },
-  { name: 'Affiliate', value: 11, revenue: 14127, color: '#10B981', growth: 5.7 },
-  { name: 'Other', value: 5, revenue: 6424, color: '#F59E0B', growth: -1.2 },
+  { name: 'Direct Sales', value: 42, revenue: 53940, color: '#385723', growth: 14.8 },
+  { name: 'Marketplace', value: 26, revenue: 33391, color: '#94AB71', growth: 9.4 },
+  { name: 'Social Media', value: 16, revenue: 20548, color: '#C7D9B5', growth: 22.1 },
+  { name: 'Affiliate', value: 11, revenue: 14127, color: '#F9EDB2', growth: 5.7 },
+  { name: 'Other', value: 5, revenue: 6424, color: '#27411a', growth: -1.2 },
 ];
 
 export const INITIAL_LIVE_ACTIVITY: LiveActivityEvent[] = [
