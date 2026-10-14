@@ -249,11 +249,29 @@ The job detail contains customer, address, scheduled time, mode, services, durat
 ## 9. Notifications
 
 ```http
+POST  /notifications/devices
 GET   /notifications
 PATCH /notifications/{id}/read
 PATCH /notifications/read-all
 DELETE /notifications/{id}
 ```
+
+When registering the FCM token, Mobile must send the language currently selected in
+the app. The backend stores it per device and sends each push in that device's
+language, so one account can safely use different languages on different phones.
+
+```json
+{
+  "token": "<fcm-registration-token>",
+  "platform": "ANDROID",
+  "deviceId": "<stable-device-id>",
+  "locale": "vi"
+}
+```
+
+`locale` is a BCP-47 style value such as `vi`, `en`, `ko`, or `ja`; it defaults to
+`vi` when omitted. Mobile should call this endpoint again whenever the user changes
+the app language, and call `DELETE /notifications/devices` on logout.
 
 After Admin approves or rejects an application, Mobile reads the result from the application API and notification API.
 

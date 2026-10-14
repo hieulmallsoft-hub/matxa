@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class RegisterDeviceTokenDto {
   @ApiProperty({ description: 'FCM registration token lay tu Firebase Messaging tren mobile' })
@@ -17,6 +17,13 @@ export class RegisterDeviceTokenDto {
   @IsString()
   @MaxLength(255)
   deviceId?: string;
+
+  @ApiPropertyOptional({ description: 'Ngôn ngữ ứng dụng trên thiết bị, ví dụ vi hoặc en', default: 'vi' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[a-z]{2}(?:-[A-Z]{2})?$/)
+  @MaxLength(16)
+  locale?: string;
 }
 
 export class RemoveDeviceTokenDto {

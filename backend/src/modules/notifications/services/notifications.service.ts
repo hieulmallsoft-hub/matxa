@@ -18,9 +18,9 @@ export class NotificationsService {
   registerDevice(userId: string, dto: RegisterDeviceTokenDto) {
     return this.prisma.deviceToken.upsert({
       where: { token: dto.token },
-      create: { userId, token: dto.token, platform: dto.platform, deviceId: dto.deviceId },
-      update: { userId, platform: dto.platform, deviceId: dto.deviceId, lastSeenAt: new Date() },
-      select: { id: true, platform: true, deviceId: true, createdAt: true, lastSeenAt: true },
+      create: { userId, token: dto.token, platform: dto.platform, deviceId: dto.deviceId, locale: dto.locale ?? 'vi' },
+      update: { userId, platform: dto.platform, deviceId: dto.deviceId, locale: dto.locale ?? 'vi', lastSeenAt: new Date() },
+      select: { id: true, platform: true, deviceId: true, locale: true, createdAt: true, lastSeenAt: true },
     });
   }
 
@@ -42,35 +42,51 @@ export class NotificationsService {
   }
 
   async sendPush(userId: string, title: string, body: string, data: Record<string, string> = {}) {
-    const devices = await this.prisma.deviceToken.findMany({ where: { userId }, select: { token: true } });
+    const devices = await this.prisma.deviceToken.findMany({ where: { userId }, select: { token: true, locale: true } });
     if (devices.length === 0) return { deviceCount: 0, successCount: 0, failureCount: 0 };
-
-    const tokens = devices.map((device) => device.token);
-    let response;
-    try {
-      response = await getMessaging(this.firebaseApp).sendEachForMulticast({
-        tokens,
-        notification: { title, body },
-        data,
-        android: { priority: 'high', notification: { channelId: 'matxa_notifications' } },
-      });
-    } catch (error) {
-      this.logger.error(
-        `FCM multicast failed for ${tokens.length} device(s)`,
-        error instanceof Error ? error.stack : undefined,
-      );
-      return { deviceCount: tokens.length, successCount: 0, failureCount: tokens.length };
+    const groups = new Map<string, typeof devices>();
+    for (const device of devices) groups.set(device.locale || 'vi', [...(groups.get(device.locale || 'vi') ?? []), device]);
+    let successCount = 0;
+    let failureCount = 0;
+    const invalidTokens: string[] = [];
+    for (const [locale, group] of groups) {
+      const tokens = group.map((device) => device.token);
+      try {
+        const localized = this.localize(data.type, title, body, locale);
+        const response = await getMessaging(this.firebaseApp).sendEachForMulticast({
+          tokens,
+          notification: localized,
+          data: { ...data, locale },
+          android: { priority: 'high', notification: { channelId: 'matxa_notifications' } },
+        });
+        successCount += response.successCount;
+        failureCount += response.failureCount;
+        response.responses.forEach((item, index) => {
+          const code = item.error?.code;
+          if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') invalidTokens.push(tokens[index]);
+        });
+      } catch (error) {
+        this.logger.error(`FCM multicast failed for ${tokens.length} ${locale} device(s)`, error instanceof Error ? error.stack : undefined);
+        failureCount += tokens.length;
+      }
     }
-    const invalidTokens = response.responses.flatMap((item, index) => {
-      const code = item.error?.code;
-      return code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token'
-        ? [tokens[index]]
-        : [];
-    });
     if (invalidTokens.length > 0) {
       await this.prisma.deviceToken.deleteMany({ where: { token: { in: invalidTokens } } });
     }
-    return { deviceCount: tokens.length, successCount: response.successCount, failureCount: response.failureCount };
+    return { deviceCount: devices.length, successCount, failureCount };
+  }
+
+  private localize(type: string | undefined, title: string, body: string, locale: string) {
+    if (!locale.toLowerCase().startsWith('en')) return { title, body };
+    const translations: Record<string, { title: string; body: string }> = {
+      BOOKING_CREATED: { title: 'New booking', body: 'A new booking is waiting for confirmation.' },
+      BOOKING_AUTO_COMPLETED: { title: 'Booking completed', body: 'The booking was automatically completed after 24 hours.' },
+      CHAT_MESSAGE_RECEIVED: { title: 'New message', body: 'You have a new message.' },
+      TECHNICIAN_KYC_REJECTED: { title: 'KYC needs updates', body: 'Please review and update your technician profile.' },
+      TECHNICIAN_APPLICATION_APPROVED: { title: 'Application approved', body: 'You can now configure your services and schedule.' },
+      TECHNICIAN_APPLICATION_REJECTED: { title: 'Application needs updates', body: 'Please review the reason and update your application.' },
+    };
+    return translations[type ?? ''] ?? { title, body };
   }
 
   async list(userId: string, query: ListNotificationsDto) {

@@ -847,6 +847,7 @@ model DeviceToken {
   token      String   @unique
   platform   String   @default("ANDROID")
   deviceId   String?  @map("device_id")
+  locale     String   @default("vi")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
   lastSeenAt DateTime @default(now()) @map("last_seen_at")
