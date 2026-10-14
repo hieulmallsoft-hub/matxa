@@ -391,6 +391,18 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
       {/* ── OVERVIEW ── */}
       {tab === 'overview' && (
         <>
+          <section className="wellness-hero" aria-label="Không gian chăm sóc Psyocore">
+            <img className="wellness-hero-image" src="/wellness/massage-treatment.jpg" alt="Không gian massage Psyocore" />
+            <div className="wellness-hero-copy">
+              <span className="wellness-hero-kicker">Psyocore Wellness</span>
+              <h2>Vận hành nhẹ nhàng,<br />chăm sóc trọn vẹn.</h2>
+              <p>Theo dõi dịch vụ, lịch hẹn và đội ngũ KTV trong một không gian vận hành ấm áp.</p>
+              <div className="wellness-hero-stats">
+                <span><b>{dashboard?.activeTechnicians ?? 0}</b>KTV đang hoạt động</span>
+                <span><b>{dashboard?.todayBookings ?? 0}</b>lịch hôm nay</span>
+              </div>
+            </div>
+          </section>
           <div className="kpi-grid">
             <Kpi
               label="Doanh thu tháng này"
