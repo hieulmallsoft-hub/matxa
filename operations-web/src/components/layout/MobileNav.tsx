@@ -11,6 +11,13 @@ import {
   Cpu,
   Radio,
   Zap,
+  UserCheck,
+  ClipboardCheck,
+  FolderTree,
+  BookOpen,
+  TicketPercent,
+  Bell,
+  MessageSquare,
 } from 'lucide-react';
 import { PageId } from '../../types/dashboard';
 
@@ -22,12 +29,18 @@ interface MobileNavProps {
 }
 
 const MOBILE_DRAWER_ITEMS: { id: PageId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'analytics', label: 'Analytics', icon: LineChart },
-  { id: 'orders', label: 'Orders', icon: ShoppingBag },
-  { id: 'customers', label: 'Customers', icon: Users },
-  { id: 'products', label: 'Products', icon: Layers },
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
+  { id: 'analytics', label: 'Doanh thu & chỉ số', icon: LineChart },
+  { id: 'orders', label: 'Lịch đặt & đơn hàng', icon: ShoppingBag },
+  { id: 'technicians', label: 'Kỹ thuật viên', icon: UserCheck },
+  { id: 'applications', label: 'Duyệt hồ sơ KTV', icon: ClipboardCheck },
+  { id: 'catalog', label: 'Catalog dịch vụ', icon: FolderTree },
+  { id: 'courses', label: 'Khóa học đào tạo', icon: BookOpen },
+  { id: 'promotions', label: 'Khuyến mãi & Banner', icon: TicketPercent },
+  { id: 'customers', label: 'Khách hàng', icon: Users },
+  { id: 'messages', label: 'Tin nhắn CSKH', icon: MessageSquare },
+  { id: 'notifications', label: 'Cảnh báo hệ thống', icon: Bell },
+  { id: 'settings', label: 'Cấu hình hệ thống', icon: Settings },
 ];
 
 export const MobileNav: React.FC<MobileNavProps> = ({
@@ -55,25 +68,25 @@ export const MobileNav: React.FC<MobileNavProps> = ({
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative w-72 max-w-[80vw] h-full bg-[#080A12] border-r border-white/10 p-5 flex flex-col justify-between"
+              className="mobile-drawer relative w-80 max-w-[88vw] h-full p-5 flex flex-col justify-between"
             >
               <div>
-                <div className="flex items-center justify-between pb-6 border-b border-white/5">
+                <div className="flex items-center justify-between pb-6 border-b border-[#dce9d7]">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-400 flex items-center justify-center">
+                    <div className="mobile-brand-mark w-9 h-9 rounded-xl flex items-center justify-center">
                       <Cpu className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <span className="font-bold text-sm tracking-wider text-white">AETHERIS</span>
-                      <div className="text-[10px] text-cyan-400 font-mono">INTELLIGENCE OS</div>
+                      <span className="font-bold text-sm tracking-wider text-[#173624]">MATXA OPS</span>
+                      <div className="text-[10px] text-[#4f8f46] font-mono">WELLNESS OPERATIONS</div>
                     </div>
                   </div>
-                  <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-white">
+                  <button onClick={onClose} className="mobile-close-button p-1 rounded-lg">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
 
-                <div className="mt-6 space-y-1.5">
+                <div className="mt-6 space-y-1.5 overflow-y-auto pr-1">
                   {MOBILE_DRAWER_ITEMS.map((item) => {
                     const isActive = currentPage === item.id;
                     const Icon = item.icon;
@@ -86,8 +99,8 @@ export const MobileNav: React.FC<MobileNavProps> = ({
                         }}
                         className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
                           isActive
-                            ? 'bg-indigo-600/20 text-cyan-400 border border-indigo-500/30'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            ? 'mobile-nav-item-active'
+                            : 'mobile-nav-item'
                         }`}
                       >
                         <Icon className="w-4 h-4" />
@@ -98,12 +111,12 @@ export const MobileNav: React.FC<MobileNavProps> = ({
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-white/5 text-[11px] font-mono text-slate-500">
+              <div className="mobile-drawer-status pt-4 border-t text-[11px] font-mono">
                 <div className="flex items-center gap-2 mb-1">
-                  <Radio className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>CLUSTER NODE: US-EAST-1</span>
+                  <Radio className="w-3.5 h-3.5 text-[#4f8f46]" />
+                  <span>HỆ THỐNG ĐANG HOẠT ĐỘNG</span>
                 </div>
-                <div className="text-[10px] text-slate-600">AETHERIS BUILD 3.4.12</div>
+                <div className="text-[10px] text-[#78907a]">MATXA OPERATIONS</div>
               </div>
             </motion.div>
           </div>
@@ -111,13 +124,13 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       </AnimatePresence>
 
       {/* Mobile Floating Bottom Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 md:hidden bg-[#080A12]/90 backdrop-blur-xl border-t border-white/10 px-4 py-2 flex items-center justify-around">
+      <div className="mobile-bottom-nav fixed bottom-0 left-0 right-0 z-30 md:hidden px-3 py-2 flex items-center justify-around">
         {[
-          { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
-          { id: 'analytics', label: 'Analytics', icon: LineChart },
-          { id: 'orders', label: 'Orders', icon: ShoppingBag },
-          { id: 'customers', label: 'Customers', icon: Users },
-          { id: 'settings', label: 'Settings', icon: Settings },
+          { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
+          { id: 'orders', label: 'Lịch đặt', icon: ShoppingBag },
+          { id: 'technicians', label: 'KTV', icon: UserCheck },
+          { id: 'courses', label: 'Khóa học', icon: BookOpen },
+          { id: 'settings', label: 'Cài đặt', icon: Settings },
         ].map((tab) => {
           const isActive = currentPage === tab.id;
           const Icon = tab.icon;
@@ -126,7 +139,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
               key={tab.id}
               onClick={() => onNavigate(tab.id as PageId)}
               className={`flex flex-col items-center gap-1 p-1.5 transition-colors ${
-                isActive ? 'text-cyan-400' : 'text-slate-500 hover:text-slate-300'
+                isActive ? 'mobile-tab-active' : 'mobile-tab'
               }`}
             >
               <Icon className="w-5 h-5" />

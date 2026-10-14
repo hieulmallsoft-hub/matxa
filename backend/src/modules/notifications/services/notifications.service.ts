@@ -80,6 +80,7 @@ export class NotificationsService {
     if (!locale.toLowerCase().startsWith('en')) return { title, body };
     const translations: Record<string, { title: string; body: string }> = {
       BOOKING_CREATED: { title: 'New booking', body: 'A new booking is waiting for confirmation.' },
+      BOOKING_EXPIRED: { title: 'Booking expired', body: 'No technician was selected before the application deadline.' },
       BOOKING_AUTO_COMPLETED: { title: 'Booking completed', body: 'The booking was automatically completed after 24 hours.' },
       CHAT_MESSAGE_RECEIVED: { title: 'New message', body: 'You have a new message.' },
       TECHNICIAN_KYC_REJECTED: { title: 'KYC needs updates', body: 'Please review and update your technician profile.' },

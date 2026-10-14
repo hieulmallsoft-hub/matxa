@@ -54,13 +54,21 @@ describe('NotificationsService', () => {
       token: 'a-valid-fcm-token-that-is-long-enough',
       platform: 'ANDROID',
       deviceId: 'phone-1',
+      locale: 'en',
     });
     expect(deviceToken.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { token: 'a-valid-fcm-token-that-is-long-enough' },
-        create: expect.objectContaining({ userId: 'user-1', deviceId: 'phone-1' }),
+        create: expect.objectContaining({ userId: 'user-1', deviceId: 'phone-1', locale: 'en' }),
       }),
     );
+  });
+
+  it('translates an expired booking push for an English device', () => {
+    expect((service as any).localize('BOOKING_EXPIRED', 'Đơn đã hết hạn', 'Nội dung tiếng Việt', 'en')).toEqual({
+      title: 'Booking expired',
+      body: 'No technician was selected before the application deadline.',
+    });
   });
 
   it('removes only a token owned by the current user', async () => {

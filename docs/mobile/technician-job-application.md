@@ -78,7 +78,7 @@ Customer creates an open booking with platform catalog IDs:
 }
 ```
 
-`applicationDeadlineAt` is optional. If omitted, backend calculates it using `OPEN_BOOKING_APPLICATION_TTL_MINUTES` (default 60 minutes). Mobile uses `applicationDeadlineAt` and optional `expiresInSeconds` from the server for its countdown; it must never decide expiry itself.
+`applicationDeadlineAt` is optional. If omitted, backend calculates it using `OPEN_BOOKING_APPLICATION_TTL_MINUTES` (default 15 minutes). Mobile uses `applicationDeadlineAt` and optional `expiresInSeconds` from the server for its countdown; it must never decide expiry itself.
 
 Select one applicant:
 

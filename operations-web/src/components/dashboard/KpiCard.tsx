@@ -26,24 +26,24 @@ const ICONS = {
 
 const ACCENT_STYLES = {
   blue: {
-    bgGlow: 'rgba(56, 87, 35, 0.25)',
-    iconBg: 'bg-[#385723]/30 text-[#F9EDB2] border-[#385723]/60',
-    gradientStroke: '#385723',
+    bgGlow: 'rgba(34, 160, 74, 0.18)',
+    iconBg: 'bg-[#f0faf2] text-[#156b2e] border border-[rgba(34,160,74,0.22)]',
+    gradientStroke: '#22a04a',
   },
   cyan: {
-    bgGlow: 'rgba(148, 171, 113, 0.25)',
-    iconBg: 'bg-[#94AB71]/25 text-[#FFFAF5] border-[#94AB71]/60',
-    gradientStroke: '#94AB71',
+    bgGlow: 'rgba(56, 182, 94, 0.15)',
+    iconBg: 'bg-[#d8f3df] text-[#22a04a] border border-[rgba(56,182,94,0.30)]',
+    gradientStroke: '#38b65e',
   },
   violet: {
-    bgGlow: 'rgba(249, 237, 178, 0.25)',
-    iconBg: 'bg-[#F9EDB2]/20 text-[#F9EDB2] border-[#F9EDB2]/40',
-    gradientStroke: '#F9EDB2',
+    bgGlow: 'rgba(245, 158, 11, 0.15)',
+    iconBg: 'bg-[#fef9ee] text-[#b45309] border border-[rgba(245,158,11,0.28)]',
+    gradientStroke: '#f59e0b',
   },
   emerald: {
-    bgGlow: 'rgba(199, 217, 181, 0.25)',
-    iconBg: 'bg-[#C7D9B5]/25 text-[#FFFAF5] border-[#C7D9B5]/60',
-    gradientStroke: '#C7D9B5',
+    bgGlow: 'rgba(34, 160, 74, 0.14)',
+    iconBg: 'bg-[#eef8f1] text-[#1a8a3c] border border-[rgba(34,160,74,0.20)]',
+    gradientStroke: '#22a04a',
   },
 };
 
@@ -140,7 +140,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({ metric, index }) => {
     >
       <TiltCard
         glowColor={style.bgGlow}
-        className="p-5 sm:p-6 bg-[#001910]/90 backdrop-blur-xl border border-[#385723]/40 hover:border-[#94AB71]/60 transition-all rounded-2xl shadow-lg"
+        className="p-5 sm:p-6 bg-white border border-[rgba(34,160,74,0.14)] hover:border-[rgba(34,160,74,0.35)] transition-all rounded-2xl shadow-[0_2px_10px_rgba(10,80,30,0.07)]"
       >
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -148,10 +148,10 @@ export const KpiCard: React.FC<KpiCardProps> = ({ metric, index }) => {
               <Icon className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs font-semibold text-[#C7D9B5]/80 tracking-wide uppercase">
+              <span className="text-xs font-semibold text-[#5a8a68] tracking-wide uppercase">
                 {metric.title}
               </span>
-              <div className="text-2xl sm:text-3xl font-bold tracking-tight text-[#FFFAF5] mt-0.5">
+              <div className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0d3318] mt-0.5" style={{fontFamily: 'Quicksand, Nunito, sans-serif'}}>
                 {displayValue}
               </div>
             </div>
@@ -159,10 +159,10 @@ export const KpiCard: React.FC<KpiCardProps> = ({ metric, index }) => {
 
           {/* Percentage badge */}
           <div
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-medium ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
               metric.isPositive
-                ? 'bg-[#385723]/40 text-[#C7D9B5] border border-[#94AB71]/40'
-                : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+                ? 'bg-[#d8f3df] text-[#156b2e] border border-[rgba(34,160,74,0.28)]'
+                : 'bg-[#fee2e2] text-[#8a1c1c] border border-[rgba(229,62,62,0.25)]'
             }`}
           >
             {metric.isPositive ? (
@@ -178,12 +178,12 @@ export const KpiCard: React.FC<KpiCardProps> = ({ metric, index }) => {
         </div>
 
         {/* Bottom row: Sparkline & Comparison Text */}
-        <div className="pt-2 border-t border-[#385723]/30 flex items-end justify-between">
+        <div className="pt-2 border-t border-[rgba(34,160,74,0.12)] flex items-end justify-between">
           <div className="space-y-0.5">
-            <div className="text-[11px] text-[#C7D9B5]/80 font-mono">
+            <div className="text-[11px] text-[#5a8a68] font-medium">
               {metric.comparisonText}
             </div>
-            <div className="text-[10px] text-[#94AB71]/80">
+            <div className="text-[10px] text-[#8bbf9a]">
               {metric.timeframe}
             </div>
           </div>

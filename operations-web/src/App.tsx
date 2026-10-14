@@ -282,7 +282,7 @@ function AppInner() {
         />
 
         {/* Page Content Container */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
+        <main className="operations-page-surface flex-1 p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
           {renderCurrentPage()}
         </main>
       </div>

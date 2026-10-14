@@ -269,9 +269,11 @@ language, so one account can safely use different languages on different phones.
 }
 ```
 
-`locale` is a BCP-47 style value such as `vi`, `en`, `ko`, or `ja`; it defaults to
-`vi` when omitted. Mobile should call this endpoint again whenever the user changes
-the app language, and call `DELETE /notifications/devices` on logout.
+`locale` is a BCP-47 style value such as `vi` or `en`; it defaults to `vi` when
+omitted. Mobile must call this endpoint after login/app start, whenever the FCM token
+refreshes, and whenever the user changes the app language. This re-register step is
+required for devices registered before the locale field was introduced; otherwise they
+remain `vi`. Call `DELETE /notifications/devices` on logout.
 
 After Admin approves or rejects an application, Mobile reads the result from the application API and notification API.
 
