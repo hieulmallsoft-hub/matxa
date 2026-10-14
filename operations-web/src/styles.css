@@ -783,3 +783,77 @@ button, input, select, textarea, .card, .kpi-card, .list-item-card, .sidebar-ite
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
 }
+
+/* ==========================================================================\n+   WELLNESS BEAUTY THEME — warm, calm and service-friendly\n+   ========================================================================== */
+:root {
+  --green-50: #f1f7ec;
+  --green-100: #e2efda;
+  --green-200: #c8dfbd;
+  --green-300: #a6ca98;
+  --green-400: #76ad67;
+  --green-500: #4f8f46;
+  --green-600: #2f7138;
+  --green-700: #20552d;
+  --green-800: #153f25;
+  --green-900: #0e2d1b;
+  --bg-page: #f5f8f1;
+  --bg-topbar: #fffdf8;
+  --bg-card: #fffefa;
+  --bg-subtle: #f1f6ed;
+  --text-primary: #173624;
+  --text-secondary: #49634d;
+  --text-muted: #78907a;
+  --border-light: #dce9d7;
+  --border-medium: #bdd5b6;
+  --shadow-card: 0 10px 28px rgba(41, 82, 38, .08), 0 1px 0 rgba(255,255,255,.8) inset;
+  --shadow-md: 0 16px 36px rgba(35, 76, 32, .13);
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --sidebar-top: #214e2b;
+  --sidebar-mid: #173f25;
+  --sidebar-bottom: #102e1d;
+  --sidebar-hover: rgba(206, 238, 185, .14);
+  --sidebar-border: rgba(221, 245, 209, .14);
+}
+
+body { background: var(--bg-page); color: var(--text-primary); }
+.sidebar { background: linear-gradient(165deg, #285d31 0%, #173f25 48%, #102e1d 100%); box-shadow: 6px 0 28px rgba(27, 67, 32, .16); }
+.sidebar::before { background: radial-gradient(circle, rgba(173, 219, 130, .22), transparent 68%); }
+.sidebar-logo { border-bottom-color: rgba(218, 239, 208, .18); }
+.sidebar-logo-icon { background: linear-gradient(145deg, #9acb69, #397a40); box-shadow: 0 10px 24px rgba(95, 171, 83, .28); }
+.sidebar-item { border-radius: 13px; font-weight: 650; }
+.sidebar-item.active { background: #e6f2dc; color: #20552d; box-shadow: 0 8px 18px rgba(8, 39, 18, .16); }
+.sidebar-item.active .sidebar-item-icon { color: #347b3e; }
+.main-area { background: var(--bg-page); }
+.topbar { background: rgba(255, 253, 248, .94); border-bottom: 1px solid var(--border-light); box-shadow: 0 2px 12px rgba(44, 86, 41, .04); }
+.topbar-page-label { color: #6e9271; }
+.topbar-page-title { color: var(--text-primary); }
+.page-content { background: radial-gradient(circle at 90% 0%, rgba(211, 232, 192, .35), transparent 30%), var(--bg-page); }
+.workspace-head { border-bottom-color: var(--border-light); }
+.workspace-eyebrow { color: #4f8f46; }
+.workspace-title { color: var(--text-primary); letter-spacing: -.045em; }
+.workspace-subtitle { color: var(--text-muted); }
+.card, .kpi-card { background: rgba(255, 254, 250, .96); border-color: var(--border-light); border-radius: 20px; box-shadow: var(--shadow-card); }
+.card:hover, .kpi-card:hover { border-color: var(--border-medium); box-shadow: var(--shadow-md); }
+.card-header { border-bottom-color: var(--border-light); }
+.card h2, .kpi-value { color: var(--text-primary); }
+.card-subtitle, .field-help { color: var(--text-muted); }
+.kpi-label { color: var(--text-secondary); }
+.kpi-icon-box { background: #e8f4df; color: #3c8142; border-color: #c5dfbb; }
+button { background: #2f7138; border-color: #2f7138; box-shadow: 0 7px 16px rgba(47, 113, 56, .17); }
+button:hover { background: #245e30; border-color: #245e30; box-shadow: 0 10px 20px rgba(47, 113, 56, .22); }
+button.quiet, .topbar-refresh-btn { background: #f4f8ef; color: #2f7138; border-color: var(--border-light); box-shadow: none; }
+button.quiet:hover, .topbar-refresh-btn:hover { background: #e6f2dc; color: #20552d; border-color: var(--border-medium); }
+input, select, textarea { background: #fffefa; color: var(--text-primary); border-color: #cfe0c9; border-radius: 12px; }
+input:focus, select:focus, textarea:focus { border-color: #71a964; box-shadow: 0 0 0 3px rgba(113, 169, 100, .16); }
+label { color: var(--text-secondary); }
+.quick-access-item, .list-item-card, .course-list-item { background: #f4f8f0; border-color: var(--border-light); }
+.quick-access-item:hover, .list-item-card:hover, .course-list-item:hover { background: #eaf4e3; border-color: var(--border-medium); }
+.course-list-item.selected { background: #e2f0d9; border-color: #83b879; }
+.course-list-actions .danger, .form-actions .danger { color: #b05247; }
+table thead th { background: #edf5e8; color: #59775d; border-bottom-color: var(--border-light); }
+table tbody td { color: var(--text-secondary); border-bottom-color: var(--border-light); }
+table tbody tr:hover td { background: #f0f7ec; color: var(--text-primary); }
+.toast, .notice { border-radius: 16px; box-shadow: var(--shadow-md); }
+.course-media-list .media-view-button { background: #eff7ea; color: #2f7138; border-color: #c9dfc1; }
+.course-media-list .media-view-button:hover { background: #dfeeda; }
