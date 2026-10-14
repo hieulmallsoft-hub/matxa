@@ -519,6 +519,11 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
               </div>
             </Card>
           </div>
+          <div className="wellness-visual-strip" aria-label="Không gian dịch vụ">
+            <figure><img src="/wellness/head-massage.jpg" alt="Dịch vụ massage thư giãn" /><figcaption><b>Chăm sóc chuyên sâu</b><span>Trải nghiệm massage tại nhà</span></figcaption></figure>
+            <figure><img src="/wellness/consultation.jpg" alt="Tư vấn liệu trình" /><figcaption><b>Tư vấn liệu trình</b><span>Đúng nhu cầu, đúng kỹ thuật</span></figcaption></figure>
+            <figure><img src="/wellness/spa-room.jpg" alt="Không gian spa" /><figcaption><b>Không gian thư thái</b><span>Tiêu chuẩn Psyocore</span></figcaption></figure>
+          </div>
         </>
       )}
 
