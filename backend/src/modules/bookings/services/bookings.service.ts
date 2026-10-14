@@ -405,7 +405,7 @@ export class BookingsService {
       throw new BadRequestException('Thoi gian dat lich phai o tuong lai');
     if (dto.mode !== 'HOME' && dto.addressId) throw new BadRequestException('Chi gui addressId khi dat tai nha');
     const now = new Date();
-    const defaultTtlMinutes = Number(this.config.get('OPEN_BOOKING_APPLICATION_TTL_MINUTES', 60));
+    const defaultTtlMinutes = Number(this.config.get('OPEN_BOOKING_APPLICATION_TTL_MINUTES', 15));
     const requestedDeadline = dto.applicationDeadlineAt ? new Date(dto.applicationDeadlineAt) : null;
     const deadline = requestedDeadline ?? new Date(now.getTime() + defaultTtlMinutes * 60_000);
     if (!Number.isFinite(deadline.getTime()) || deadline <= now || deadline >= start)
@@ -874,6 +874,12 @@ export class BookingsService {
         data: { status: 'EXPIRED', expiredAt: now },
       });
       if (!claimed.count) return null;
+      const applied = typeof tx.bookingTechnicianApplication.findMany === 'function'
+        ? await tx.bookingTechnicianApplication.findMany({
+            where: { bookingId, status: 'APPLIED' },
+            select: { technicianProfile: { select: { userId: true } } },
+          })
+        : [];
       const applications = await tx.bookingTechnicianApplication.updateMany({
         where: { bookingId, status: 'APPLIED' },
         data: { status: 'EXPIRED', expiredAt: now },
@@ -881,18 +887,15 @@ export class BookingsService {
       return {
         customerId: booking.customerId,
         applicationCount: applications.count,
+        technicianUserIds: applied.map((item: { technicianProfile: { userId: string } }) => item.technicianProfile.userId),
         deadline: booking.applicationDeadlineAt,
         expiredAt: now,
       };
     });
     if (result) {
-      void this.notifyStatus(
-        result.customerId,
-        bookingId,
-        'BOOKING_EXPIRED',
-        'Don da het han',
-        'Don OPEN chua duoc chon KTV truoc han ung tuyen.',
-      );
+      const recipients = [result.customerId, ...result.technicianUserIds];
+      for (const recipient of recipients)
+        void this.notifyStatus(recipient, bookingId, 'BOOKING_EXPIRED', 'Don da het han', 'Don OPEN chua duoc chon KTV truoc han ung tuyen.');
     }
     return result;
   }
