@@ -4,12 +4,20 @@ describe('OpenBookingExpirationService', () => {
   afterEach(() => jest.useRealTimers());
 
   it('only scans overdue unassigned OPEN marketplace bookings and delegates atomic expiry', async () => {
-    const prisma: any = { booking: { findMany: jest.fn().mockResolvedValue([{ id: 'due-1' }, { id: 'due-2' }]) } };
+    const prisma: any = {
+      booking: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([{ id: 'due-1' }, { id: 'due-2' }])
+          .mockResolvedValueOnce([]),
+      },
+    };
     const bookings = {
       expireOpenBookingIfDue: jest
         .fn()
         .mockResolvedValueOnce({ deadline: new Date('2026-10-06T00:00:00.000Z'), applicationCount: 2 })
         .mockResolvedValueOnce(null),
+      expireDirectBookingIfDue: jest.fn(),
     };
     const config = {
       get: jest.fn((key: string, fallback: number) => (key === 'OPEN_BOOKING_EXPIRATION_BATCH_SIZE' ? 50 : fallback)),
@@ -29,13 +37,14 @@ describe('OpenBookingExpirationService', () => {
       }),
     );
     expect(bookings.expireOpenBookingIfDue).toHaveBeenCalledTimes(2);
+    expect(bookings.expireDirectBookingIfDue).not.toHaveBeenCalled();
   });
 
   it('uses a periodic timer but clears it on shutdown', () => {
     jest.useFakeTimers();
     const service = new OpenBookingExpirationService(
       { booking: { findMany: jest.fn().mockResolvedValue([]) } } as any,
-      { expireOpenBookingIfDue: jest.fn() } as any,
+      { expireOpenBookingIfDue: jest.fn(), expireDirectBookingIfDue: jest.fn() } as any,
       { get: jest.fn((_key: string, fallback: number) => fallback) } as any,
     );
     service.onModuleInit();

@@ -172,11 +172,11 @@ export class TechnicianBookingCancellationService {
     await this.notifications.create(
       booking.customerId,
       'BOOKING_CANCELLED',
-      'Lich hen da huy',
-      'Ky thuat vien da huy lich hen.',
+      'Lịch hẹn đã hủy',
+      'Kỹ thuật viên đã hủy lịch hẹn.',
       `matxa://bookings/${bookingId}`,
     );
-    await this.notifications.sendPush(booking.customerId, 'Lich hen da huy', 'Ky thuat vien da huy lich hen.', {
+    await this.notifications.sendPush(booking.customerId, 'Lịch hẹn đã hủy', 'Kỹ thuật viên đã hủy lịch hẹn.', {
       type: 'BOOKING_CANCELLED',
       bookingId,
       actor: 'TECHNICIAN',

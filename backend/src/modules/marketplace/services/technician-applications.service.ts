@@ -181,7 +181,7 @@ export class TechnicianApplicationsService {
     });
     if (status === 'REJECTED') {
       const type = 'TECHNICIAN_KYC_REJECTED';
-      const title = 'KYC can bo sung';
+      const title = 'KYC cần bổ sung';
       const actionUrl = 'matxa://technician/application';
       await this.notifications.create(
         app.userId,
@@ -250,8 +250,8 @@ export class TechnicianApplicationsService {
       });
     });
     const type = 'TECHNICIAN_APPLICATION_APPROVED';
-    const title = 'Ho so KTV da duoc duyet';
-    const body = 'Ban da co the bat dau cau hinh dich vu va lich lam viec.';
+    const title = 'Hồ sơ KTV đã được duyệt';
+    const body = 'Bạn đã có thể bắt đầu cấu hình dịch vụ và lịch làm việc.';
     const actionUrl = 'matxa://technician/application';
     await this.notifications.create(
       app.userId,
@@ -284,7 +284,7 @@ export class TechnicianApplicationsService {
       data: { status: 'REJECTED', rejectionReason: reason.trim(), reviewedBy: adminId, reviewedAt: now },
     });
     const type = 'TECHNICIAN_APPLICATION_REJECTED';
-    const title = 'Ho so KTV can bo sung';
+    const title = 'Hồ sơ KTV cần bổ sung';
     const body = reason.trim();
     const actionUrl = 'matxa://technician/application';
     await this.notifications.create(

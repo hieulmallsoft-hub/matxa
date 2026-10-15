@@ -45,6 +45,44 @@ describe('open booking expiry transition', () => {
     });
   });
 
+  it('expires an overdue DIRECT booking whose assigned technician never accepted it', async () => {
+    const createdAt = new Date('2026-10-06T00:00:00.000Z');
+    const now = new Date('2026-10-06T01:00:00.000Z');
+    const tx: any = {
+      booking: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'direct-1',
+          customerId: 'customer-1',
+          technicianId: 'profile-1',
+          assignmentMode: 'DIRECT',
+          status: 'PENDING',
+          createdAt,
+          applicationDeadlineAt: null,
+          technician: { userId: 'technician-user-1' },
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const prisma: any = { $transaction: jest.fn((callback: any) => callback(tx)) };
+    const notifications = { create: jest.fn(), sendPush: jest.fn() };
+    const service = new BookingsService(
+      prisma,
+      { get: jest.fn((_key: string, fallback: number) => fallback) } as any,
+      notifications as any,
+      { createPaymentUrl: jest.fn(), verify: jest.fn() } as any,
+    );
+
+    await expect(service.expireDirectBookingIfDue('direct-1', now)).resolves.toMatchObject({
+      customerId: 'customer-1',
+      technicianUserId: 'technician-user-1',
+      expiredAt: now,
+    });
+    expect(tx.booking.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({ assignmentMode: 'DIRECT', status: 'PENDING', technicianId: { not: null } }),
+      data: { status: 'EXPIRED', expiredAt: now },
+    });
+  });
+
   it('is idempotent when another worker or customer already claimed the booking', async () => {
     const tx: any = {
       booking: {

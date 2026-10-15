@@ -30,8 +30,8 @@ export class NotificationsService {
   }
 
   async sendTestPush(userId: string, dto: TestPushDto) {
-    const title = dto.title ?? 'Matxa test notification';
-    const body = dto.body ?? 'Firebase Cloud Messaging da hoat dong.';
+    const title = dto.title ?? 'Thông báo kiểm thử Matxa';
+    const body = dto.body ?? 'Firebase Cloud Messaging đã hoạt động.';
     const notification = await this.create(userId, 'TEST', title, body, 'matxa://notifications');
     const result = await this.sendPush(userId, title, body, {
       notificationId: notification.id,

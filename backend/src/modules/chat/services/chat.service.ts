@@ -338,13 +338,13 @@ export class ChatService {
       this.recipientIds(senderId, conversationId),
       this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { bookingId: true } }),
     ]);
-    const title = sender?.displayName ?? 'Ban co tin nhan moi';
+    const title = sender?.displayName ?? 'Bạn có tin nhắn mới';
     const body =
       dto.type === 'TEXT'
         ? dto.text!.trim().slice(0, 200)
         : dto.type === 'IMAGE'
-          ? 'Da gui mot hinh anh'
-          : 'Da gui vi tri';
+          ? 'Đã gửi một hình ảnh'
+          : 'Đã gửi vị trí';
     await Promise.all(
       recipients.map(async (recipientId) => {
         const actionUrl = conversation?.bookingId

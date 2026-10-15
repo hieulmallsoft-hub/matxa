@@ -94,7 +94,7 @@ If another selection has already won, or the deadline passed, expect `409` (`BOO
 
 ## Deadline expiry
 
-The backend worker periodically transitions overdue unassigned OPEN bookings to `EXPIRED`. All `APPLIED` applications become `EXPIRED`; `DECLINED` and `WITHDRAWN` remain unchanged. A customer receives `BOOKING_EXPIRED`. On `EXPIRED`, display **Don da het han**, hide Apply, Withdraw, Contact, Cancel and Complete. The worker is idempotent; clients should refresh on retry rather than attempt a state transition.
+The backend worker periodically transitions bookings with no accepted technician to `EXPIRED` after the configured 15-minute acceptance window. Overdue unassigned OPEN bookings are expired together with their `APPLIED` applications. Direct bookings remain `PENDING` until the assigned KTV accepts; if that KTV does not accept in time, the direct booking transitions `PENDING` -> `EXPIRED`. `DECLINED` and `WITHDRAWN` applications remain unchanged. A customer and the relevant KTV receive `BOOKING_EXPIRED`. On `EXPIRED`, display **Đơn đã hết hạn** and hide Apply, Withdraw, Contact, Cancel and Complete. The worker is idempotent; clients should refresh on retry rather than attempt a state transition.
 
 ## Error handling and security
 
@@ -107,4 +107,4 @@ KTV may apply to multiple open jobs. Availability and booking conflict are reval
 
 ## Existing DIRECT flow
 
-Existing direct booking APIs continue unchanged: `POST /bookings`, `POST /technician/jobs/:id/accept`, `POST /technician/jobs/:id/decline`, and `POST /technician/jobs/:id/complete`.
+Direct booking APIs remain: `POST /bookings`, `POST /technician/jobs/:id/accept`, `POST /technician/jobs/:id/decline`, and `POST /technician/jobs/:id/complete`. The assigned KTV must accept within the 15-minute window; otherwise the API returns the booking as `EXPIRED` and `accept` returns `409 BOOKING_EXPIRED`.

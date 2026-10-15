@@ -191,8 +191,8 @@ export class WalletService {
           data: {
             userId: result.notify.userId,
             type: 'WALLET_TOPUP_SUCCESS',
-            title: 'Nap tien thanh cong',
-            body: `Da cong ${result.notify.amount.toLocaleString('vi-VN')} VND vao so du quang cao`,
+            title: 'Nạp tiền thành công',
+            body: `Đã cộng ${result.notify.amount.toLocaleString('vi-VN')} VND vào số dư quảng cáo`,
             actionUrl: `matxa://wallet/topups/${id}`,
           },
         })

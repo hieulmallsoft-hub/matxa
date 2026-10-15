@@ -49,6 +49,21 @@ export class OpenBookingExpirationService implements OnModuleInit, OnModuleDestr
       orderBy: { applicationDeadlineAt: 'asc' },
       take,
     });
+    const directCutoff = new Date(now.getTime() - Number(this.config.get('OPEN_BOOKING_APPLICATION_TTL_MINUTES', 15)) * 60_000);
+    const directDue = await this.prisma.booking.findMany({
+      where: {
+        assignmentMode: 'DIRECT',
+        status: 'PENDING',
+        technicianId: { not: null },
+        OR: [
+          { applicationDeadlineAt: { lte: now } },
+          { applicationDeadlineAt: null, createdAt: { lte: directCutoff } },
+        ],
+      },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+      take,
+    });
     let expired = 0;
     for (const booking of due) {
       const result = await this.bookings.expireOpenBookingIfDue(booking.id, now);
@@ -59,6 +74,13 @@ export class OpenBookingExpirationService implements OnModuleInit, OnModuleDestr
         );
       }
     }
-    return { scanned: due.length, expired };
+    for (const booking of directDue) {
+      const result = await this.bookings.expireDirectBookingIfDue(booking.id, now);
+      if (result) {
+        expired++;
+        this.logger.log(`Expired direct booking ${booking.id}; deadline=${result.deadline.toISOString()}`);
+      }
+    }
+    return { scanned: due.length + directDue.length, expired };
   }
 }

@@ -151,6 +151,9 @@ export class BookingsService {
   }
 
   async create(userId: string, dto: CreateBookingDto) {
+    const acceptanceDeadlineAt = new Date(
+      Date.now() + Number(this.config.get('OPEN_BOOKING_APPLICATION_TTL_MINUTES', 15)) * 60_000,
+    );
     try {
       const booking = await this.prisma.$transaction(
         async (tx) => {
@@ -179,6 +182,7 @@ export class BookingsService {
               technicianId: dto.technicianId,
               addressId: dto.mode === 'HOME' ? dto.addressId : null,
               addressSnapshot: quote.addressSnapshot ?? Prisma.DbNull,
+              applicationDeadlineAt: acceptanceDeadlineAt,
               promotionId: quote.promotionId,
               mode: dto.mode,
               scheduledStart: quote.scheduledStart,
@@ -513,8 +517,8 @@ export class BookingsService {
         booking.customerId,
         bookingId,
         'TECHNICIAN_APPLIED',
-        'Co KTV ung tuyen',
-        'Mot KTV da gui ung tuyen cho don cua ban.',
+        'Có KTV ứng tuyển',
+        'Một KTV đã gửi ứng tuyển cho đơn của bạn.',
       );
       return application;
     } catch (error) {
@@ -617,8 +621,8 @@ export class BookingsService {
       result.winnerUserId,
       bookingId,
       'TECHNICIAN_SELECTED',
-      'Ban da duoc chon',
-      'Khach hang da chon ban cho don dich vu.',
+      'Bạn đã được chọn',
+      'Khách hàng đã chọn bạn cho đơn dịch vụ.',
     );
     this.realtime?.broadcastAvailabilityChanged(result.booking.technicianId);
     for (const userId of result.loserUserIds)
@@ -626,8 +630,8 @@ export class BookingsService {
         userId,
         bookingId,
         'TECHNICIAN_NOT_SELECTED',
-        'Khach da chon KTV khac',
-        'Don nay da duoc gan cho mot KTV khac.',
+        'Khách đã chọn KTV khác',
+        'Đơn này đã được gán cho một KTV khác.',
       );
     return this.openBookingResponse(result.booking, 'SELECTED', true);
   }
@@ -695,7 +699,7 @@ export class BookingsService {
     const directWhere: Prisma.BookingWhereInput = {
       technician: { userId },
       assignmentMode: 'DIRECT',
-      ...(query.status && ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(query.status)
+      ...(query.status && ['PENDING', 'EXPIRED', 'CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(query.status)
         ? { status: query.status as any }
         : {}),
     };
@@ -807,7 +811,10 @@ export class BookingsService {
     return { bookingId: id, displayName: booking.customer.displayName, phoneNumber: phone.phoneNumber };
   }
 
-  acceptTechnicianJob(userId: string, id: string) {
+  async acceptTechnicianJob(userId: string, id: string) {
+    await this.detail(userId, id, true);
+    const expired = await this.expireDirectBookingIfDue(id);
+    if (expired) throw new ConflictException('BOOKING_EXPIRED');
     return this.updateStatus(userId, id, { status: 'CONFIRMED' });
   }
 
@@ -851,7 +858,7 @@ export class BookingsService {
         ? ([booking.customerId, technicianUserId].filter(Boolean) as string[])
         : ([booking.customerId === userId ? technicianUserId : booking.customerId].filter(Boolean) as string[]);
     for (const recipient of recipients)
-      void this.notifyStatus(recipient, id, 'BOOKING_CANCELLED', 'Lich hen da huy', 'Mot lich hen da duoc huy.');
+      void this.notifyStatus(recipient, id, 'BOOKING_CANCELLED', 'Lịch hẹn đã hủy', 'Một lịch hẹn đã được hủy.');
     return updated;
   }
 
@@ -895,7 +902,67 @@ export class BookingsService {
     if (result) {
       const recipients = [result.customerId, ...result.technicianUserIds];
       for (const recipient of recipients)
-        void this.notifyStatus(recipient, bookingId, 'BOOKING_EXPIRED', 'Don da het han', 'Don OPEN chua duoc chon KTV truoc han ung tuyen.');
+        void this.notifyStatus(recipient, bookingId, 'BOOKING_EXPIRED', 'Đơn đã hết hạn', 'Đơn OPEN chưa được chọn KTV trước hạn ứng tuyển.');
+    }
+    return result;
+  }
+
+  /** Idempotently expires a directly assigned booking whose technician never accepted it. */
+  async expireDirectBookingIfDue(bookingId: string, now = new Date()) {
+    const ttlMinutes = Number(this.config.get('OPEN_BOOKING_APPLICATION_TTL_MINUTES', 15));
+    const result = await this.prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.findUnique({
+        where: { id: bookingId },
+        select: {
+          id: true,
+          customerId: true,
+          technicianId: true,
+          assignmentMode: true,
+          status: true,
+          createdAt: true,
+          applicationDeadlineAt: true,
+          technician: { select: { userId: true } },
+        },
+      });
+      if (
+        !booking ||
+        booking.assignmentMode !== 'DIRECT' ||
+        booking.status !== 'PENDING' ||
+        !booking.technicianId
+      )
+        return null;
+      const deadline =
+        booking.applicationDeadlineAt ?? new Date(booking.createdAt.getTime() + ttlMinutes * 60_000);
+      if (deadline > now) return null;
+      const claimed = await tx.booking.updateMany({
+        where: {
+          id: bookingId,
+          assignmentMode: 'DIRECT',
+          status: 'PENDING',
+          technicianId: { not: null },
+        },
+        data: { status: 'EXPIRED', expiredAt: now },
+      });
+      if (!claimed.count) return null;
+      return {
+        customerId: booking.customerId,
+        technicianUserId: booking.technician?.userId ?? null,
+        deadline,
+        expiredAt: now,
+      };
+    });
+    if (result) {
+      const recipients = [result.customerId, result.technicianUserId].filter(
+        (userId): userId is string => Boolean(userId),
+      );
+      for (const recipient of recipients)
+        void this.notifyStatus(
+          recipient,
+          bookingId,
+          'BOOKING_EXPIRED',
+          'Đơn đã hết hạn',
+          'KTV chưa nhận đơn trong thời hạn 15 phút.',
+        );
     }
     return result;
   }
@@ -912,7 +979,7 @@ export class BookingsService {
       throw new BadRequestException('Chua den gio ket thuc dich vu');
     }
     const updated = await this.transition(id, booking.status, { status: dto.status });
-    const title = dto.status === 'CONFIRMED' ? 'Dat lich thanh cong' : 'Dich vu da hoan thanh';
+    const title = dto.status === 'CONFIRMED' ? 'Đặt lịch thành công' : 'Dịch vụ đã hoàn thành';
     void this.notifyStatus(booking.customerId, id, `BOOKING_${dto.status}`, title, title);
     return updated;
   }
@@ -1340,8 +1407,8 @@ export class BookingsService {
   }
 
   private async notifyBookingCreated(customerId: string, technicianUserId: string, bookingId: string) {
-    const title = 'Ban co lich dat moi';
-    const body = 'Mot lich hen moi dang cho xac nhan.';
+    const title = 'Bạn có lịch đặt mới';
+    const body = 'Một lịch hẹn mới đang chờ xác nhận.';
     await this.notifications.create(technicianUserId, 'BOOKING_CREATED', title, body, `matxa://bookings/${bookingId}`);
     await this.notifications.sendPush(technicianUserId, title, body, {
       type: 'BOOKING_CREATED',

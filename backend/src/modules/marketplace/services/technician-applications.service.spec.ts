@@ -50,7 +50,7 @@ describe('TechnicianApplicationsService.getMine', () => {
 
     expect(notifications.sendPush).toHaveBeenCalledWith(
       'user-1',
-      'KYC can bo sung',
+      'KYC cần bổ sung',
       'Anh giay to chua ro',
       expect.objectContaining({
         type: 'TECHNICIAN_KYC_REJECTED',
@@ -75,7 +75,7 @@ describe('TechnicianApplicationsService.getMine', () => {
 
     expect(notifications.sendPush).toHaveBeenCalledWith(
       'user-1',
-      'Ho so KTV can bo sung',
+      'Hồ sơ KTV cần bổ sung',
       'Can bo sung thong tin',
       expect.objectContaining({
         type: 'TECHNICIAN_APPLICATION_REJECTED',
