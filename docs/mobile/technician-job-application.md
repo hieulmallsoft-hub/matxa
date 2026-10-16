@@ -10,7 +10,7 @@ Base URL: `/api`. All endpoints require `Authorization: Bearer <accessToken>`.
 | ----------- | -------------- | -------------------------------------- |
 | `OPEN`      | `null`         | Don phu hop; hien Apply / Decline      |
 | `OPEN`      | `APPLIED`      | Dang cho khach xac nhan; hien Withdraw |
-| `EXPIRED`   | `EXPIRED`      | Don da het han; khong con thao tac     |
+| `EXPIRED`   | `EXPIRED`      | Đơn đã hết hạn; không còn thao tác     |
 | `CONFIRMED` | `SELECTED`     | Da duoc chon; duoc contact va complete |
 | `CONFIRMED` | `NOT_SELECTED` | Khach da chon KTV khac                 |
 | `CANCELLED` | any            | Don da huy                             |

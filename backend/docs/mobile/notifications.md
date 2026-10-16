@@ -26,8 +26,8 @@ Response:
     {
       "id": "notification-id",
       "type": "BOOKING_CONFIRMED",
-      "title": "Dat lich thanh cong",
-      "body": "Lich hen da duoc xac nhan.",
+      "title": "Đặt lịch thành công",
+      "body": "Lịch hẹn đã được xác nhận.",
       "actionUrl": "matxa://bookings/booking-id",
       "readAt": null,
       "createdAt": "2026-09-29T10:00:00.000Z"
