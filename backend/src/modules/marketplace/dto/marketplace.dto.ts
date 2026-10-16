@@ -214,7 +214,21 @@ export class CreateTechnicianServicePriceOptionDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Boolean) @IsBoolean() isActive?: boolean;
 }
 
-export class UpdateTechnicianServicePriceOptionDto extends PartialType(CreateTechnicianServicePriceOptionDto) {}
+/** KTV may change the price and activation state of an existing catalog option. */
+export class UpdateTechnicianServicePriceOptionDto {
+  @ApiPropertyOptional({ example: 450000, description: 'Giá mới, đơn vị VND' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  price?: number;
+
+  @ApiPropertyOptional({ description: 'Hiển thị gói này cho khách đặt lịch' })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  isActive?: boolean;
+}
 
 export class CreateAvailabilityDto {
   @ApiProperty() @IsDateString() startAt!: string;

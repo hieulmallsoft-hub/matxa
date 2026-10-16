@@ -273,24 +273,19 @@ PATCH /technician/services/<technicianServiceId>
 
 ```text
 GET    /technician/services/<technicianServiceId>/price-options
-POST   /technician/services/<technicianServiceId>/price-options
 PATCH  /technician/services/<technicianServiceId>/price-options/<priceOptionId>
-DELETE /technician/services/<technicianServiceId>/price-options/<priceOptionId>
 ```
 
-Tạo option:
+KTV sửa giá và bật/tắt option đã được tạo từ catalog:
 
 ```json
 {
-  "code": "90_MINUTES",
-  "durationMinutes": 90,
   "price": 450000,
-  "sortOrder": 2,
   "isActive": true
 }
 ```
 
-Option inactive hoặc đã xóa sẽ không dùng được trong quote/booking mới.
+`price` là số nguyên VND. KTV không được tự thêm/xóa option, đổi mã gói hoặc đổi thời lượng; các trường đó do catalog/Admin quản lý. Phải còn ít nhất một option active cho mỗi dịch vụ.
 
 ## 10. Lịch làm việc
 

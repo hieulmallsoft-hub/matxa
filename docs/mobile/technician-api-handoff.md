@@ -193,10 +193,19 @@ DELETE /technician/application/gallery/{id}
 POST   /technician/services
 PATCH  /technician/services/{id}
 GET    /technician/services/{id}/price-options
-POST   /technician/services/{id}/price-options
 PATCH  /technician/services/{id}/price-options/{optionId}
-DELETE /technician/services/{id}/price-options/{optionId}
 ```
+
+KTV cập nhật từng dòng thời lượng trong màn hình thiết lập giá bằng payload:
+
+```json
+{
+  "price": 500000,
+  "isActive": true
+}
+```
+
+`price` là số nguyên VND. `isActive` tương ứng với checkbox; phải giữ lại ít nhất một gói đang hoạt động. Mã gói và thời lượng lấy từ catalog, KTV không tự thay đổi.
 
 Create service example:
 

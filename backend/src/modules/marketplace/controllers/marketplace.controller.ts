@@ -329,7 +329,10 @@ export class TechnicianController {
   }
   @Patch('services/:id/price-options/:optionId')
   @ApiTags('Technician Management')
-  @ApiOperation({ summary: 'Sua goi gia/thoi luong cua dich vu' })
+  @ApiOperation({
+    summary: 'KTV sua gia va bat/tat goi dich vu',
+    description: 'KTV chi duoc sua price va isActive. Ma goi va thoi luong do catalog/Admin quan ly.',
+  })
   @ApiOkResponse({
     schema: {
       type: 'object',

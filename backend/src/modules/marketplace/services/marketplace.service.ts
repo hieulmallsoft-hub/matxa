@@ -489,10 +489,11 @@ export class MarketplaceService {
   async listMyServicePriceOptions(userId: string, serviceId: string) {
     const profile = await this.myProfile(userId);
     await this.requireOwnedService(profile.id, serviceId);
-    return this.prisma.technicianServicePriceOption.findMany({
+    const options = await this.prisma.technicianServicePriceOption.findMany({
       where: { technicianServiceId: serviceId },
       orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }],
     });
+    return options.map((option) => ({ ...option, price: Number(option.price) }));
   }
 
   async createMyServicePriceOption(userId: string, serviceId: string, dto: CreateTechnicianServicePriceOptionDto) {
@@ -506,8 +507,52 @@ export class MarketplaceService {
     optionId: string,
     dto: UpdateTechnicianServicePriceOptionDto,
   ) {
-    void userId; void serviceId; void optionId; void dto;
-    throw new ForbiddenException('Goi gia do Admin quan ly; KTV khong duoc sua gia');
+    const profile = await this.myProfile(userId);
+    if (dto.price === undefined && dto.isActive === undefined)
+      throw new BadRequestException('Vui long nhap gia hoac trang thai goi gia');
+
+    return this.prisma.$transaction(async (tx) => {
+      const option = await tx.technicianServicePriceOption.findFirst({
+        where: {
+          id: optionId,
+          technicianServiceId: serviceId,
+          technicianService: { technicianId: profile.id },
+        },
+      });
+      if (!option) throw new NotFoundException('Goi gia khong ton tai');
+
+      const nextIsActive = dto.isActive ?? option.isActive;
+      if (!nextIsActive) {
+        const activeCount = await tx.technicianServicePriceOption.count({
+          where: { technicianServiceId: serviceId, isActive: true, id: { not: optionId } },
+        });
+        if (activeCount === 0)
+          throw new BadRequestException('Dich vu phai co it nhat mot goi gia hoat dong');
+      }
+
+      const updated = await tx.technicianServicePriceOption.update({
+        where: { id: option.id },
+        data: {
+          ...(dto.price !== undefined ? { price: dto.price } : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        },
+      });
+
+      // The parent price is the starting price used when the customer does
+      // not select a duration, so keep it aligned with the first active option.
+      const primary = await tx.technicianServicePriceOption.findFirst({
+        where: { technicianServiceId: serviceId, isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }],
+      });
+      if (primary) {
+        await tx.technicianService.update({
+          where: { id: serviceId },
+          data: { durationMinutes: primary.durationMinutes, price: primary.price },
+        });
+      }
+
+      return { ...updated, price: Number(updated.price) };
+    });
   }
 
   async removeMyServicePriceOption(userId: string, serviceId: string, optionId: string) {
