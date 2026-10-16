@@ -91,6 +91,8 @@ Mobile gọi mỗi 3–5 giây trong lúc màn hình thanh toán mở và gọi 
 
 Chỉ hiển thị thành công khi API trả `status: "SUCCESS"`. Redirect/deep link của PayOS chỉ đưa người dùng về app, không dùng để tự xác nhận.
 
+Backend tự đánh dấu giao dịch `EXPIRED` sau thời điểm `expiresAt` (mặc định 15 phút). Việc này chạy độc lập với mobile, nên người dùng đóng app vẫn không làm mất giao dịch. Khi mở app lại, mobile dùng `transactionId` đã lưu để gọi `GET /api/wallet/topups/{transactionId}` hoặc tải `GET /api/wallet/transactions`; nếu nhận `SUCCESS` thì mở màn thành công, nếu nhận `EXPIRED` thì báo hết hạn và tạo giao dịch mới.
+
 ## 4. Kiểm tra số dư
 
 Sau khi giao dịch `SUCCESS`:

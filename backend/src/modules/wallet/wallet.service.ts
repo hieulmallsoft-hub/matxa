@@ -144,8 +144,20 @@ export class WalletService {
     return { items, total, page, limit };
   }
   async detail(userId: string, id: string) {
-    const item = await this.prisma.topUpTransaction.findFirst({ where: { id, userId } });
+    let item = await this.prisma.topUpTransaction.findFirst({ where: { id, userId } });
     if (!item) throw new NotFoundException('Giao dich khong ton tai');
+    if (item.status === 'PENDING_PAYMENT' && item.expiresAt <= new Date()) {
+      const expired = await this.prisma.topUpTransaction.updateMany({
+        where: { id: item.id, status: 'PENDING_PAYMENT', expiresAt: { lte: new Date() } },
+        data: {
+          status: 'EXPIRED',
+          failureCode: 'EXPIRED',
+          failureMessage: 'Giao dich het han thanh toan',
+          processedAt: new Date(),
+        },
+      });
+      if (expired.count) item = await this.prisma.topUpTransaction.findUniqueOrThrow({ where: { id: item.id } });
+    }
     return {
       ...item,
       bank: item.paymentMethod === 'BANK_TRANSFER' ? this.bank() : null,
