@@ -49,3 +49,27 @@ export class WalletTopupDetailResponseDto extends WalletTopupItemResponseDto {
   @ApiPropertyOptional({ type: Object, nullable: true }) bank?: { bankName: string; accountName: string; accountNumber: string } | null;
   @ApiProperty() transferContent!: string;
 }
+
+export class WalletTransactionResponseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ example: 'TOP_UP' }) type!: string;
+  @ApiProperty({ enum: ['CREDIT', 'DEBIT'] }) direction!: 'CREDIT' | 'DEBIT';
+  @ApiProperty({ description: 'Số tiền có dấu, đơn vị VND' }) amountVnd!: number;
+  @ApiProperty({ nullable: true }) balanceBeforeVnd!: number | null;
+  @ApiProperty({ nullable: true }) balanceAfterVnd!: number | null;
+  @ApiProperty({ example: 'Nạp tiền vào số dư quảng cáo' }) title!: string;
+  @ApiProperty() referenceType!: string;
+  @ApiProperty() referenceId!: string;
+  @ApiProperty() createdAt!: string;
+  @ApiPropertyOptional() status?: string;
+  @ApiPropertyOptional() paymentMethod?: string;
+  @ApiPropertyOptional() referenceCode?: string;
+  @ApiPropertyOptional() failureMessage?: string | null;
+}
+
+export class WalletTransactionListResponseDto {
+  @ApiProperty({ type: [WalletTransactionResponseDto] }) items!: WalletTransactionResponseDto[];
+  @ApiProperty() total!: number;
+  @ApiProperty() page!: number;
+  @ApiProperty() limit!: number;
+}

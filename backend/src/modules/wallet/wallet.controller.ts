@@ -4,6 +4,8 @@ import {
   WalletTopupDetailResponseDto,
   WalletTopupItemResponseDto,
   WalletTopupListResponseDto,
+  WalletTransactionListResponseDto,
+  WalletTransactionResponseDto,
 } from './wallet-response.dto';
 import { Body, Controller, Get, Param, ParseIntPipe, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -45,6 +47,18 @@ export class WalletController {
   @Get('topups/:id') @ApiOkResponse({ type: WalletTopupDetailResponseDto })
   detail(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.wallet.detail(auth.sub, id);
+  }
+  @Get('transactions') @ApiOkResponse({ type: WalletTransactionListResponseDto })
+  transactions(
+    @CurrentAuth() auth: AccessTokenPayload,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+  ) {
+    return this.wallet.transactions(auth.sub, Number(page), Number(limit));
+  }
+  @Get('transactions/:id') @ApiOkResponse({ type: WalletTransactionResponseDto })
+  transactionDetail(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
+    return this.wallet.transactionDetail(auth.sub, id);
   }
 }
 

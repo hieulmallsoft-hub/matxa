@@ -152,6 +152,87 @@ export class WalletService {
       transferContent: `NAP PSY ${item.referenceCode}`,
     };
   }
+  async transactions(userId: string, page = 1, limit = 20) {
+    const wallet = await this.wallet(userId);
+    const safePage = Number.isInteger(page) && page > 0 ? page : 1;
+    const safeLimit = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 100) : 20;
+    const ledgerWhere = { walletId: wallet.id };
+    const topUpWhere = { walletId: wallet.id };
+    const [ledger, topUps] = await this.prisma.$transaction([
+      this.prisma.walletLedgerEntry.findMany({
+        where: ledgerWhere,
+        include: { topUp: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.topUpTransaction.findMany({
+        where: topUpWhere,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+    const ledgerTopUpIds = new Set(ledger.map((item) => item.topUpId).filter(Boolean));
+    const items = [
+      ...ledger.map((item) => this.transactionResponse(item)),
+      ...topUps
+        .filter((topUp) => !ledgerTopUpIds.has(topUp.id))
+        .map((topUp) => this.pendingTopUpResponse(topUp)),
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const offset = (safePage - 1) * safeLimit;
+    return { items: items.slice(offset, offset + safeLimit), total: items.length, page: safePage, limit: safeLimit };
+  }
+  async transactionDetail(userId: string, id: string) {
+    const wallet = await this.wallet(userId);
+    const item = await this.prisma.walletLedgerEntry.findFirst({
+      where: { walletId: wallet.id, OR: [{ id }, { topUpId: id }] },
+      include: { topUp: true },
+    });
+    if (item) return this.transactionResponse(item);
+    const topUp = await this.prisma.topUpTransaction.findFirst({ where: { id, walletId: wallet.id } });
+    if (!topUp) throw new NotFoundException('Giao dich khong ton tai');
+    return this.pendingTopUpResponse(topUp);
+  }
+  private transactionResponse(item: any) {
+    const amountVnd = Number(item.amountVnd);
+    const topUp = item.topUp;
+    const isTopUp = item.type === 'TOP_UP';
+    return {
+      id: item.id,
+      type: item.type,
+      direction: amountVnd >= 0 ? 'CREDIT' : 'DEBIT',
+      amountVnd,
+      balanceBeforeVnd: Number(item.balanceBeforeVnd),
+      balanceAfterVnd: Number(item.balanceAfterVnd),
+      title: isTopUp ? 'Nạp tiền vào số dư quảng cáo' : 'Thanh toán dịch vụ',
+      referenceType: item.referenceType,
+      referenceId: item.referenceId,
+      createdAt: item.createdAt,
+      ...(topUp
+        ? {
+            status: topUp.status,
+            paymentMethod: topUp.paymentMethod,
+            referenceCode: topUp.referenceCode,
+            failureMessage: topUp.failureMessage,
+          }
+        : {}),
+    };
+  }
+  private pendingTopUpResponse(topUp: any) {
+    return {
+      id: topUp.id,
+      type: 'TOP_UP',
+      direction: 'CREDIT',
+      amountVnd: Number(topUp.amountVnd),
+      balanceBeforeVnd: null,
+      balanceAfterVnd: null,
+      title: 'Nạp tiền vào số dư quảng cáo',
+      referenceType: 'TOP_UP',
+      referenceId: topUp.id,
+      createdAt: topUp.createdAt,
+      status: topUp.status,
+      paymentMethod: topUp.paymentMethod,
+      referenceCode: topUp.referenceCode,
+      failureMessage: topUp.failureMessage,
+    };
+  }
   async simulate(adminId: string, id: string, success: boolean, reason?: string) {
     if (this.config.get('NODE_ENV') === 'production') throw new ForbiddenException('Simulation bi tat tren production');
     const result = await this.prisma.$transaction(async (tx) => {

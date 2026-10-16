@@ -112,7 +112,20 @@ Response có dạng:
 
 Số dư phải tăng đúng bằng số tiền đã thanh toán. Gọi lại API chi tiết hoặc refresh app không được cộng lần hai.
 
-## 5. Các bước test trên Swagger
+## 5. Lịch sử giao dịch ví
+
+Lấy lịch sử tổng hợp từ ledger của ví:
+
+```http
+GET /api/wallet/transactions?page=1&limit=20
+GET /api/wallet/transactions/{transactionId}
+```
+
+Mỗi item có `amountVnd` có dấu: số dương là tiền vào, số âm là tiền ra. `balanceBeforeVnd` và `balanceAfterVnd` là số dư trước/sau giao dịch. Với giao dịch nạp tiền, response có thêm `status`, `paymentMethod`, `referenceCode` và `failureMessage`.
+
+Hiện ledger phát sinh giao dịch `TOP_UP` khi nạp ví thành công. Các loại chi tiền dịch vụ chỉ hiển thị sau khi backend có luồng sử dụng ví tương ứng.
+
+## 6. Các bước test trên Swagger
 
 1. Đăng nhập bằng tài khoản KTV đã được duyệt, copy `accessToken`.
 2. Bấm **Authorize** và nhập `Bearer <accessToken>`.
@@ -123,7 +136,7 @@ Số dư phải tăng đúng bằng số tiền đã thanh toán. Gọi lại AP
 7. Khi status là `SUCCESS`, gọi `GET /api/wallet` và kiểm tra số dư.
 8. Ghi lại transactionId, status cuối và số dư để bàn giao kết quả test.
 
-## 6. Webhook backend
+## 7. Webhook backend
 
 Mobile không gọi webhook. PayOS gọi endpoint này:
 
@@ -140,7 +153,7 @@ http://149.28.156.66/api/payments/payos/return
 http://149.28.156.66/api/payments/payos/cancel
 ```
 
-## 7. Lỗi thường gặp
+## 8. Lỗi thường gặp
 
 | Mã lỗi | Nguyên nhân/xử lý |
 |---|---|
