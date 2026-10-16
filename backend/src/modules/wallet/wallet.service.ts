@@ -106,7 +106,10 @@ export class WalletService {
     if (!orderCode) throw new BadRequestException('Webhook PayOS thieu orderCode');
     const topUp = await this.prisma.topUpTransaction.findFirst({ where: { providerTransactionId: orderCode, paymentMethod: 'PAYOS' } });
     if (!topUp) throw new NotFoundException('Khong tim thay giao dich nap PayOS');
-    if (String(data.code ?? data.status ?? '').toUpperCase() !== '00' && String(data.status ?? '').toUpperCase() !== 'PAID') return { ok: true, status: topUp.status };
+    // PayOS puts the webhook result (`code`, `success`) at the top level;
+    // `data` contains the order and amount. Do not credit on a non-success event.
+    const success = String(body.code ?? '') === '00' && body.success === true;
+    if (!success) return { ok: true, status: topUp.status };
     if (Number(data.amount) !== topUp.amountVnd)
       throw new ConflictException('So tien webhook PayOS khong khop giao dich');
     return this.simulateInternal(topUp.id);
