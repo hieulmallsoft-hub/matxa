@@ -143,7 +143,11 @@ export class WalletService {
   async detail(userId: string, id: string) {
     const item = await this.prisma.topUpTransaction.findFirst({ where: { id, userId } });
     if (!item) throw new NotFoundException('Giao dich khong ton tai');
-    return { ...item, bank: this.bank(), transferContent: `NAP PSY ${item.referenceCode}` };
+    return {
+      ...item,
+      bank: item.paymentMethod === 'BANK_TRANSFER' ? this.bank() : null,
+      transferContent: `NAP PSY ${item.referenceCode}`,
+    };
   }
   async simulate(adminId: string, id: string, success: boolean, reason?: string) {
     if (this.config.get('NODE_ENV') === 'production') throw new ForbiddenException('Simulation bi tat tren production');

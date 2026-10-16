@@ -13,7 +13,7 @@ export class WalletTopupCreateResponseDto {
   @ApiProperty({ example: 'VND' }) currency!: string;
   @ApiProperty() status!: string;
   @ApiProperty({ example: 'BANK_TRANSFER' }) paymentMethod!: string;
-  @ApiProperty({ type: Object }) bank!: { bankName: string; accountName: string; accountNumber: string };
+  @ApiPropertyOptional({ type: Object, nullable: true }) bank?: { bankName: string; accountName: string; accountNumber: string } | null;
   @ApiProperty() referenceCode!: string;
   @ApiProperty() transferContent!: string;
   @ApiProperty() expiresAt!: string;
@@ -46,6 +46,6 @@ export class WalletTopupListResponseDto {
 }
 
 export class WalletTopupDetailResponseDto extends WalletTopupItemResponseDto {
-  @ApiProperty({ type: Object }) bank!: { bankName: string; accountName: string; accountNumber: string };
+  @ApiPropertyOptional({ type: Object, nullable: true }) bank?: { bankName: string; accountName: string; accountNumber: string } | null;
   @ApiProperty() transferContent!: string;
 }
