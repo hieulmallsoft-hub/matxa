@@ -6,13 +6,14 @@ import {
   WalletTopupListResponseDto,
 } from './wallet-response.dto';
 import { Body, Controller, Get, Param, ParseIntPipe, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AccessTokenGuard } from '../auth/guards/access-token.guard';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { AccessTokenPayload } from '../auth/entities/access-token-payload.entity';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { WalletService } from './wallet.service';
+import { WalletTopupCreateDto } from './wallet.dto';
 
 @ApiTags('Wallet')
 @ApiBearerAuth('access-token')
@@ -24,10 +25,12 @@ export class WalletController {
   balance(@CurrentAuth() auth: AccessTokenPayload) {
     return this.wallet.balance(auth.sub);
   }
-  @Post('topups') @ApiCreatedResponse({ type: WalletTopupCreateResponseDto })
+  @Post('topups')
+  @ApiBody({ type: WalletTopupCreateDto })
+  @ApiCreatedResponse({ type: WalletTopupCreateResponseDto })
   create(
     @CurrentAuth() auth: AccessTokenPayload,
-    @Body() body: { amount: number; paymentMethod?: string },
+    @Body() body: WalletTopupCreateDto,
   ) {
     return this.wallet.create(auth.sub, body.amount, body.paymentMethod);
   }
