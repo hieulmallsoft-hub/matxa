@@ -3,7 +3,7 @@ import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, Min } from 'class-validator';
 
 export class WalletTopupCreateDto {
-  @ApiProperty({ example: 50000, description: 'Số tiền nạp, đơn vị VND' })
+  @ApiProperty({ example: 1000, description: 'Số tiền nạp, đơn vị VND; tối thiểu 1.000đ' })
   @Type(() => Number)
   @IsInt()
   @Min(1)

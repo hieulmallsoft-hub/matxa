@@ -44,7 +44,7 @@ export class WalletService {
   }
   async create(userId: string, amount: number, paymentMethod = 'BANK_TRANSFER') {
     if (!Number.isInteger(amount) || amount <= 0) throw new BadRequestException('So tien phai la so nguyen duong');
-    const min = Number(this.config.get('WALLET_TOPUP_MIN_VND', 50000));
+    const min = Number(this.config.get('WALLET_TOPUP_MIN_VND', 1000));
     const max = Number(this.config.get('WALLET_TOPUP_MAX_VND', 100000000));
     if (amount < min || amount > max) throw new BadRequestException(`So tien phai tu ${min} den ${max} VND`);
     if (!['BANK_TRANSFER', 'PAYOS'].includes(paymentMethod)) throw new BadRequestException('Phuong thuc thanh toan chua ho tro');

@@ -37,17 +37,17 @@ POST /api/wallet/topups
 
 ```json
 {
-  "amount": 50000,
+  "amount": 1000,
   "paymentMethod": "PAYOS"
 }
 ```
 
-`amount` là số nguyên VND. Mức tối thiểu hiện tại là 50.000 VND. Response mẫu:
+`amount` là số nguyên VND. Mức tối thiểu mặc định hiện tại là 1.000 VND để phục vụ kiểm thử. Server có thể ghi đè bằng biến môi trường `WALLET_TOPUP_MIN_VND`.
 
 ```json
 {
   "transactionId": "12b17c82-52c8-472e-9301-3660fb6fcf28",
-  "amount": 50000,
+  "amount": 1000,
   "currency": "VND",
   "status": "PENDING_PAYMENT",
   "paymentMethod": "PAYOS",
@@ -129,7 +129,7 @@ Hiện ledger phát sinh giao dịch `TOP_UP` khi nạp ví thành công. Các l
 
 1. Đăng nhập bằng tài khoản KTV đã được duyệt, copy `accessToken`.
 2. Bấm **Authorize** và nhập `Bearer <accessToken>`.
-3. Mở `POST /api/wallet/topups`, nhập amount `50000` và paymentMethod `PAYOS`.
+3. Mở `POST /api/wallet/topups`, nhập amount `1000` hoặc `2000` và paymentMethod `PAYOS`.
 4. Bấm **Execute**, lưu `transactionId` và `checkoutUrl`.
 5. Mở `checkoutUrl`, quét QR và hoàn tất chuyển khoản thật.
 6. Gọi `GET /api/wallet/topups/{transactionId}` sau mỗi 3–5 giây.
