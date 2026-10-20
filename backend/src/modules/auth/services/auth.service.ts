@@ -36,7 +36,7 @@ export class AuthService {
     private readonly appleTokenVerifier: AppleTokenVerifierService,
     config: ConfigService,
   ) {
-    this.accessTokenExpiresIn = config.get('JWT_EXPIRES_IN', '15m');
+    this.accessTokenExpiresIn = config.get('JWT_EXPIRES_IN', '7d');
     this.refreshTokenTtlDays = config.get<number>('REFRESH_TOKEN_TTL_DAYS', 30);
     this.refreshTokenPepper = config.getOrThrow<string>('REFRESH_TOKEN_PEPPER');
   }

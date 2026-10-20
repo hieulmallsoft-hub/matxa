@@ -82,6 +82,16 @@ function AppInner() {
           message: 'Vui lòng điền thông tin khách hàng và dịch vụ tại biểu mẫu.',
           type: 'info',
         });
+      } else if (actionName === 'view-bookings' || actionName === 'confirm-booking') {
+        setCurrentPage('orders');
+      } else if (actionName === 'view-schedule') {
+        setCurrentPage('orders');
+      } else if (actionName === 'add-service') {
+        setCurrentPage('catalog');
+      } else if (actionName === 'create-promotion') {
+        setCurrentPage('promotions');
+      } else if (actionName === 'add-customer') {
+        setCurrentPage('customers');
       } else {
         addToast({
           title: 'Hành động kích hoạt',
@@ -236,7 +246,7 @@ function AppInner() {
   };
 
   return (
-    <div className="min-h-screen bg-[#07080D] text-[#F8FAFC] flex font-sans antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="min-h-screen bg-[#f5f8f3] text-[#1f2b22] flex font-sans antialiased selection:bg-[#d9efd2] selection:text-[#1d5d2a]">
       {/* 1. Left Desktop Sidebar */}
       <Sidebar
         currentPage={currentPage}
@@ -282,7 +292,7 @@ function AppInner() {
         />
 
         {/* Page Content Container */}
-        <main className="operations-page-surface flex-1 p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
+        <main className="operations-page-surface flex-1 bg-[#f5f8f3] p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
           {renderCurrentPage()}
         </main>
       </div>

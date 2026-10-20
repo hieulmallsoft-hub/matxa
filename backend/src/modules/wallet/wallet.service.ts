@@ -112,7 +112,15 @@ export class WalletService {
     // PayOS puts the webhook result (`code`, `success`) at the top level;
     // `data` contains the order and amount. Do not credit on a non-success event.
     const success = String(body.code ?? '') === '00' && body.success === true;
-    if (!success) return { ok: true, status: topUp.status };
+    if (!success) {
+      const failureCode = String(body.code ?? 'PAYOS_FAILED');
+      const failureMessage = String(body.desc ?? 'Thanh toan PayOS that bai');
+      const failed = await this.prisma.topUpTransaction.updateMany({
+        where: { id: topUp.id, status: { in: ['PENDING_PAYMENT', 'PROCESSING'] } },
+        data: { status: 'FAILED', failureCode, failureMessage, processedAt: new Date() },
+      });
+      return { ok: true, status: failed.count ? 'FAILED' : topUp.status };
+    }
     if (Number(data.amount) !== topUp.amountVnd)
       throw new ConflictException('So tien webhook PayOS khong khop giao dich');
     return this.simulateInternal(topUp.id);

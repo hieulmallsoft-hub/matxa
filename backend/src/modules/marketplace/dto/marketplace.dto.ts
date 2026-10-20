@@ -3,6 +3,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -196,10 +197,26 @@ export class CreateTechnicianServiceDto {
   @ApiProperty({ description: 'ID dịch vụ do Admin tạo trong service catalog' })
   @IsUUID()
   catalogServiceId!: string;
+
+  @ApiProperty({ enum: ['HOME', 'ONSITE', 'ONLINE'], isArray: true })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(3)
+  @ArrayUnique()
+  @IsIn(['HOME', 'ONSITE', 'ONLINE'], { each: true })
+  modes!: ('HOME' | 'ONSITE' | 'ONLINE')[];
 }
 
 export class UpdateTechnicianServiceDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Boolean) @IsBoolean() isActive?: boolean;
+
+  @ApiPropertyOptional({ enum: ['HOME', 'ONSITE', 'ONLINE'], isArray: true })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(3)
+  @IsIn(['HOME', 'ONSITE', 'ONLINE'], { each: true })
+  modes?: ('HOME' | 'ONSITE' | 'ONLINE')[];
 }
 
 export class CreateTechnicianServicePriceOptionDto {

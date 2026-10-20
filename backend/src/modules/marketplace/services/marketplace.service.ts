@@ -449,7 +449,13 @@ export class MarketplaceService {
       include: { priceOptions: { where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }] } },
     });
     if (!catalog) throw new NotFoundException('Dich vu catalog khong ton tai hoac da bi an');
-    if (catalog.modes.some((mode) => !profile.serviceModes.includes(mode)))
+    const modes = dto.modes;
+    if (!modes.length) throw new BadRequestException('Dich vu phai co it nhat mot noi phuc vu');
+    if (modes.some((mode) => !catalog.modes.includes(mode)))
+      throw new BadRequestException('Noi phuc vu khong duoc catalog cho phep');
+    if (catalog.modes.length === 1 && (modes.length !== 1 || modes[0] !== catalog.modes[0]))
+      throw new BadRequestException('Dich vu nay chi ho tro mot noi phuc vu da cau hinh');
+    if (modes.some((mode) => !profile.serviceModes.includes(mode)))
       throw new BadRequestException('Dich vu khong phu hop voi noi phuc vu cua ho so KTV');
     if (!catalog.priceOptions.length) throw new BadRequestException('Dich vu chua co goi gia hoat dong');
     const primary = catalog.priceOptions[0];
@@ -461,7 +467,7 @@ export class MarketplaceService {
         description: catalog.description,
         durationMinutes: primary.durationMinutes,
         price: primary.price,
-        modes: catalog.modes,
+        modes,
         priceOptions: {
           create: catalog.priceOptions.map((option) => ({
             code: option.code,
@@ -478,6 +484,16 @@ export class MarketplaceService {
 
   async updateMyService(userId: string, serviceId: string, dto: UpdateTechnicianServiceDto) {
     const profile = await this.myProfile(userId);
+    if (dto.modes !== undefined) {
+      if (!dto.modes.length) throw new BadRequestException('Dich vu phai co it nhat mot noi phuc vu');
+      if (dto.modes.some((mode) => !profile.serviceModes.includes(mode)))
+        throw new BadRequestException('Dich vu khong phu hop voi noi phuc vu cua ho so KTV');
+      const service = await this.prisma.technicianService.findFirst({
+        where: { id: serviceId, technicianId: profile.id },
+        select: { categoryId: true },
+      });
+      if (!service) throw new NotFoundException('Dich vu khong ton tai');
+    }
     const result = await this.prisma.technicianService.updateMany({
       where: { id: serviceId, technicianId: profile.id },
       data: dto,

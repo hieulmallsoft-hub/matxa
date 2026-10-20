@@ -31,6 +31,41 @@ export class ServiceCatalogService {
     return items.map((item) => this.mobile(item));
   }
 
+  /**
+   * Catalog for the technician service-selection screen.
+   * We intentionally return every active catalog item. The technician profile
+   * only controls which modes can be selected; it must not hide services.
+   */
+  async listForTechnician(userId: string) {
+    const profile = await this.prisma.technicianProfile.findUnique({
+      where: { userId },
+      select: { serviceModes: true },
+    });
+    if (!profile) throw new NotFoundException('Tai khoan chua co ho so ky thuat vien');
+
+    const items = await this.prisma.serviceCatalogItem.findMany({
+      where: { isActive: true, category: { isActive: true } },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        priceOptions: { where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }] },
+      },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+    const profileModes = new Set(profile.serviceModes);
+    return {
+      profileServiceModes: profile.serviceModes,
+      items: items.map((item) => {
+        const selectableModes = item.modes.filter((mode) => profileModes.has(mode));
+        return {
+          ...this.mobile(item),
+          selectableModes,
+          unavailableModes: item.modes.filter((mode) => !profileModes.has(mode)),
+          canSelect: selectableModes.length > 0,
+        };
+      }),
+    };
+  }
+
   listAdmin() {
     return this.prisma.serviceCatalogItem.findMany({
       include: { category: true, priceOptions: { orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }] } },

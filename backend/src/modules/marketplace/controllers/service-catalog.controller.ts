@@ -25,6 +25,16 @@ import { ServiceCatalogService } from '../services/service-catalog.service';
 @Controller('service-catalog')
 export class ServiceCatalogController {
   constructor(private readonly catalog: ServiceCatalogService) {}
+  @Get('technician')
+  @UseGuards(AccessTokenGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Catalog day du cho man hinh chon dich vu KTV',
+    description: 'Khong an dich vu; tra ve selectableModes/unavailableModes theo Profile KTV.',
+  })
+  technicianList(@CurrentAuth() auth: AccessTokenPayload) {
+    return this.catalog.listForTechnician(auth.sub);
+  }
   @Get()
   @ApiOperation({ summary: 'Mobile lay catalog dich vu dang hoat dong cho OPEN booking' })
   @ApiOkResponse({

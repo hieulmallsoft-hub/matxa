@@ -68,10 +68,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <motion.aside
       animate={{ width: isCollapsed ? 80 : 260 }}
       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-      className="hidden md:flex flex-col h-screen fixed top-0 left-0 z-40 bg-[#001910]/95 backdrop-blur-2xl border-r border-[#C7D9B5]/12 select-none"
+      className="hidden md:flex flex-col h-screen fixed top-0 left-0 z-40 bg-white border-r border-[#e1ebe0] select-none shadow-[4px_0_18px_rgba(40,100,40,.04)]"
     >
       {/* Brand Header */}
-      <div className="h-18 flex items-center justify-between px-5 py-4 border-b border-[#C7D9B5]/10">
+      <div className="h-18 flex items-center justify-between px-5 py-4 border-b border-[#edf2eb]">
         <div className="flex items-center gap-3 overflow-hidden cursor-pointer" onClick={() => onNavigate('dashboard')}>
           <div className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-[#385723] via-[#4d7530] to-[#C7D9B5] flex items-center justify-center flex-shrink-0 shadow-lg shadow-[#385723]/30">
             <Cpu className="w-5 h-5 text-[#FFFAF5]" />
@@ -88,13 +88,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className="flex flex-col min-w-0"
               >
                 <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-base tracking-wider text-[#FFFAF5]">MATXA OPS</span>
+                  <span className="font-bold text-base tracking-wider text-[#24442b]">MATXXA</span>
                   <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold bg-[#385723]/40 text-[#F9EDB2] border border-[#94AB71]/35">
                     PRO 3.4
                   </span>
                 </div>
                 <span className="text-[10px] text-[#8A9E7A] font-mono tracking-wider">
-                  WELLNESS TELEMETRY OS
+                  MASSAGE &amp; SPA
                 </span>
               </motion.div>
             )}
@@ -104,7 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={onToggleCollapse}
           title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="p-1.5 rounded-lg text-[#8A9E7A] hover:text-[#FFFAF5] hover:bg-white/5 transition-colors"
+          className="p-1.5 rounded-lg text-[#91a094] hover:text-[#2e7138] hover:bg-[#f1f7ef] transition-colors"
         >
           {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
@@ -127,15 +127,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => onNavigate(item.id)}
                 className={`w-full flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative ${
                   isActive
-                    ? 'text-[#FFFAF5] bg-gradient-to-r from-[#385723]/40 via-[#385723]/20 to-transparent border border-[#94AB71]/40 shadow-sm shadow-[#385723]/20'
-                    : 'text-[#C7D9B5]/75 hover:text-[#FFFAF5] hover:bg-white/5'
+                    ? 'text-[#245e2e] bg-[#e8f5e4] border border-[#cce5c7] shadow-sm shadow-[#4d9a48]/10'
+                    : 'text-[#627266] hover:text-[#24442b] hover:bg-[#f3f8f1]'
                 }`}
               >
                 {/* Active Indicator Bar */}
                 {isActive && (
                   <motion.div
                     layoutId="activeIndicator"
-                    className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-[#C7D9B5] shadow-sm shadow-[#C7D9B5]"
+                    className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-[#4ba153] shadow-sm shadow-[#4ba153]"
                     transition={{ type: 'spring', damping: 25, stiffness: 350 }}
                   />
                 )}
@@ -144,7 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <motion.div
                   whileHover={{ scale: 1.12, rotate: 2 }}
                   transition={{ type: 'spring', stiffness: 400 }}
-                  className={`flex-shrink-0 ${isActive ? item.color : 'text-[#8A9E7A] group-hover:text-[#FFFAF5]'}`}
+                    className={`flex-shrink-0 ${isActive ? 'text-[#318846]' : 'text-[#91a094]'}`}
                 >
                   <Icon className="w-5 h-5" />
                 </motion.div>
@@ -182,11 +182,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Footer System Telemetry Widget */}
-      <div className="p-3 border-t border-[#C7D9B5]/10">
+      <div className="p-3 border-t border-[#edf2eb]">
         {!isCollapsed ? (
-          <div className="p-3 rounded-xl bg-white/[0.03] border border-[#C7D9B5]/10">
+          <div className="p-3 rounded-xl bg-[#f5f9f3] border border-[#e1ebe0]">
             <div className="flex items-center justify-between text-xs mb-2">
-              <span className="flex items-center gap-1.5 text-[#C7D9B5] font-medium">
+              <span className="flex items-center gap-1.5 text-[#58705d] font-medium">
                 <Radio className="w-3.5 h-3.5 text-[#94AB71] animate-pulse" /> Wellness Telemetry
               </span>
               <span className="font-mono text-[11px] text-[#F9EDB2]">99.98%</span>
