@@ -267,6 +267,13 @@ export class TechnicianController {
   service(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateTechnicianServiceDto) {
     return this.marketplace.createMyService(auth.sub, dto);
   }
+  @Get('services')
+  @ApiTags('Technician Management')
+  @ApiOperation({ summary: 'Danh sach toan bo dich vu va gia cua KTV hien tai' })
+  @ApiOkResponse({ type: [TechnicianServiceResponseDto] })
+  services(@CurrentAuth() auth: AccessTokenPayload) {
+    return this.marketplace.listMyServices(auth.sub);
+  }
   @Patch('services/:id')
   @ApiTags('Technician Management')
   @ApiOperation({ summary: 'Sua dich vu va bang gia' })

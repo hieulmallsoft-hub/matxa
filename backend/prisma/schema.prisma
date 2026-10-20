@@ -379,6 +379,7 @@ model ServiceCatalogItem {
   category        ServiceCategory @relation(fields: [categoryId], references: [id])
   bookingItems    BookingItem[]
   priceOptions    ServiceCatalogPriceOption[]
+  technicianServices TechnicianService[]
 
   @@index([categoryId, isActive, sortOrder])
   @@map("service_catalog_items")
@@ -423,6 +424,7 @@ model District {
 model TechnicianService {
   id              String             @id @default(uuid()) @db.Uuid
   technicianId    String             @map("technician_id") @db.Uuid
+  catalogServiceId String?            @map("catalog_service_id") @db.Uuid
   categoryId      String             @map("category_id") @db.Uuid
   name            String
   description     String?
@@ -434,11 +436,13 @@ model TechnicianService {
   updatedAt       DateTime           @updatedAt @map("updated_at")
   technician      TechnicianProfile  @relation(fields: [technicianId], references: [id], onDelete: Cascade)
   category        ServiceCategory    @relation(fields: [categoryId], references: [id])
+  catalogService  ServiceCatalogItem? @relation(fields: [catalogServiceId], references: [id])
   bookingItems    BookingItem[]
   priceOptions    TechnicianServicePriceOption[]
 
   @@index([technicianId, isActive])
   @@index([categoryId, isActive])
+  @@index([catalogServiceId])
   @@map("technician_services")
 }
 

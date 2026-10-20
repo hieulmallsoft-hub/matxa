@@ -39,7 +39,7 @@ export class ServiceCatalogService {
   async listForTechnician(userId: string) {
     const profile = await this.prisma.technicianProfile.findUnique({
       where: { userId },
-      select: { serviceModes: true },
+      select: { id: true, serviceModes: true },
     });
     if (!profile) throw new NotFoundException('Tai khoan chua co ho so ky thuat vien');
 
@@ -48,6 +48,11 @@ export class ServiceCatalogService {
       include: {
         category: { select: { id: true, name: true, slug: true } },
         priceOptions: { where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }] },
+        technicianServices: {
+          where: { technicianId: profile.id },
+          include: { priceOptions: { orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }] } },
+          take: 1,
+        },
       },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
@@ -56,11 +61,22 @@ export class ServiceCatalogService {
       profileServiceModes: profile.serviceModes,
       items: items.map((item) => {
         const selectableModes = item.modes.filter((mode) => profileModes.has(mode));
+        const selectedService = item.technicianServices[0] ?? null;
         return {
           ...this.mobile(item),
           selectableModes,
           unavailableModes: item.modes.filter((mode) => !profileModes.has(mode)),
           canSelect: selectableModes.length > 0,
+          selected: Boolean(selectedService),
+          selectedServiceId: selectedService?.id ?? null,
+          selectedModes: selectedService?.modes ?? [],
+          selectedPriceOptions: (selectedService?.priceOptions ?? []).map((option) => ({
+            id: option.id,
+            code: option.code,
+            durationMinutes: option.durationMinutes,
+            price: Number(option.price),
+            isActive: option.isActive,
+          })),
         };
       }),
     };

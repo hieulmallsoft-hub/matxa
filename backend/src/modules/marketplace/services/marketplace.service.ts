@@ -462,6 +462,7 @@ export class MarketplaceService {
     return this.prisma.technicianService.create({
       data: {
         technicianId: profile.id,
+        catalogServiceId: catalog.id,
         categoryId: catalog.categoryId,
         name: catalog.name,
         description: catalog.description,
@@ -480,6 +481,24 @@ export class MarketplaceService {
       },
       include: { priceOptions: true },
     });
+  }
+
+  async listMyServices(userId: string) {
+    const profile = await this.myProfile(userId);
+    const services = await this.prisma.technicianService.findMany({
+      where: { technicianId: profile.id },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        catalogService: { select: { id: true, slug: true, name: true, modes: true } },
+        priceOptions: { orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }] },
+      },
+      orderBy: [{ category: { sortOrder: 'asc' } }, { name: 'asc' }],
+    });
+    return services.map((service) => ({
+      ...service,
+      price: Number(service.price),
+      priceOptions: service.priceOptions.map((option) => ({ ...option, price: Number(option.price) })),
+    }));
   }
 
   async updateMyService(userId: string, serviceId: string, dto: UpdateTechnicianServiceDto) {
