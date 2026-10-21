@@ -66,6 +66,15 @@ async function main() {
       create: { categoryId: category.id, slug: item.slug, name: item.name, pricingTemplate: item.template, modes: item.modes, durationMinutes: first.durationMinutes, price: first.price, priceOptions: { create: item.options } },
     });
   }
+  // Keep legacy catalog rows for historical references, but hide rows that are
+  // no longer part of the Figma catalog (for example old category-name items).
+  await prisma.serviceCatalogItem.updateMany({
+    where: {
+      category: { slug: { in: Object.keys(categoryOrder) } },
+      slug: { notIn: items.map((item) => item.slug) },
+    },
+    data: { isActive: false },
+  });
   await prisma.$disconnect();
   console.log(`Seeded ${items.length} service catalog items`);
 }
