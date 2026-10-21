@@ -1,62 +1,114 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, UserPlus, Search, Mail, Shield, Star, DollarSign, ArrowUpRight } from 'lucide-react';
+import {
+  Users,
+  UserPlus,
+  Search,
+  Mail,
+  Phone,
+  Shield,
+  Star,
+  DollarSign,
+  HeartHandshake,
+  CalendarDays,
+  Sparkles,
+  Award,
+  ChevronRight,
+  Clock,
+  MessageCircle,
+} from 'lucide-react';
 import { useToast } from '../components/ui/ToastContainer';
+import { PageHeader } from '../components/common/PageHeader';
+import { StatCard } from '../components/common/StatCard';
+import { SectionCard } from '../components/common/SectionCard';
+import { SearchInput, FilterTabs } from '../components/common/FilterBar';
+import { DetailDrawer } from '../components/common/DetailDrawer';
+import { StatusBadge } from '../components/common/StatusBadge';
 
-const CUSTOMER_ENTITIES = [
+interface CustomerEntity {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  tier: 'VIP Platinum' | 'Gold Member' | 'Silver' | 'Thành viên mới';
+  spent: number;
+  orders: number;
+  lastBooking: string;
+  favoriteService: string;
+  address: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  avatar: string;
+}
+
+const CUSTOMER_ENTITIES: CustomerEntity[] = [
   {
     id: 'CUST-1049',
-    name: 'Dr. Sarah Chen',
-    company: 'Quantum Lab Robotics',
-    email: 's.chen@quantumlab.io',
-    tier: 'Enterprise VIP',
-    spent: '$48,290',
-    orders: 14,
-    status: 'Active',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+    name: 'Nguyễn Thị Lan Anh',
+    phone: '0901 888 234',
+    email: 'lananh.nguyen@wellness.vn',
+    tier: 'VIP Platinum',
+    spent: 18450000,
+    orders: 24,
+    lastBooking: 'Hôm nay, 09:30',
+    favoriteService: 'Massage Trị Liệu Cổ Vai Gáy Chuyên Sâu',
+    address: 'Quận 1, TP. Hồ Chí Minh',
+    status: 'ACTIVE',
+    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80',
   },
   {
     id: 'CUST-1048',
-    name: 'Marcus Vance',
-    company: 'Vanguard AI Security',
-    email: 'm.vance@vanguard-ai.com',
-    tier: 'Enterprise VIP',
-    spent: '$32,150',
-    orders: 9,
-    status: 'Active',
+    name: 'Trần Minh Hoàng',
+    phone: '0903 555 888',
+    email: 'hoang.tran@techcorp.vn',
+    tier: 'Gold Member',
+    spent: 9800000,
+    orders: 14,
+    lastBooking: 'Hôm qua, 15:00',
+    favoriteService: 'Massage Shiatsu Nhật Bản & Bấm Huyệt',
+    address: 'Quận 3, TP. Hồ Chí Minh',
+    status: 'ACTIVE',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
   },
   {
     id: 'CUST-1047',
-    name: 'Aiko Tanaka',
-    company: 'Shibuya Autonomous Tech',
-    email: 'aiko@shibuya-robotics.jp',
-    tier: 'Growth Tier',
-    spent: '$19,840',
-    orders: 6,
-    status: 'Active',
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80',
+    name: 'Lê Thu Hà',
+    phone: '0912 666 777',
+    email: 'ha.lethu@creative.com',
+    tier: 'VIP Platinum',
+    spent: 24600000,
+    orders: 31,
+    lastBooking: '2 ngày trước',
+    favoriteService: 'Combo Thư Giãn Toàn Diện 120 Phút',
+    address: 'Cầu Giấy, Hà Nội',
+    status: 'ACTIVE',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
   },
   {
     id: 'CUST-1046',
-    name: 'Julian Sterling',
-    company: 'Apex Quant Partners',
-    email: 'j.sterling@apexpartners.ch',
-    tier: 'Enterprise VIP',
-    spent: '$64,100',
-    orders: 22,
-    status: 'Active',
+    name: 'Phạm Tuấn Anh',
+    phone: '0988 222 333',
+    email: 'anh.pham@apex.vn',
+    tier: 'Silver',
+    spent: 4200000,
+    orders: 6,
+    lastBooking: '4 ngày trước',
+    favoriteService: 'Massage Đá Nóng Himalaya Phục Hồi',
+    address: 'Ba Đình, Hà Nội',
+    status: 'ACTIVE',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
   },
   {
     id: 'CUST-1045',
-    name: 'Maya Lin',
-    company: 'Prism Creative Edge',
-    email: 'maya@prism-studios.co',
-    tier: 'Standard',
-    spent: '$4,890',
-    orders: 3,
-    status: 'Active',
+    name: 'Vũ Quỳnh Trang',
+    phone: '0933 999 111',
+    email: 'trang.vu@fashion.vn',
+    tier: 'Thành viên mới',
+    spent: 1250000,
+    orders: 1,
+    lastBooking: '1 tuần trước',
+    favoriteService: 'Chăm Sóc Da Mặt Nâng Cơ Chuyên Sâu',
+    address: 'Hải Châu, Đà Nẵng',
+    status: 'ACTIVE',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
   },
 ];
@@ -64,144 +116,288 @@ const CUSTOMER_ENTITIES = [
 export const CustomersPage: React.FC = () => {
   const { addToast } = useToast();
   const [search, setSearch] = useState('');
+  const [selectedTier, setSelectedTier] = useState<string>('ALL');
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerEntity | null>(null);
 
-  const filtered = CUSTOMER_ENTITIES.filter(
-    (c) =>
+  const filtered = CUSTOMER_ENTITIES.filter((c) => {
+    const matchSearch =
       c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.company.toLowerCase().includes(search.toLowerCase()) ||
-      c.email.toLowerCase().includes(search.toLowerCase())
-  );
+      c.phone.includes(search) ||
+      c.email.toLowerCase().includes(search.toLowerCase());
+    const matchTier = selectedTier === 'ALL' || c.tier === selectedTier;
+    return matchSearch && matchTier;
+  });
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 15 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -15 }}
-      transition={{ duration: 0.4 }}
-      className="space-y-8 pb-16"
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+      className="space-y-6 pb-12"
     >
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-[#0D101C]/80 border border-white/10 backdrop-blur-xl">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-              <Users className="w-5 h-5" />
-            </div>
-            <h1 className="text-2xl font-bold text-white tracking-wide">
-              Customer Directory
-            </h1>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Global high-net-worth client accounts, lifetime values, and dedicated tier privileges
-          </p>
-        </div>
-
-        <button
-          onClick={() =>
-            addToast({
-              title: 'Customer Invitation Sent',
-              message: 'Generated single-use quantum onboarding link.',
-              type: 'success',
-            })
-          }
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-600 text-white text-xs font-semibold shadow-lg shadow-emerald-500/20 border border-white/20 transition-all cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>+ Add Customer</span>
-        </button>
-      </div>
-
-      {/* Customer Stat Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Accounts', value: '24,892', sub: '+18.7% this month', color: 'text-cyan-400' },
-          { label: 'Average LTV', value: '$1,480.00', sub: '+12.4% expansion', color: 'text-emerald-400' },
-          { label: 'VIP Enterprise Seats', value: '1,420', sub: '99.2% renewal rate', color: 'text-violet-400' },
-          { label: 'Net Promoter Score', value: '78 / 100', sub: 'Global 99th percentile', color: 'text-amber-400' },
-        ].map((kpi, i) => (
-          <div key={i} className="p-5 rounded-2xl bg-[#0E1220]/80 border border-white/10 backdrop-blur-xl">
-            <span className="text-[11px] font-mono text-slate-400 uppercase">{kpi.label}</span>
-            <div className={`text-2xl font-bold font-mono ${kpi.color} mt-1`}>{kpi.value}</div>
-            <div className="text-[11px] text-slate-400 font-mono mt-1">{kpi.sub}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Search Bar */}
-      <div className="p-4 rounded-2xl bg-[#0D101C]/80 border border-white/10 flex items-center justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search client entity by name, company, or email..."
-            className="w-full pl-9 pr-3 py-2 rounded-xl bg-black/40 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-          />
-        </div>
-
-        <span className="text-xs font-mono text-slate-400 hidden sm:block">
-          Showing {filtered.length} client entities
-        </span>
-      </div>
-
-      {/* Customer Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map((customer) => (
-          <div
-            key={customer.id}
-            className="p-5 rounded-2xl bg-[#0D101C]/80 border border-white/10 hover:border-white/20 transition-all backdrop-blur-xl space-y-4 group"
+      {/* 1. Header */}
+      <PageHeader
+        title="Quản lý Khách hàng"
+        subtitle="Danh sách khách hàng, lịch sử sử dụng dịch vụ và phân hạng hội viên"
+        badge="3.920 hội viên"
+        badgeTone="green"
+        breadcrumbs={[
+          { label: 'MATXXA' },
+          { label: 'Khách hàng' },
+        ]}
+        actions={
+          <button
+            onClick={() =>
+              addToast({
+                title: 'Thêm khách hàng',
+                message: 'Vui lòng nhập thông tin khách hàng tại biểu mẫu liên kết.',
+                type: 'info',
+              })
+            }
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white text-xs font-semibold shadow-sm transition-all cursor-pointer"
           >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <img
-                  src={customer.avatar}
-                  alt={customer.name}
-                  className="w-12 h-12 rounded-2xl object-cover ring-1 ring-white/10"
-                />
-                <div>
-                  <h3 className="text-sm font-semibold text-white group-hover:text-cyan-300 transition-colors">
-                    {customer.name}
-                  </h3>
-                  <div className="text-xs text-slate-400">{customer.company}</div>
+            <UserPlus className="w-4 h-4" />
+            <span>+ Thêm khách hàng mới</span>
+          </button>
+        }
+      />
+
+      {/* 2. KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard
+          label="Tổng số khách hàng"
+          value="3.920 khách"
+          change={15.8}
+          isPositive={true}
+          caption="toàn hệ thống"
+          icon={<Users className="w-5 h-5" />}
+          tone="primary"
+          sparkline={[310, 325, 340, 355, 370, 382, 392]}
+        />
+        <StatCard
+          label="Khách mới tháng này"
+          value="535 khách"
+          change={22.4}
+          isPositive={true}
+          caption="tăng trưởng 22%"
+          icon={<UserPlus className="w-5 h-5" />}
+          tone="success"
+          sparkline={[410, 435, 460, 485, 510, 525, 535]}
+        />
+        <StatCard
+          label="Khách hàng quay lại"
+          value="88.8%"
+          change={3.2}
+          isPositive={true}
+          caption="tỷ lệ giữ chân cao"
+          icon={<HeartHandshake className="w-5 h-5" />}
+          tone="info"
+          sparkline={[84, 85, 86, 86.8, 87.5, 88.2, 88.8]}
+        />
+        <StatCard
+          label="Khách VIP Platinum"
+          value="480 khách"
+          change={8.5}
+          isPositive={true}
+          caption="đóng góp 62% doanh thu"
+          icon={<Award className="w-5 h-5" />}
+          tone="warning"
+          sparkline={[420, 435, 448, 455, 468, 475, 480]}
+        />
+      </div>
+
+      {/* 3. Filter Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-white rounded-2xl border border-[#E5EBE5] shadow-2xs">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Tìm tên khách hàng, số điện thoại, email..."
+        />
+
+        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full">
+          {[
+            { key: 'ALL', label: 'Tất cả hạng' },
+            { key: 'VIP Platinum', label: 'VIP Platinum' },
+            { key: 'Gold Member', label: 'Gold Member' },
+            { key: 'Silver', label: 'Silver' },
+            { key: 'Thành viên mới', label: 'Thành viên mới' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setSelectedTier(tab.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+                selectedTier === tab.key
+                  ? 'bg-[#EAF5EC] text-[#2E7D4A]'
+                  : 'text-[#66756B] hover:text-[#1C2B20] hover:bg-[#F6F8F4]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 4. Main Customer Table */}
+      <SectionCard title="Danh sách khách hàng" subtitle={`${filtered.length} tài khoản khách hàng`} noPadding>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-[#F6F8F4] text-[#66756B] uppercase font-semibold border-b border-[#E5EBE5]">
+              <tr>
+                <th className="py-3 px-4">Khách hàng</th>
+                <th className="py-3 px-4">Số điện thoại</th>
+                <th className="py-3 px-4">Khu vực</th>
+                <th className="py-3 px-4">Số đơn</th>
+                <th className="py-3 px-4 text-right">Tổng chi tiêu</th>
+                <th className="py-3 px-4">Lần đặt gần nhất</th>
+                <th className="py-3 px-4">Hạng thành viên</th>
+                <th className="py-3 px-4 text-right">Hồ sơ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#F1F5EF] text-sm text-[#1C2B20]">
+              {filtered.map((cust) => (
+                <tr
+                  key={cust.id}
+                  onClick={() => setSelectedCustomer(cust)}
+                  className="hover:bg-[#F6F8F4] transition-colors cursor-pointer h-16 group"
+                >
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={cust.avatar}
+                        alt={cust.name}
+                        className="w-9 h-9 rounded-full object-cover ring-1 ring-[#E5EBE5]"
+                      />
+                      <div>
+                        <div className="font-bold text-xs text-[#1C2B20]">{cust.name}</div>
+                        <div className="text-[11px] text-[#94A399] font-mono">{cust.id}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 font-mono text-xs text-[#66756B]">
+                    {cust.phone}
+                  </td>
+                  <td className="py-3 px-4 text-xs font-medium text-[#66756B]">
+                    {cust.address}
+                  </td>
+                  <td className="py-3 px-4 font-bold text-xs text-[#2E7D4A]">
+                    {cust.orders} đơn
+                  </td>
+                  <td className="py-3 px-4 text-right font-bold text-xs text-[#1C2B20]">
+                    {new Intl.NumberFormat('vi-VN').format(cust.spent)} đ
+                  </td>
+                  <td className="py-3 px-4 text-xs text-[#66756B] whitespace-nowrap">
+                    {cust.lastBooking}
+                  </td>
+                  <td className="py-3 px-4">
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                        cust.tier === 'VIP Platinum'
+                          ? 'bg-[#FEF6E9] text-[#B87A14] border-[#FBE3B8]'
+                          : cust.tier === 'Gold Member'
+                          ? 'bg-[#EAF5EC] text-[#2E7D4A] border-[#D0E7D5]'
+                          : 'bg-[#F1F5EF] text-[#66756B] border-[#E5EBE5]'
+                      }`}
+                    >
+                      {cust.tier}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-right">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCustomer(cust);
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-xs font-semibold text-[#2E7D4A] bg-[#EAF5EC] hover:bg-[#DDF0E1] transition-colors"
+                    >
+                      Xem chi tiết
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
+
+      {/* 5. Customer Detail Drawer */}
+      <DetailDrawer
+        isOpen={!!selectedCustomer}
+        onClose={() => setSelectedCustomer(null)}
+        title={selectedCustomer ? `Hồ sơ khách hàng • ${selectedCustomer.name}` : ''}
+        subtitle="Thông tin chi tiết, lịch sử sử dụng dịch vụ và dịch vụ yêu thích"
+        badge={
+          selectedCustomer ? (
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FEF6E9] text-[#B87A14] border border-[#FBE3B8]">
+              {selectedCustomer.tier}
+            </span>
+          ) : undefined
+        }
+      >
+        {selectedCustomer && (
+          <div className="space-y-6">
+            {/* Profile Avatar Card */}
+            <div className="p-4 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] flex items-center gap-4">
+              <img
+                src={selectedCustomer.avatar}
+                alt={selectedCustomer.name}
+                className="w-16 h-16 rounded-full object-cover ring-2 ring-[#EAF5EC]"
+              />
+              <div className="space-y-1">
+                <h4 className="font-bold text-base text-[#1C2B20]">{selectedCustomer.name}</h4>
+                <div className="text-xs text-[#66756B] flex items-center gap-3">
+                  <span>SĐT: {selectedCustomer.phone}</span>
+                  <span>•</span>
+                  <span>{selectedCustomer.address}</span>
+                </div>
+                <div className="text-[11px] text-[#2E7D4A] font-semibold">
+                  Hội viên thân thiết từ tháng 01/2026
                 </div>
               </div>
+            </div>
 
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-indigo-500/10 text-cyan-300 border border-indigo-500/30">
-                {customer.tier}
+            {/* Spent & Orders Stats */}
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3.5 rounded-xl bg-white border border-[#E5EBE5] space-y-1">
+                <span className="text-[#66756B] block">Tổng chi tiêu</span>
+                <span className="font-bold text-base text-[#2E7D4A]">
+                  {new Intl.NumberFormat('vi-VN').format(selectedCustomer.spent)} đ
+                </span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-white border border-[#E5EBE5] space-y-1">
+                <span className="text-[#66756B] block">Tổng số ca phục vụ</span>
+                <span className="font-bold text-base text-[#1C2B20]">
+                  {selectedCustomer.orders} lịch đặt
+                </span>
+              </div>
+            </div>
+
+            {/* Favorite Service */}
+            <div className="p-4 rounded-xl bg-white border border-[#E5EBE5] space-y-2">
+              <span className="text-xs font-bold text-[#66756B] uppercase tracking-wider block">
+                Dịch vụ yêu thích
               </span>
-            </div>
-
-            <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1.5 font-mono text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500 text-[11px]">Lifetime Spend:</span>
-                <span className="text-white font-bold">{customer.spent}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500 text-[11px]">Orders Fulfilled:</span>
-                <span className="text-cyan-400">{customer.orders} orders</span>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-[#EAF5EC] text-[#2E7D4A] flex items-center justify-center">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="font-bold text-xs text-[#1C2B20]">{selectedCustomer.favoriteService}</div>
+                  <div className="text-[11px] text-[#94A399]">Đã đặt 18 lần trong năm nay</div>
+                </div>
               </div>
             </div>
 
-            <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs">
-              <span className="text-[11px] text-slate-500 font-mono">{customer.email}</span>
-              <button
-                onClick={() =>
-                  addToast({
-                    title: 'Message Thread Opened',
-                    message: `Connecting to encrypted chat with ${customer.name}`,
-                    type: 'info',
-                  })
-                }
-                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-cyan-400 transition-colors"
-                title="Send secure dispatch"
-              >
-                <Mail className="w-4 h-4" />
-              </button>
+            {/* CSKH & Notes */}
+            <div className="p-4 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] space-y-2 text-xs">
+              <span className="font-bold text-[#1C2B20] block">Ghi chú chăm sóc khách hàng:</span>
+              <p className="text-[#66756B] leading-relaxed">
+                Khách thích kỹ thuật viên Lê Thu Hương hoặc Nguyễn Thị Mai. Ưu tiên khung giờ buổi tối từ 19:00 - 21:00. Yêu cầu khăn và ga giường tinh dầu quế.
+              </p>
             </div>
           </div>
-        ))}
-      </div>
+        )}
+      </DetailDrawer>
     </motion.div>
   );
 };

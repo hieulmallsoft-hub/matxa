@@ -495,6 +495,7 @@ export class BookingsService {
       },
       include: { items: { include: { catalogService: true } }, payment: true },
     });
+    void this.notifyEligibleTechniciansForOpenBooking(created);
     return {
       ...this.openBookingResponse(created, null, false),
       expiresInSeconds: Math.max(0, Math.floor((deadline.getTime() - Date.now()) / 1000)),
@@ -1113,6 +1114,15 @@ export class BookingsService {
       throw new ForbiddenException('KTV khong phu hop quan huyen cua don');
     if (!profile.serviceModes.includes(booking.mode))
       throw new ForbiddenException('KTV khong ho tro hinh thuc dich vu nay');
+    const unfinished = await db.booking.findFirst({
+      where: {
+        technicianId: profile.id,
+        status: 'CONFIRMED',
+        id: { not: booking.id },
+      },
+      select: { id: true },
+    });
+    if (unfinished) throw new ConflictException('KTV phai hoan thanh don hien tai truoc khi nhan don moi');
     const catalogItems = (booking.items ?? []).map((item: any) => item.catalogService).filter(Boolean);
     if (!catalogItems.length || catalogItems.length !== (booking.items ?? []).length)
       throw new BadRequestException('Du lieu dich vu OPEN khong hop le');
@@ -1416,6 +1426,35 @@ export class BookingsService {
       bookingId,
       customerId,
     });
+  }
+
+  private async notifyEligibleTechniciansForOpenBooking(booking: any) {
+    try {
+      const candidates = await this.prisma.technicianProfile.findMany({
+        where: {
+          isActive: true,
+          isVerified: true,
+          user: { status: 'ACTIVE', role: 'TECHNICIAN', technicianApplication: { is: { status: 'APPROVED' } } },
+        },
+        select: { id: true, userId: true },
+      });
+      for (const candidate of candidates) {
+        try {
+          await this.assertOpenEligibility(this.prisma, booking, candidate.id);
+          await this.notifyStatus(
+            candidate.userId,
+            booking.id,
+            'OPEN_BOOKING_AVAILABLE',
+            'Có đơn mới phù hợp',
+            'Có đơn dịch vụ mới phù hợp. Hãy mở tab Nhận việc để xem và ứng tuyển.',
+          );
+        } catch {
+          // One ineligible technician must not block other notifications.
+        }
+      }
+    } catch {
+      // Notification delivery must not affect successful booking creation.
+    }
   }
 
   private async notifyStatus(userId: string, bookingId: string, type: string, title: string, body: string) {

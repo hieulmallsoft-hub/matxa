@@ -217,7 +217,7 @@ function AppInner() {
       case 'courses':
       case 'promotions':
         return (
-          <div className="bg-[#0D111E]/80 backdrop-blur-xl border border-white/5 rounded-2xl p-6 shadow-2xl">
+          <div className="bg-white border border-[#E5EBE5] rounded-2xl p-6 shadow-sm">
             <AdminDashboard
               notify={(msg, isErr) =>
                 addToast({
@@ -246,7 +246,7 @@ function AppInner() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f8f3] text-[#1f2b22] flex font-sans antialiased selection:bg-[#d9efd2] selection:text-[#1d5d2a]">
+    <div className="min-h-screen bg-[#F6F8F4] text-[#1C2B20] flex font-sans antialiased selection:bg-[#EAF5EC] selection:text-[#2E7D4A]">
       {/* 1. Left Desktop Sidebar */}
       <Sidebar
         currentPage={currentPage}
@@ -254,7 +254,7 @@ function AppInner() {
         isCollapsed={isCollapsed}
         onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
         unreadNotifications={notifications.filter((n) => !n.read).length}
-        unreadMessages={3}
+        unreadMessages={2}
       />
 
       {/* 2. Mobile Drawer Navigation */}
@@ -271,7 +271,7 @@ function AppInner() {
       {/* 3. Main Workspace Area */}
       <div
         className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
-          isCollapsed ? 'md:ml-20' : 'md:ml-[260px]'
+          isCollapsed ? 'md:ml-[76px]' : 'md:ml-[256px]'
         }`}
       >
         {/* Top Navbar */}
@@ -292,7 +292,7 @@ function AppInner() {
         />
 
         {/* Page Content Container */}
-        <main className="operations-page-surface flex-1 bg-[#f5f8f3] p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
+        <main className="flex-1 bg-[#F6F8F4] p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
           {renderCurrentPage()}
         </main>
       </div>
@@ -307,29 +307,29 @@ function AppInner() {
 
       {/* 5. Live Backend Authentication Modal */}
       {isLoginModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="relative w-full max-w-md bg-[#0D101E] border border-white/10 rounded-2xl p-6 shadow-2xl space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C2B20]/45 backdrop-blur-sm">
+          <div className="relative w-full max-w-md bg-white border border-[#E5EBE5] rounded-2xl p-6 shadow-2xl space-y-5">
             <button
               onClick={() => setIsLoginModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+              className="absolute top-4 right-4 p-1.5 text-[#66756B] hover:text-[#1C2B20] rounded-lg hover:bg-[#F6F8F4] transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="space-y-1.5">
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-indigo-500/20 text-cyan-400 border border-indigo-500/30">
-                <Sparkles className="w-3.5 h-3.5" /> MATXA LUXURY OPERATIONS
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#EAF5EC] text-[#2E7D4A] border border-[#D0E7D5]">
+                <Sparkles className="w-3.5 h-3.5" /> MATXXA SPA ADMIN
               </div>
-              <h2 className="text-xl font-bold text-white tracking-tight">Kết nối Live API</h2>
-              <p className="text-xs text-slate-400">
-                Nhập tài khoản Quản trị viên để đồng bộ dữ liệu trực tiếp với backend máy chủ.
+              <h2 className="text-xl font-bold text-[#1C2B20] tracking-tight">Kết nối Live API Máy chủ</h2>
+              <p className="text-xs text-[#66756B]">
+                Nhập tài khoản Quản trị viên để đồng bộ dữ liệu trực tiếp với backend.
               </p>
             </div>
 
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-cyan-400" /> Email quản trị
+                <label className="text-xs font-semibold text-[#1C2B20] flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-[#2E7D4A]" /> Email quản trị
                 </label>
                 <input
                   type="email"
@@ -337,13 +337,13 @@ function AppInner() {
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
                   placeholder="admin@matxa.local"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-[#1C2B20] placeholder-[#94A399] text-xs focus:outline-none focus:border-[#2E7D4A] focus:ring-1 focus:ring-[#2E7D4A] transition-colors"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-violet-400" /> Mật khẩu
+                <label className="text-xs font-semibold text-[#1C2B20] flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-[#2E7D4A]" /> Mật khẩu
                 </label>
                 <input
                   type="password"
@@ -351,12 +351,12 @@ function AppInner() {
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-[#1C2B20] placeholder-[#94A399] text-xs focus:outline-none focus:border-[#2E7D4A] focus:ring-1 focus:ring-[#2E7D4A] transition-colors"
                 />
               </div>
 
               {loginError && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-[#FDF0EF] border border-[#F8D2D0] text-[#D04A44] text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
                   <span>{loginError}</span>
                 </div>
@@ -366,7 +366,7 @@ function AppInner() {
                 <button
                   type="submit"
                   disabled={loginLoading}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-500 text-white text-sm font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 disabled:opacity-50 transition-all cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white text-xs font-semibold shadow-md shadow-[#2E7D4A]/25 disabled:opacity-50 transition-all cursor-pointer"
                 >
                   {loginLoading ? 'Đang xác thực...' : 'Đăng nhập vào hệ thống'}
                   <ArrowRight className="w-4 h-4" />
@@ -383,9 +383,9 @@ function AppInner() {
                       type: 'info',
                     });
                   }}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-medium transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#F6F8F4] hover:bg-[#EEF2EC] text-[#66756B] hover:text-[#1C2B20] text-xs font-medium transition-colors"
                 >
-                  Dùng chế độ Demo Sandbox không cần đăng nhập
+                  Tiếp tục dùng chế độ Demo không cần đăng nhập
                 </button>
               </div>
             </form>

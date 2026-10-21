@@ -10,92 +10,73 @@
    ========================================================================== */
 
 :root {
-  --font-main: "Nunito", "Quicksand", -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-heading: "Quicksand", "Nunito", sans-serif;
+  --font-main: "Be Vietnam Pro", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-heading: "Be Vietnam Pro", "Inter", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 
-  /* ── Core Beauty Green Palette ── */
-  --green-50:  #f0faf2;
-  --green-100: #d8f3df;
-  --green-200: #aee4bb;
-  --green-300: #74cf8e;
-  --green-400: #38b65e;
-  --green-500: #22a04a;   /* main brand green */
-  --green-600: #1a8a3c;
-  --green-700: #156b2e;
-  --green-800: #0f4d21;
-  --green-900: #0a3318;
-  --green-950: #061e0f;
+  /* ── Matxxa Primary Green Palette ── */
+  --primary:         #2E7D4A;
+  --primary-hover:   #256A3E;
+  --primary-soft:    #EAF5EC;
+  --primary-light:   #F0F8F2;
+  --primary-dark:    #1C5430;
 
-  /* ── Sidebar gradient tones ── */
-  --sidebar-top:    #1b6b33;
-  --sidebar-mid:    #145527;
-  --sidebar-bottom: #0d3f1c;
+  /* ── Backgrounds & Surfaces ── */
+  --bg-page:         #F6F8F4;
+  --bg-surface:      #FFFFFF;
+  --bg-subtle:       #F1F5EF;
+  --bg-card:         #FFFFFF;
+  --bg-topbar:       #FFFFFF;
 
-  /* ── Page backgrounds ── */
-  --bg-root:    #ffffff;
-  --bg-page:    #f6fdf8;
-  --bg-topbar:  #ffffff;
-  --bg-card:    #ffffff;
-  --bg-subtle:  #eef8f1;
-  --bg-input:   #f4fbf6;
-  --bg-tag:     #d6f0de;
-
-  /* ── Sidebar tokens ── */
-  --sidebar-text:   rgba(255,255,255,0.82);
-  --sidebar-muted:  rgba(255,255,255,0.48);
-  --sidebar-border: rgba(255,255,255,0.14);
-  --sidebar-hover:  rgba(255,255,255,0.12);
-
-  /* ── Text ── */
-  --text-primary:   #0d3318;
-  --text-secondary: #1a5c30;
-  --text-muted:     #5a8a68;
-  --text-light:     #8bbf9a;
-  --text-inverse:   #ffffff;
+  /* ── Typography Colors ── */
+  --text-primary:    #1C2B20;
+  --text-secondary:  #66756B;
+  --text-muted:      #94A399;
+  --text-light:      #B3C1B7;
+  --text-inverse:    #FFFFFF;
 
   /* ── Borders ── */
-  --border-light:  rgba(34, 160, 74, 0.14);
-  --border-medium: rgba(26, 138, 60, 0.28);
-  --border-strong: #38b65e;
-  --border-focus:  #22a04a;
+  --border-light:    #E5EBE5;
+  --border-subtle:   #EDF2EC;
+  --border-medium:   #D0DCD1;
+  --border-focus:    #2E7D4A;
 
-  /* ── Status ── */
-  --success:       #22a04a;
-  --warning:       #f59e0b;
-  --danger:        #e53e3e;
-  --info:          #3b9ede;
-  --danger-bg:     rgba(229, 62, 62, 0.08);
-  --danger-border: rgba(229, 62, 62, 0.25);
+  /* ── Status Colors ── */
+  --success:         #2E9B62;
+  --success-bg:      #EBF8F1;
+  --warning:         #F2A93B;
+  --warning-bg:      #FEF6E9;
+  --danger:          #E05B55;
+  --danger-bg:       #FDF0EF;
+  --info:            #4285D4;
+  --info-bg:         #EDF4FC;
 
-  /* ── Shadows (green-tinted) ── */
-  --shadow-xs:      0 1px 4px rgba(10, 80, 30, 0.07);
-  --shadow-sm:      0 3px 12px rgba(10, 80, 30, 0.10);
-  --shadow-md:      0 8px 28px rgba(10, 80, 30, 0.13);
-  --shadow-lg:      0 20px 60px rgba(10, 80, 30, 0.16);
-  --shadow-card:    0 2px 10px rgba(10, 80, 30, 0.06), 0 0 0 1px rgba(34,160,74,0.09);
-  --shadow-glow:    0 0 0 3px rgba(34, 160, 74, 0.22);
-  --shadow-sidebar: 6px 0 40px rgba(6, 30, 15, 0.30);
+  /* ── Shadows ── */
+  --shadow-xs:       0 1px 3px rgba(28, 43, 32, 0.04);
+  --shadow-sm:       0 2px 8px rgba(28, 43, 32, 0.04);
+  --shadow-md:       0 6px 18px rgba(28, 43, 32, 0.06);
+  --shadow-lg:       0 16px 36px rgba(28, 43, 32, 0.08);
+  --shadow-card:     0 2px 10px rgba(28, 43, 32, 0.04), 0 0 0 1px rgba(229, 235, 229, 0.7);
+  --shadow-drawer:   -10px 0 35px -5px rgba(28, 43, 32, 0.12);
 
   /* ── Layout ── */
-  --sidebar-w: 256px;
-  --topbar-h:  66px;
-
-  /* ── Easing ── */
-  --ease-fast:   0.15s cubic-bezier(.2,.8,.2,1);
-  --ease-normal: 0.26s cubic-bezier(.16,1,.3,1);
-  --ease-smooth: 0.42s cubic-bezier(.16,1,.3,1);
-  --ease-spring: 0.48s cubic-bezier(.34,1.56,.64,1);
+  --sidebar-w:       260px;
+  --sidebar-collapsed-w: 80px;
+  --topbar-h:        66px;
 
   /* ── Radii ── */
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
+  --radius-sm:       8px;
+  --radius-md:       12px;
+  /* ── Radii ── */
+  --radius-sm:       8px;
+  --radius-md:       12px;
+  --radius-lg:       18px;
+  --radius-xl:       24px;
 
-  --focus-ring:    0 0 0 4px rgba(34,160,74,.20);
-  --motion-fast:   160ms cubic-bezier(.2,.8,.2,1);
-  --motion-normal: 260ms cubic-bezier(.16,1,.3,1);
+  /* ── Motion & Easing ── */
+  --ease-normal:     0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-fast:       0.16s ease;
+  --focus-ring:      0 0 0 3px rgba(46, 125, 74, 0.20);
 }
 
 /* ── Reset ── */

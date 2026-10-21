@@ -3,22 +3,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
   Bell,
-
-  
-  MessageSquare,
-  Sparkles,
-  ChevronDown,
+  MessageCircle,
+  HelpCircle,
   User,
-  Key,
-  Users,
-  Shield,
+  Settings,
   LogOut,
   Menu,
   Check,
-  Moon,
-  Palette,
-  Sun,
-  Laptop,
+  ShieldCheck,
+  ExternalLink,
+  ChevronDown,
+  Sparkles,
+  Database,
+  Radio,
 } from 'lucide-react';
 import { PageId, NotificationItem } from '../../types/dashboard';
 
@@ -39,21 +36,21 @@ interface NavbarProps {
 }
 
 const PAGE_NAMES: Record<PageId, string> = {
-  dashboard: 'Tổng quan & Telemetry 3D',
-  analytics: 'Phân tích Doanh thu & Metric',
-  orders: 'Quản lý Lịch đặt & Đơn dịch vụ',
-  technicians: 'Danh bạ Kỹ thuật viên',
-  applications: 'Duyệt hồ sơ & KYC KTV',
-  catalog: 'Catalog Dịch vụ & Bảng giá',
-  courses: 'Khóa học Đào tạo & Bài giảng',
-  promotions: 'Voucher Khuyến mãi & Banner',
-  customers: 'Danh sách Khách hàng',
-  products: 'Sản phẩm & Vật tư',
-  payments: 'Cổng thanh toán & Payout',
-  transactions: 'Sổ cái Giao dịch Cryptographic',
-  messages: 'Tin nhắn CSKH & Copilot',
-  notifications: 'Cảnh báo & Sự cố Vận hành',
-  settings: 'Cấu hình Hệ thống & Token',
+  dashboard: 'Tổng quan',
+  analytics: 'Doanh thu & Báo cáo',
+  orders: 'Lịch đặt & Đơn hàng',
+  technicians: 'Kỹ thuật viên',
+  applications: 'Duyệt hồ sơ KTV',
+  catalog: 'Dịch vụ',
+  courses: 'Khóa học đào tạo',
+  promotions: 'Khuyến mãi & Banner',
+  customers: 'Khách hàng',
+  products: 'Vật tư & Sản phẩm',
+  payments: 'Cổng thanh toán',
+  transactions: 'Sổ cái đối soát',
+  messages: 'Tin nhắn CSKH',
+  notifications: 'Thông báo hệ thống',
+  settings: 'Cấu hình hệ thống',
 };
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -63,8 +60,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenMobileMenu,
   notifications,
   onMarkNotificationsRead,
-  theme,
-  onToggleTheme,
   user,
   isDemoMode,
   onToggleDemoMode,
@@ -73,11 +68,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showThemeMenu, setShowThemeMenu] = useState(false);
-
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifMenuRef = useRef<HTMLDivElement>(null);
-  const themeMenuRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -89,49 +81,50 @@ export const Navbar: React.FC<NavbarProps> = ({
       if (notifMenuRef.current && !notifMenuRef.current.contains(e.target as Node)) {
         setShowNotifications(false);
       }
-      if (themeMenuRef.current && !themeMenuRef.current.contains(e.target as Node)) {
-        setShowThemeMenu(false);
-      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 w-full h-[66px] bg-white border-b border-[rgba(34,160,74,0.14)] px-4 sm:px-6 flex items-center justify-between shadow-[0_2px_16px_rgba(10,80,30,0.07)]">
+    <header className="sticky top-0 z-30 w-full h-[66px] bg-white border-b border-[#E5EBE5] px-4 sm:px-6 flex items-center justify-between shadow-[0_1px_4px_rgba(28,43,32,0.03)]">
       {/* Left: Mobile hamburger & Breadcrumb */}
       <div className="flex items-center gap-3">
         {onOpenMobileMenu && (
           <button
             onClick={onOpenMobileMenu}
-            className="md:hidden p-2 rounded-lg text-[#6B8F67] hover:text-[#1A3818] hover:bg-[#EDF5E9]"
+            className="md:hidden p-2 rounded-xl text-[#66756B] hover:text-[#1C2B20] hover:bg-[#F6F8F4] transition-colors"
+            title="Mở menu"
           >
             <Menu className="w-5 h-5" />
           </button>
         )}
 
-        <div className="flex items-center gap-2 text-xs font-mono">
-          <span className="text-[#3D9132] hover:text-[#1E5019] cursor-pointer font-bold tracking-wider transition-colors" onClick={() => onNavigate('dashboard')}>
-            🌿 MATXA OPERATIONS
+        <div className="flex items-center gap-2 text-xs sm:text-sm font-medium">
+          <span
+            className="text-[#2E7D4A] hover:text-[#256A3E] cursor-pointer font-bold tracking-tight transition-colors flex items-center gap-1.5"
+            onClick={() => onNavigate('dashboard')}
+          >
+            MATXXA
           </span>
-          <span className="text-[#6B8F67]/50">/</span>
-          <span className="text-[#3A6037] font-semibold tracking-wide">
-            {PAGE_NAMES[currentPage] || currentPage.toUpperCase()}
+          <span className="text-[#94A399]">/</span>
+          <span className="text-[#1C2B20] font-semibold tracking-tight">
+            {PAGE_NAMES[currentPage] || currentPage}
           </span>
         </div>
       </div>
 
       {/* Middle: Global Search Bar */}
-      <div className="flex-1 max-w-md mx-4 hidden lg:block">
+      <div className="flex-1 max-w-md mx-6 hidden lg:block">
         <button
           onClick={onOpenCommandPalette}
-          className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl bg-[#F6FAF4] hover:bg-[#EDF5E9] border border-[rgba(94,163,80,0.18)] text-xs text-[#6B8F67] hover:text-[#1A3818] transition-all group"
+          className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl bg-[#F6F8F4] hover:bg-[#EEF2EC] border border-[#E5EBE5] text-xs text-[#66756B] hover:text-[#1C2B20] transition-all group cursor-pointer"
         >
           <div className="flex items-center gap-2.5">
-            <Search className="w-4 h-4 text-[#6B8F67] group-hover:text-[#3D9132] transition-colors" />
-            <span>Tìm kiếm dịch vụ, lịch đặt, KTV...</span>
+            <Search className="w-4 h-4 text-[#94A399] group-hover:text-[#2E7D4A] transition-colors" />
+            <span className="truncate">Tìm kiếm dịch vụ, lịch đặt, KTV, khách hàng...</span>
           </div>
-          <div className="flex items-center gap-1 font-mono text-[10px] bg-[#EDF5E9] px-2 py-0.5 rounded border border-[rgba(94,163,80,0.22)] text-[#3D9132]">
+          <div className="flex items-center gap-1 font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-[#E5EBE5] text-[#2E7D4A] shadow-xs">
             <span>⌘K</span>
           </div>
         </button>
@@ -139,86 +132,47 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Right Controls */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Mobile Search button */}
-        <button
-          onClick={onOpenCommandPalette}
-          className="lg:hidden p-2 rounded-xl text-[#6B8F67] hover:text-[#1A3818] hover:bg-[#EDF5E9] transition-colors"
-        >
-          <Search className="w-4 h-4" />
-        </button>
-
-        {/* Theme Switcher */}
-        <div className="relative" ref={themeMenuRef}>
+        {/* Mode Toggle Button: Live API vs Demo */}
+        {onToggleDemoMode && (
           <button
-            onClick={() => setShowThemeMenu(!showThemeMenu)}
-            title="Giao diện"
-            className="p-2 rounded-xl text-[#6B8F67] hover:text-[#1A3818] hover:bg-[#EDF5E9] transition-colors relative"
+            onClick={onToggleDemoMode}
+            className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+              isDemoMode
+                ? 'bg-[#FEF6E9] text-[#B87A14] border-[#FBE3B8] hover:bg-[#FDECD0]'
+                : 'bg-[#EAF5EC] text-[#2E7D4A] border-[#D0E7D5] hover:bg-[#DDF0E1]'
+            }`}
+            title={isDemoMode ? 'Đang dùng dữ liệu mô phỏng. Bấm để kết nối API.' : 'Đang kết nối API máy chủ.'}
           >
-            <Palette className="w-4 h-4" />
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                isDemoMode ? 'bg-[#F2A93B]' : 'bg-[#2E9B62]'
+              }`}
+            />
+            <span>{isDemoMode ? 'Chế độ Demo' : 'Live API'}</span>
           </button>
+        )}
 
-          <AnimatePresence>
-            {showThemeMenu && (
-              <motion.div
-                initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                className="absolute right-0 mt-2 w-52 rounded-2xl bg-white border border-[rgba(94,163,80,0.20)] shadow-[0_8px_28px_rgba(30,100,20,0.14)] p-1.5 z-50 text-xs"
-              >
-                <div className="px-3 py-1.5 text-[10px] font-mono text-[#6B8F67] uppercase tracking-wider">
-                  🎨 Chọn giao diện
-                </div>
-                {[
-                  { id: 'nature-light', name: 'Thiên nhiên (Mặc định)', icon: Sun },
-                  { id: 'nature-warm', name: 'Ấm áp Ban mai', icon: Sparkles },
-                  { id: 'nature-dark', name: 'Rừng đêm Tĩnh lặng', icon: Moon },
-                ].map((th) => (
-                  <button
-                    key={th.id}
-                    onClick={() => {
-                      onToggleTheme(th.id);
-                      setShowThemeMenu(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all ${
-                      theme === th.id
-                        ? 'bg-[#EDF5E9] text-[#1E5019] font-semibold border border-[rgba(63,145,50,0.25)]'
-                        : 'text-[#3A6037] hover:bg-[#F6FAF4]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <th.icon className="w-3.5 h-3.5 text-[#3D9132]" />
-                      <span>{th.name}</span>
-                    </div>
-                    {theme === th.id && <Check className="w-3.5 h-3.5 text-[#3D9132]" />}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Messages Button */}
+        {/* Messages Shortcut */}
         <button
           onClick={() => onNavigate('messages')}
-          className="p-2 rounded-xl text-[#6B8F67] hover:text-[#1A3818] hover:bg-[#EDF5E9] transition-colors relative"
-          title="Tin nhắn"
+          className="relative p-2 rounded-xl text-[#66756B] hover:text-[#2E7D4A] hover:bg-[#F6F8F4] transition-colors"
+          title="Tin nhắn CSKH"
         >
-          <MessageSquare className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#3D9132] ring-2 ring-white" />
+          <MessageCircle className="w-5 h-5" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#4285D4]" />
         </button>
 
-        {/* Notification Bell Dropdown */}
+        {/* Notifications Dropdown */}
         <div className="relative" ref={notifMenuRef}>
           <button
             onClick={() => setShowNotifications(!showNotifications)}
-            className="p-2 rounded-xl text-[#6B8F67] hover:text-[#1A3818] hover:bg-[#EDF5E9] transition-colors relative"
-            title="Thông báo"
+            className="relative p-2 rounded-xl text-[#66756B] hover:text-[#2E7D4A] hover:bg-[#F6F8F4] transition-colors"
+            title="Thông báo hệ thống"
           >
-            <Bell className="w-4 h-4" />
+            <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E8B84B] opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#E8B84B]"></span>
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#E05B55] text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
+                {unreadCount}
               </span>
             )}
           </button>
@@ -226,55 +180,63 @@ export const Navbar: React.FC<NavbarProps> = ({
           <AnimatePresence>
             {showNotifications && (
               <motion.div
-                initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                initial={{ opacity: 0, y: 8, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white border border-[rgba(94,163,80,0.18)] shadow-[0_12px_40px_rgba(30,100,20,0.14)] overflow-hidden z-50 text-xs"
+                exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                transition={{ duration: 0.15 }}
+                className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white border border-[#E5EBE5] shadow-[0_10px_32px_-4px_rgba(28,43,32,0.12)] p-4 z-50 space-y-3"
               >
-                <div className="px-4 py-3 border-b border-[rgba(94,163,80,0.12)] flex items-center justify-between bg-[#F6FAF4]">
+                <div className="flex items-center justify-between pb-2 border-b border-[#E5EBE5]">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-[#1A3818]">🔔 Thông báo</span>
-                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-[#EDF5E9] text-[#2C7024] border border-[rgba(63,145,50,0.25)]">
-                      {unreadCount} mới
-                    </span>
+                    <h3 className="font-bold text-sm text-[#1C2B20]">Thông báo hệ thống</h3>
+                    {unreadCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full bg-[#EAF5EC] text-[#2E7D4A] text-[10px] font-bold">
+                        {unreadCount} mới
+                      </span>
+                    )}
                   </div>
                   {unreadCount > 0 && (
                     <button
                       onClick={onMarkNotificationsRead}
-                      className="text-[11px] text-[#3D9132] hover:text-[#1E5019] hover:underline font-semibold"
+                      className="text-xs text-[#2E7D4A] hover:underline font-semibold"
                     >
-                      Đánh dấu đã đọc
+                      Đã đọc tất cả
                     </button>
                   )}
                 </div>
 
-                <div className="max-h-72 overflow-y-auto divide-y divide-[rgba(94,163,80,0.10)]">
-                  {notifications.map((n) => (
+                <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+                  {notifications.slice(0, 4).map((notif) => (
                     <div
-                      key={n.id}
-                      className={`p-3.5 hover:bg-[#F6FAF4] transition-colors cursor-pointer ${
-                        !n.read ? 'bg-[#EDF5E9]/50' : ''
+                      key={notif.id}
+                      className={`p-3 rounded-xl border text-xs transition-colors ${
+                        !notif.read
+                          ? 'bg-[#EAF5EC]/40 border-[#D0E7D5]'
+                          : 'bg-[#F6F8F4] border-[#E5EBE5]'
                       }`}
-                      onClick={() => onNavigate('notifications')}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-[#1A3818]">{n.title}</span>
-                        <span className="text-[10px] font-mono text-[#6B8F67]">{n.timestamp}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-[#1C2B20] truncate">
+                          {notif.title}
+                        </span>
+                        <span className="text-[10px] text-[#94A399] flex-shrink-0">
+                          {notif.timestamp}
+                        </span>
                       </div>
-                      <p className="text-[#3A6037] leading-relaxed text-[11px]">{n.message}</p>
+                      <p className="text-[#66756B] mt-1 leading-relaxed">{notif.message}</p>
                     </div>
                   ))}
                 </div>
 
-                <div className="p-2 border-t border-[rgba(94,163,80,0.12)] text-center bg-[#F6FAF4]">
+                <div className="pt-2 border-t border-[#E5EBE5] text-center">
                   <button
                     onClick={() => {
                       setShowNotifications(false);
                       onNavigate('notifications');
                     }}
-                    className="text-[11px] text-[#3D9132] hover:text-[#1E5019] font-semibold py-1 transition-colors"
+                    className="text-xs text-[#2E7D4A] hover:underline font-semibold"
                   >
-                    Xem toàn bộ thông báo →
+                    Xem tất cả thông báo →
                   </button>
                 </div>
               </motion.div>
@@ -282,113 +244,92 @@ export const Navbar: React.FC<NavbarProps> = ({
           </AnimatePresence>
         </div>
 
-        {/* Live / Demo Mode Badge */}
-        <div className="hidden sm:flex items-center">
-          <button
-            onClick={onToggleDemoMode}
-            title={isDemoMode ? 'Đang chạy Demo Sandbox. Bấm để đổi chế độ.' : 'Đang chạy Live API. Bấm để đổi chế độ.'}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-              isDemoMode
-                ? 'bg-[#EDF5E9] text-[#3A6037] border-[rgba(63,145,50,0.25)] hover:bg-[#D4EDCC]'
-                : 'bg-[#EDF5E9] text-[#1E5019] border-[rgba(63,145,50,0.35)] hover:bg-[#D4EDCC]'
-            }`}
-          >
-            <span className={`w-2 h-2 rounded-full ${isDemoMode ? 'bg-[#6B8F67]' : 'bg-[#3D9132] animate-pulse'}`} />
-            <span>{isDemoMode ? '🌱 Demo' : '🌿 Live API'}</span>
-          </button>
-        </div>
-
-        {/* Separator */}
-        <div className="w-[1px] h-6 bg-[rgba(94,163,80,0.20)] mx-1 hidden sm:block" />
-
-        {/* User Profile Avatar Dropdown */}
+        {/* User Profile Dropdown */}
         <div className="relative" ref={userMenuRef}>
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
-            className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-[#EDF5E9] transition-all text-left"
+            className="flex items-center gap-2.5 p-1.5 pr-2.5 rounded-xl hover:bg-[#F6F8F4] border border-transparent hover:border-[#E5EBE5] transition-all cursor-pointer"
           >
-            <div className="relative">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#2C7024] via-[#3D9132] to-[#5FAF54] flex items-center justify-center font-bold text-white text-xs ring-1 ring-[rgba(63,145,50,0.25)]">
-                {(user?.name || user?.email || 'A').slice(0, 1).toUpperCase()}
-              </div>
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#3D9132] ring-2 ring-white" />
+            <div className="w-8 h-8 rounded-full bg-[#EAF5EC] text-[#2E7D4A] font-bold text-xs flex items-center justify-center border border-[#D0E7D5]">
+              {user?.name ? user.name.substring(0, 2).toUpperCase() : 'AD'}
             </div>
-
-            <div className="hidden sm:block text-left">
-              <div className="text-xs font-bold text-[#1A3818] leading-tight">
-                {user?.name || user?.email || 'Quản trị viên'}
-              </div>
-              <div className="text-[10px] text-[#6B8F67] font-semibold">{user?.role || 'ADMIN'}</div>
+            <div className="hidden sm:flex flex-col text-left">
+              <span className="text-xs font-bold text-[#1C2B20] leading-tight">
+                {user?.name || 'Quản trị viên'}
+              </span>
+              <span className="text-[10px] text-[#66756B] leading-tight">
+                {user?.role || 'Admin'}
+              </span>
             </div>
-
-            <ChevronDown className="w-3.5 h-3.5 text-[#6B8F67] hidden sm:block" />
+            <ChevronDown className="w-3.5 h-3.5 text-[#94A399]" />
           </button>
 
           <AnimatePresence>
             {showUserMenu && (
               <motion.div
-                initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                initial={{ opacity: 0, y: 8, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                className="absolute right-0 mt-2 w-60 rounded-2xl bg-white border border-[rgba(94,163,80,0.20)] shadow-[0_12px_40px_rgba(30,100,20,0.14)] p-2 z-50 text-xs"
+                exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                transition={{ duration: 0.15 }}
+                className="absolute right-0 mt-2 w-56 rounded-2xl bg-white border border-[#E5EBE5] shadow-[0_10px_32px_-4px_rgba(28,43,32,0.12)] p-2 z-50 text-xs font-medium space-y-1"
               >
-                <div className="px-3 py-2.5 border-b border-[rgba(94,163,80,0.12)] mb-1 bg-[#F6FAF4] rounded-xl">
-                  <div className="font-bold text-[#1A3818]">{user?.name || 'Quản trị viên'}</div>
-                  <div className="text-[11px] text-[#6B8F67] font-mono truncate mt-0.5">{user?.email || 'admin@matxa.local'}</div>
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#3D9132]" />
-                    <span className="text-[10px] text-[#3A6037] font-semibold">
-                      {isDemoMode ? '🌱 Chế độ Demo' : '🌿 Live API'}
-                    </span>
+                <div className="px-3 py-2 border-b border-[#E5EBE5] mb-1">
+                  <div className="font-bold text-[#1C2B20] text-sm truncate">
+                    {user?.name || 'Quản trị viên'}
+                  </div>
+                  <div className="text-[11px] text-[#66756B] truncate">
+                    {user?.email || 'admin@matxa.local'}
                   </div>
                 </div>
 
-                <div className="space-y-0.5">
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    onNavigate('settings');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#1C2B20] hover:bg-[#F6F8F4] transition-colors"
+                >
+                  <User className="w-4 h-4 text-[#66756B]" />
+                  <span>Hồ sơ cá nhân</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    onNavigate('settings');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#1C2B20] hover:bg-[#F6F8F4] transition-colors"
+                >
+                  <Settings className="w-4 h-4 text-[#66756B]" />
+                  <span>Cài đặt hệ thống</span>
+                </button>
+
+                {onOpenLoginModal && (
                   <button
                     onClick={() => {
                       setShowUserMenu(false);
-                      onOpenLoginModal?.();
+                      onOpenLoginModal();
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#3A6037] hover:text-[#1A3818] hover:bg-[#EDF5E9] transition-colors"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#2E7D4A] hover:bg-[#EAF5EC] transition-colors"
                   >
-                    <Key className="w-3.5 h-3.5 text-[#E8B84B]" />
+                    <Database className="w-4 h-4" />
                     <span>Đăng nhập Live API</span>
                   </button>
+                )}
 
-                  <button
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      onToggleDemoMode?.();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#3A6037] hover:text-[#1A3818] hover:bg-[#EDF5E9] transition-colors"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-[#3D9132]" />
-                    <span>{isDemoMode ? 'Chuyển sang Live API' : 'Chuyển sang Demo'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      onNavigate('settings');
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#3A6037] hover:text-[#1A3818] hover:bg-[#EDF5E9] transition-colors"
-                  >
-                    <User className="w-3.5 h-3.5 text-[#3A6037]" />
-                    <span>Cấu hình hệ thống</span>
-                  </button>
-                </div>
-
-                <div className="border-t border-[rgba(94,163,80,0.12)] mt-1.5 pt-1.5">
-                  <button
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      onLogout?.();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#D4574A] hover:text-[#b03a2e] hover:bg-[rgba(212,87,74,0.08)] transition-colors"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Đăng xuất</span>
-                  </button>
+                <div className="pt-1 border-t border-[#E5EBE5] mt-1">
+                  {onLogout && (
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        onLogout();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#E05B55] hover:bg-[#FDF0EF] transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Đăng xuất</span>
+                    </button>
+                  )}
                 </div>
               </motion.div>
             )}

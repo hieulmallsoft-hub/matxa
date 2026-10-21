@@ -13,6 +13,7 @@ export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private readonly defaultTemplates: Record<string, { title: string; body: string }> = {
     BOOKING_CREATED: { title: '[Thông báo Psyocore]', body: 'Khách mới đã đặt lịch. KTV vui lòng thu tiền trước khi làm.' },
+    OPEN_BOOKING_AVAILABLE: { title: '[Thông báo Psyocore]', body: 'Có đơn dịch vụ mới phù hợp. Hãy mở tab Nhận việc để xem và ứng tuyển.' },
     TECHNICIAN_SELECTED: { title: '[Thông báo Psyocore]', body: 'Khách hàng đã chọn KTV cho đơn dịch vụ.' },
     BOOKING_CANCELLED: { title: '[Thông báo Psyocore]', body: 'Lịch hẹn đã được hủy.' },
     BOOKING_EXPIRED: { title: '[Thông báo Psyocore]', body: 'Đơn đã hết hạn.' },
@@ -108,6 +109,7 @@ export class NotificationsService {
     if (!locale.toLowerCase().startsWith('en')) return { title, body };
     const translations: Record<string, { title: string; body: string }> = {
       BOOKING_CREATED: { title: 'New booking', body: 'A new booking is waiting for confirmation.' },
+      OPEN_BOOKING_AVAILABLE: { title: 'New job available', body: 'A new job matching your services is available. Open Jobs to apply.' },
       BOOKING_EXPIRED: { title: 'Booking expired', body: 'No technician was selected before the application deadline.' },
       BOOKING_AUTO_COMPLETED: { title: 'Booking completed', body: 'The booking was automatically completed after 24 hours.' },
       CHAT_MESSAGE_RECEIVED: { title: 'New message', body: 'You have a new message.' },

@@ -1,17 +1,42 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import {
-  ArrowRight,
   CalendarDays,
-  Check,
-  ChevronLeft,
-  ChevronRight,
+  CheckCircle2,
   CircleDollarSign,
-  Plus,
-  Sparkles,
-  Star,
   UsersRound,
+  Sparkles,
+  Plus,
+  ArrowRight,
+  Clock,
+  AlertTriangle,
+  UserCheck,
+  CreditCard,
+  ChevronRight,
+  Star,
+  Check,
+  TrendingUp,
+  MapPin,
+  Filter,
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
 import { request } from '../api/client';
+import { PageHeader } from '../components/common/PageHeader';
+import { StatCard } from '../components/common/StatCard';
+import { SectionCard } from '../components/common/SectionCard';
+import { StatusBadge } from '../components/common/StatusBadge';
+import { NewReportModal } from '../components/dashboard/NewReportModal';
 
 interface DashboardPageProps {
   onTriggerAction: (actionName: string) => void;
@@ -19,30 +44,6 @@ interface DashboardPageProps {
   isReportModalOpen: boolean;
   onCloseReportModal: () => void;
 }
-
-const FALLBACK_BOOKINGS = [
-  ['#1048', 'Nguyá»…n Thá»‹ Lan', 'Aroma Massage', 'Mai Anh', '09:00', 'Confirmed', '/wellness/head-massage.jpg'],
-  [
-    '#1047',
-    'Tráº§n Minh HoÃ ng',
-    'Thai Massage',
-    'Quang Huy',
-    '10:30',
-    'In Progress',
-    '/wellness/massage-treatment.jpg',
-  ],
-  ['#1046', 'LÃª Thu HÃ ', 'Hot Stone Massage', 'Ngá»c TrÃ¢m', '13:00', 'Confirmed', '/wellness/spa-room.jpg'],
-  ['#1045', 'Pháº¡m Tuáº¥n Anh', 'Facial Treatment', 'Tháº£o Vy', '15:30', 'Pending', '/wellness/consultation.jpg'],
-  ['#1044', 'VÅ© Quá»³nh Trang', 'Body Scrub', 'Minh TÃ¢m', '17:00', 'Confirmed', '/wellness/massage-treatment.jpg'],
-];
-const STATUS_CLASS: Record<string, string> = {
-  Confirmed: 'bg-[#e6f5df] text-[#2d8b40]',
-  CONFIRMED: 'bg-[#e6f5df] text-[#2d8b40]',
-  'In Progress': 'bg-[#e8f1ff] text-[#3b82d6]',
-  IN_PROGRESS: 'bg-[#e8f1ff] text-[#3b82d6]',
-  Pending: 'bg-[#fff1d8] text-[#bd7a16]',
-  PENDING: 'bg-[#fff1d8] text-[#bd7a16]',
-};
 
 type BookingRow = {
   id: string;
@@ -52,6 +53,7 @@ type BookingRow = {
   scheduledStart?: string;
   status?: string;
 };
+
 type DashboardStats = {
   todayBookings?: number;
   activeTechnicians?: number;
@@ -62,11 +64,38 @@ type DashboardStats = {
 
 type BookingDisplayRow = [string, string, string, string, string, string, string];
 
+const FALLBACK_BOOKINGS: BookingDisplayRow[] = [
+  ['#1048', 'Nguyễn Thị Lan', 'Massage Trị Liệu Cổ Vai Gáy', 'Lê Thu Hương', '09:00', 'Confirmed', 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80'],
+  ['#1047', 'Trần Minh Hoàng', 'Massage Shiatsu Nhật Bản', 'Trần Văn Hoàng', '10:30', 'In Progress', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80'],
+  ['#1046', 'Lê Thu Hà', 'Massage Đá Nóng Himalaya', 'Nguyễn Thị Mai', '13:00', 'Confirmed', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'],
+  ['#1045', 'Phạm Tuấn Anh', 'Chăm Sóc Da Mặt Nâng Cơ', 'Vũ Thị Ngọc', '15:30', 'Pending', 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80'],
+  ['#1044', 'Vũ Quỳnh Trang', 'Combo Thư Giãn Toàn Diện', 'Lê Thu Hương', '17:00', 'Confirmed', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80'],
+];
+
+const REVENUE_SPARK_HOURLY = [
+  { hour: '08h', revenue: 2400000 },
+  { hour: '10h', revenue: 5800000 },
+  { hour: '12h', revenue: 8200000 },
+  { hour: '14h', revenue: 12500000 },
+  { hour: '16h', revenue: 18900000 },
+  { hour: '18h', revenue: 26400000 },
+  { hour: '20h', revenue: 34200000 },
+  { hour: '22h', revenue: 38600000 },
+];
+
+const ORDER_STATUS_DISTRIBUTION = [
+  { name: 'Đã hoàn thành', value: 24, color: '#2E9B62' },
+  { name: 'Đang thực hiện', value: 8, color: '#4285D4' },
+  { name: 'Chờ xác nhận', value: 6, color: '#F2A93B' },
+];
+
 function useDashboardData() {
   const [stats, setStats] = useState<DashboardStats>({});
   const [liveBookings, setLiveBookings] = useState<BookingRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    setIsLoading(true);
     void Promise.all([
       request<DashboardStats>('/admin/marketplace/dashboard'),
       request<{ items: BookingRow[] }>('/admin/marketplace/bookings?limit=5'),
@@ -75,337 +104,460 @@ function useDashboardData() {
         if (nextStats) setStats(nextStats);
         if (nextBookings?.items?.length) setLiveBookings(nextBookings.items);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setIsLoading(false));
   }, []);
 
   const displayBookings: BookingDisplayRow[] = liveBookings.length
     ? liveBookings.map((booking) => [
         booking.id.slice(0, 8),
         booking.customer?.displayName ?? 'Khách hàng',
-        booking.items?.[0]?.serviceName ?? 'Dịch vụ',
+        booking.items?.[0]?.serviceName ?? 'Dịch vụ Spa',
         booking.technician?.user?.displayName ?? 'Chưa phân công',
         booking.scheduledStart
           ? new Date(booking.scheduledStart).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
           : '--:--',
         booking.status ?? 'PENDING',
-        '/wellness/massage-treatment.jpg',
+        'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80',
       ])
-    : (FALLBACK_BOOKINGS as BookingDisplayRow[]);
+    : FALLBACK_BOOKINGS;
 
-  return { stats, displayBookings };
+  return { stats, displayBookings, isLoading };
 }
 
-export const DashboardPage: React.FC<DashboardPageProps> = ({ onTriggerAction }) => {
+export const DashboardPage: React.FC<DashboardPageProps> = ({
+  onTriggerAction,
+  onOpenReportModal,
+  isReportModalOpen,
+  onCloseReportModal,
+}) => {
   const { stats, displayBookings } = useDashboardData();
-  const revenue = stats.revenueThisMonth
-    ? new Intl.NumberFormat('vi-VN').format(stats.revenueThisMonth)
-    : '128,560,000';
+  const [dateFilter, setDateFilter] = useState<'today' | '7d' | '30d' | 'month'>('today');
+
+  const formattedRevenue = stats.revenueThisMonth
+    ? new Intl.NumberFormat('vi-VN').format(stats.revenueThisMonth) + ' đ'
+    : '248.560.000 đ';
+
   return (
-    <div className="mx-auto max-w-[1500px] space-y-5 pb-10 text-[#1f2b22]">
-      <section className="relative min-h-[185px] overflow-hidden rounded-[22px] bg-[#eaf5e2] shadow-[0_8px_25px_rgba(49,106,45,.08)]">
-        <img
-          src="/wellness/massage-treatment.jpg"
-          alt="Matxxa wellness"
-          className="absolute inset-0 h-full w-full object-cover opacity-55"
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+      className="space-y-6 pb-12"
+    >
+      {/* 1. Page Header with Time Filters */}
+      <PageHeader
+        title="Tổng quan hoạt động"
+        subtitle="Theo dõi tình hình vận hành của MATXXA hôm nay"
+        badge="Hoạt động bình thường"
+        badgeTone="green"
+        breadcrumbs={[
+          { label: 'MATXXA' },
+          { label: 'Tổng quan' },
+        ]}
+        actions={
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center p-1 bg-[#F1F5EF] rounded-xl border border-[#E5EBE5]">
+              {[
+                { key: 'today', label: 'Hôm nay' },
+                { key: '7d', label: '7 ngày' },
+                { key: '30d', label: '30 ngày' },
+                { key: 'month', label: 'Tháng này' },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setDateFilter(tab.key as any)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    dateFilter === tab.key
+                      ? 'bg-white text-[#2E7D4A] shadow-xs'
+                      : 'text-[#66756B] hover:text-[#1C2B20]'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={onOpenReportModal}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#E5EBE5] hover:bg-[#F6F8F4] text-[#1C2B20] text-xs font-semibold transition-all cursor-pointer"
+            >
+              <span>Xuất báo cáo</span>
+            </button>
+
+            <button
+              onClick={() => onTriggerAction('create-order')}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white text-xs font-semibold shadow-sm shadow-[#2E7D4A]/25 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Tạo đơn mới</span>
+            </button>
+          </div>
+        }
+      />
+
+      {/* 2. KPI Cards Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard
+          label="Doanh thu hôm nay"
+          value={dateFilter === 'today' ? '38.600.000 đ' : formattedRevenue}
+          change={18.2}
+          isPositive={true}
+          caption="so với hôm qua"
+          icon={<CircleDollarSign className="w-5 h-5" />}
+          tone="primary"
+          sparkline={[22, 26, 25, 29, 32, 35, 38]}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#eaf5e2] via-[#eaf5e2]/90 to-transparent" />
-        <div className="relative max-w-[650px] px-7 py-7 sm:px-9 sm:py-8">
-          <p className="mb-2 text-sm font-semibold text-[#3f8140]">Good morning,</p>
-          <h1 className="text-3xl font-extrabold tracking-tight text-[#14251a] sm:text-[38px]">
-            Welcome back to Matxxa! <span className="text-[#4d9a48]">ðŸŒ¿</span>
-          </h1>
-          <p className="mt-2 text-sm text-[#638069]">Let's create more moments of relaxation today.</p>
+        <StatCard
+          label="Đơn đặt hôm nay"
+          value={`${stats.todayBookings ?? 38} lịch`}
+          change={26.5}
+          isPositive={true}
+          caption="vs tuần trước"
+          icon={<CalendarDays className="w-5 h-5" />}
+          tone="success"
+          sparkline={[24, 28, 26, 31, 33, 36, 38]}
+        />
+        <StatCard
+          label="KTV đang hoạt động"
+          value={`${stats.activeTechnicians ?? 42} KTV`}
+          change={8.5}
+          isPositive={true}
+          caption="trên tổng 50 KTV"
+          icon={<UsersRound className="w-5 h-5" />}
+          tone="info"
+          sparkline={[34, 36, 38, 39, 40, 41, 42]}
+        />
+        <StatCard
+          label="Đánh giá trung bình"
+          value={`${(stats.averageRating ?? 4.94).toFixed(2)} / 5.0`}
+          change={4.8}
+          isPositive={true}
+          caption={`${stats.reviewCount ?? 618} đánh giá`}
+          icon={<Star className="w-5 h-5" />}
+          tone="warning"
+          sparkline={[4.88, 4.9, 4.91, 4.92, 4.93, 4.94]}
+        />
+      </div>
+
+      {/* 3. Section "Việc cần xử lý" (Action Needed - Highly Prominent) */}
+      <div className="p-5 rounded-2xl bg-[#FEF6E9]/60 border border-[#FBE3B8] shadow-xs">
+        <div className="flex items-center justify-between pb-3 border-b border-[#FBE3B8]/80 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-[#FEF6E9] text-[#B87A14] border border-[#FBE3B8]">
+              <AlertTriangle className="w-4 h-4" />
+            </span>
+            <h2 className="text-sm font-bold text-[#1C2B20]">Việc cần xử lý ngay</h2>
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#FEF6E9] text-[#B87A14]">
+              4 việc đang chờ
+            </span>
+          </div>
+          <span className="text-xs text-[#66756B]">Cập nhật 2 phút trước</span>
         </div>
-      </section>
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric
-          icon={<CalendarDays />}
-          label="Total Bookings"
-          value={stats.todayBookings ? `${stats.todayBookings}` : '1,248'}
-          trend="+12%"
-          caption="vs last month"
-        />
-        <Metric
-          icon={<Check />}
-          label="Today's Appointments"
-          value={`${stats.todayBookings ?? 28}`}
-          trend="+27%"
-          caption="vs yesterday"
-        />
-        <Metric
-          icon={<UsersRound />}
-          label="Active Customers"
-          value={stats.activeTechnicians ? `${stats.activeTechnicians}` : '892'}
-          trend="+8%"
-          caption="vs last month"
-        />
-        <Metric
-          icon={<CircleDollarSign />}
-          label="Revenue (VND)"
-          value={revenue}
-          trend="+18%"
-          caption="vs last month"
-        />
-      </section>
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,1fr)]">
-        <section className="rounded-[20px] border border-[#e2ebe0] bg-white p-5 shadow-[0_7px_22px_rgba(49,106,45,.06)]">
-          <PanelTitle
-            icon={<CalendarDays />}
-            title="Recent Bookings"
-            action="View all"
-            onAction={() => onTriggerAction('view-bookings')}
-          />
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b border-[#edf1eb] text-xs text-[#647469]">
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div
+            onClick={() => onTriggerAction('view-applications')}
+            className="p-3.5 rounded-xl bg-white border border-[#E5EBE5] hover:border-[#D0DCD1] hover:shadow-xs transition-all cursor-pointer flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-[#EAF5EC] text-[#2E7D4A] flex items-center justify-center flex-shrink-0">
+                <UserCheck className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-[#1C2B20] block">Hồ sơ KTV chờ duyệt</span>
+                <span className="text-[11px] text-[#66756B]">3 ứng viên mới nộp</span>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[#94A399] group-hover:text-[#2E7D4A] transition-colors" />
+          </div>
+
+          <div
+            onClick={() => onTriggerAction('view-bookings')}
+            className="p-3.5 rounded-xl bg-white border border-[#E5EBE5] hover:border-[#D0DCD1] hover:shadow-xs transition-all cursor-pointer flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-[#FEF6E9] text-[#B87A14] flex items-center justify-center flex-shrink-0">
+                <Clock className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-[#1C2B20] block">Booking cần điều phối</span>
+                <span className="text-[11px] text-[#66756B]">2 ca đặt lúc 16:00</span>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[#94A399] group-hover:text-[#2E7D4A] transition-colors" />
+          </div>
+
+          <div
+            onClick={() => onTriggerAction('view-payments')}
+            className="p-3.5 rounded-xl bg-white border border-[#E5EBE5] hover:border-[#D0DCD1] hover:shadow-xs transition-all cursor-pointer flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-[#EDF4FC] text-[#4285D4] flex items-center justify-center flex-shrink-0">
+                <CreditCard className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-[#1C2B20] block">Xác minh thanh toán</span>
+                <span className="text-[11px] text-[#66756B]">1 giao dịch QR chờ duyệt</span>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[#94A399] group-hover:text-[#2E7D4A] transition-colors" />
+          </div>
+
+          <div
+            onClick={() => onTriggerAction('view-complaints')}
+            className="p-3.5 rounded-xl bg-white border border-[#E5EBE5] hover:border-[#D0DCD1] hover:shadow-xs transition-all cursor-pointer flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-[#EBF8F1] text-[#2E9B62] flex items-center justify-center flex-shrink-0">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-[#1C2B20] block">Phản hồi khách hàng</span>
+                <span className="text-[11px] text-[#66756B]">0 khiếu nại tồn đọng</span>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[#94A399] group-hover:text-[#2E7D4A] transition-colors" />
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Main Charts Section (Doanh thu & Tình trạng đơn hàng) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Revenue Trend Area Chart */}
+        <SectionCard
+          title="Doanh thu hôm nay theo giờ"
+          subtitle="Tốc độ tăng trưởng doanh thu so với ngày hôm qua"
+          className="lg:col-span-2"
+          action={
+            <div className="flex items-center gap-1.5 text-xs text-[#2E7D4A] font-semibold bg-[#EAF5EC] px-2.5 py-1 rounded-lg">
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>+18.2% tăng trưởng</span>
+            </div>
+          }
+        >
+          <div className="w-full h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={REVENUE_SPARK_HOURLY} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="dashRevGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#2E7D4A" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#2E7D4A" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#EDF2EC" vertical={false} />
+                <XAxis dataKey="hour" stroke="#94A399" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis
+                  stroke="#94A399"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v) => `${(v / 1000000).toFixed(0)}Tr`}
+                />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      const val = payload[0]?.value as number;
+                      return (
+                        <div className="p-3 rounded-xl bg-white border border-[#E5EBE5] shadow-lg text-xs space-y-1">
+                          <div className="font-bold text-[#1C2B20]">Khung giờ {label}</div>
+                          <div className="text-[#2E7D4A] font-bold">
+                            {new Intl.NumberFormat('vi-VN').format(val)} đ
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="#2E7D4A"
+                  strokeWidth={2.5}
+                  fill="url(#dashRevGrad)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </SectionCard>
+
+        {/* Right: Order Status Distribution */}
+        <SectionCard
+          title="Tình trạng đơn hàng"
+          subtitle="38 lịch đặt trong ngày hôm nay"
+          className="lg:col-span-1"
+        >
+          <div className="flex flex-col items-center">
+            <div className="w-44 h-44 relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={ORDER_STATUS_DISTRIBUTION}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={72}
+                    paddingAngle={4}
+                    dataKey="value"
+                  >
+                    {ORDER_STATUS_DISTRIBUTION.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-2xl font-bold text-[#1C2B20]">38</span>
+                <span className="text-[11px] text-[#66756B]">Lịch hẹn</span>
+              </div>
+            </div>
+
+            <div className="w-full space-y-2 mt-4 pt-3 border-t border-[#F1F5EF]">
+              {ORDER_STATUS_DISTRIBUTION.map((item, idx) => (
+                <div key={idx} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-[#1C2B20] font-medium">{item.name}</span>
+                  </div>
+                  <span className="font-bold text-[#1C2B20]">{item.value} ca</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </SectionCard>
+      </div>
+
+      {/* 5. Recent Bookings Table & Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left 2 Cols: Recent Bookings */}
+        <SectionCard
+          title="Lịch đặt dịch vụ gần nhất"
+          subtitle="Các lịch hẹn massage và spa vừa được tiếp nhận"
+          className="lg:col-span-2"
+          noPadding
+          action={
+            <button
+              onClick={() => onTriggerAction('view-bookings')}
+              className="text-xs font-semibold text-[#2E7D4A] hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <span>Xem tất cả lịch hẹn</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          }
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#F6F8F4] text-[#66756B] uppercase font-semibold border-b border-[#E5EBE5]">
                 <tr>
-                  <th className="pb-4">#</th>
-                  <th className="pb-4">Customer</th>
-                  <th className="pb-4">Service</th>
-                  <th className="pb-4">Therapist</th>
-                  <th className="pb-4">Date &amp; Time</th>
-                  <th className="pb-4">Status</th>
+                  <th className="py-3 px-4">Mã</th>
+                  <th className="py-3 px-4">Khách hàng</th>
+                  <th className="py-3 px-4">Dịch vụ</th>
+                  <th className="py-3 px-4">Kỹ thuật viên</th>
+                  <th className="py-3 px-4">Thời gian</th>
+                  <th className="py-3 px-4">Trạng thái</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-[#F1F5EF] text-sm text-[#1C2B20]">
                 {displayBookings.map(([id, customer, service, therapist, time, status, avatar]) => (
-                  <tr key={id} className="border-b border-[#f0f3ef] last:border-0">
-                    <td className="py-4 font-semibold text-[#708072]">{id}</td>
-                    <td className="py-4">
+                  <tr key={id} className="hover:bg-[#F6F8F4] transition-colors h-14">
+                    <td className="py-3 px-4 font-mono font-semibold text-[#2E7D4A] text-xs">{id}</td>
+                    <td className="py-3 px-4">
                       <div className="flex items-center gap-2.5">
-                        <img src={avatar} alt="" className="h-10 w-10 rounded-full object-cover" />
+                        <img src={avatar} alt="" className="w-8 h-8 rounded-full object-cover ring-1 ring-[#E5EBE5]" />
                         <div>
-                          <b className="block text-[#26352a]">{customer}</b>
-                          <span className="text-xs text-[#7d8c80]">+84 901 665 444</span>
+                          <div className="font-bold text-xs">{customer}</div>
+                          <div className="text-[11px] text-[#94A399]">+84 901 *** 888</div>
                         </div>
                       </div>
                     </td>
-                    <td className="py-3">
-                      <b className="block">{service}</b>
-                      <span className="text-xs text-[#7d8c80]">60 minutes</span>
+                    <td className="py-3 px-4">
+                      <div className="font-semibold text-xs truncate max-w-[160px]">{service}</div>
+                      <div className="text-[10px] text-[#94A399]">60 - 90 phút</div>
                     </td>
-                    <td className="py-3">{therapist}</td>
-                    <td className="py-3">
-                      <b className="block">Today, {time}</b>
-                      <span className="text-xs text-[#7d8c80]">Apr 26, 2026</span>
+                    <td className="py-3 px-4 font-medium text-xs text-[#66756B]">{therapist}</td>
+                    <td className="py-3 px-4 font-semibold text-xs">
+                      <span>{time}</span>
                     </td>
-                    <td className="py-3">
-                      <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${STATUS_CLASS[status]}`}>
-                        {status}
-                      </span>
+                    <td className="py-3 px-4">
+                      <StatusBadge status={status} size="sm" />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </section>
-        <section className="rounded-[20px] border border-[#e2ebe0] bg-white p-5 shadow-[0_7px_22px_rgba(49,106,45,.06)]">
-          <PanelTitle
-            icon={<CalendarDays />}
-            title="Schedule"
-            action="View schedule"
-            onAction={() => onTriggerAction('view-schedule')}
-          />
-          <div className="mt-4 flex items-center justify-between">
-            <button className="rounded-lg p-1 text-[#819087] hover:bg-[#f2f7ef]">
-              <ChevronLeft size={17} />
-            </button>
-            <b>April 2026</b>
-            <button className="rounded-lg p-1 text-[#819087] hover:bg-[#f2f7ef]">
-              <ChevronRight size={17} />
-            </button>
-          </div>
-          <div className="mt-4 grid grid-cols-7 gap-1 text-center text-xs text-[#718078]">
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-              <span key={day} className="py-1 font-semibold">
-                {day}
-              </span>
-            ))}
-            {Array.from({ length: 35 }, (_, index) => {
-              const day = index - 2;
-              return (
-                <span
-                  key={index}
-                  className={`rounded-full py-1.5 ${day === 26 ? 'bg-[#2f8a40] text-white' : day > 0 && day <= 30 ? 'text-[#425246]' : 'text-[#cbd4cc]'}`}
-                >
-                  {day > 0 && day <= 30 ? day : ''}
-                </span>
-              );
-            })}
-          </div>
-          <div className="mt-4 space-y-3 border-t border-[#edf1eb] pt-4">
-            <p className="text-sm font-bold">Today's Appointments (Apr 26)</p>
-            {displayBookings.slice(0, 4).map((booking) => (
-              <div key={booking[0]} className="flex items-center gap-2 text-sm">
-                <span className="h-2 w-2 rounded-full bg-[#45a255]" />
-                <span className="w-10 font-semibold text-[#718078]">{booking[4]}</span>
-                <span className="flex-1 truncate">{booking[2]}</span>
-                <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_CLASS[booking[5]]}`}>{booking[5]}</span>
+        </SectionCard>
+
+        {/* Right 1 Col: Quick Actions */}
+        <SectionCard
+          title="Thao tác nhanh"
+          subtitle="Tác vụ thường dùng cho ca trực"
+          className="lg:col-span-1"
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => onTriggerAction('create-order')}
+              className="p-3.5 rounded-xl bg-[#EAF5EC] hover:bg-[#DDF0E1] text-[#2E7D4A] text-left transition-all border border-[#D0E7D5] cursor-pointer group"
+            >
+              <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shadow-2xs mb-2 group-hover:scale-105 transition-transform">
+                <Plus className="w-4 h-4 text-[#2E7D4A]" />
               </div>
-            ))}
-          </div>
-        </section>
-      </div>
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(310px,1fr)]">
-        <section className="rounded-[20px] border border-[#e2ebe0] bg-white p-5 shadow-[0_7px_22px_rgba(49,106,45,.06)]">
-          <PanelTitle
-            icon={<Sparkles />}
-            title="Bookings Trend"
-            action="Last 30 days"
-            onAction={() => onTriggerAction('bookings-trend')}
-          />
-          <div className="mt-5 flex h-48 items-end gap-3 rounded-xl bg-gradient-to-t from-[#f3f9ef] to-white px-4 pb-5 pt-3">
-            {[35, 44, 39, 58, 50, 66, 62, 78, 72, 91, 82, 96].map((height, index) => (
-              <div key={index} className="flex flex-1 flex-col items-center gap-2">
-                <div className="w-full rounded-t-md bg-[#b8dfb3]" style={{ height: `${height}%` }} />
-                <span className="text-[9px] text-[#91a094]">Apr {index + 1 + (index > 7 ? 10 : 0)}</span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 flex gap-3">
-            <TrendStat label="Total Bookings" value="1,248" />
-            <TrendStat label="Growth Rate" value="+12%" />
-            <TrendStat label="Avg. Rating" value="4.8/5" />
-          </div>
-        </section>
-        <section className="rounded-[20px] border border-[#e2ebe0] bg-white p-5 shadow-[0_7px_22px_rgba(49,106,45,.06)]">
-          <PanelTitle icon={<Plus />} title="Quick Actions" />
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <QuickAction
-              icon={<Plus />}
-              title="Add Service"
-              subtitle="Create new spa service"
-              onClick={() => onTriggerAction('add-service')}
-              tone="green"
-            />
-            <QuickAction
-              icon={<CalendarDays />}
-              title="Confirm Booking"
-              subtitle="Manage appointments"
+              <span className="font-bold text-xs block text-[#1C2B20]">Tạo đơn mới</span>
+              <span className="text-[10px] text-[#66756B]">Đặt ca massage</span>
+            </button>
+
+            <button
               onClick={() => onTriggerAction('confirm-booking')}
-              tone="blue"
-            />
-            <QuickAction
-              icon={<Sparkles />}
-              title="Create Promotion"
-              subtitle="Launch special offer"
-              onClick={() => onTriggerAction('create-promotion')}
-              tone="pink"
-            />
-            <QuickAction
-              icon={<UsersRound />}
-              title="Add Customer"
-              subtitle="Register new customer"
-              onClick={() => onTriggerAction('add-customer')}
-              tone="blue"
-            />
-          </div>
-          <div className="mt-5 rounded-xl bg-[#f0f8eb] p-4">
-            <div className="flex items-center gap-3">
-              <Star className="fill-[#e9af26] text-[#e9af26]" size={22} />
-              <div>
-                <b className="block text-sm">Customer Reviews</b>
-                <span className="text-[11px] text-[#718078]">Keep your team inspired.</span>
+              className="p-3.5 rounded-xl bg-[#EDF4FC] hover:bg-[#E1EDFA] text-[#4285D4] text-left transition-all border border-[#CDE0F8] cursor-pointer group"
+            >
+              <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shadow-2xs mb-2 group-hover:scale-105 transition-transform">
+                <CalendarDays className="w-4 h-4 text-[#4285D4]" />
               </div>
-              <ArrowRight className="ml-auto text-[#4b9853]" size={17} />
-            </div>
+              <span className="font-bold text-xs block text-[#1C2B20]">Xác nhận lịch</span>
+              <span className="text-[10px] text-[#66756B]">Duyệt booking</span>
+            </button>
+
+            <button
+              onClick={() => onTriggerAction('add-service')}
+              className="p-3.5 rounded-xl bg-[#FEF6E9] hover:bg-[#FDECD0] text-[#B87A14] text-left transition-all border border-[#FBE3B8] cursor-pointer group"
+            >
+              <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shadow-2xs mb-2 group-hover:scale-105 transition-transform">
+                <Sparkles className="w-4 h-4 text-[#B87A14]" />
+              </div>
+              <span className="font-bold text-xs block text-[#1C2B20]">Thêm dịch vụ</span>
+              <span className="text-[10px] text-[#66756B]">Catalog gói spa</span>
+            </button>
+
+            <button
+              onClick={() => onTriggerAction('add-customer')}
+              className="p-3.5 rounded-xl bg-[#F6F8F4] hover:bg-[#EEF2EC] text-[#66756B] text-left transition-all border border-[#E5EBE5] cursor-pointer group"
+            >
+              <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shadow-2xs mb-2 group-hover:scale-105 transition-transform">
+                <UsersRound className="w-4 h-4 text-[#66756B]" />
+              </div>
+              <span className="font-bold text-xs block text-[#1C2B20]">Thêm khách</span>
+              <span className="text-[10px] text-[#66756B]">Hồ sơ thành viên</span>
+            </button>
           </div>
-        </section>
+
+          <div className="mt-5 p-3.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Star className="w-5 h-5 fill-[#F2A93B] text-[#F2A93B]" />
+              <div>
+                <span className="text-xs font-bold text-[#1C2B20] block">Đánh giá khách hàng</span>
+                <span className="text-[10px] text-[#66756B]">99.2% đánh giá 5 sao tuần này</span>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-[#2E7D4A]" />
+          </div>
+        </SectionCard>
       </div>
-    </div>
+
+      <NewReportModal isOpen={isReportModalOpen} onClose={onCloseReportModal} />
+    </motion.div>
   );
 };
-
-function Metric({
-  icon,
-  label,
-  value,
-  trend,
-  caption,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  trend: string;
-  caption: string;
-}) {
-  return (
-    <div className="rounded-[18px] border border-[#e2ebe0] bg-white p-5 shadow-[0_7px_22px_rgba(49,106,45,.06)]">
-      <div className="flex items-center gap-3">
-        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#e4f5df] text-[#319047]">
-          {icon}
-        </span>
-        <span className="text-sm font-semibold text-[#5e6d62]">{label}</span>
-      </div>
-      <div className="mt-4 text-3xl font-extrabold tracking-tight">{value}</div>
-      <div className="mt-2 text-xs">
-        <b className="text-[#29913e]">â†‘ {trend}</b>
-        <span className="ml-1 text-[#96a198]">{caption}</span>
-      </div>
-    </div>
-  );
-}
-function PanelTitle({
-  icon,
-  title,
-  action,
-  onAction,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  action?: string;
-  onAction?: () => void;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <h2 className="flex items-center gap-2 text-lg font-bold">
-        <span className="text-[#34934a]">{icon}</span>
-        {title}
-      </h2>
-      {action && (
-        <button
-          onClick={onAction}
-          className="flex items-center gap-1 text-sm font-semibold text-[#5c8860] hover:text-[#2e7b3b]"
-        >
-          {action}
-          <ArrowRight size={13} />
-        </button>
-      )}
-    </div>
-  );
-}
-function TrendStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex-1 rounded-xl bg-[#f4f8f1] p-3">
-      <span className="block text-[10px] text-[#87958a]">{label}</span>
-      <b className="mt-1 block text-base">{value}</b>
-    </div>
-  );
-}
-function QuickAction({
-  icon,
-  title,
-  subtitle,
-  onClick,
-  tone,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  onClick: () => void;
-  tone: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-xl p-4 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${tone === 'green' ? 'bg-[#edf8e9]' : tone === 'pink' ? 'bg-[#fff0f0]' : 'bg-[#eef7fc]'}`}
-    >
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/80 text-[#318846]">{icon}</span>
-      <b className="mt-3 block text-xs">{title}</b>
-      <span className="mt-1 block text-[10px] text-[#829087]">{subtitle}</span>
-    </button>
-  );
-}
 
 export default DashboardPage;

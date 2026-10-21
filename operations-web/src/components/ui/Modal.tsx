@@ -33,8 +33,14 @@ export const Modal: React.FC<ModalProps> = ({
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen, onClose]);
 
   return (
@@ -46,34 +52,36 @@ export const Modal: React.FC<ModalProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             onClick={onClose}
-            className="fixed inset-0 bg-[#001910]/85 backdrop-blur-md"
+            className="fixed inset-0 bg-[#1C2B20]/45 backdrop-blur-sm"
           />
 
           {/* Modal Card */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 15 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-            className={`relative w-full ${MAX_WIDTHS[maxWidth]} rounded-2xl bg-[#001910] border border-[#385723]/50 shadow-2xl shadow-[#001910]/95 overflow-hidden z-10 flex flex-col max-h-[90vh]`}
+            exit={{ opacity: 0, scale: 0.96, y: 12 }}
+            transition={{ type: 'spring', damping: 26, stiffness: 350 }}
+            className={`relative w-full ${MAX_WIDTHS[maxWidth]} rounded-2xl bg-white border border-[#E5EBE5] shadow-[0_20px_50px_rgba(28,43,32,0.15)] overflow-hidden z-10 flex flex-col max-h-[90vh]`}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#385723]/30 bg-[#001910]/80">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5EBE5] bg-white">
               <div>
-                <h3 className="text-base font-semibold text-[#FFFAF5] tracking-wide">{title}</h3>
-                {subtitle && <p className="text-xs text-[#C7D9B5]/80 mt-0.5">{subtitle}</p>}
+                <h3 className="text-base font-bold text-[#1C2B20] tracking-tight">{title}</h3>
+                {subtitle && <p className="text-xs text-[#66756B] mt-0.5">{subtitle}</p>}
               </div>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-[#C7D9B5]/70 hover:text-[#FFFAF5] hover:bg-[#385723]/25 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-[#66756B] hover:text-[#1C2B20] hover:bg-[#F6F8F4] transition-colors cursor-pointer"
+                title="Đóng"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Scrollable Body */}
-            <div className="p-6 overflow-y-auto text-sm text-[#C7D9B5]/90 space-y-4">
+            <div className="p-6 overflow-y-auto text-sm text-[#1C2B20] space-y-4">
               {children}
             </div>
           </motion.div>

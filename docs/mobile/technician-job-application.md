@@ -47,6 +47,20 @@ For an OPEN job the response deliberately omits exact customer address/contact. 
 
 ## Detail and application actions
 
+When a customer creates a matching `OPEN_MARKETPLACE` booking, the backend
+sends eligible active technicians an in-app notification and an FCM push:
+
+```json
+{
+  "type": "OPEN_BOOKING_AVAILABLE",
+  "bookingId": "booking-id"
+}
+```
+
+Mobile should open or refresh the Jobs screen after tapping it. The app must
+still call `GET /technician/jobs` because push delivery can be delayed or
+disabled on the device.
+
 | Action   | Endpoint                                    | Result                                                          |
 | -------- | ------------------------------------------- | --------------------------------------------------------------- |
 | Detail   | `GET /technician/jobs/:bookingId`           | Safe job detail and permissions                                 |
@@ -103,7 +117,13 @@ The backend worker periodically transitions bookings with no accepted technician
 - `409`: booking is no longer OPEN, deadline has passed, application cannot transition, or selection raced.
 - `400`: invalid catalog item, mode, schedule or payload.
 
-KTV may apply to multiple open jobs. Availability and booking conflict are revalidated when the customer selects a winner. Losers must not show contact, chat, cancel, or complete controls.
+KTV may see multiple eligible open jobs. Availability and booking conflict are
+revalidated when the customer selects a winner. Losers must not show contact,
+chat, cancel, or complete controls.
+
+A KTV with another `CONFIRMED` booking must complete that booking before the
+backend allows a new open-marketplace application. Mobile should refresh the
+Jobs list after the current booking becomes `COMPLETED`.
 
 ## Existing DIRECT flow
 

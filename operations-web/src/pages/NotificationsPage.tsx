@@ -9,97 +9,163 @@ import {
   Trash2,
   Check,
   Filter,
+  CreditCard,
+  CalendarDays,
+  Server,
+  Webhook,
+  Send,
 } from 'lucide-react';
-import { INITIAL_NOTIFICATIONS } from '../data/mockData';
 import { NotificationItem } from '../types/dashboard';
 import { useToast } from '../components/ui/ToastContainer';
+import { PageHeader } from '../components/common/PageHeader';
+import { SectionCard } from '../components/common/SectionCard';
+
+interface SpaNotification {
+  id: string;
+  title: string;
+  content: string;
+  module: 'Thanh toán' | 'Booking' | 'Kỹ thuật viên' | 'Hệ thống' | 'Thông báo Push';
+  severity: 'info' | 'warning' | 'danger';
+  time: string;
+  isResolved: boolean;
+  read: boolean;
+}
+
+const SPA_NOTIFICATIONS: SpaNotification[] = [
+  {
+    id: 'nt-1',
+    title: 'Hồ sơ kỹ thuật viên mới chờ duyệt',
+    content: 'KTV Vũ Thị Ngọc vừa tải lên CCCD và chứng chỉ hành nghề Y học Cổ truyền tại Hà Nội. Cần admin kiểm tra và xác thực KYC.',
+    module: 'Kỹ thuật viên',
+    severity: 'warning',
+    time: '10 phút trước',
+    isResolved: false,
+    read: false,
+  },
+  {
+    id: 'nt-2',
+    title: 'Booking chưa có KTV nhận ca (Quá hạn 15 phút)',
+    content: 'Lịch đặt #BK-1045 tại Cầu Giấy lúc 16:00 chưa có kỹ thuật viên nhận. Đã gửi thông báo ưu tiên đến 5 KTV gần nhất.',
+    module: 'Booking',
+    severity: 'danger',
+    time: '25 phút trước',
+    isResolved: false,
+    read: false,
+  },
+  {
+    id: 'nt-3',
+    title: 'Thanh toán VietQR hoàn tất tự động',
+    content: 'Đơn đặt #BK-1046 của khách hàng Trần Thu Hà (750.000 đ) đã được đối soát tự động thành công qua cổng thanh toán.',
+    module: 'Thanh toán',
+    severity: 'info',
+    time: '42 phút trước',
+    isResolved: true,
+    read: true,
+  },
+  {
+    id: 'nt-4',
+    title: 'Lỗi gửi tin nhắn SMS Zalo ZNS cho khách hàng',
+    content: 'Đầu số Zalo ZNS phản hồi timeout mã lỗi #408 khi gửi mã OTP đăng nhập. Hệ thống đã tự động chuyển hướng sang SMS dự phòng.',
+    module: 'Thông báo Push',
+    severity: 'warning',
+    time: '2 giờ trước',
+    isResolved: true,
+    read: true,
+  },
+  {
+    id: 'nt-5',
+    title: 'Tối ưu định tuyến di chuyển kỹ thuật viên',
+    content: 'Cập nhật bản đồ giao thông giúp giảm trung bình 12% thời gian di chuyển giữa các ca trị liệu tại TP. Hồ Chí Minh.',
+    module: 'Hệ thống',
+    severity: 'info',
+    time: '5 giờ trước',
+    isResolved: true,
+    read: true,
+  },
+];
 
 export const NotificationsPage: React.FC = () => {
   const { addToast } = useToast();
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
-  const [filterType, setFilterType] = useState<string>('all');
+  const [notifications, setNotifications] = useState<SpaNotification[]>(SPA_NOTIFICATIONS);
+  const [severityFilter, setSeverityFilter] = useState<'ALL' | 'info' | 'warning' | 'danger'>('ALL');
 
   const handleMarkAllRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     addToast({
-      title: 'Alerts Acknowledged',
-      message: 'All notifications marked as read.',
+      title: 'Đã đánh dấu đọc',
+      message: 'Tất cả thông báo đã được lưu trữ.',
       type: 'info',
     });
   };
 
-  const handleClear = () => {
-    setNotifications([]);
+  const handleToggleResolve = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isResolved: !n.isResolved } : n))
+    );
     addToast({
-      title: 'Feed Cleared',
-      message: 'Archived all notification records to cold storage.',
-      type: 'info',
+      title: 'Cập nhật trạng thái',
+      message: 'Đã thay đổi trạng thái xử lý sự cố.',
+      type: 'success',
     });
   };
 
   const filtered = notifications.filter((n) => {
-    if (filterType === 'all') return true;
-    return n.type === filterType;
+    if (severityFilter === 'ALL') return true;
+    return n.severity === severityFilter;
   });
+
+  const severityBadges = {
+    info: { label: 'Thông tin', bg: 'bg-[#EDF4FC]', text: 'text-[#2970C2]', border: 'border-[#CDE0F8]' },
+    warning: { label: 'Cảnh báo', bg: 'bg-[#FEF6E9]', text: 'text-[#B87A14]', border: 'border-[#FBE3B8]' },
+    danger: { label: 'Quan trọng', bg: 'bg-[#FDF0EF]', text: 'text-[#D04A44]', border: 'border-[#F8D2D0]' },
+  };
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 15 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -15 }}
-      transition={{ duration: 0.4 }}
-      className="space-y-8 pb-16"
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+      className="space-y-6 pb-12"
     >
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-[#0D101C]/80 border border-white/10 backdrop-blur-xl">
-        <div>
+      <PageHeader
+        title="Thông báo hệ thống"
+        subtitle="Theo dõi sự kiện vận hành, cảnh báo booking và trạng thái xử lý nghiệp vụ"
+        badge="Cập nhật tự động"
+        badgeTone="green"
+        breadcrumbs={[
+          { label: 'MATXXA' },
+          { label: 'Thông báo hệ thống' },
+        ]}
+        actions={
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
-              <Bell className="w-5 h-5" />
-            </div>
-            <h1 className="text-2xl font-bold text-white tracking-wide">
-              Telemetry Alerts & Incidents
-            </h1>
+            <button
+              onClick={handleMarkAllRead}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#E5EBE5] text-xs font-semibold text-[#66756B] hover:text-[#1C2B20] hover:bg-[#F6F8F4] transition-colors cursor-pointer"
+            >
+              <Check className="w-4 h-4" />
+              <span>Đánh dấu đã đọc</span>
+            </button>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Real-time security events, volume anomalies, and system health status dispatches
-          </p>
-        </div>
+        }
+      />
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleMarkAllRead}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-all"
-          >
-            <Check className="w-4 h-4" />
-            <span>Mark All Read</span>
-          </button>
-
-          <button
-            onClick={handleClear}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-all"
-          >
-            <Trash2 className="w-4 h-4" />
-            <span>Clear Archive</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 text-xs font-mono">
+      {/* Severity Filter Tabs */}
+      <div className="flex items-center gap-1.5 p-1 bg-[#F1F5EF] rounded-xl border border-[#E5EBE5] max-w-fit">
         {[
-          { key: 'all', label: 'All Alerts' },
-          { key: 'info', label: 'Info & Analytics' },
-          { key: 'success', label: 'Settlement Cleared' },
-          { key: 'warning', label: 'Stock & Thresholds' },
+          { key: 'ALL', label: 'Tất cả thông báo' },
+          { key: 'danger', label: 'Quan trọng (Cần xử lý)' },
+          { key: 'warning', label: 'Cảnh báo vận hành' },
+          { key: 'info', label: 'Thông tin hệ thống' },
         ].map((f) => (
           <button
             key={f.key}
-            onClick={() => setFilterType(f.key)}
-            className={`px-3 py-1.5 rounded-xl border transition-all ${
-              filterType === f.key
-                ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300 font-semibold'
-                : 'bg-white/5 border-white/5 text-slate-400 hover:text-white'
+            onClick={() => setSeverityFilter(f.key as any)}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              severityFilter === f.key
+                ? 'bg-white text-[#2E7D4A] shadow-xs'
+                : 'text-[#66756B] hover:text-[#1C2B20]'
             }`}
           >
             {f.label}
@@ -109,37 +175,54 @@ export const NotificationsPage: React.FC = () => {
 
       {/* Notifications List */}
       <div className="space-y-3">
-        {filtered.length === 0 ? (
-          <div className="p-12 text-center rounded-3xl bg-[#0D101C]/60 border border-white/5 text-slate-500 font-mono text-xs">
-            No telemetry incidents matching selected filter. All clusters normal.
-          </div>
-        ) : (
-          filtered.map((item) => (
+        {filtered.map((item) => {
+          const sev = severityBadges[item.severity];
+          return (
             <div
               key={item.id}
-              className={`p-5 rounded-2xl border transition-all flex items-start gap-4 ${
+              className={`p-5 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
                 !item.read
-                  ? 'bg-gradient-to-r from-indigo-500/10 to-transparent border-indigo-500/30'
-                  : 'bg-[#0D101C]/80 border-white/5 hover:border-white/10'
+                  ? 'bg-white border-[#2E7D4A]/40 shadow-xs'
+                  : 'bg-white border-[#E5EBE5] hover:border-[#D0DCD1]'
               }`}
             >
-              <div className="mt-0.5">
-                {item.type === 'info' && <Info className="w-5 h-5 text-cyan-400" />}
-                {item.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
-                {item.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-400" />}
-                {item.type === 'error' && <ShieldAlert className="w-5 h-5 text-rose-400" />}
+              <div className="flex items-start gap-3.5 min-w-0">
+                <div className={`p-2.5 rounded-xl border ${sev.bg} ${sev.text} ${sev.border} flex-shrink-0 mt-0.5`}>
+                  {item.severity === 'danger' && <AlertTriangle className="w-5 h-5 text-[#E05B55]" />}
+                  {item.severity === 'warning' && <AlertTriangle className="w-5 h-5 text-[#F2A93B]" />}
+                  {item.severity === 'info' && <Info className="w-5 h-5 text-[#4285D4]" />}
+                </div>
+
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-sm text-[#1C2B20]">{item.title}</span>
+                    <span className={`px-2 py-0.2 rounded-full text-[10px] font-bold border ${sev.bg} ${sev.text} ${sev.border}`}>
+                      {sev.label}
+                    </span>
+                    <span className="px-2 py-0.2 rounded-full text-[10px] font-semibold bg-[#F1F5EF] text-[#66756B]">
+                      {item.module}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#66756B] leading-relaxed max-w-2xl">{item.content}</p>
+                  <span className="text-[11px] text-[#94A399] block font-mono">{item.time}</span>
+                </div>
               </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-white text-sm">{item.title}</h3>
-                  <span className="text-[11px] font-mono text-slate-500">{item.timestamp}</span>
-                </div>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">{item.message}</p>
+              <div className="flex items-center gap-2.5 self-end sm:self-auto flex-shrink-0">
+                <button
+                  onClick={() => handleToggleResolve(item.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                    item.isResolved
+                      ? 'bg-[#EBF8F1] text-[#2E9B62] border-[#C8EED7]'
+                      : 'bg-[#FEF6E9] text-[#B87A14] border-[#FBE3B8] hover:bg-[#FDECD0]'
+                  }`}
+                >
+                  {item.isResolved ? '✓ Đã xử lý' : 'Đánh dấu đã xử lý'}
+                </button>
               </div>
             </div>
-          ))
-        )}
+          );
+        })}
       </div>
     </motion.div>
   );
