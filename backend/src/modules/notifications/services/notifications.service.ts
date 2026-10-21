@@ -6,14 +6,42 @@ import { FIREBASE_ADMIN } from '../../auth/firebase/firebase-admin.provider';
 import { ListNotificationsDto } from '../dto/list-notifications.dto';
 import { RegisterDeviceTokenDto } from '../dto/register-device-token.dto';
 import { TestPushDto } from '../dto/test-push.dto';
+import { UpdateNotificationTemplateDto } from '../dto/update-notification-template.dto';
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
+  private readonly defaultTemplates: Record<string, { title: string; body: string }> = {
+    BOOKING_CREATED: { title: '[Thông báo Psyocore]', body: 'Khách mới đã đặt lịch. KTV vui lòng thu tiền trước khi làm.' },
+    TECHNICIAN_SELECTED: { title: '[Thông báo Psyocore]', body: 'Khách hàng đã chọn KTV cho đơn dịch vụ.' },
+    BOOKING_CANCELLED: { title: '[Thông báo Psyocore]', body: 'Lịch hẹn đã được hủy.' },
+    BOOKING_EXPIRED: { title: '[Thông báo Psyocore]', body: 'Đơn đã hết hạn.' },
+  };
   constructor(
     private readonly prisma: PrismaService,
     @Inject(FIREBASE_ADMIN) private readonly firebaseApp: App,
   ) {}
+
+  async listTemplates() {
+    const current = await this.prisma.notificationTemplate.findMany({ orderBy: { type: 'asc' } });
+    const byType = new Map(current.map((item) => [item.type, item]));
+    return Object.entries(this.defaultTemplates).map(([type, fallback]) => byType.get(type) ?? { type, ...fallback, isActive: true });
+  }
+
+  async getTemplate(type: string) {
+    const stored = await this.prisma.notificationTemplate.findUnique({ where: { type } });
+    if (stored) return stored;
+    const fallback = this.defaultTemplates[type];
+    return fallback ? { type, ...fallback, isActive: true } : null;
+  }
+
+  upsertTemplate(type: string, dto: UpdateNotificationTemplateDto) {
+    return this.prisma.notificationTemplate.upsert({
+      where: { type },
+      create: { type, title: dto.title.trim(), body: dto.body.trim(), isActive: dto.isActive ?? true },
+      update: { title: dto.title.trim(), body: dto.body.trim(), ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}) },
+    });
+  }
 
   registerDevice(userId: string, dto: RegisterDeviceTokenDto) {
     return this.prisma.deviceToken.upsert({

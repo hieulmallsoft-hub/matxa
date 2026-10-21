@@ -1407,8 +1407,9 @@ export class BookingsService {
   }
 
   private async notifyBookingCreated(customerId: string, technicianUserId: string, bookingId: string) {
-    const title = 'Bạn có lịch đặt mới';
-    const body = 'Một lịch hẹn mới đang chờ xác nhận.';
+    const template = await this.notifications.getTemplate('BOOKING_CREATED');
+    const title = template?.title ?? '[Thông báo Psyocore]';
+    const body = template?.body ?? 'Khách mới đã đặt lịch. KTV vui lòng thu tiền trước khi làm.';
     await this.notifications.create(technicianUserId, 'BOOKING_CREATED', title, body, `matxa://bookings/${bookingId}`);
     await this.notifications.sendPush(technicianUserId, title, body, {
       type: 'BOOKING_CREATED',
@@ -1419,8 +1420,11 @@ export class BookingsService {
 
   private async notifyStatus(userId: string, bookingId: string, type: string, title: string, body: string) {
     try {
-      await this.notifications.create(userId, type, title, body, `matxa://bookings/${bookingId}`);
-      await this.notifications.sendPush(userId, title, body, { type, bookingId });
+      const template = await this.notifications.getTemplate(type);
+      const effectiveTitle = template?.isActive ? template.title : title;
+      const effectiveBody = template?.isActive ? template.body : body;
+      await this.notifications.create(userId, type, effectiveTitle, effectiveBody, `matxa://bookings/${bookingId}`);
+      await this.notifications.sendPush(userId, effectiveTitle, effectiveBody, { type, bookingId });
     } catch {
       // Booking state must not roll back or return 500 only because FCM is unavailable.
     }

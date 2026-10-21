@@ -15,6 +15,15 @@ const date = [
 ];
 type PriceSeed = { code: string; durationMinutes: number; price: number; sortOrder: number };
 type CatalogSeed = { categorySlug: string; categoryName: string; slug: string; name: string; template: ServiceCatalogPricingTemplate; modes: ServiceMode[]; options: PriceSeed[] };
+const categoryOrder: Record<string, number> = {
+  'massage-gian-co': 1,
+  'pt-fitness': 2,
+  'yoga-pilates': 3,
+  coaching: 4,
+  'co-van': 5,
+  'tham-van': 6,
+  'hen-ho': 7,
+};
 const service = (categorySlug: string, categoryName: string, slug: string, name: string, modes: ServiceMode[], template: ServiceCatalogPricingTemplate = ServiceCatalogPricingTemplate.STANDARD_60_90_120, options: PriceSeed[] = standard): CatalogSeed => ({ categorySlug, categoryName, slug, name, template, modes, options });
 const many = (categorySlug: string, categoryName: string, values: string[][], modes: ServiceMode[], template: ServiceCatalogPricingTemplate = ServiceCatalogPricingTemplate.STANDARD_60_90_120, options: PriceSeed[] = standard) => values.map(([slug, name]) => service(categorySlug, categoryName, slug, name, modes, template, options));
 
@@ -48,7 +57,8 @@ async function main() {
   if (!databaseUrl) throw new Error('DATABASE_URL la bat buoc');
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
   for (const item of items) {
-    const category = await prisma.serviceCategory.upsert({ where: { slug: item.categorySlug }, update: { name: item.categoryName, isActive: true }, create: { slug: item.categorySlug, name: item.categoryName, isActive: true } });
+    const sortOrder = categoryOrder[item.categorySlug] ?? 999;
+    const category = await prisma.serviceCategory.upsert({ where: { slug: item.categorySlug }, update: { name: item.categoryName, sortOrder, isActive: true }, create: { slug: item.categorySlug, name: item.categoryName, sortOrder, isActive: true } });
     const first = item.options[0];
     await prisma.serviceCatalogItem.upsert({
       where: { slug: item.slug },

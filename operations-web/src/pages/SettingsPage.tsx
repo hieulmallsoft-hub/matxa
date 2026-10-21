@@ -13,6 +13,9 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { useToast } from '../components/ui/ToastContainer';
+import { request } from '../api/client';
+
+type NotificationTemplate = { type: string; title: string; body: string; isActive: boolean };
 
 interface SettingsPageProps {
   theme: string;
@@ -25,6 +28,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
   const [showKey, setShowKey] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
   const [webhookUrl, setWebhookUrl] = useState('https://api.aetheris.io/v1/telemetry/webhook');
+  const [notificationTemplates, setNotificationTemplates] = useState<NotificationTemplate[]>([]);
+
+  React.useEffect(() => {
+    void request<NotificationTemplate[]>('/admin/notifications/templates')
+      .then(setNotificationTemplates)
+      .catch(() => undefined);
+  }, []);
 
   const handleCopyKey = () => {
     addToast({
@@ -50,6 +60,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
       message: 'Platform configuration updated across all edge replicas.',
       type: 'success',
     });
+  };
+
+  const updateTemplate = (type: string, field: 'title' | 'body', value: string) => {
+    setNotificationTemplates((current) => current.map((template) => template.type === type ? { ...template, [field]: value } : template));
+  };
+
+  const saveTemplate = async (template: NotificationTemplate) => {
+    try {
+      await request(`/admin/notifications/templates/${template.type}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ title: template.title, body: template.body, isActive: template.isActive }),
+      });
+      addToast({ title: 'Đã lưu thông báo', message: template.type, type: 'success' });
+    } catch (error) {
+      addToast({ title: 'Không thể lưu', message: error instanceof Error ? error.message : 'Vui lòng thử lại', type: 'error' });
+    }
   };
 
   return (
@@ -174,6 +200,24 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
               ĐANG BẬT
             </span>
           </div>
+        </div>
+      </div>
+
+      {/* Notification templates */}
+      <div className="p-6 rounded-3xl bg-[#0D101C]/80 border border-white/10 backdrop-blur-xl space-y-5">
+        <div className="flex items-center gap-2">
+          <Bell className="w-4 h-4 text-amber-400" />
+          <div>
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Mẫu thông báo</h2>
+            <p className="text-xs text-slate-400 mt-1">Admin có thể đổi nội dung; mã sự kiện vẫn giữ cố định cho Mobile.</p>
+          </div>
+        </div>
+        <div className="space-y-4">
+          {notificationTemplates.map((template) => <div key={template.type} className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
+            <div className="flex items-center justify-between"><span className="text-xs font-mono text-cyan-300">{template.type}</span><button type="button" onClick={() => void saveTemplate(template)} className="px-3 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-xs text-cyan-300">Lưu mẫu</button></div>
+            <input value={template.title} onChange={(e) => updateTemplate(template.type, 'title', e.target.value)} placeholder="Tiêu đề" className="w-full px-3 py-2.5 rounded-xl bg-black/30 border border-white/10 text-sm text-white focus:outline-none focus:border-cyan-500" />
+            <textarea value={template.body} onChange={(e) => updateTemplate(template.type, 'body', e.target.value)} rows={2} placeholder="Nội dung" className="w-full px-3 py-2.5 rounded-xl bg-black/30 border border-white/10 text-sm text-white focus:outline-none focus:border-cyan-500" />
+          </div>)}
         </div>
       </div>
 

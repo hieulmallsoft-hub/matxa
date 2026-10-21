@@ -879,6 +879,18 @@ model Notification {
   @@map("notifications")
 }
 
+model NotificationTemplate {
+  id        String   @id @default(uuid()) @db.Uuid
+  type      String   @unique
+  title     String
+  body      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("notification_templates")
+}
+
 model UserIdentity {
   id              String       @id @default(uuid()) @db.Uuid
   userId          String       @map("user_id") @db.Uuid

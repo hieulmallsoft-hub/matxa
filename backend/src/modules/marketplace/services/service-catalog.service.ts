@@ -26,7 +26,7 @@ export class ServiceCatalogService {
         category: { select: { id: true, name: true, slug: true } },
         priceOptions: { where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }] },
       },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      orderBy: [{ category: { sortOrder: 'asc' } }, { sortOrder: 'asc' }, { name: 'asc' }],
     });
     return items.map((item) => this.mobile(item));
   }
@@ -54,7 +54,7 @@ export class ServiceCatalogService {
           take: 1,
         },
       },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      orderBy: [{ category: { sortOrder: 'asc' } }, { sortOrder: 'asc' }, { name: 'asc' }],
     });
     const profileModes = new Set(profile.serviceModes);
     return {
