@@ -12,6 +12,7 @@ import {
   CreateBookingDto,
   CreateOpenBookingDto,
   CreateUnifiedBookingDto,
+  MatchTechniciansDto,
   CreateReviewDto,
   QuoteBookingDto,
   SelectTechnicianDto,
@@ -56,7 +57,7 @@ export class BookingsController {
 
   @Post('matching-technicians')
   @ApiOperation({ summary: 'Tim KTV phu hop de user chon truoc khi dat lich' })
-  matchingTechnicians(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateUnifiedBookingDto) {
+  matchingTechnicians(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: MatchTechniciansDto) {
     return this.bookings.matchingTechnicians(auth.sub, dto);
   }
 

@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -106,6 +106,9 @@ export class CreateUnifiedBookingDto {
   @ApiProperty({ enum: ['CASH', 'ONLINE'] }) @IsIn(['CASH', 'ONLINE']) paymentMethod!: 'CASH' | 'ONLINE';
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) note?: string;
 }
+
+/** Payload used before the customer has selected a technician. */
+export class MatchTechniciansDto extends OmitType(CreateUnifiedBookingDto, ['technicianId'] as const) {}
 export class SelectTechnicianDto {
   @ApiProperty() @IsUUID() applicationId!: string;
 }
