@@ -412,6 +412,48 @@ export class BookingsService {
   }
 
   /** Creates an unassigned marketplace request from platform-owned catalog items. */
+  async matchingTechnicians(userId: string, dto: any) {
+    const start = new Date(dto.scheduledStart);
+    if (!Number.isFinite(start.getTime()) || start <= new Date()) throw new BadRequestException('Thoi gian dat lich khong hop le');
+    const serviceIds: string[] = [...new Set((dto.items ?? []).map((item: any) => String(item.catalogServiceId)))] as string[];
+    const optionIds: string[] = [...new Set((dto.items ?? []).map((item: any) => String(item.priceOptionId)))] as string[];
+    if (!serviceIds.length || serviceIds.length !== (dto.items ?? []).length) throw new BadRequestException('Danh sach dich vu khong hop le');
+    const [services, options] = await Promise.all([
+      this.prisma.serviceCatalogItem.findMany({ where: { id: { in: serviceIds }, isActive: true }, include: { category: true } }),
+      this.prisma.serviceCatalogPriceOption.findMany({ where: { id: { in: optionIds }, isActive: true } }),
+    ]);
+    if (services.length !== serviceIds.length || options.length !== optionIds.length) throw new BadRequestException('Dich vu hoac goi gia khong hop le');
+    const duration = dto.items.reduce((sum: number, item: any) => sum + (options.find((option: any) => option.id === item.priceOptionId)?.durationMinutes ?? 0), 0);
+    const end = new Date(start.getTime() + duration * 60_000);
+    const candidates: any[] = await this.prisma.technicianProfile.findMany({
+      where: { isActive: true, isVerified: true, city: dto.city, ...(dto.district ? { district: dto.district } : {}), serviceModes: { has: dto.mode }, user: { status: 'ACTIVE', role: 'TECHNICIAN', technicianApplication: { is: { status: 'APPROVED' } } }, services: { some: { isActive: true, catalogServiceId: { in: serviceIds }, modes: { has: dto.mode } } } },
+      include: { user: { select: { id: true, displayName: true, avatarUrl: true } } },
+    });
+    const eligible = [] as any[];
+    for (const candidate of candidates) {
+      const [slot, conflict] = await Promise.all([
+        this.prisma.availabilitySlot.findFirst({ where: { technicianId: candidate.id, isAvailable: true, startAt: { lte: start }, endAt: { gte: end } } }),
+        this.prisma.booking.findFirst({ where: { technicianId: candidate.id, status: 'CONFIRMED', scheduledStart: { lt: end }, scheduledEnd: { gt: start } }, select: { id: true } }),
+      ]);
+      if (!slot || conflict) continue;
+      eligible.push({ technicianId: candidate.id, displayName: candidate.user.displayName, avatarUrl: candidate.user.avatarUrl, city: candidate.city, district: candidate.district });
+    }
+    return { items: eligible, total: eligible.length };
+  }
+
+  async createSelectedFromCatalog(userId: string, dto: any) {
+    const serviceIds = dto.items.map((item: any) => item.catalogServiceId);
+    const selected = await this.prisma.technicianService.findMany({ where: { technicianId: dto.technicianId, catalogServiceId: { in: serviceIds }, isActive: true }, include: { priceOptions: { where: { isActive: true } } } });
+    if (selected.length !== serviceIds.length) throw new BadRequestException('KTV khong co dich vu phu hop');
+    const priceOptionIds = dto.items.map((item: any) => {
+      const service = selected.find((candidate: any) => candidate.catalogServiceId === item.catalogServiceId)!;
+      const option = service.priceOptions[0];
+      if (!option) throw new BadRequestException('KTV chua co goi gia');
+      return option.id;
+    });
+    return this.create(userId, { ...dto, serviceIds: selected.map((item: any) => item.id), priceOptionIds, technicianId: dto.technicianId } as any);
+  }
+
   async createOpen(userId: string, dto: CreateOpenBookingDto) {
     const start = new Date(dto.scheduledStart);
     if (!Number.isFinite(start.getTime()) || start <= new Date())

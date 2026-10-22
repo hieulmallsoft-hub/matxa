@@ -50,7 +50,14 @@ export class BookingsController {
   create(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateUnifiedBookingDto) {
     // Mobile uses one booking flow. The backend always publishes the booking
     // to eligible technicians; clients do not choose DIRECT/OPEN_MARKETPLACE.
+    if (dto.technicianId) return this.bookings.createSelectedFromCatalog(auth.sub, dto);
     return this.bookings.createOpen(auth.sub, dto as CreateOpenBookingDto);
+  }
+
+  @Post('matching-technicians')
+  @ApiOperation({ summary: 'Tim KTV phu hop de user chon truoc khi dat lich' })
+  matchingTechnicians(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateUnifiedBookingDto) {
+    return this.bookings.matchingTechnicians(auth.sub, dto);
   }
 
   @Post('open')

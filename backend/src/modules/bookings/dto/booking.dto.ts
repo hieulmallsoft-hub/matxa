@@ -85,6 +85,9 @@ export class CreateOpenBookingDto {
 
 /** Single mobile booking payload. The server always finds eligible technicians. */
 export class CreateUnifiedBookingDto {
+  @ApiPropertyOptional({ description: 'KTV do user chon sau khi xem danh sach phu hop' })
+  @IsOptional() @IsUUID()
+  technicianId?: string;
   @ApiProperty({ type: [OpenBookingItemDto] })
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10)
   items!: OpenBookingItemDto[];

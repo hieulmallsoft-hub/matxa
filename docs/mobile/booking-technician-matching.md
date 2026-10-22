@@ -20,7 +20,7 @@ http://149.28.156.66:5600
 ## 1. Tìm KTV phù hợp
 
 ```http
-POST /api/marketplace/technicians/matching
+POST /api/bookings/matching-technicians
 ```
 
 Body:
