@@ -78,7 +78,7 @@ export class OpenBookingExpirationService implements OnModuleInit, OnModuleDestr
       const result = await this.bookings.expireDirectBookingIfDue(booking.id, now);
       if (result) {
         expired++;
-        this.logger.log(`Expired direct booking ${booking.id}; deadline=${result.deadline.toISOString()}`);
+        this.logger.log(`Moved direct booking ${booking.id} to marketplace fallback; deadline=${result.deadline.toISOString()}`);
       }
     }
     return { scanned: due.length + directDue.length, expired };

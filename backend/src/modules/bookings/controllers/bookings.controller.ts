@@ -11,6 +11,7 @@ import {
   CancelBookingDto,
   CreateBookingDto,
   CreateOpenBookingDto,
+  CreateUnifiedBookingDto,
   CreateReviewDto,
   QuoteBookingDto,
   SelectTechnicianDto,
@@ -32,7 +33,7 @@ export class BookingsController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Tao lich dat va khoa khung gio' })
+  @ApiOperation({ summary: 'Tao don va tu dong tim KTV phu hop' })
   @ApiCreatedResponse({
     schema: {
       type: 'object',
@@ -46,8 +47,10 @@ export class BookingsController {
       },
     },
   })
-  create(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateBookingDto) {
-    return this.bookings.create(auth.sub, dto);
+  create(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateUnifiedBookingDto) {
+    // Mobile uses one booking flow. The backend always publishes the booking
+    // to eligible technicians; clients do not choose DIRECT/OPEN_MARKETPLACE.
+    return this.bookings.createOpen(auth.sub, dto as CreateOpenBookingDto);
   }
 
   @Post('open')

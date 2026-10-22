@@ -143,6 +143,14 @@ enum TechnicianApplicationStatus {
   REJECTED
 }
 
+enum TechnicianContractStatus {
+  DRAFT
+  SIGNED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
 enum TechnicianKycStatus {
   NOT_STARTED
   ID_UPLOADED
@@ -254,6 +262,7 @@ model TechnicianApplication {
   supportedModes ServiceMode[] @default([]) @map("supported_modes")
   idCardFrontKey String?  @map("id_card_front_key")
   idCardBackKey  String?  @map("id_card_back_key")
+  idCardNumber   String?  @map("id_card_number")
   faceImageKey   String?  @map("face_image_key")
   rejectionReason String? @map("rejection_reason")
   submittedAt      DateTime? @map("submitted_at")
@@ -269,6 +278,26 @@ model TechnicianApplication {
   gallery        TechnicianApplicationGalleryImage[]
   @@index([status, createdAt(sort: Desc)])
   @@map("technician_applications")
+}
+
+model TechnicianContract {
+  id                String                   @id @default(uuid()) @db.Uuid
+  userId            String                   @unique @map("user_id") @db.Uuid
+  applicationId     String                   @unique @map("application_id") @db.Uuid
+  contractNumber    String                   @unique @map("contract_number")
+  templateVersion   String                   @map("template_version")
+  status            TechnicianContractStatus @default(DRAFT)
+  contractData      Json                     @map("contract_data")
+  signatureKey      String?                  @map("signature_key")
+  signedDocumentKey String?                  @map("signed_document_key")
+  signedAt          DateTime?                @map("signed_at")
+  reviewedBy        String?                  @map("reviewed_by") @db.Uuid
+  reviewedAt        DateTime?                @map("reviewed_at")
+  rejectionReason   String?                  @map("rejection_reason")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  updatedAt         DateTime                 @updatedAt @map("updated_at")
+  @@index([status, createdAt(sort: Desc)])
+  @@map("technician_contracts")
 }
 
 model TechnicianKyc {

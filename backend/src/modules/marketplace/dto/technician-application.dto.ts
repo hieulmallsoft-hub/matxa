@@ -19,6 +19,7 @@ export class UpdateTechnicianApplicationDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) bio?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1024) idCardFrontKey?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1024) idCardBackKey?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(32) idCardNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1024) faceImageKey?: string;
 }
 

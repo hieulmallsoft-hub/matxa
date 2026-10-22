@@ -111,7 +111,7 @@ export class TechnicianApplicationsService {
   async submit(userId: string) {
     const app = await this.prisma.technicianApplication.findUnique({ where: { userId } });
     if (!app) throw new NotFoundException('Chua co ho so dang ky');
-    if (!app.displayName || !app.idCardFrontKey || !app.idCardBackKey || !app.faceImageKey)
+    if (!app.displayName || !app.idCardNumber || !app.idCardFrontKey || !app.idCardBackKey || !app.faceImageKey)
       throw new BadRequestException('Vui long bo sung du thong tin va anh giay to');
     if (app.status === 'APPROVED') throw new ConflictException('Ho so da duoc duyet');
     const result = await this.prisma.technicianApplication.update({
@@ -157,7 +157,10 @@ export class TechnicianApplicationsService {
     const signedKyc = await Promise.all(
       legacy.map(async (storageKey) => ({ storageKey, ...(await this.storage.createPrivateViewUrl(storageKey)) })),
     );
-    return { ...app, signedKyc };
+    const signedGallery = await Promise.all(
+      app.gallery.map(async (image) => ({ ...image, ...(await this.storage.createPrivateViewUrl(image.storageKey)) })),
+    );
+    return { ...app, signedKyc, signedGallery };
   }
   async reviewKyc(adminId: string, id: string, status: 'VERIFIED' | 'REJECTED', reason?: string) {
     if (status === 'REJECTED' && !reason?.trim()) throw new BadRequestException('Can nhap ly do tu choi KYC');

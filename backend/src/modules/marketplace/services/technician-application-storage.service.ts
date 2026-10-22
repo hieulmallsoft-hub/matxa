@@ -21,6 +21,7 @@ export class TechnicianApplicationStorageService {
     const client = new S3Client({
       region,
       endpoint: this.config.get<string>('S3_ENDPOINT') || undefined,
+      forcePathStyle: Boolean(this.config.get<string>('S3_ENDPOINT')),
       credentials: { accessKeyId, secretAccessKey },
     });
     const uploadUrl = await getSignedUrl(
@@ -48,6 +49,7 @@ export class TechnicianApplicationStorageService {
     const client = new S3Client({
       region,
       endpoint: this.config.get<string>('S3_ENDPOINT') || undefined,
+      forcePathStyle: Boolean(this.config.get<string>('S3_ENDPOINT')),
       credentials: { accessKeyId, secretAccessKey },
     });
     const viewUrl = await getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: storageKey }), {

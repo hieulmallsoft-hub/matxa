@@ -21,6 +21,14 @@ import { SectionCard } from '../components/common/SectionCard';
 
 type NotificationTemplate = { type: string; title: string; body: string; isActive: boolean };
 
+const defaultNotificationTemplates: NotificationTemplate[] = [
+  { type: 'BOOKING_CREATED', title: '[Thông báo MATXXA]', body: 'Khách mới đã đặt lịch. KTV vui lòng thu tiền trước khi làm.', isActive: true },
+  { type: 'OPEN_BOOKING_AVAILABLE', title: '[Thông báo MATXXA]', body: 'Có đơn dịch vụ mới phù hợp. Hãy mở tab Nhận việc để xem và ứng tuyển.', isActive: true },
+  { type: 'TECHNICIAN_SELECTED', title: '[Thông báo MATXXA]', body: 'Khách hàng đã chọn bạn cho đơn dịch vụ.', isActive: true },
+  { type: 'BOOKING_CANCELLED', title: '[Thông báo MATXXA]', body: 'Lịch hẹn đã được hủy.', isActive: true },
+  { type: 'BOOKING_EXPIRED', title: '[Thông báo MATXXA]', body: 'Đơn đã hết hạn.', isActive: true },
+];
+
 interface SettingsPageProps {
   theme: string;
   onToggleTheme: (t: string) => void;
@@ -38,6 +46,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
   const { addToast } = useToast();
   const [activeCategory, setActiveCategory] = useState<SettingCategory>('brand');
   const [notificationTemplates, setNotificationTemplates] = useState<NotificationTemplate[]>([]);
+  const [notificationTemplatesLoading, setNotificationTemplatesLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   // Settings State
@@ -54,7 +63,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
   React.useEffect(() => {
     void request<NotificationTemplate[]>('/admin/notifications/templates')
       .then(setNotificationTemplates)
-      .catch(() => undefined);
+      .catch(() => setNotificationTemplates(defaultNotificationTemplates))
+      .finally(() => setNotificationTemplatesLoading(false));
   }, []);
 
   const updateTemplate = (type: string, field: 'title' | 'body', value: string) => {
@@ -316,7 +326,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
               </div>
 
               <div className="space-y-4">
-                {notificationTemplates.length === 0 ? (
+                {notificationTemplatesLoading ? (
                   <p className="text-xs text-[#66756B]">Đang tải danh sách mẫu thông báo từ máy chủ...</p>
                 ) : (
                   notificationTemplates.map((template) => (

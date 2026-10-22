@@ -16,6 +16,7 @@ export class NotificationsService {
     OPEN_BOOKING_AVAILABLE: { title: '[Thông báo Psyocore]', body: 'Có đơn dịch vụ mới phù hợp. Hãy mở tab Nhận việc để xem và ứng tuyển.' },
     TECHNICIAN_SELECTED: { title: '[Thông báo Psyocore]', body: 'Khách hàng đã chọn KTV cho đơn dịch vụ.' },
     BOOKING_CANCELLED: { title: '[Thông báo Psyocore]', body: 'Lịch hẹn đã được hủy.' },
+    BOOKING_FALLBACK_OPEN: { title: '[Thông báo Psyocore]', body: 'KTV được chỉ định chưa phản hồi. Đơn đã mở cho KTV phù hợp khác.' },
     BOOKING_EXPIRED: { title: '[Thông báo Psyocore]', body: 'Đơn đã hết hạn.' },
   };
   constructor(
@@ -110,7 +111,8 @@ export class NotificationsService {
     const translations: Record<string, { title: string; body: string }> = {
       BOOKING_CREATED: { title: 'New booking', body: 'A new booking is waiting for confirmation.' },
       OPEN_BOOKING_AVAILABLE: { title: 'New job available', body: 'A new job matching your services is available. Open Jobs to apply.' },
-      BOOKING_EXPIRED: { title: 'Booking expired', body: 'No technician was selected before the application deadline.' },
+      BOOKING_FALLBACK_OPEN: { title: '[Thông báo Psyocore]', body: 'KTV được chỉ định chưa phản hồi. Đơn đã mở cho KTV phù hợp khác.' },
+    BOOKING_EXPIRED: { title: 'Booking expired', body: 'No technician was selected before the application deadline.' },
       BOOKING_AUTO_COMPLETED: { title: 'Booking completed', body: 'The booking was automatically completed after 24 hours.' },
       CHAT_MESSAGE_RECEIVED: { title: 'New message', body: 'You have a new message.' },
       TECHNICIAN_KYC_REJECTED: { title: 'KYC needs updates', body: 'Please review and update your technician profile.' },

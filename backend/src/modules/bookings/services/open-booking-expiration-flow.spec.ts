@@ -45,7 +45,7 @@ describe('open booking expiry transition', () => {
     });
   });
 
-  it('expires an overdue DIRECT booking whose assigned technician never accepted it', async () => {
+  it('moves an overdue DIRECT booking to the marketplace fallback', async () => {
     const createdAt = new Date('2026-10-06T00:00:00.000Z');
     const now = new Date('2026-10-06T01:00:00.000Z');
     const tx: any = {
@@ -75,11 +75,11 @@ describe('open booking expiry transition', () => {
     await expect(service.expireDirectBookingIfDue('direct-1', now)).resolves.toMatchObject({
       customerId: 'customer-1',
       technicianUserId: 'technician-user-1',
-      expiredAt: now,
+      expiredAt: null,
     });
     expect(tx.booking.updateMany).toHaveBeenCalledWith({
       where: expect.objectContaining({ assignmentMode: 'DIRECT', status: 'PENDING', technicianId: { not: null } }),
-      data: { status: 'EXPIRED', expiredAt: now },
+      data: expect.objectContaining({ assignmentMode: 'OPEN_MARKETPLACE', status: 'OPEN', technicianId: null }),
     });
   });
 

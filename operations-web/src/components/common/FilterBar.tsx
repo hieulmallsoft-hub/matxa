@@ -65,7 +65,7 @@ export function FilterTabs<T extends string = string>({
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
               isActive
                 ? 'bg-white text-[#2E7D4A] shadow-sm'
-                : 'text-[#66756B] hover:text-[#1C2B20] hover:bg-white/50'
+                : 'bg-transparent text-[#1C2B20] hover:text-[#2E7D4A] hover:bg-white/80'
             }`}
           >
             <span>{tab.label}</span>

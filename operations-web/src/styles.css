@@ -457,7 +457,7 @@ select[multiple] option:checked { background: var(--green-700); color: #fff; }
 /* ==========================================================================
    BUTTONS — Vibrant green, beauty brand style
    ========================================================================== */
-button {
+button:not([class*="bg-"]):not([class*="text-"]) {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   font-family: var(--font-main); font-size: 0.88rem; font-weight: 700;
   padding: 10px 22px; border-radius: 12px; border: none; cursor: pointer;
@@ -471,17 +471,16 @@ button {
 button::before {
   content: ""; position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
-  transition: left 0.5s ease;
+  display: none;
 }
-button:hover::before { left: 150%; }
-button:hover {
+button:not([class*="bg-"]):not([class*="text-"]):hover {
   background: linear-gradient(135deg, #4ad67a 0%, #38b65e 50%, #22a04a 100%);
   box-shadow: 0 8px 28px rgba(34,160,74,0.50);
-  transform: translateY(-2px);
+  transform: none;
 }
-button:active { transform: translateY(0) scale(0.99); box-shadow: 0 3px 12px rgba(34,160,74,0.30); }
+button:active { transform: none; box-shadow: 0 3px 12px rgba(34,160,74,0.30); }
 button:disabled { opacity: 0.52; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
-button:not(:disabled):active { transform: translateY(1px) scale(.99); }
+button:not(:disabled):active { transform: none; }
 button:focus-visible, input:focus-visible, select:focus-visible,
 textarea:focus-visible, [tabindex]:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
@@ -860,8 +859,8 @@ body { background: var(--bg-page); color: var(--text-primary); }
 .card-subtitle, .field-help { color: var(--text-muted); }
 .kpi-label { color: var(--text-secondary); }
 .kpi-icon-box { background: #e8f4df; color: #3c8142; border-color: #c5dfbb; }
-button { background: #2f7138; border-color: #2f7138; box-shadow: 0 7px 16px rgba(47, 113, 56, .17); }
-button:hover { background: #245e30; border-color: #245e30; box-shadow: 0 10px 20px rgba(47, 113, 56, .22); }
+button:not([class*="bg-"]):not([class*="text-"]) { background: #2f7138; border-color: #2f7138; box-shadow: 0 7px 16px rgba(47, 113, 56, .17); }
+button:not([class*="bg-"]):not([class*="text-"]):hover { background: #245e30; border-color: #245e30; box-shadow: 0 10px 20px rgba(47, 113, 56, .22); }
 button.quiet, .topbar-refresh-btn { background: #f4f8ef; color: #2f7138; border-color: var(--border-light); box-shadow: none; }
 button.quiet:hover, .topbar-refresh-btn:hover { background: #e6f2dc; color: #20552d; border-color: var(--border-medium); }
 input, select, textarea { background: #fffefa; color: var(--text-primary); border-color: #cfe0c9; border-radius: 12px; }

@@ -122,7 +122,7 @@ export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ onSelectOr
                   className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                     isActive
                       ? 'bg-white text-[#2E7D4A] shadow-xs'
-                      : 'text-[#66756B] hover:text-[#1C2B20]'
+                       : 'bg-transparent text-[#1C2B20] hover:bg-white/80 hover:text-[#2E7D4A]'
                   }`}
                 >
                   {statusTabLabels[status]}

@@ -29,6 +29,10 @@ export class ChatService {
     const booking = await this.bookingChatContext(userId, bookingId);
     const technicianUserId = booking.technician!.userId;
     const participantKey = [booking.customerId, technicianUserId].sort().join(':');
+    const selectionTemplate = await this.getNotificationTemplate('TECHNICIAN_SELECTED');
+    const selectionText = selectionTemplate?.isActive === false
+      ? 'TECHNICIAN_SELECTED'
+      : selectionTemplate?.body || 'Khách hàng đã chọn KTV cho đơn dịch vụ.';
     let conversation;
     try {
       conversation = await this.prisma.conversation.upsert({
@@ -45,7 +49,7 @@ export class ChatService {
             create: {
               senderId: booking.customerId,
               type: 'SYSTEM',
-              text: 'TECHNICIAN_SELECTED',
+              text: selectionText,
               bookingId,
             },
           },
@@ -137,7 +141,7 @@ export class ChatService {
       this.prisma.message.count({ where }),
     ]);
     return {
-      items: await Promise.all(items.map((item) => this.withSignedMediaUrl(item))),
+      items: await Promise.all(items.map(async (item) => this.withSignedMediaUrl(await this.withSystemMessageText(item)))),
       total,
       page: query.page,
       limit: query.limit,
@@ -277,6 +281,22 @@ export class ChatService {
   private async withSignedMediaUrl<T extends { type: string; mediaKey: string | null }>(message: T) {
     if (message.type !== 'IMAGE' || !message.mediaKey) return message;
     return { ...message, mediaUrl: await this.storage.createReadUrl(message.mediaKey) };
+  }
+
+  private async withSystemMessageText<T extends { type: string; text: string | null }>(message: T) {
+    if (message.type !== 'SYSTEM' || message.text !== 'TECHNICIAN_SELECTED') return message;
+    const template = await this.getNotificationTemplate('TECHNICIAN_SELECTED');
+    if (template?.isActive === false) return message;
+    return { ...message, text: template?.body || 'Khách hàng đã chọn KTV cho đơn dịch vụ.' };
+  }
+
+  private async getNotificationTemplate(type: string) {
+    // Keep chat creation compatible with lightweight service mocks and older
+    // deployments while the notification template API is being rolled out.
+    const getter = (this.notifications as NotificationsService & {
+      getTemplate?: (templateType: string) => Promise<{ body?: string; isActive?: boolean } | null>;
+    }).getTemplate;
+    return typeof getter === 'function' ? getter.call(this.notifications, type) : null;
   }
 
   private async bookingChatContext(userId: string, bookingId: string) {

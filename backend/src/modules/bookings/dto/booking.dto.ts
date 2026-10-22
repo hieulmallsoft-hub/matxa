@@ -79,10 +79,30 @@ export class CreateOpenBookingDto {
   @IsOptional()
   @IsDateString({ strict: true })
   applicationDeadlineAt?: string;
-  @ApiProperty({ enum: ['CASH'] }) @IsIn(['CASH']) paymentMethod!: 'CASH';
+  @ApiProperty({ enum: ['CASH', 'ONLINE'] }) @IsIn(['CASH', 'ONLINE']) paymentMethod!: 'CASH' | 'ONLINE';
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) note?: string;
 }
 
+/** Single mobile booking payload. The server always finds eligible technicians. */
+export class CreateUnifiedBookingDto {
+  @ApiProperty({ type: [OpenBookingItemDto] })
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10)
+  items!: OpenBookingItemDto[];
+  @ApiProperty({ enum: ['HOME', 'ONSITE', 'ONLINE'] }) @IsIn(['HOME', 'ONSITE', 'ONLINE']) mode!:
+    'HOME' | 'ONSITE' | 'ONLINE';
+  @ApiProperty({ example: 'HN', description: 'Ma thanh pho theo location master' })
+  @IsString() @MaxLength(50)
+  city!: string;
+  @ApiPropertyOptional({ example: 'HN-CAU-GIAY' }) @IsOptional() @IsString() @MaxLength(50) district?: string;
+  @ApiProperty({ description: 'ISO timestamp with explicit Z or timezone offset' })
+  @IsDateString({ strict: true }) @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
+  scheduledStart!: string;
+  @ApiPropertyOptional() @IsOptional() @IsUUID() addressId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) promotionCode?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() applicationDeadlineAt?: string;
+  @ApiProperty({ enum: ['CASH', 'ONLINE'] }) @IsIn(['CASH', 'ONLINE']) paymentMethod!: 'CASH' | 'ONLINE';
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) note?: string;
+}
 export class SelectTechnicianDto {
   @ApiProperty() @IsUUID() applicationId!: string;
 }

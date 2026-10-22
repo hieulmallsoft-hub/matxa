@@ -18,6 +18,8 @@ import { ServiceCatalogController, AdminServiceCatalogController } from './contr
 import { ServiceCatalogService } from './services/service-catalog.service';
 import { MarketplaceGateway } from './gateways/marketplace.gateway';
 import { MarketplaceRealtimeService } from './services/marketplace-realtime.service';
+import { TechnicianContractService } from './services/technician-contract.service';
+import { AdminTechnicianContractController, TechnicianContractController } from './controllers/technician-contract.controller';
 
 @Module({
   imports: [AuthModule, NotificationsModule],
@@ -30,6 +32,8 @@ import { MarketplaceRealtimeService } from './services/marketplace-realtime.serv
     AdminMarketplaceController,
     ServiceCatalogController,
     AdminServiceCatalogController,
+    TechnicianContractController,
+    AdminTechnicianContractController,
   ],
   providers: [
     MarketplaceService,
@@ -40,6 +44,7 @@ import { MarketplaceRealtimeService } from './services/marketplace-realtime.serv
     ServiceCatalogService,
     MarketplaceGateway,
     MarketplaceRealtimeService,
+    TechnicianContractService,
   ],
   exports: [MarketplaceService, MarketplaceRealtimeService],
 })

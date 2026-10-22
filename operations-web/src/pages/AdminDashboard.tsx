@@ -130,6 +130,19 @@ type TechnicianApplication = {
   services?: any[];
 };
 
+const serviceModeLabels: Record<string, string> = {
+  HOME: 'Tận nơi',
+  HOME_VISIT: 'Tận nơi',
+  ONSITE: 'Tại cơ sở',
+  STUDIO: 'Tại cơ sở',
+  ONLINE: 'Online',
+};
+
+function formatServiceModes(modes?: string[] | null) {
+  if (!modes?.length) return 'Chưa chọn';
+  return modes.map((mode) => serviceModeLabels[mode] || mode).join(', ');
+}
+
 const money = (value: number) => `${new Intl.NumberFormat('vi-VN').format(value)} đ`;
 const date = (value: string) => new Date(value).toLocaleString('vi-VN');
 
@@ -565,7 +578,7 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                         {app.district ? `${app.district}, ` : ''}{app.city || 'TP. Hồ Chí Minh'}
                       </td>
                       <td className="py-3 px-4 text-xs font-medium text-[#2E7D4A]">
-                        {app.supportedModes?.join(', ') || 'Tại nhà (HOME)'}
+                        {formatServiceModes(app.supportedModes)}
                       </td>
                       <td className="py-3 px-4 text-xs">
                         <span className="inline-flex items-center gap-1 font-semibold text-[#2E9B62]">
@@ -616,6 +629,7 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                     </span>
                   </div>
                 </div>
+
               </div>
 
               <button
@@ -630,6 +644,24 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
             <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-[#1C2B20]">
               {/* Cột trái: Thông tin applicant */}
               <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] space-y-3">
+                  <h4 className="font-bold text-xs text-[#2E7D4A] uppercase tracking-wider">Ảnh cá nhân và ảnh dịch vụ</h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    {(() => {
+                      const personal = applicationDetail.signedKyc?.find(
+                        (item: any) => item.storageKey === applicationDetail.faceImageKey,
+                      )?.viewUrl || applicationDetail.user?.avatarUrl;
+                      return personal ? (
+                        <img src={personal} alt="Ảnh cá nhân" className="h-28 w-full rounded-lg object-cover border border-[#E5EBE5]" />
+                      ) : (
+                        <div className="h-28 rounded-lg border border-dashed border-[#CBD8CC] flex items-center justify-center text-[11px] text-[#94A399]">Chưa có ảnh cá nhân</div>
+                      );
+                    })()}
+                    {(applicationDetail.signedGallery ?? []).map((image: any) => image.viewUrl && (
+                      <img key={image.id} src={image.viewUrl} alt="Ảnh dịch vụ" className="h-28 w-full rounded-lg object-cover border border-[#E5EBE5]" />
+                    ))}
+                  </div>
+                </div>
                 <div className="p-4 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] space-y-3">
                   <h4 className="font-bold text-xs text-[#2E7D4A] uppercase tracking-wider">
                     Thông tin cá nhân & Liên hệ
@@ -650,7 +682,7 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                     <div className="flex justify-between">
                       <span className="text-[#66756B]">Hình thức nhận lịch:</span>
                       <span className="font-semibold text-[#2E7D4A]">
-                        {applicationDetail.supportedModes?.join(', ') || 'Tại nhà (HOME)'}
+                        {formatServiceModes(applicationDetail.supportedModes)}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -681,11 +713,10 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                     <div className="space-y-1">
                       <span className="text-[11px] text-[#66756B] block">CCCD mặt trước</span>
                       <div className="h-28 rounded-lg bg-white border border-[#E5EBE5] overflow-hidden flex items-center justify-center relative group">
-                        <img
-                          src="https://images.unsplash.com/photo-1544717305-2782549b5136?w=400&auto=format&fit=crop&q=80"
-                          alt="CCCD trước"
-                          className="w-full h-full object-cover"
-                        />
+                        {(() => {
+                          const url = applicationDetail.signedKyc?.find((item: any) => item.storageKey === applicationDetail.idCardFrontKey)?.viewUrl;
+                          return url ? <img src={url} alt="CCCD trước" className="w-full h-full object-cover" /> : <span className="text-[11px] text-[#94A399]">Chưa có ảnh</span>;
+                        })()}
                         <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-black/60 text-white">
                           Đã chụp
                         </span>
@@ -695,11 +726,10 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                     <div className="space-y-1">
                       <span className="text-[11px] text-[#66756B] block">CCCD mặt sau</span>
                       <div className="h-28 rounded-lg bg-white border border-[#E5EBE5] overflow-hidden flex items-center justify-center relative group">
-                        <img
-                          src="https://images.unsplash.com/photo-1544717305-2782549b5136?w=400&auto=format&fit=crop&q=80"
-                          alt="CCCD sau"
-                          className="w-full h-full object-cover"
-                        />
+                        {(() => {
+                          const url = applicationDetail.signedKyc?.find((item: any) => item.storageKey === applicationDetail.idCardBackKey)?.viewUrl;
+                          return url ? <img src={url} alt="CCCD sau" className="w-full h-full object-cover" /> : <span className="text-[11px] text-[#94A399]">Chưa có ảnh</span>;
+                        })()}
                         <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-black/60 text-white">
                           Đã chụp
                         </span>

@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -28,6 +29,8 @@ import {
 
 @Injectable()
 export class BookingsService {
+  private readonly logger = new Logger(BookingsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
@@ -115,6 +118,8 @@ export class BookingsService {
         id: item.id,
         serviceId: item.id,
         technicianServiceId: item.id,
+        catalogServiceId: item.catalogServiceId ?? null,
+        categoryId: item.categoryId ?? null,
         name: item.name,
         durationMinutes: item.durationMinutes,
         price: Number(item.price),
@@ -200,6 +205,8 @@ export class BookingsService {
               items: {
                 create: quote.services.map((item) => ({
                   serviceId: item.id,
+                  catalogServiceId: item.catalogServiceId ?? null,
+                  categoryId: item.categoryId ?? null,
                   priceOptionId: item.priceOptionId,
                   priceOptionCode: item.priceOptionCode,
                   serviceName: item.name,
@@ -227,7 +234,9 @@ export class BookingsService {
         },
         { isolationLevel: 'Serializable' },
       );
-      this.notifyBookingCreated(userId, booking.technician!.userId, booking.id).catch(() => undefined);
+      this.notifyBookingCreated(userId, booking.technician!.userId, booking.id).catch((error) => {
+        this.logger.warn(`Khong gui duoc thong bao BOOKING_CREATED cho booking ${booking.id}: ${error instanceof Error ? error.message : 'khong ro ly do'}`);
+      });
       if (booking.technicianId) this.realtime?.broadcastAvailabilityChanged(booking.technicianId);
       return this.createdBookingResponse(this.withHistoricalAddress(booking));
     } catch (error) {
@@ -848,10 +857,22 @@ export class BookingsService {
       cancelledByRole: actor?.role,
     });
     if (booking.assignmentMode === 'OPEN_MARKETPLACE' && booking.status === 'OPEN') {
+      const applied = await this.prisma.bookingTechnicianApplication.findMany({
+        where: { bookingId: id, status: 'APPLIED' },
+        include: { technicianProfile: { select: { userId: true } } },
+      });
       await this.prisma.bookingTechnicianApplication.updateMany({
         where: { bookingId: id, status: 'APPLIED' },
         data: { status: 'EXPIRED', expiredAt: new Date() },
       });
+      for (const application of applied)
+        void this.notifyStatus(
+          application.technicianProfile.userId,
+          id,
+          'BOOKING_CANCELLED',
+          'Đơn đã bị hủy',
+          'Khách hàng đã hủy đơn mà bạn đang ứng tuyển.',
+        );
     }
     const technicianUserId = booking.technician?.userId;
     const recipients =
@@ -908,7 +929,7 @@ export class BookingsService {
     return result;
   }
 
-  /** Idempotently expires a directly assigned booking whose technician never accepted it. */
+  /** Moves an unanswered DIRECT booking to the marketplace fallback. */
   async expireDirectBookingIfDue(bookingId: string, now = new Date()) {
     const ttlMinutes = Number(this.config.get('OPEN_BOOKING_APPLICATION_TTL_MINUTES', 15));
     const result = await this.prisma.$transaction(async (tx) => {
@@ -920,9 +941,14 @@ export class BookingsService {
           technicianId: true,
           assignmentMode: true,
           status: true,
+          mode: true,
+          addressSnapshot: true,
+          scheduledStart: true,
+          scheduledEnd: true,
           createdAt: true,
           applicationDeadlineAt: true,
           technician: { select: { userId: true } },
+          items: { include: { catalogService: true } },
         },
       });
       if (
@@ -935,6 +961,7 @@ export class BookingsService {
       const deadline =
         booking.applicationDeadlineAt ?? new Date(booking.createdAt.getTime() + ttlMinutes * 60_000);
       if (deadline > now) return null;
+      const fallbackDeadline = new Date(now.getTime() + ttlMinutes * 60_000);
       const claimed = await tx.booking.updateMany({
         where: {
           id: bookingId,
@@ -942,14 +969,33 @@ export class BookingsService {
           status: 'PENDING',
           technicianId: { not: null },
         },
-        data: { status: 'EXPIRED', expiredAt: now },
+        data: {
+          assignmentMode: 'OPEN_MARKETPLACE',
+          status: 'OPEN',
+          technicianId: null,
+          applicationDeadlineAt: fallbackDeadline,
+          expiredAt: null,
+        },
       });
       if (!claimed.count) return null;
       return {
         customerId: booking.customerId,
         technicianUserId: booking.technician?.userId ?? null,
-        deadline,
-        expiredAt: now,
+        excludedTechnicianId: booking.technicianId,
+        deadline: fallbackDeadline,
+        expiredAt: null,
+        booking: {
+          id: booking.id,
+          assignmentMode: 'OPEN_MARKETPLACE',
+          status: 'OPEN',
+          technicianId: null,
+          mode: (booking as any).mode,
+          addressSnapshot: (booking as any).addressSnapshot,
+          scheduledStart: (booking as any).scheduledStart,
+          scheduledEnd: (booking as any).scheduledEnd,
+          applicationDeadlineAt: fallbackDeadline,
+          items: booking.items,
+        },
       };
     });
     if (result) {
@@ -960,10 +1006,11 @@ export class BookingsService {
         void this.notifyStatus(
           recipient,
           bookingId,
-          'BOOKING_EXPIRED',
+          'BOOKING_FALLBACK_OPEN',
           'Đơn đã hết hạn',
           'KTV chưa nhận đơn trong thời hạn 15 phút.',
         );
+      void this.notifyEligibleTechniciansForOpenBooking(result.booking, result.excludedTechnicianId ?? undefined);
     }
     return result;
   }
@@ -1131,6 +1178,7 @@ export class BookingsService {
         where: {
           technicianId: profile.id,
           isActive: true,
+          catalogServiceId: catalog.id,
           categoryId: catalog.categoryId,
           modes: { has: booking.mode },
         },
@@ -1428,10 +1476,11 @@ export class BookingsService {
     });
   }
 
-  private async notifyEligibleTechniciansForOpenBooking(booking: any) {
+  private async notifyEligibleTechniciansForOpenBooking(booking: any, excludedTechnicianId?: string) {
     try {
       const candidates = await this.prisma.technicianProfile.findMany({
         where: {
+          ...(excludedTechnicianId ? { id: { not: excludedTechnicianId } } : {}),
           isActive: true,
           isVerified: true,
           user: { status: 'ACTIVE', role: 'TECHNICIAN', technicianApplication: { is: { status: 'APPROVED' } } },
@@ -1448,24 +1497,44 @@ export class BookingsService {
             'Có đơn mới phù hợp',
             'Có đơn dịch vụ mới phù hợp. Hãy mở tab Nhận việc để xem và ứng tuyển.',
           );
-        } catch {
-          // One ineligible technician must not block other notifications.
+        } catch (error) {
+          // One ineligible technician must not block other notifications, but
+          // keep the reason visible in server logs for operations debugging.
+          this.logger.debug(
+            `Bo qua thong bao OPEN_BOOKING_AVAILABLE cho KTV ${candidate.id}: ${error instanceof Error ? error.message : 'khong ro ly do'}`,
+          );
         }
       }
-    } catch {
+    } catch (error) {
       // Notification delivery must not affect successful booking creation.
+      this.logger.warn(
+        `Khong the quet KTV phu hop cho booking mo ${booking.id}: ${error instanceof Error ? error.message : 'khong ro ly do'}`,
+      );
     }
   }
 
   private async notifyStatus(userId: string, bookingId: string, type: string, title: string, body: string) {
+    let effectiveTitle = title;
+    let effectiveBody = body;
     try {
       const template = await this.notifications.getTemplate(type);
-      const effectiveTitle = template?.isActive ? template.title : title;
-      const effectiveBody = template?.isActive ? template.body : body;
+      if (template?.isActive) {
+        effectiveTitle = template.title;
+        effectiveBody = template.body;
+      }
+    } catch (error) {
+      this.logger.warn(`Khong doc duoc mau thong bao ${type}: ${error instanceof Error ? error.message : 'khong ro ly do'}`);
+    }
+    try {
       await this.notifications.create(userId, type, effectiveTitle, effectiveBody, `matxa://bookings/${bookingId}`);
+    } catch (error) {
+      this.logger.warn(`Khong tao duoc thong bao trong app ${type}: ${error instanceof Error ? error.message : 'khong ro ly do'}`);
+    }
+    try {
       await this.notifications.sendPush(userId, effectiveTitle, effectiveBody, { type, bookingId });
-    } catch {
-      // Booking state must not roll back or return 500 only because FCM is unavailable.
+    } catch (error) {
+      // FCM failure must not remove the in-app notification or fail booking creation.
+      this.logger.warn(`Khong gui duoc push ${type}: ${error instanceof Error ? error.message : 'khong ro ly do'}`);
     }
   }
 }

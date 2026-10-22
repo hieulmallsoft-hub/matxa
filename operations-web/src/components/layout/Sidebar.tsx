@@ -143,7 +143,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {NAV_GROUPS.map((group, gIdx) => (
           <div key={gIdx} className="space-y-1">
             {!isCollapsed && (
-              <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#94A399]">
+              <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#6E9271]">
                 {group.groupTitle}
               </div>
             )}
@@ -171,7 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-200 relative group cursor-pointer ${
                       isActive
                         ? 'bg-[#EAF5EC] text-[#1C2B20] font-semibold shadow-xs'
-                        : 'text-[#66756B] hover:text-[#1C2B20] hover:bg-[#F6F8F4] hover:translate-x-1'
+                         : 'text-[#49634D] hover:text-[#1C2B20] hover:bg-[#F1F7EF]'
                     }`}
                   >
                     {/* Active Left Indicator Pill */}
@@ -186,7 +186,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {/* Icon */}
                     <div
                       className={`flex-shrink-0 transition-colors ${
-                        isActive ? 'text-[#2E7D4A]' : 'text-[#94A399] group-hover:text-[#2E7D4A]'
+                         isActive ? 'text-[#2E7D4A]' : 'text-[#4F8F46] group-hover:text-[#2E7D4A]'
                       }`}
                     >
                       <Icon className="w-4 h-4" />
