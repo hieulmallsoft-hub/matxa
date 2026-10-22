@@ -34,7 +34,11 @@ export class BookingsController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Tao don va tu dong tim KTV phu hop' })
+  @ApiOperation({
+    summary: 'Tao don voi KTV da duoc user chon',
+    description:
+      'Mobile goi POST /bookings/matching-technicians truoc de lay danh sach KTV. Sau khi user chon, gui technicianId vao endpoint nay de tao don.',
+  })
   @ApiCreatedResponse({
     schema: {
       type: 'object',

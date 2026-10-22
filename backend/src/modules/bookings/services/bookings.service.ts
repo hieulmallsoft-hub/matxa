@@ -426,9 +426,28 @@ export class BookingsService {
     const duration = dto.items.reduce((sum: number, item: any) => sum + (options.find((option: any) => option.id === item.priceOptionId)?.durationMinutes ?? 0), 0);
     const end = new Date(start.getTime() + duration * 60_000);
     const candidates: any[] = await this.prisma.technicianProfile.findMany({
-      where: { isActive: true, isVerified: true, city: dto.city, ...(dto.district ? { district: dto.district } : {}), serviceModes: { has: dto.mode }, user: { status: 'ACTIVE', role: 'TECHNICIAN', technicianApplication: { is: { status: 'APPROVED' } } }, services: { some: { isActive: true, catalogServiceId: { in: serviceIds }, modes: { has: dto.mode } } } },
+      where: {
+        isActive: true,
+        isVerified: true,
+        city: dto.city,
+        ...(dto.district ? { district: dto.district } : {}),
+        serviceModes: { has: dto.mode },
+        user: { status: 'ACTIVE', role: 'TECHNICIAN', ...(dto.search ? { displayName: { contains: dto.search, mode: 'insensitive' } } : {}), technicianApplication: { is: { status: 'APPROVED' } } },
+        services: { some: { isActive: true, catalogServiceId: { in: serviceIds }, modes: { has: dto.mode } } },
+      },
       include: { user: { select: { id: true, displayName: true, avatarUrl: true } } },
     });
+    const location = dto.latitude !== undefined && dto.longitude !== undefined
+      ? { latitude: dto.latitude, longitude: dto.longitude }
+      : dto.mode === 'HOME' && dto.addressId
+        ? await this.prisma.address.findFirst({ where: { id: dto.addressId, userId, deletedAt: null }, select: { latitude: true, longitude: true } }).then((a) => a && { latitude: Number(a.latitude), longitude: Number(a.longitude) })
+        : null;
+    const distanceKm = (latitude: unknown, longitude: unknown) => {
+      if (!location || latitude === null || latitude === undefined || longitude === null || longitude === undefined) return null;
+      const rad = (v: number) => (v * Math.PI) / 180;
+      const a = Math.sin(rad(Number(latitude) - location.latitude) / 2) ** 2 + Math.cos(rad(location.latitude)) * Math.cos(rad(Number(latitude))) * Math.sin(rad(Number(longitude) - location.longitude) / 2) ** 2;
+      return Math.round(6371 * 2 * Math.asin(Math.sqrt(Math.min(1, Math.max(0, a)))) * 10) / 10;
+    };
     const eligible = [] as any[];
     for (const candidate of candidates) {
       const [slot, conflict] = await Promise.all([
@@ -436,8 +455,14 @@ export class BookingsService {
         this.prisma.booking.findFirst({ where: { technicianId: candidate.id, status: 'CONFIRMED', scheduledStart: { lt: end }, scheduledEnd: { gt: start } }, select: { id: true } }),
       ]);
       if (!slot || conflict) continue;
-      eligible.push({ technicianId: candidate.id, displayName: candidate.user.displayName, avatarUrl: candidate.user.avatarUrl, city: candidate.city, district: candidate.district });
+       eligible.push({ technicianId: candidate.id, displayName: candidate.user.displayName, avatarUrl: candidate.user.avatarUrl, city: candidate.city, district: candidate.district, distanceKm: distanceKm(candidate.latitude, candidate.longitude), rating: Number(candidate.averageRating), reviewCount: candidate.reviewCount });
     }
+    eligible.sort((a, b) => {
+      if (dto.sort === 'rating') return b.rating - a.rating;
+      if (a.distanceKm === null) return 1;
+      if (b.distanceKm === null) return -1;
+      return a.distanceKm - b.distanceKm;
+    });
     return { items: eligible, total: eligible.length };
   }
 

@@ -1,8 +1,6 @@
-# Mobile: tạo đơn và tự tìm KTV
+# Mobile: tìm KTV và đặt lịch
 
-Mobile dùng luồng **tìm KTV rồi để user chọn KTV**. Backend không dùng bước KTV ứng tuyển.
-
-> Lưu ý: đây là contract của luồng user chọn KTV. Backend cần có endpoint matching và nhận `technicianId` ở bước tạo đơn trước khi mobile tích hợp production.
+Mobile dùng một luồng duy nhất: user chọn thông tin dịch vụ, xem danh sách KTV phù hợp, chọn một KTV rồi đặt lịch. Mobile không gửi `assignmentMode` và không dùng luồng KTV ứng tuyển.
 
 ## Xác thực
 
@@ -17,7 +15,9 @@ Base URL production:
 http://149.28.156.66:5600
 ```
 
-## 1. Tìm KTV phù hợp
+## 1. Hiển thị danh sách KTV
+
+Khi user mở nhóm dịch vụ hoặc thay đổi bộ lọc, gọi lại cùng API:
 
 ```http
 POST /api/bookings/matching-technicians
@@ -39,31 +39,48 @@ Body:
   "scheduledStart": "2026-10-25T10:00:00+07:00",
   "addressId": "customer-address-id",
   "paymentMethod": "CASH",
-  "note": "Ghi chú cho KTV"
+  "search": "Nguyễn",
+  "sort": "distance",
+  "latitude": 21.0285,
+  "longitude": 105.8542
 }
 ```
 
-### Trường bắt buộc
+`items`, `mode`, `city`, `scheduledStart` và `paymentMethod` là bắt buộc. Khi `mode = HOME`, bắt buộc có `addressId`. `district`, `note`, `promotionCode` và `applicationDeadlineAt` là tùy chọn.
 
-| Field | Mô tả |
+Các field lọc tùy chọn:
+
+| Field | Ý nghĩa |
 |---|---|
-| `items` | Danh sách dịch vụ từ catalog Admin |
-| `items[].catalogServiceId` | ID dịch vụ catalog |
-| `items[].priceOptionId` | ID gói giá catalog |
-| `mode` | `HOME`, `ONSITE` hoặc `ONLINE` |
-| `city` | Mã thành phố của địa chỉ đặt dịch vụ |
-| `scheduledStart` | Thời gian bắt đầu, phải có timezone và nằm trong tương lai |
-| `paymentMethod` | `CASH` hoặc `ONLINE` |
+| `search` | Lọc theo tên hiển thị của KTV |
+| `sort` | `distance`, `rating` hoặc `availability` |
+| `latitude`, `longitude` | Tọa độ để tính khoảng cách; nếu không gửi, backend dùng tọa độ của `addressId` khi đặt tại nhà |
 
-Khi `mode = HOME`, bắt buộc gửi `addressId`. `district`, `note`, `promotionCode` và `applicationDeadlineAt` là tùy chọn.
+Mỗi lần user đổi dịch vụ, nhập tên, đổi khu vực, đổi thời gian hoặc đổi cách sắp xếp, mobile gửi lại request với toàn bộ giá trị hiện tại. Không cần gọi thêm API tìm KTV khác.
 
-Ở bước này chưa gửi `technicianId`; field này chỉ gửi sau khi user chọn KTV.
+Backend chỉ trả KTV đã được duyệt, đang hoạt động, có dịch vụ và mode phù hợp, có lịch rảnh bao phủ toàn bộ thời gian đặt và không bị trùng booking `CONFIRMED`.
 
-### Response danh sách KTV
+Response:
 
-Response trả danh sách KTV phù hợp để mobile hiển thị cho user chọn. Mỗi KTV cần có `technicianId`, tên, ảnh, khoảng cách và dịch vụ có thể đặt.
+```json
+{
+  "items": [
+    {
+      "technicianId": "technician-profile-id",
+      "displayName": "Nguyễn Văn A",
+      "avatarUrl": "https://...",
+      "city": "HN",
+      "district": "HN-CAU-GIAY",
+      "distanceKm": 2.4,
+      "rating": 4.8,
+      "reviewCount": 15
+    }
+  ],
+  "total": 1
+}
+```
 
-## 2. Tạo đơn sau khi user chọn KTV
+## 2. User bấm “Đặt lịch”
 
 Sau khi user chọn một KTV, gọi:
 
@@ -71,98 +88,80 @@ Sau khi user chọn một KTV, gọi:
 POST /api/bookings
 ```
 
-Body giữ nguyên thông tin dịch vụ/thời gian và thêm:
+Body:
 
 ```json
 {
-  "technicianId": "technician-profile-id"
+  "technicianId": "technician-profile-id",
+  "items": [
+    {
+      "catalogServiceId": "catalog-service-id",
+      "priceOptionId": "catalog-price-option-id"
+    }
+  ],
+  "mode": "HOME",
+  "city": "HN",
+  "district": "HN-CAU-GIAY",
+  "scheduledStart": "2026-10-25T10:00:00+07:00",
+  "addressId": "customer-address-id",
+  "paymentMethod": "CASH",
+  "note": "Ghi chú cho KTV"
 }
 ```
 
-Backend kiểm tra lại toàn bộ điều kiện trước khi tạo đơn và gửi thông báo `BOOKING_CREATED` cho KTV được chọn.
+Backend kiểm tra lại điều kiện, tạo booking ở trạng thái chờ KTV xác nhận và trả về `id`, `status`, thời gian, tổng tiền và thông tin thanh toán.
 
-## 3. Điều kiện lọc KTV
+Không gửi `assignmentMode` hoặc `serviceIds`.
 
-Ngay sau khi tạo đơn, backend kiểm tra từng KTV theo các điều kiện:
+## 3. Thông báo cho KTV
 
-- Tài khoản đã được Admin duyệt, đang hoạt động và đã xác thực.
-- Có đúng dịch vụ trong `items` và dịch vụ đang bật.
-- Hỗ trợ đúng `mode` của đơn.
-- Thành phố/quận phù hợp với đơn.
-- Có availability bao phủ toàn bộ khoảng thời gian đặt.
-- Không có booking `CONFIRMED` bị trùng giờ.
+Khi tạo booking thành công, backend lưu thông báo `BOOKING_CREATED` cho tài khoản KTV và gửi push FCM nếu KTV đã đăng ký device token. Thông báo trong hệ thống vẫn được lưu khi KTV không mở app, mất mạng hoặc tắt máy.
 
-Danh sách trả về được dùng để user chọn KTV. Sau khi tạo đơn, KTV được chọn nhận thông báo loại:
-
-```text
-BOOKING_CREATED
-```
-
-Thông báo có cả bản lưu trong app và push FCM. Push cần device token hợp lệ; bản lưu trong app vẫn được tạo khi KTV đang tắt máy.
-
-## 4. KTV nhận đơn
-
-Danh sách đơn phù hợp:
-
-```http
-GET /api/technician/jobs
-```
-
-KTV được chọn nhận đơn và xác nhận bằng API hiện có:
-
-```http
-POST /api/technician/jobs/{bookingId}/accept
-```
-
-## 5. Hủy đơn
-
-User hủy booking:
-
-```http
-PATCH /api/bookings/{bookingId}/cancel
-```
-
-## 6. Trạng thái và thông báo
-
-User hủy booking:
-
-```http
-PATCH /api/bookings/{bookingId}/cancel
-```
-
-KTV được chọn nhận thông báo khi user hủy booking:
-
-```text
-BOOKING_CANCELLED
-```
-
-Nếu KTV không nhận đơn trong thời hạn, mobile báo user để chọn KTV khác.
-
-## 7. Đồng bộ thông báo
-
-Mobile nên gọi danh sách thông báo khi mở app, resume app và sau khi đăng nhập:
+Khi app mở lại, mobile KTV đồng bộ:
 
 ```http
 GET /api/notifications
 ```
 
-Đánh dấu đã đọc theo API notifications hiện có. Không chỉ phụ thuộc FCM vì thiết bị có thể đang tắt máy, mất mạng hoặc bị hệ điều hành trì hoãn push.
+KTV xem đơn:
 
-## 8. Quy tắc UI
+```http
+GET /api/technician/jobs
+```
 
-- Không hiển thị lựa chọn `DIRECT` hoặc `OPEN_MARKETPLACE` cho user.
-- Sau khi tạo đơn, hiển thị trạng thái “Đang tìm KTV phù hợp”.
-- Khi có ứng viên, hiển thị danh sách KTV và nút chọn KTV.
-- Khi đã chọn KTV, khóa thao tác chọn ứng viên khác.
-- Khi nhận `BOOKING_CANCELLED`, hiển thị trạng thái đơn đã hủy.
+KTV xác nhận đơn:
 
-## 9. Lấy catalog và gói giá
+```http
+POST /api/technician/jobs/{bookingId}/accept
+```
 
-Trước khi tạo đơn, mobile lấy dịch vụ và gói giá từ:
+## 4. Hủy booking
+
+User hủy đơn:
+
+```http
+PATCH /api/bookings/{bookingId}/cancel
+```
+
+KTV nhận thông báo `BOOKING_CANCELLED` qua bản lưu trong app và push FCM nếu có device token.
+
+## 5. Catalog dịch vụ
+
+Trước khi matching và đặt lịch, mobile lấy dịch vụ/gói giá đang hoạt động từ:
 
 ```http
 GET /api/service-catalog
 ```
 
-Chỉ gửi các `catalogServiceId` và `priceOptionId` còn hoạt động trong response catalog. Không tự gửi tên dịch vụ hoặc giá do client tự nhập.
+Chỉ gửi `catalogServiceId` và `priceOptionId` lấy từ catalog.
 
+## 6. API không dùng trong luồng mới
+
+Mobile không dùng các API marketplace cũ:
+
+```text
+POST /api/bookings/open
+POST /api/bookings/{bookingId}/select-technician
+POST /api/technician/jobs/{bookingId}/apply
+POST /api/technician/jobs/{bookingId}/withdraw
+```

@@ -7,6 +7,9 @@ import {
   IsDateString,
   IsIn,
   IsInt,
+  IsLatitude,
+  IsLongitude,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -108,7 +111,23 @@ export class CreateUnifiedBookingDto {
 }
 
 /** Payload used before the customer has selected a technician. */
-export class MatchTechniciansDto extends OmitType(CreateUnifiedBookingDto, ['technicianId'] as const) {}
+export class MatchTechniciansDto extends OmitType(CreateUnifiedBookingDto, ['technicianId'] as const) {
+  @ApiPropertyOptional({ description: 'Loc theo ten KTV' })
+  @IsOptional() @IsString() @MaxLength(100)
+  search?: string;
+
+  @ApiPropertyOptional({ enum: ['distance', 'rating', 'availability'] })
+  @IsOptional() @IsIn(['distance', 'rating', 'availability'])
+  sort?: 'distance' | 'rating' | 'availability';
+
+  @ApiPropertyOptional({ description: 'Vi do vi tri khach hang, dung de sap xep khoang cach' })
+  @IsOptional() @Type(() => Number) @IsNumber() @IsLatitude()
+  latitude?: number;
+
+  @ApiPropertyOptional({ description: 'Kinh do vi tri khach hang, dung de sap xep khoang cach' })
+  @IsOptional() @Type(() => Number) @IsNumber() @IsLongitude()
+  longitude?: number;
+}
 export class SelectTechnicianDto {
   @ApiProperty() @IsUUID() applicationId!: string;
 }
