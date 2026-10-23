@@ -790,6 +790,9 @@ export class BookingsService {
         : {}),
       OR: [
         { status: 'OPEN', OR: [{ applicationDeadlineAt: null }, { applicationDeadlineAt: { gt: now } }] },
+        // Keep expired marketplace jobs visible in technician history even
+        // when this technician never created an application record.
+        { status: 'EXPIRED' },
         { applications: { some: { technicianProfileId: profile.id } } },
       ],
       ...(query.serviceId ? { items: { some: { catalogServiceId: query.serviceId } } } : {}),
