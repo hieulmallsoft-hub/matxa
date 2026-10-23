@@ -1287,16 +1287,19 @@ export class BookingsService {
     selected: boolean,
     includeTechnicianPricing = false,
   ) {
+    const effectiveApplicationStatus =
+      applicationStatus ??
+      (booking.assignmentMode === 'OPEN_MARKETPLACE' && booking.status === 'EXPIRED' ? 'EXPIRED' : null);
     const canApply =
       booking.status === 'OPEN' &&
-      !applicationStatus &&
+      !effectiveApplicationStatus &&
       (!booking.applicationDeadlineAt || new Date(booking.applicationDeadlineAt) > new Date());
     return {
       bookingId: booking.id,
       id: booking.id,
       assignmentMode: booking.assignmentMode,
       bookingStatus: booking.status,
-      applicationStatus,
+      applicationStatus: effectiveApplicationStatus,
       scheduledAt: booking.scheduledStart,
       scheduledStart: booking.scheduledStart,
       scheduledEnd: booking.scheduledEnd,
@@ -1321,14 +1324,14 @@ export class BookingsService {
             nationality: booking.customer.nationality ?? null,
           }
         : null,
-      address: selected ? (booking.addressSnapshot ?? null) : null,
+      address: selected || booking.status === 'EXPIRED' ? (booking.addressSnapshot ?? null) : null,
       canApply,
       canDecline: canApply,
-      canWithdraw: booking.status === 'OPEN' && applicationStatus === 'APPLIED',
+      canWithdraw: booking.status === 'OPEN' && effectiveApplicationStatus === 'APPLIED',
       canContact: selected && ['CONFIRMED', 'COMPLETED'].includes(booking.status),
       canCancel: selected && booking.status === 'CONFIRMED',
       canComplete: selected && booking.status === 'CONFIRMED' && new Date(booking.scheduledEnd) <= new Date(),
-      customerSelectedAnotherTechnician: applicationStatus === 'NOT_SELECTED',
+      customerSelectedAnotherTechnician: effectiveApplicationStatus === 'NOT_SELECTED',
       applicationDeadlineAt: booking.applicationDeadlineAt ?? null,
       expiredAt: booking.expiredAt ?? null,
       ...(includeTechnicianPricing ? { pricing: this.technicianPricing(booking) } : {}),
