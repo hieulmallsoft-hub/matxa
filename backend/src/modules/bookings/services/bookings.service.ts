@@ -749,7 +749,7 @@ export class BookingsService {
     return query ? { items, total, page: options.page, limit: options.limit } : items;
   }
 
-  async detail(userId: string, id: string, internal = false) {
+  async detail(userId: string, id: string, internal = false, allowMarketplaceTechnician = false) {
     const booking = await this.prisma.booking.findUnique({
       where: { id },
       include: {
@@ -766,7 +766,23 @@ export class BookingsService {
     });
     if (!booking) throw new NotFoundException('Lich dat khong ton tai');
     const actor = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
-    if (booking.customerId !== userId && booking.technician?.userId !== userId && actor?.role !== 'ADMIN')
+    const marketplaceNotification = allowMarketplaceTechnician && actor?.role === 'TECHNICIAN'
+      ? await this.prisma.notification.findFirst({
+          where: {
+            userId,
+            actionUrl: `matxa://bookings/${id}`,
+            type: { in: ['OPEN_BOOKING_AVAILABLE', 'BOOKING_EXPIRED', 'BOOKING_CANCELLED', 'BOOKING_FALLBACK_OPEN'] },
+          },
+          select: { id: true },
+        })
+      : null;
+    const canViewMarketplaceJob =
+      allowMarketplaceTechnician &&
+      actor?.role === 'TECHNICIAN' &&
+      booking.assignmentMode === 'OPEN_MARKETPLACE' &&
+      ['OPEN', 'EXPIRED'].includes(booking.status) &&
+      Boolean(marketplaceNotification);
+    if (booking.customerId !== userId && booking.technician?.userId !== userId && actor?.role !== 'ADMIN' && !canViewMarketplaceJob)
       throw new ForbiddenException('Ban khong co quyen xem lich dat');
     const historical = this.withHistoricalAddress(booking);
     return internal ? historical : this.historyResponse(historical, userId);
@@ -842,7 +858,7 @@ export class BookingsService {
 
   async technicianJobDetail(userId: string, id: string) {
     const profile = await this.requireActiveTechnician(userId);
-    const booking = await this.detail(userId, id, true);
+    const booking = await this.detail(userId, id, true, true);
     if (booking.assignmentMode === 'OPEN_MARKETPLACE') {
       if (booking.status === 'OPEN' && booking.applicationDeadlineAt && booking.applicationDeadlineAt <= new Date()) {
         await this.expireOpenBookingIfDue(id);
@@ -855,6 +871,8 @@ export class BookingsService {
       const application = await this.prisma.bookingTechnicianApplication.findUnique({
         where: { bookingId_technicianProfileId: { bookingId: id, technicianProfileId: profile.id } },
       });
+      if (booking.status === 'EXPIRED' && !application)
+        return this.openBookingResponse(booking, 'EXPIRED', false, true);
       if (booking.status === 'OPEN' && !application) await this.assertOpenEligibility(this.prisma, booking, profile.id);
       else if (!application) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
       return this.openBookingResponse(booking, application?.status ?? null, application?.status === 'SELECTED', true);
