@@ -1556,7 +1556,7 @@ export class BookingsService {
         },
         select: { id: true, userId: true },
       });
-      for (const candidate of candidates) {
+      await Promise.all(candidates.map(async (candidate) => {
         try {
           await this.assertOpenEligibility(this.prisma, booking, candidate.id);
           await this.notifyStatus(
@@ -1573,7 +1573,7 @@ export class BookingsService {
             `Bo qua thong bao OPEN_BOOKING_AVAILABLE cho KTV ${candidate.id}: ${error instanceof Error ? error.message : 'khong ro ly do'}`,
           );
         }
-      }
+      }));
     } catch (error) {
       // Notification delivery must not affect successful booking creation.
       this.logger.warn(
