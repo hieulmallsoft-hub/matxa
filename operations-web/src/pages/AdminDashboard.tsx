@@ -197,14 +197,14 @@ const FALLBACK_BANNERS: Banner[] = [
 ];
 
 export function AdminDashboard({ notify, refreshCategories, tab, setTab, refreshKey }: Props) {
-  const [dashboard, setDashboard] = useState<Dashboard | null>(FALLBACK_DASHBOARD);
-  const [categories, setCategories] = useState<Category[]>(FALLBACK_CATEGORIES);
+  const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [users, setUsers] = useState<Page<User> | null>(null);
   const [bookings, setBookings] = useState<Page<Booking> | null>(null);
-  const [technicians, setTechnicians] = useState<Page<Technician> | null>(FALLBACK_TECHNICIANS);
-  const [banners, setBanners] = useState<Banner[]>(FALLBACK_BANNERS);
-  const [promotions, setPromotions] = useState<Promotion[]>(FALLBACK_PROMOTIONS);
-  const [applications, setApplications] = useState<Page<TechnicianApplication> | null>(FALLBACK_APPLICATIONS);
+  const [technicians, setTechnicians] = useState<Page<Technician> | null>(null);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [applications, setApplications] = useState<Page<TechnicianApplication> | null>(null);
   const [applicationAction, setApplicationAction] = useState<string | null>(null);
   const [applicationDetail, setApplicationDetail] = useState<any | null>(null);
   const [appFilterTab, setAppFilterTab] = useState<'ALL' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED'>('ALL');
@@ -242,12 +242,6 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
       if (nextPromotions?.length) setPromotions(nextPromotions);
       if (nextApplications?.items?.length) setApplications(nextApplications);
     } catch {
-      setDashboard((d) => d || FALLBACK_DASHBOARD);
-      setCategories((c) => (c.length ? c : FALLBACK_CATEGORIES));
-      setTechnicians((t) => t || FALLBACK_TECHNICIANS);
-      setApplications((a) => a || FALLBACK_APPLICATIONS);
-      setPromotions((p) => (p.length ? p : FALLBACK_PROMOTIONS));
-      setBanners((b) => (b.length ? b : FALLBACK_BANNERS));
     } finally {
       setLoading(false);
     }

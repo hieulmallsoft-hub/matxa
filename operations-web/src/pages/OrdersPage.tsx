@@ -60,7 +60,7 @@ export const OrdersPage: React.FC = () => {
       <PageHeader
         title="Lịch đặt & Đơn hàng"
         subtitle="Quản lý và điều phối tất cả các ca trị liệu massage & spa tại nhà"
-        badge="14 ca đang phục vụ"
+          badge="0 ca đang phục vụ"
         badgeTone="blue"
         breadcrumbs={[
           { label: 'MATXXA' },
@@ -91,7 +91,7 @@ export const OrdersPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           label="Tổng số lịch đặt tháng này"
-          value="1.428 lịch"
+          value="0 lịch"
           change={12.4}
           isPositive={true}
           caption="so với tháng 9"
@@ -101,7 +101,7 @@ export const OrdersPage: React.FC = () => {
         />
         <StatCard
           label="Giá trị đơn trung bình"
-          value="680.000 đ"
+          value="0 đ"
           change={6.2}
           isPositive={true}
           caption="tăng 40.000 đ/đơn"
@@ -111,7 +111,7 @@ export const OrdersPage: React.FC = () => {
         />
         <StatCard
           label="Tỷ lệ hoàn thành đúng giờ"
-          value="98.6%"
+          value="0%"
           change={1.2}
           isPositive={true}
           caption="trung bình đến trước 10p"
@@ -121,7 +121,7 @@ export const OrdersPage: React.FC = () => {
         />
         <StatCard
           label="Tỷ lệ hủy đơn"
-          value="1.4%"
+          value="0%"
           change={-0.6}
           isPositive={true}
           caption="thấp hơn tiêu chuẩn ngành (5%)"

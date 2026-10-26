@@ -199,7 +199,7 @@ export const AnalyticsPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           label="Tổng doanh thu tích lũy"
-          value="2.485.600.000 đ"
+          value="0 đ"
           change={18.2}
           isPositive={true}
           caption="so với kỳ trước"
@@ -209,7 +209,7 @@ export const AnalyticsPage: React.FC = () => {
         />
         <StatCard
           label="Doanh thu tháng này"
-          value="248.560.000 đ"
+          value="0 đ"
           change={14.8}
           isPositive={true}
           caption="so với tháng 9"
@@ -219,7 +219,7 @@ export const AnalyticsPage: React.FC = () => {
         />
         <StatCard
           label="Giá trị đơn trung bình"
-          value="680.000 đ"
+          value="0 đ"
           change={6.4}
           isPositive={true}
           caption="so với tháng trước"
@@ -229,10 +229,10 @@ export const AnalyticsPage: React.FC = () => {
         />
         <StatCard
           label="Tỷ lệ hoàn thành đơn"
-          value="98.6%"
+          value="0%"
           change={1.4}
           isPositive={true}
-          caption="1.428 ca thành công"
+          caption="0 ca thành công"
           icon={<CheckCircle2 className="w-5 h-5" />}
           tone="info"
           sparkline={[96.2, 96.8, 97.4, 97.9, 98.2, 98.6]}

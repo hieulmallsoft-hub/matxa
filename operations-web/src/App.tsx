@@ -49,7 +49,7 @@ function AppInner() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(() => !localStorage.getItem('matxa.operations.token'));
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [user, setUser] = useState<AuthUser>(storedUser);
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
   const [theme, setTheme] = useState('dark');
