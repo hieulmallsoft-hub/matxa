@@ -668,6 +668,7 @@ export class BookingsService {
             include: { items: { include: { catalogService: true } } },
           });
           await this.assertOpenEligibility(tx, booking, application.technicianProfileId);
+          await this.chargeTechnicianCommission(application.technicianProfile.user.id, bookingId, tx);
           await tx.bookingTechnicianApplication.update({
             where: { id: application.id },
             data: { status: 'SELECTED', selectedAt: now },
@@ -921,14 +922,18 @@ export class BookingsService {
     return this.updateStatus(userId, id, { status: 'CONFIRMED' });
   }
 
-  private async chargeTechnicianCommission(userId: string, bookingId: string) {
+  private async chargeTechnicianCommission(
+    userId: string,
+    bookingId: string,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
     const rate = this.settings ? await this.settings.platformFeePercent() : Number(this.config.get('TECHNICIAN_COMMISSION_RATE_PERCENT', 25));
     if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new BadRequestException('Ty le chiet khau KTV khong hop le');
-    const booking = await this.prisma.booking.findFirst({ where: { id: bookingId, technician: { userId } }, select: { grossServiceAmount: true } });
+    const booking = await db.booking.findFirst({ where: { id: bookingId, technician: { userId } }, select: { grossServiceAmount: true } });
     if (!booking) throw new ForbiddenException('Don khong thuoc KTV nay');
     const fee = Math.round(Number(booking.grossServiceAmount ?? 0) * rate / 100);
     if (fee <= 0) return;
-    await this.prisma.$transaction(async (tx) => {
+    const debit = async (tx: Prisma.TransactionClient) => {
       const wallet = await tx.wallet.upsert({ where: { userId_type: { userId, type: 'ADVERTISING_CREDIT' } }, create: { userId, type: 'ADVERTISING_CREDIT' }, update: {} });
       const existing = await tx.walletLedgerEntry.findUnique({ where: { referenceType_referenceId: { referenceType: 'BOOKING_COMMISSION', referenceId: bookingId } } });
       if (existing) return;
@@ -937,7 +942,9 @@ export class BookingsService {
       const current = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id }, select: { balanceVnd: true } });
       await tx.walletLedgerEntry.create({ data: { walletId: wallet.id, type: 'COMMISSION_DEBIT', amountVnd: -fee, balanceBeforeVnd: current.balanceVnd + fee, balanceAfterVnd: current.balanceVnd, referenceType: 'BOOKING_COMMISSION', referenceId: bookingId } });
       await tx.booking.update({ where: { id: bookingId }, data: { platformFee: fee, technicianEarning: Number(booking.grossServiceAmount ?? 0) - fee, feePolicyVersion: `COMMISSION_${rate}_V1` } });
-    });
+    };
+    if (db === this.prisma) await this.prisma.$transaction(debit);
+    else await debit(db);
   }
 
   async declineTechnicianJob(userId: string, id: string, dto: CancelBookingDto) {
