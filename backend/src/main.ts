@@ -10,7 +10,9 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix('api');
   // Keep the operations portal on the API origin so browser requests do not
   // require a broad CORS policy.
-  app.use('/admin', serveStatic(join(process.cwd(), '..', 'operations-web', 'dist')));
+  // Resolve from the compiled backend directory so PM2's working directory
+  // cannot make the Admin portal render as a blank page.
+  app.use('/admin', serveStatic(join(__dirname, '../../operations-web/dist')));
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   const swaggerConfig = new DocumentBuilder()
