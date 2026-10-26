@@ -155,7 +155,27 @@ GET /api/service-catalog
 
 Chỉ gửi `catalogServiceId` và `priceOptionId` lấy từ catalog.
 
-## 6. API không dùng trong luồng mới
+## 6. Hoa hồng và số dư ví KTV
+
+Tỷ lệ do Admin cấu hình tại **Cấu hình hệ thống → Chính sách & Hoa hồng KTV**. Ví dụ Admin đặt KTV nhận `75%` thì phần sàn là `25%`.
+
+Khi KTV nhận đơn hoặc khách chọn KTV marketplace, backend trừ ngay phần sàn khỏi ví ký quỹ của KTV; không chờ đến khi booking hoàn thành.
+
+```text
+Phí trừ ví = giá trị dịch vụ × (100 - tỷ lệ KTV nhận) / 100
+Thu nhập KTV = giá trị dịch vụ - phí trừ ví
+```
+
+Ví dụ giá trị dịch vụ `600.000đ`, KTV nhận `75%`:
+
+```text
+Trừ ví: 150.000đ
+Thu nhập KTV: 450.000đ
+```
+
+Nếu ví không đủ số dư, thao tác nhận/chọn KTV bị từ chối và booking không được xác nhận. Giao dịch trừ tiền được lưu trong lịch sử ví với mã tham chiếu booking.
+
+## 7. API không dùng trong luồng mới
 
 Mobile không dùng các API marketplace cũ:
 
