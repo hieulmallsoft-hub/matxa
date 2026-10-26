@@ -120,7 +120,7 @@ function useDashboardData() {
         booking.status ?? 'PENDING',
         'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80',
       ])
-    : FALLBACK_BOOKINGS;
+    : [];
 
   return { stats, displayBookings, isLoading };
 }
@@ -136,7 +136,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
   const formattedRevenue = stats.revenueThisMonth
     ? new Intl.NumberFormat('vi-VN').format(stats.revenueThisMonth) + ' đ'
-    : '248.560.000 đ';
+    : '0 đ';
 
   return (
     <motion.div
@@ -201,7 +201,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           label="Doanh thu hôm nay"
-          value={dateFilter === 'today' ? '38.600.000 đ' : formattedRevenue}
+          value={formattedRevenue}
           change={18.2}
           isPositive={true}
           caption="so với hôm qua"
@@ -211,7 +211,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         />
         <StatCard
           label="Đơn đặt hôm nay"
-          value={`${stats.todayBookings ?? 38} lịch`}
+          value={`${stats.todayBookings ?? 0} lịch`}
           change={26.5}
           isPositive={true}
           caption="vs tuần trước"
@@ -221,7 +221,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         />
         <StatCard
           label="KTV đang hoạt động"
-          value={`${stats.activeTechnicians ?? 42} KTV`}
+          value={`${stats.activeTechnicians ?? 0} KTV`}
           change={8.5}
           isPositive={true}
           caption="trên tổng 50 KTV"
@@ -231,10 +231,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         />
         <StatCard
           label="Đánh giá trung bình"
-          value={`${(stats.averageRating ?? 4.94).toFixed(2)} / 5.0`}
+          value={`${(stats.averageRating ?? 0).toFixed(2)} / 5.0`}
           change={4.8}
           isPositive={true}
-          caption={`${stats.reviewCount ?? 618} đánh giá`}
+          caption={`${stats.reviewCount ?? 0} đánh giá`}
           icon={<Star className="w-5 h-5" />}
           tone="warning"
           sparkline={[4.88, 4.9, 4.91, 4.92, 4.93, 4.94]}
