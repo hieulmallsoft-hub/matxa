@@ -113,6 +113,8 @@ enum TopUpStatus {
 }
 enum WalletTransactionType {
   TOP_UP
+  COMMISSION_DEBIT
+  COMMISSION_REFUND
 }
 enum WalletPaymentMethod {
   BANK_TRANSFER

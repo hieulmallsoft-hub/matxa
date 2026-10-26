@@ -915,7 +915,27 @@ export class BookingsService {
     await this.detail(userId, id, true);
     const expired = await this.expireDirectBookingIfDue(id);
     if (expired) throw new ConflictException('BOOKING_EXPIRED');
+    await this.chargeTechnicianCommission(userId, id);
     return this.updateStatus(userId, id, { status: 'CONFIRMED' });
+  }
+
+  private async chargeTechnicianCommission(userId: string, bookingId: string) {
+    const rate = Number(this.config.get('TECHNICIAN_COMMISSION_RATE_PERCENT', 25));
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new BadRequestException('Ty le chiet khau KTV khong hop le');
+    const booking = await this.prisma.booking.findFirst({ where: { id: bookingId, technician: { userId } }, select: { grossServiceAmount: true } });
+    if (!booking) throw new ForbiddenException('Don khong thuoc KTV nay');
+    const fee = Math.round(Number(booking.grossServiceAmount ?? 0) * rate / 100);
+    if (fee <= 0) return;
+    await this.prisma.$transaction(async (tx) => {
+      const wallet = await tx.wallet.upsert({ where: { userId_type: { userId, type: 'ADVERTISING_CREDIT' } }, create: { userId, type: 'ADVERTISING_CREDIT' }, update: {} });
+      const existing = await tx.walletLedgerEntry.findUnique({ where: { referenceType_referenceId: { referenceType: 'BOOKING_COMMISSION', referenceId: bookingId } } });
+      if (existing) return;
+      const updated = await tx.wallet.updateMany({ where: { id: wallet.id, balanceVnd: { gte: fee } }, data: { balanceVnd: { decrement: fee } } });
+      if (!updated.count) throw new ConflictException('So du vi khong du de nhan don');
+      const current = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id }, select: { balanceVnd: true } });
+      await tx.walletLedgerEntry.create({ data: { walletId: wallet.id, type: 'COMMISSION_DEBIT', amountVnd: -fee, balanceBeforeVnd: current.balanceVnd + fee, balanceAfterVnd: current.balanceVnd, referenceType: 'BOOKING_COMMISSION', referenceId: bookingId } });
+      await tx.booking.update({ where: { id: bookingId }, data: { platformFee: fee, technicianEarning: Number(booking.grossServiceAmount ?? 0) - fee, feePolicyVersion: `COMMISSION_${rate}_V1` } });
+    });
   }
 
   async declineTechnicianJob(userId: string, id: string, dto: CancelBookingDto) {
