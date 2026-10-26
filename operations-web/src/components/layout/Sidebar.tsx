@@ -73,6 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'notifications', label: 'Thông báo hệ thống', icon: Bell },
       { id: 'settings', label: 'Cấu hình hệ thống', icon: Settings },
+      { id: 'technicianPolicy', label: 'Chính sách KTV', icon: UserCheck },
     ],
   },
 ];

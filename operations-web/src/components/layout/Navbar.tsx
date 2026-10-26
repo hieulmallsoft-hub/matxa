@@ -51,6 +51,7 @@ const PAGE_NAMES: Record<PageId, string> = {
   messages: 'Tin nhắn CSKH',
   notifications: 'Thông báo hệ thống',
   settings: 'Cấu hình hệ thống',
+  technicianPolicy: 'Chính sách KTV',
 };
 
 export const Navbar: React.FC<NavbarProps> = ({

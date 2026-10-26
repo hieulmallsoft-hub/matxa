@@ -32,6 +32,7 @@ const defaultNotificationTemplates: NotificationTemplate[] = [
 interface SettingsPageProps {
   theme: string;
   onToggleTheme: (t: string) => void;
+  initialCategory?: SettingCategory;
 }
 
 type SettingCategory =
@@ -42,9 +43,9 @@ type SettingCategory =
   | 'notifications'
   | 'security';
 
-export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme }) => {
+export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme, initialCategory = 'brand' }) => {
   const { addToast } = useToast();
-  const [activeCategory, setActiveCategory] = useState<SettingCategory>('brand');
+  const [activeCategory, setActiveCategory] = useState<SettingCategory>(initialCategory);
   const [notificationTemplates, setNotificationTemplates] = useState<NotificationTemplate[]>([]);
   const [notificationTemplatesLoading, setNotificationTemplatesLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);

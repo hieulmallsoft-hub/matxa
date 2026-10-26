@@ -211,6 +211,8 @@ function AppInner() {
         return <NotificationsPage />;
       case 'settings':
         return <SettingsPage theme={theme} onToggleTheme={(t) => setTheme(t)} />;
+      case 'technicianPolicy':
+        return <SettingsPage theme={theme} onToggleTheme={(t) => setTheme(t)} initialCategory="technician" />;
       case 'technicians':
       case 'applications':
       case 'catalog':
