@@ -16,14 +16,14 @@ import {
   Calendar,
 } from 'lucide-react';
 import { OrderItem, OrderStatus } from '../../types/dashboard';
-import { RECENT_ORDERS } from '../../data/mockData';
 import { StatusBadge } from '../common/StatusBadge';
 
 interface RecentOrdersTableProps {
   onSelectOrder?: (order: OrderItem) => void;
+  orders?: OrderItem[];
 }
 
-export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ onSelectOrder }) => {
+export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ onSelectOrder, orders = [] }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [sortField, setSortField] = useState<'date' | 'amount' | 'customer'>('date');
@@ -35,7 +35,7 @@ export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ onSelectOr
 
   // Filter and sort orders
   const filteredOrders = useMemo(() => {
-    return RECENT_ORDERS.filter((order) => {
+    return orders.filter((order) => {
       const matchesSearch =
         order.id.toLowerCase().includes(search.toLowerCase()) ||
         order.customer.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -55,7 +55,7 @@ export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ onSelectOr
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
-  }, [search, statusFilter, sortField, sortOrder]);
+  }, [orders, search, statusFilter, sortField, sortOrder]);
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage) || 1;
   const paginatedOrders = filteredOrders.slice(
