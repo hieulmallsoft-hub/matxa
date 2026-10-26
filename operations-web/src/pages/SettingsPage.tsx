@@ -67,6 +67,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
       .finally(() => setNotificationTemplatesLoading(false));
   }, []);
 
+  React.useEffect(() => {
+    void request<{ technicianSharePercent: number }>('/admin/settings/commission')
+      .then((value) => setTechCommissionRate(String(value.technicianSharePercent)))
+      .catch(() => undefined);
+  }, []);
+
   const updateTemplate = (type: string, field: 'title' | 'body', value: string) => {
     setNotificationTemplates((current) =>
       current.map((template) =>
@@ -87,16 +93,24 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
     }
   };
 
-  const handleSaveAll = () => {
+  const handleSaveAll = async () => {
     setIsSaving(true);
-    setTimeout(() => {
+    try {
+      if (activeCategory === 'technician') {
+        const share = Number(techCommissionRate);
+        if (!Number.isFinite(share) || share < 0 || share > 100) throw new Error('Tỷ lệ KTV nhận phải từ 0 đến 100%');
+        await request('/admin/settings/commission', { method: 'PATCH', body: JSON.stringify({ technicianSharePercent: share }) });
+      }
       setIsSaving(false);
       addToast({
         title: 'Đã lưu thay đổi',
         message: 'Cấu hình hệ thống đã được cập nhật thành công.',
         type: 'success',
       });
-    }, 600);
+    } catch (error) {
+      setIsSaving(false);
+      addToast({ title: 'Không thể lưu thay đổi', message: error instanceof Error ? error.message : 'Vui lòng thử lại', type: 'error' });
+    }
   };
 
   const categories = [

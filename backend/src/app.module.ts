@@ -14,6 +14,7 @@ import { BookingsModule } from './modules/bookings/bookings.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { WalletModule } from './modules/wallet/wallet.module';
 import { CoursesModule } from './modules/courses/courses.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { CoursesModule } from './modules/courses/courses.module';
     ProfileModule,
     WalletModule,
     CoursesModule,
+    SettingsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

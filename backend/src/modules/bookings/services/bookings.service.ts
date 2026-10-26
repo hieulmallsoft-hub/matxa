@@ -16,6 +16,7 @@ import { VnpayService } from './vnpay.service';
 import { PlatformFeePolicyService } from './platform-fee-policy.service';
 import { PayosService } from './payos.service';
 import { Optional } from '@nestjs/common';
+import { SettingsService } from '../../settings/settings.service';
 import {
   BookingHistoryQueryDto,
   CancelBookingDto,
@@ -39,6 +40,7 @@ export class BookingsService {
     private readonly feePolicy: PlatformFeePolicyService = new PlatformFeePolicyService(),
     @Optional() private readonly payos?: PayosService,
     private readonly realtime?: MarketplaceRealtimeService,
+    private readonly settings?: SettingsService,
   ) {}
 
   async quote(userId: string, dto: QuoteBookingDto, db: Prisma.TransactionClient = this.prisma) {
@@ -920,7 +922,7 @@ export class BookingsService {
   }
 
   private async chargeTechnicianCommission(userId: string, bookingId: string) {
-    const rate = Number(this.config.get('TECHNICIAN_COMMISSION_RATE_PERCENT', 25));
+    const rate = this.settings ? await this.settings.platformFeePercent() : Number(this.config.get('TECHNICIAN_COMMISSION_RATE_PERCENT', 25));
     if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new BadRequestException('Ty le chiet khau KTV khong hop le');
     const booking = await this.prisma.booking.findFirst({ where: { id: bookingId, technician: { userId } }, select: { grossServiceAmount: true } });
     if (!booking) throw new ForbiddenException('Don khong thuoc KTV nay');

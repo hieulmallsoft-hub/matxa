@@ -14,9 +14,10 @@ import { PlatformFeePolicyService } from './services/platform-fee-policy.service
 import { BookingVnpayController, VnpayController } from './controllers/vnpay.controller';
 import { BookingPayosController, PayosWebhookController } from './controllers/payos.controller';
 import { PayosService } from './services/payos.service';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
-  imports: [AuthModule, NotificationsModule, MarketplaceModule],
+  imports: [AuthModule, NotificationsModule, MarketplaceModule, SettingsModule],
   controllers: [
     BookingsController,
     TechnicianJobsController,
