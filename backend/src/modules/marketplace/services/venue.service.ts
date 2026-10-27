@@ -20,10 +20,14 @@ export class VenueService {
     return venue;
   }
 
-  create(dto: CreateVenueDto) { return this.prisma.venue.create({ data: { ...dto, latitude: dto.latitude, longitude: dto.longitude, images: dto.images ?? [] } }); }
+  create(dto: CreateVenueDto) {
+    const { services, hours, ...venue } = dto;
+    return this.prisma.venue.create({ data: { ...venue, images: dto.images ?? [], services: services?.length ? { create: services } : undefined, hours: hours?.length ? { create: hours } : undefined }, include: { services: true, hours: true } });
+  }
   async update(id: string, dto: UpdateVenueDto) {
     const current = await this.prisma.venue.findUnique({ where: { id } });
     if (!current) throw new NotFoundException('Khong tim thay dia diem');
-    return this.prisma.venue.update({ where: { id }, data: dto });
+    const { services: _services, hours: _hours, ...data } = dto;
+    return this.prisma.venue.update({ where: { id }, data });
   }
 }
