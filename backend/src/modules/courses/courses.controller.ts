@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AccessTokenGuard } from '../auth/guards/access-token.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -33,5 +34,8 @@ export class AdminCoursesController {
   @Patch('lessons/:id') updateLesson(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateLessonDto) { return this.courses.updateLesson(id, dto); }
   @Delete('lessons/:id') removeLesson(@Param('id', ParseUUIDPipe) id: string) { return this.courses.removeLesson(id); }
   @Post('lessons/:id/media-upload-url') uploadUrl(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateMediaUploadUrlDto) { return this.courses.uploadUrl(id, dto); }
+  @Post('lessons/:id/media-upload')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadMedia(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: any, @Body('type') type: string) { return this.courses.uploadMedia(id, file, type); }
   @Post('lessons/:id/media') createMedia(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateMediaDto) { return this.courses.createMedia(id, dto); }
 }

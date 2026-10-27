@@ -196,15 +196,12 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
     setBusy(true);
     try {
       const type = file.type.startsWith('video/') ? 'VIDEO' : file.type === 'application/pdf' ? 'PDF' : 'IMAGE';
-      const signed = await request<{ uploadUrl: string; storageKey: string }>(`/admin/courses/lessons/${lesson.id}/media-upload-url`, {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('type', type);
+      await request(`/admin/courses/lessons/${lesson.id}/media-upload`, {
         method: 'POST',
-        body: JSON.stringify({ type, fileName: file.name, contentType: file.type }),
-      });
-      const put = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
-      if (!put.ok) throw new Error('Upload S3 thất bại');
-      await request(`/admin/courses/lessons/${lesson.id}/media`, {
-        method: 'POST',
-        body: JSON.stringify({ type, storageKey: signed.storageKey, contentType: file.type, title: file.name }),
+        body: form,
       });
       notify(`Đã tải ${type === 'VIDEO' ? 'video' : type === 'PDF' ? 'PDF' : 'ảnh'} lên bài học`);
       const fresh = await request<Course>(`/admin/courses/${selected?.id}`);

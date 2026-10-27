@@ -9,6 +9,17 @@ import { CreateCourseDto, CreateCoverUploadUrlDto, CreateLessonDto, CreateMediaD
 @Injectable()
 export class CoursesService {
   constructor(private readonly prisma: PrismaService, private readonly config: ConfigService) {}
+  async uploadMedia(lessonId: string, file: any, type: string) {
+    const lesson = await this.prisma.courseLesson.findUnique({ where: { id: lessonId } });
+    if (!lesson) throw new NotFoundException('Không tìm thấy bài học');
+    if (!file?.buffer?.length) throw new BadRequestException('Chưa chọn file media');
+    if (!['VIDEO', 'IMAGE', 'PDF'].includes(type)) throw new BadRequestException('Loại media không hợp lệ');
+    const ext = file.originalname.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+    const storageKey = `courses/${lesson.courseId}/${lessonId}/${randomUUID()}.${ext}`;
+    const { bucket, client } = this.storage();
+    await client.send(new PutObjectCommand({ Bucket: bucket, Key: storageKey, Body: file.buffer, ContentType: file.mimetype }));
+    return this.prisma.courseMedia.create({ data: { lessonId, type: type as any, storageKey, contentType: file.mimetype, title: file.originalname, fileSize: file.size } });
+  }
   private storage() {
     const bucket = this.config.get<string>('S3_BUCKET'); const region = this.config.get<string>('S3_REGION');
     const accessKeyId = this.config.get<string>('S3_ACCESS_KEY_ID'); const secretAccessKey = this.config.get<string>('S3_SECRET_ACCESS_KEY');
