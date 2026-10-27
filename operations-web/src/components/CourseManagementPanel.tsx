@@ -95,15 +95,13 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
         );
         return;
       }
+      setCourses([]);
+      setSelected(null);
     } catch {
-      // fallback gracefully
+      setCourses([]);
+      setSelected(null);
+      notify('Không tải được khóa học thật từ backend', true);
     }
-    setCourses(FALLBACK_COURSES);
-    setSelected((current) =>
-      current
-        ? FALLBACK_COURSES.find((c) => c.id === current.id) ?? FALLBACK_COURSES[0] ?? null
-        : FALLBACK_COURSES[0] ?? null,
-    );
   }
   useEffect(() => { void load(); }, []);
 
