@@ -362,6 +362,7 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
                   ].map((t) => (
                     <button
                       key={t.key}
+                      type="button"
                       onClick={() => setActiveTab(t.key as any)}
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                         activeTab === t.key ? 'bg-white text-[#2E7D4A] shadow-sm border border-[#E5EBE5]' : 'text-[#66756B] hover:text-[#1C2B20]'
