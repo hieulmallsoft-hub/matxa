@@ -129,6 +129,7 @@ export class ProfileService {
     const phoneIdentity = user.identities?.find((identity) => identity.provider === 'PHONE' && identity.phoneNumber);
     return {
       ...user,
+      customerCode: `CUST-${user.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`,
       status: user.status ?? 'ACTIVE',
       email: emailIdentity,
       phone: phoneIdentity?.phoneNumber ?? null,
