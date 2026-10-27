@@ -14,6 +14,7 @@ import { TransactionsPage } from './pages/TransactionsPage';
 import { MessagesPage } from './pages/MessagesPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { VenuesPage } from './pages/VenuesPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { INITIAL_NOTIFICATIONS } from './data/mockData';
 import { PageId, NotificationItem } from './types/dashboard';
@@ -213,6 +214,8 @@ function AppInner() {
         return <SettingsPage theme={theme} onToggleTheme={(t) => setTheme(t)} />;
       case 'technicianPolicy':
         return <SettingsPage theme={theme} onToggleTheme={(t) => setTheme(t)} initialCategory="technician" />;
+      case 'venues':
+        return <VenuesPage />;
       case 'technicians':
       case 'applications':
       case 'catalog':

@@ -14,7 +14,8 @@ export type PageId =
   | 'messages'
   | 'notifications'
   | 'settings'
-  | 'technicianPolicy';
+  | 'technicianPolicy'
+  | 'venues';
 
 export type TimePeriod = '7d' | '30d' | '3m' | '1y';
 

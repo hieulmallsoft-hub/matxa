@@ -36,22 +36,23 @@ interface NavbarProps {
 }
 
 const PAGE_NAMES: Record<PageId, string> = {
-  dashboard: 'Tổng quan',
-  analytics: 'Doanh thu & Báo cáo',
-  orders: 'Lịch đặt & Đơn hàng',
-  technicians: 'Kỹ thuật viên',
-  applications: 'Duyệt hồ sơ KTV',
-  catalog: 'Dịch vụ',
-  courses: 'Khóa học đào tạo',
-  promotions: 'Khuyến mãi & Banner',
-  customers: 'Khách hàng',
-  products: 'Vật tư & Sản phẩm',
-  payments: 'Cổng thanh toán',
-  transactions: 'Sổ cái đối soát',
-  messages: 'Tin nhắn CSKH',
-  notifications: 'Thông báo hệ thống',
-  settings: 'Cấu hình hệ thống',
-  technicianPolicy: 'Chính sách KTV',
+  dashboard: 'Tá»•ng quan',
+  analytics: 'Doanh thu & BÃ¡o cÃ¡o',
+  orders: 'Lá»‹ch Ä‘áº·t & ÄÆ¡n hÃ ng',
+  technicians: 'Ká»¹ thuáº­t viÃªn',
+  applications: 'Duyá»‡t há»“ sÆ¡ KTV',
+  catalog: 'Dá»‹ch vá»¥',
+  courses: 'KhÃ³a há»c Ä‘Ã o táº¡o',
+  promotions: 'Khuyáº¿n mÃ£i & Banner',
+  customers: 'KhÃ¡ch hÃ ng',
+  products: 'Váº­t tÆ° & Sáº£n pháº©m',
+  payments: 'Cá»•ng thanh toÃ¡n',
+  transactions: 'Sá»• cÃ¡i Ä‘á»‘i soÃ¡t',
+  messages: 'Tin nháº¯n CSKH',
+  notifications: 'ThÃ´ng bÃ¡o há»‡ thá»‘ng',
+  settings: 'Cáº¥u hÃ¬nh há»‡ thá»‘ng',
+  technicianPolicy: 'ChÃ­nh sÃ¡ch KTV',
+  venues: 'Ð?a di?m & Spa',
 };
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -95,7 +96,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={onOpenMobileMenu}
             className="md:hidden p-2 rounded-xl text-[#66756B] hover:text-[#1C2B20] hover:bg-[#F6F8F4] transition-colors"
-            title="Mở menu"
+            title="Má»Ÿ menu"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -123,10 +124,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           <div className="flex items-center gap-2.5">
             <Search className="w-4 h-4 text-[#94A399] group-hover:text-[#2E7D4A] transition-colors" />
-            <span className="truncate">Tìm kiếm dịch vụ, lịch đặt, KTV, khách hàng...</span>
+            <span className="truncate">TÃ¬m kiáº¿m dá»‹ch vá»¥, lá»‹ch Ä‘áº·t, KTV, khÃ¡ch hÃ ng...</span>
           </div>
           <div className="flex items-center gap-1 font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-[#E5EBE5] text-[#2E7D4A] shadow-xs">
-            <span>⌘K</span>
+            <span>âŒ˜K</span>
           </div>
         </button>
       </div>
@@ -142,14 +143,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                 ? 'bg-[#FEF6E9] text-[#B87A14] border-[#FBE3B8] hover:bg-[#FDECD0]'
                 : 'bg-[#EAF5EC] text-[#2E7D4A] border-[#D0E7D5] hover:bg-[#DDF0E1]'
             }`}
-            title={isDemoMode ? 'Đang dùng dữ liệu mô phỏng. Bấm để kết nối API.' : 'Đang kết nối API máy chủ.'}
+            title={isDemoMode ? 'Äang dÃ¹ng dá»¯ liá»‡u mÃ´ phá»ng. Báº¥m Ä‘á»ƒ káº¿t ná»‘i API.' : 'Äang káº¿t ná»‘i API mÃ¡y chá»§.'}
           >
             <span
               className={`w-1.5 h-1.5 rounded-full ${
                 isDemoMode ? 'bg-[#F2A93B]' : 'bg-[#2E9B62]'
               }`}
             />
-            <span>{isDemoMode ? 'Chế độ Demo' : 'Live API'}</span>
+            <span>{isDemoMode ? 'Cháº¿ Ä‘á»™ Demo' : 'Live API'}</span>
           </button>
         )}
 
@@ -157,7 +158,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <button
           onClick={() => onNavigate('messages')}
           className="relative p-2 rounded-xl text-[#66756B] hover:text-[#2E7D4A] hover:bg-[#F6F8F4] transition-colors"
-          title="Tin nhắn CSKH"
+          title="Tin nháº¯n CSKH"
         >
           <MessageCircle className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#4285D4]" />
@@ -168,7 +169,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={() => setShowNotifications(!showNotifications)}
             className="relative p-2 rounded-xl text-[#66756B] hover:text-[#2E7D4A] hover:bg-[#F6F8F4] transition-colors"
-            title="Thông báo hệ thống"
+            title="ThÃ´ng bÃ¡o há»‡ thá»‘ng"
           >
             <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
@@ -189,10 +190,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <div className="flex items-center justify-between pb-2 border-b border-[#E5EBE5]">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-sm text-[#1C2B20]">Thông báo hệ thống</h3>
+                    <h3 className="font-bold text-sm text-[#1C2B20]">ThÃ´ng bÃ¡o há»‡ thá»‘ng</h3>
                     {unreadCount > 0 && (
                       <span className="px-1.5 py-0.2 rounded-full bg-[#EAF5EC] text-[#2E7D4A] text-[10px] font-bold">
-                        {unreadCount} mới
+                        {unreadCount} má»›i
                       </span>
                     )}
                   </div>
@@ -201,7 +202,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       onClick={onMarkNotificationsRead}
                       className="text-xs text-[#2E7D4A] hover:underline font-semibold"
                     >
-                      Đã đọc tất cả
+                      ÄÃ£ Ä‘á»c táº¥t cáº£
                     </button>
                   )}
                 </div>
@@ -237,7 +238,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }}
                     className="text-xs text-[#2E7D4A] hover:underline font-semibold"
                   >
-                    Xem tất cả thông báo →
+                    Xem táº¥t cáº£ thÃ´ng bÃ¡o â†’
                   </button>
                 </div>
               </motion.div>
@@ -256,7 +257,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
             <div className="hidden sm:flex flex-col text-left">
               <span className="text-xs font-bold text-[#1C2B20] leading-tight">
-                {user?.name || 'Quản trị viên'}
+                {user?.name || 'Quáº£n trá»‹ viÃªn'}
               </span>
               <span className="text-[10px] text-[#66756B] leading-tight">
                 {user?.role || 'Admin'}
@@ -276,7 +277,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <div className="px-3 py-2 border-b border-[#E5EBE5] mb-1">
                   <div className="font-bold text-[#1C2B20] text-sm truncate">
-                    {user?.name || 'Quản trị viên'}
+                    {user?.name || 'Quáº£n trá»‹ viÃªn'}
                   </div>
                   <div className="text-[11px] text-[#66756B] truncate">
                     {user?.email || 'admin@matxa.local'}
@@ -291,7 +292,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#1C2B20] hover:bg-[#F6F8F4] transition-colors"
                 >
                   <User className="w-4 h-4 text-[#66756B]" />
-                  <span>Hồ sơ cá nhân</span>
+                  <span>Há»“ sÆ¡ cÃ¡ nhÃ¢n</span>
                 </button>
 
                 <button
@@ -302,7 +303,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#1C2B20] hover:bg-[#F6F8F4] transition-colors"
                 >
                   <Settings className="w-4 h-4 text-[#66756B]" />
-                  <span>Cài đặt hệ thống</span>
+                  <span>CÃ i Ä‘áº·t há»‡ thá»‘ng</span>
                 </button>
 
                 {onOpenLoginModal && (
@@ -314,7 +315,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#2E7D4A] hover:bg-[#EAF5EC] transition-colors"
                   >
                     <Database className="w-4 h-4" />
-                    <span>Đăng nhập Live API</span>
+                    <span>ÄÄƒng nháº­p Live API</span>
                   </button>
                 )}
 
@@ -328,7 +329,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#E05B55] hover:bg-[#FDF0EF] transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
-                      <span>Đăng xuất</span>
+                      <span>ÄÄƒng xuáº¥t</span>
                     </button>
                   )}
                 </div>
