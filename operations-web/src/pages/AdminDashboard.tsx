@@ -476,6 +476,14 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
+                            onClick={() => void request<any>(`/marketplace/technicians/${tech.id}`).then((detail) => {
+                              window.alert(`KTV: ${detail.displayName ?? tech.user.displayName ?? tech.id}\nKhu vực: ${detail.city ?? tech.city ?? 'Chưa cập nhật'}\nĐánh giá: ${Number(detail.averageRating ?? tech.averageRating ?? 0).toFixed(2)} (${detail.reviewCount ?? tech.reviewCount ?? 0})\nDịch vụ: ${(detail.services ?? []).map((item: any) => item.name).join(', ') || 'Chưa có dữ liệu'}`);
+                            }).catch((error) => notify(error instanceof Error ? error.message : 'Không thể tải chi tiết KTV', true))}
+                            className="px-2.5 py-1 rounded-lg text-xs font-semibold text-[#1C2B20] bg-[#F1F5EF] hover:bg-[#E5EBE5] transition-colors"
+                          >
+                            Chi tiết
+                          </button>
+                          <button
                             onClick={() => setTab('pricing')}
                             className="px-2.5 py-1 rounded-lg text-xs font-semibold text-[#2E7D4A] bg-[#EAF5EC] hover:bg-[#DDF0E1] transition-colors"
                           >
