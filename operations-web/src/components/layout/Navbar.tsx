@@ -53,6 +53,7 @@ const PAGE_NAMES: Record<PageId, string> = {
   settings: 'Cấu hình hệ thống',
   technicianPolicy: 'Chính sách KTV',
   venues: 'Địa điểm & Spa',
+  contracts: 'Mẫu hợp đồng KTV',
 };
 
 export const Navbar: React.FC<NavbarProps> = ({

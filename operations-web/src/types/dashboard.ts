@@ -15,7 +15,8 @@ export type PageId =
   | 'notifications'
   | 'settings'
   | 'technicianPolicy'
-  | 'venues';
+  | 'venues'
+  | 'contracts';
 
 export type TimePeriod = '7d' | '30d' | '3m' | '1y';
 
