@@ -15,6 +15,7 @@ import { TechnicianContractService } from '../services/technician-contract.servi
 export class TechnicianContractController {
   constructor(private readonly contracts: TechnicianContractService) {}
   @Get() get(@CurrentAuth() auth: AccessTokenPayload) { return this.contracts.getMine(auth.sub); }
+  @Get('template') template() { return this.contracts.templateUrl(); }
   @Post('signature-upload-url') upload(@CurrentAuth() auth: AccessTokenPayload, @Body() body: { contentType?: string; size?: number }) { return this.contracts.signatureUploadUrl(auth.sub, body.contentType, body.size); }
   @Post('sign') sign(@CurrentAuth() auth: AccessTokenPayload, @Body() body: { signatureKey: string }) { return this.contracts.sign(auth.sub, body.signatureKey); }
 }
@@ -27,6 +28,8 @@ export class TechnicianContractController {
 export class AdminTechnicianContractController {
   constructor(private readonly contracts: TechnicianContractService) {}
   @Get() list() { return this.contracts.listAdmin(); }
+  @Post('template-upload-url') templateUpload(@Body() body: { fileName: string; contentType: string }) { return this.contracts.templateUploadUrl(body.fileName, body.contentType); }
+  @Patch('template') setTemplate(@Body() body: { storageKey: string; fileName: string; contentType: string }) { return this.contracts.setTemplate(body.storageKey, body.fileName, body.contentType); }
   @Patch(':id/review') review(@CurrentAuth() auth: AccessTokenPayload, @Param('id') id: string, @Body() body: { status: 'APPROVED' | 'REJECTED'; reason?: string }) { return this.contracts.review(auth.sub, id, body.status, body.reason); }
   @Get(':id/download-url') download(@Param('id') id: string) { return this.contracts.downloadUrl(id); }
 }

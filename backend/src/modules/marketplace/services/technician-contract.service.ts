@@ -63,6 +63,21 @@ export class TechnicianContractService {
     return this.prisma.technicianContract.update({ where: { id: contract.id }, data: { signatureKey, signedAt: new Date(), status: 'PENDING_REVIEW', rejectionReason: null } });
   }
 
+  async templateUploadUrl(fileName: string, contentType: string) {
+    if (contentType !== 'application/pdf') throw new BadRequestException('Mau hop dong phai la PDF');
+    const { bucket, client } = this.storage(); const storageKey = `technician-contracts/templates/${randomUUID()}.pdf`;
+    return { uploadUrl: await getSignedUrl(client, new PutObjectCommand({ Bucket: bucket, Key: storageKey, ContentType: contentType }), { expiresIn: 600 }), storageKey, expiresIn: 600 };
+  }
+  async setTemplate(storageKey: string, fileName: string, contentType: string) {
+    if (!storageKey.startsWith('technician-contracts/templates/')) throw new BadRequestException('Storage key khong hop le');
+    await this.prisma.contractTemplate.updateMany({ data: { isActive: false } });
+    return this.prisma.contractTemplate.create({ data: { storageKey, fileName, contentType, isActive: true } });
+  }
+  async templateUrl() {
+    const template = await this.prisma.contractTemplate.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'desc' } });
+    if (!template) throw new NotFoundException('Chua co mau hop dong'); const { bucket, client } = this.storage();
+    return { templateId: template.id, fileName: template.fileName, downloadUrl: await getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: template.storageKey }), { expiresIn: 600 }), expiresIn: 600 };
+  }
   listAdmin() { return this.prisma.technicianContract.findMany({ orderBy: { createdAt: 'desc' } }); }
 
   async review(adminId: string, id: string, status: 'APPROVED' | 'REJECTED', reason?: string) {

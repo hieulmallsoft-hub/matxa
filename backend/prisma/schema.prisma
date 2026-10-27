@@ -303,6 +303,18 @@ model TechnicianContract {
   @@map("technician_contracts")
 }
 
+model ContractTemplate {
+  id            String   @id @default(uuid()) @db.Uuid
+  storageKey    String   @map("storage_key")
+  contentType   String   @map("content_type")
+  fileName      String   @map("file_name")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  @@index([isActive, createdAt(sort: Desc)])
+  @@map("contract_templates")
+}
+
 model TechnicianKyc {
   id              String              @id @default(uuid()) @db.Uuid
   applicationId   String              @unique @map("application_id") @db.Uuid
