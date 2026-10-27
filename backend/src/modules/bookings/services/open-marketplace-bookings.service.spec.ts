@@ -22,7 +22,7 @@ describe('open marketplace selection', () => {
       booking: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findUniqueOrThrow: jest.fn().mockResolvedValue(booking),
-        findFirst: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue({ grossServiceAmount: 0 }),
         update: jest.fn().mockResolvedValue({
           ...booking,
           technicianId: 'tech-profile-1',
@@ -48,7 +48,7 @@ describe('open marketplace selection', () => {
     const notifications = { create: jest.fn().mockResolvedValue({}), sendPush: jest.fn().mockResolvedValue({}) };
     const service = new BookingsService(
       prisma,
-      { get: jest.fn() } as any,
+      { get: jest.fn((_key: string, fallback: unknown) => fallback) } as any,
       notifications as any,
       { createPaymentUrl: jest.fn(), verify: jest.fn() } as any,
     );
