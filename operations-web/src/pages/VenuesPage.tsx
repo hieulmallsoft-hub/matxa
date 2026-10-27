@@ -159,13 +159,10 @@ function DiscountBadge({ pct }: { pct: number }) {
 }
 
 /* ── Venue Card (list item) ── */
-function VenueCard({ venue, onClick }: { venue: Venue; onClick: () => void }) {
+function VenueCard({ venue, onClick, onDelete }: { venue: Venue; onClick: () => void; onDelete: () => void }) {
   const thumb = venue.images?.[0];
   return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white border border-[#F1F5EF] hover:border-[#2E7D4A]/30 hover:shadow-md transition-all text-left group"
-    >
+    <div className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white border border-[#F1F5EF] hover:border-[#2E7D4A]/30 hover:shadow-md transition-all text-left group">
       {/* Thumbnail */}
       <div className="relative w-[72px] h-[72px] rounded-xl overflow-hidden flex-shrink-0 bg-[#F6F8F4]">
         {thumb ? (
@@ -179,7 +176,7 @@ function VenueCard({ venue, onClick }: { venue: Venue; onClick: () => void }) {
       </div>
 
       {/* Info */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
         <p className="font-bold text-sm text-[#1C2B20] leading-snug truncate">{venue.name}</p>
         <div className="flex items-center gap-1 mt-1">
           <Star className="w-3.5 h-3.5 fill-[#F2A93B] text-[#F2A93B]" />
@@ -190,7 +187,8 @@ function VenueCard({ venue, onClick }: { venue: Venue; onClick: () => void }) {
           <span>{venue.distance ? `${venue.distance} km` : venue.city}</span>
         </div>
       </div>
-    </button>
+      <button type="button" onClick={onDelete} className="px-3 py-2 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50">Xóa</button>
+    </div>
   );
 }
 
@@ -487,6 +485,11 @@ export const VenuesPage: React.FC = () => {
     }
   };
 
+  const removeVenue = async (venue: Venue) => {
+    if (!window.confirm(`Xóa địa điểm “${venue.name}”?`)) return;
+    try { await request(`/admin/venues/${venue.id}`, { method: 'DELETE' }); setSelected(null); load(); } catch { /* keep current list */ }
+  };
+
   const CATEGORIES = [
     { key: 'massage', label: 'Massage/spa', sub: 'Thư giãn·Tái tạo', icon: <Sparkles className="w-5 h-5" /> },
     { key: 'consult', label: 'Phòng tham vấn', sub: 'Lắng nghe·Đồng hành', icon: <Stethoscope className="w-5 h-5" /> },
@@ -715,7 +718,7 @@ export const VenuesPage: React.FC = () => {
 
             <div className="p-3 space-y-2 max-h-[480px] overflow-y-auto">
               {items.map((venue) => (
-                <VenueCard key={venue.id} venue={venue} onClick={() => setSelected(venue)} />
+                <VenueCard key={venue.id} venue={venue} onClick={() => setSelected(venue)} onDelete={() => void removeVenue(venue)} />
               ))}
               {!items.length && (
                 <div className="py-12 text-center">

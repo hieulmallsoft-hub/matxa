@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
@@ -24,4 +24,5 @@ export class AdminVenueController {
   @Get() list(@Query() query: VenueQueryDto) { return this.venues.list(query, true); }
   @Post() create(@Body() dto: CreateVenueDto) { return this.venues.create(dto); }
   @Patch(':id') update(@Param('id') id: string, @Body() dto: UpdateVenueDto) { return this.venues.update(id, dto); }
+  @Delete(':id') remove(@Param('id') id: string) { return this.venues.remove(id); }
 }

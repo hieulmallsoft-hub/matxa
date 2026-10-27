@@ -30,4 +30,9 @@ export class VenueService {
     const { services: _services, hours: _hours, ...data } = dto;
     return this.prisma.venue.update({ where: { id }, data });
   }
+  async remove(id: string) {
+    const current = await this.prisma.venue.findUnique({ where: { id } });
+    if (!current) throw new NotFoundException('Khong tim thay dia diem');
+    return this.prisma.venue.update({ where: { id }, data: { isActive: false } });
+  }
 }
