@@ -107,13 +107,14 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
 
   async function createCourse(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const f = new FormData(form);
     try {
       await request('/admin/courses', {
         method: 'POST',
         body: JSON.stringify({ title: f.get('title'), slug: f.get('slug'), description: f.get('description'), access: f.get('access'), isPublished: false }),
       });
-      e.currentTarget.reset();
+      form.reset();
       notify('Đã tạo khóa học');
       await load();
       setActiveTab('info');
