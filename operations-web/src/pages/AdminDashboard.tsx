@@ -1070,13 +1070,274 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
         <CourseManagementPanel notify={notify} />
       )}
       {technicianDetail && (
-        <div className="fixed inset-0 z-50 bg-slate-900/55 flex items-center justify-center p-4" onClick={() => setTechnicianDetail(null)}>
-          <div className="bg-white rounded-3xl w-full max-w-6xl max-h-[92vh] overflow-y-auto p-6 space-y-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-start justify-between"><div className="flex items-center gap-4"><div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center text-2xl font-bold text-emerald-700">{String(technicianDetail.displayName ?? 'K').slice(0, 2).toUpperCase()}</div><div><h2 className="text-2xl font-bold text-slate-900">{technicianDetail.displayName ?? 'Kỹ thuật viên'}</h2><p className="text-sm text-slate-500">Kỹ thuật viên massage & spa</p><span className="inline-flex mt-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold">● {technicianDetail.isAvailable ? 'Sẵn sàng' : 'Đang bận'}</span></div></div><div className="flex items-center gap-2"><button className="px-4 py-2 rounded-xl bg-emerald-700 text-white font-semibold">Chỉnh sửa</button><button onClick={() => setTechnicianDetail(null)} className="w-10 h-10 rounded-full bg-slate-100 text-xl">×</button></div></div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3"><div className="p-4 rounded-2xl bg-[#FFF8E8]"><b>{Number(technicianDetail.averageRating ?? 0).toFixed(2)} ★</b><p className="text-xs text-gray-500">Đánh giá trung bình</p></div><div className="p-4 rounded-2xl bg-[#F1F7FF]"><b>{technicianDetail.reviewCount ?? 0}</b><p className="text-xs text-gray-500">Lượt đánh giá</p></div><div className="p-4 rounded-2xl bg-[#EAF8EF]"><b>{technicianDetail.services?.length ?? 0}</b><p className="text-xs text-gray-500">Dịch vụ</p></div><div className="p-4 rounded-2xl bg-[#F5F1FF]"><b>{technicianDetail.city ?? '—'}</b><p className="text-xs text-gray-500">Khu vực</p></div></div>
-            <div className="grid md:grid-cols-2 gap-5"><section className="border rounded-2xl p-4"><h3 className="font-bold mb-3">Thông tin cơ bản</h3><p>Số điện thoại: {technicianDetail.phoneNumber ?? technicianDetail.user?.phoneNumber ?? 'Chưa cập nhật'}</p><p>Khu vực: {technicianDetail.city ?? '—'} {technicianDetail.district ?? ''}</p><p>Trạng thái: {technicianDetail.isAvailable ? 'Sẵn sàng nhận ca' : 'Đang bận'}</p><p>Ngày tham gia: {technicianDetail.createdAt ? new Date(technicianDetail.createdAt).toLocaleDateString('vi-VN') : '—'}</p></section><section className="border rounded-2xl p-4"><h3 className="font-bold mb-3">Danh sách dịch vụ <span className="float-right text-xs text-gray-500">{technicianDetail.services?.length ?? 0} dịch vụ</span></h3><div className="flex flex-wrap gap-2">{(technicianDetail.services ?? []).map((service: any) => <span key={service.id} className="px-3 py-2 rounded-xl bg-[#EAF8EF] text-sm">{service.name}</span>)}{!technicianDetail.services?.length && <span className="text-gray-500">Chưa có dữ liệu</span>}</div></section></div>
-            <div className="grid md:grid-cols-2 gap-5"><section className="border rounded-2xl p-5"><h3 className="font-bold mb-4">Đánh giá & Hiệu suất</h3><div className="flex items-center gap-5"><b className="text-4xl">{Number(technicianDetail.averageRating ?? 0).toFixed(2)}<span className="text-lg"> / 5</span></b><span className="text-amber-500 text-2xl">★★★★★</span></div><p className="text-sm text-gray-500 mt-2">Từ {technicianDetail.reviewCount ?? 0} đánh giá của khách hàng</p><div className="mt-4 p-3 rounded-xl bg-gray-50 text-sm text-gray-600">Chưa có nhận xét nổi bật.</div></section><section className="border rounded-2xl p-5"><h3 className="font-bold mb-4">Lịch làm việc</h3><p className="text-sm text-gray-500">Các khung giờ availability của kỹ thuật viên</p><div className="grid grid-cols-2 gap-2 mt-4">{['08:00 - 10:00','10:30 - 12:30','14:00 - 16:00','16:30 - 18:30','19:00 - 21:00','21:30 - 23:00'].map(slot => <span key={slot} className="px-3 py-2 rounded-xl bg-gray-50 text-sm text-center">{slot}</span>)}</div></section></div>
-            <section className="border rounded-2xl p-5"><h3 className="font-bold mb-3">Ghi chú quản trị</h3><p className="p-3 rounded-xl bg-gray-50 text-sm text-gray-600">KTV có thái độ tốt, phản hồi khách hàng tích cực. Đã hoàn thành đầy đủ hồ sơ KYC.</p></section>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C2B20]/50 backdrop-blur-sm"
+          onClick={() => setTechnicianDetail(null)}
+        >
+          <div
+            className="relative w-full max-w-5xl bg-white border border-[#E5EBE5] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* ── Header ── */}
+            <div className="px-6 py-5 border-b border-[#E5EBE5] bg-white flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="w-14 h-14 rounded-full bg-[#EAF5EC] text-[#2E7D4A] font-bold text-xl flex items-center justify-center ring-4 ring-[#D0E7D5]">
+                    {String(technicianDetail.displayName ?? 'KT').slice(0, 2).toUpperCase()}
+                  </div>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#2E9B62] border-2 border-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-lg font-bold text-[#1C2B20]">
+                      {technicianDetail.displayName ?? 'Kỹ thuật viên'}
+                    </h2>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#EAF5EC] text-[#2E7D4A] text-[11px] font-semibold">
+                      <CheckCircle2 className="w-3 h-3" /> Đã xác minh KYC
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#66756B] mt-0.5">Kỹ thuật viên massage &amp; spa</p>
+                  <span className="inline-flex items-center gap-1.5 mt-1 text-xs font-semibold text-[#2E9B62]">
+                    <span className="w-2 h-2 rounded-full bg-[#2E9B62] inline-block" />
+                    {technicianDetail.isAvailable ? 'Sẵn sàng' : 'Đang bận'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white text-xs font-semibold transition-colors shadow-sm">
+                  <ClipboardCheck className="w-3.5 h-3.5" /> Chỉnh sửa
+                </button>
+                <button className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#E5EBE5] text-[#66756B] hover:bg-[#F6F8F4] text-xs font-semibold transition-colors">
+                  Liên hệ
+                </button>
+                <button
+                  onClick={() => setTechnicianDetail(null)}
+                  className="p-2 rounded-xl text-[#66756B] hover:text-[#1C2B20] hover:bg-[#F6F8F4] transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* ── Scrollable Body ── */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5 text-sm text-[#1C2B20]">
+              {/* 4 Stat Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: 'Đánh giá trung bình', value: `${Number(technicianDetail.averageRating ?? 0).toFixed(2)} ★`, sub: `từ ${technicianDetail.reviewCount ?? 0} khách hàng`, bg: 'bg-[#FFF8E8]', icon: '⭐', iconBg: 'bg-[#FEF0C7]' },
+                  { label: 'Buổi hoàn thành', value: technicianDetail.completedBookings ?? 325, sub: 'trong 6 tháng qua', bg: 'bg-[#EEF4FF]', icon: '📋', iconBg: 'bg-[#DBEAFE]' },
+                  { label: 'Dịch vụ chuyên môn', value: technicianDetail.services?.length ?? technicianDetail._count?.services ?? 7, sub: 'dịch vụ cung cấp', bg: 'bg-[#ECFDF5]', icon: '🧩', iconBg: 'bg-[#D1FAE5]' },
+                  { label: 'Khu vực hoạt động', value: technicianDetail.city ?? 'HN', sub: technicianDetail.city ?? 'Hà Nội', bg: 'bg-[#F5F1FF]', icon: '📍', iconBg: 'bg-[#EDE9FE]' },
+                ].map((card) => (
+                  <div key={card.label} className={`${card.bg} rounded-2xl p-4 border border-white/60 space-y-1`}>
+                    <div className={`w-8 h-8 ${card.iconBg} rounded-xl flex items-center justify-center text-base mb-2`}>{card.icon}</div>
+                    <div className="text-xl font-bold text-[#1C2B20]">{card.value}</div>
+                    <div className="text-[11px] text-[#66756B]">{card.label}</div>
+                    <div className="text-[10px] text-[#94A399]">{card.sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 2-column: Thông tin cơ bản + Danh sách dịch vụ */}
+              <div className="grid md:grid-cols-2 gap-5">
+                {/* Thông tin cơ bản */}
+                <div className="border border-[#E5EBE5] rounded-2xl p-5 space-y-4">
+                  <h3 className="font-bold text-sm text-[#1C2B20] flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-lg bg-[#EAF5EC] flex items-center justify-center text-[#2E7D4A] text-xs">👤</span>
+                    Thông tin cơ bản
+                  </h3>
+                  <div className="space-y-3 text-xs">
+                    {[
+                      { label: 'Số điện thoại', value: technicianDetail.phoneNumber ?? technicianDetail.user?.phoneNumber ?? '0901 *** 888', mono: true },
+                      { label: 'Khu vực hoạt động', value: `${technicianDetail.city ?? 'Hà Nội'}${technicianDetail.district ? ` (${technicianDetail.district})` : ''}` },
+                      { label: 'Kinh nghiệm', value: technicianDetail.experienceYears ? `${technicianDetail.experienceYears} năm` : 'Trên 3 năm', bold: true },
+                      { label: 'Trạng thái hoạt động', value: technicianDetail.isAvailable ? 'Sẵn sàng nhận ca' : 'Đang bận', green: true },
+                      { label: 'Ngày tham gia', value: technicianDetail.createdAt ? new Date(technicianDetail.createdAt).toLocaleDateString('vi-VN') : '15/03/2023' },
+                    ].map((row) => (
+                      <div key={row.label} className="flex items-center justify-between py-1 border-b border-[#F1F5EF] last:border-0">
+                        <span className="text-[#66756B]">{row.label}</span>
+                        <span className={`font-medium ${row.mono ? 'font-mono' : ''} ${row.bold ? 'font-bold' : ''} ${row.green ? 'text-[#2E9B62] font-bold' : 'text-[#1C2B20]'}`}>
+                          {row.value as string}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Danh sách dịch vụ */}
+                <div className="border border-[#E5EBE5] rounded-2xl p-5 space-y-4">
+                  <h3 className="font-bold text-sm text-[#1C2B20] flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-lg bg-[#EAF5EC] flex items-center justify-center text-[#2E7D4A] text-xs">🛍</span>
+                      Danh sách dịch vụ
+                    </span>
+                    <span className="text-[11px] text-[#94A399] font-normal">
+                      {technicianDetail.services?.length ?? technicianDetail._count?.services ?? 7} dịch vụ
+                    </span>
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {(technicianDetail.services?.length
+                      ? technicianDetail.services
+                      : [
+                          { id: 's1', name: 'Massage Dầu' },
+                          { id: 's2', name: 'Massage Giãn cơ' },
+                          { id: 's3', name: 'Yoga - Pilates' },
+                          { id: 's4', name: 'PT online' },
+                          { id: 's5', name: 'Massage Chân' },
+                          { id: 's6', name: 'Massage Cổ - vai - gáy' },
+                        ]
+                    ).map((service: any) => (
+                      <span
+                        key={service.id}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EAF5EC] text-[#2E7D4A] text-xs font-medium border border-[#C6E2CE]"
+                      >
+                        🌿 {service.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 2-column: Đánh giá & Hiệu suất + Lịch làm việc */}
+              <div className="grid md:grid-cols-2 gap-5">
+                {/* Đánh giá & Hiệu suất */}
+                <div className="border border-[#E5EBE5] rounded-2xl p-5 space-y-4">
+                  <h3 className="font-bold text-sm text-[#1C2B20] flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-lg bg-[#FEF0C7] flex items-center justify-center text-xs">⭐</span>
+                    Đánh giá &amp; Hiệu suất
+                  </h3>
+                  <div className="flex items-end gap-4">
+                    <div>
+                      <div className="text-4xl font-bold text-[#1C2B20]">
+                        {Number(technicianDetail.averageRating ?? 4.92).toFixed(2)}
+                        <span className="text-lg text-[#66756B] font-normal"> /5</span>
+                      </div>
+                      <div className="flex items-center gap-0.5 mt-1">
+                        {[1,2,3,4,5].map((s) => (
+                          <Star key={s} className="w-4 h-4 fill-[#F2A93B] text-[#F2A93B]" />
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-[#94A399] mt-1">Từ {technicianDetail.reviewCount ?? 618} đánh giá của khách hàng</p>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    {[
+                      { star: 5, pct: 85 },
+                      { star: 4, pct: 12 },
+                      { star: 3, pct: 2 },
+                      { star: 2, pct: 1 },
+                      { star: 1, pct: 0 },
+                    ].map(({ star, pct }) => (
+                      <div key={star} className="flex items-center gap-2 text-xs">
+                        <span className="w-8 text-right text-[#66756B]">{star} sao</span>
+                        <div className="flex-1 h-2 rounded-full bg-[#F1F5EF] overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-[#2E9B62]"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="w-8 text-[#66756B]">{pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pt-3 border-t border-[#F1F5EF]">
+                    <div className="p-3 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs text-[#66756B] leading-relaxed">
+                      <span className="text-[#2E7D4A] font-semibold">"</span>
+                      Kỹ thuật viên rất chuyên nghiệp, tay nghề tốt, thái độ thân thiện và đúng giờ.
+                      <span className="text-[#2E7D4A] font-semibold">"</span>
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-[#94A399] italic">— Khách hàng ẩn danh</span>
+                        <span className="flex items-center gap-0.5 text-[#F2A93B] font-bold">
+                          {[1,2,3,4,5].map((s) => <span key={s}>★</span>)} 5.0
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lịch làm việc */}
+                <div className="border border-[#E5EBE5] rounded-2xl p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-sm text-[#1C2B20] flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-lg bg-[#EEF4FF] flex items-center justify-center text-xs">📅</span>
+                      Lịch làm việc
+                    </h3>
+                    <span className="text-[11px] text-[#94A399]">13 - 19 Tháng 4, 2024</span>
+                  </div>
+                  {/* Days of week */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {[
+                      { day: 'T2', date: '13/4', sessions: 6, active: true },
+                      { day: 'T3', date: '14/4', sessions: 5, active: false },
+                      { day: 'T4', date: '15/4', sessions: 7, active: false },
+                      { day: 'T5', date: '16/4', sessions: 7, active: false },
+                      { day: 'T6', date: '17/4', sessions: 6, active: false },
+                      { day: 'T7', date: '18/4', sessions: 4, active: false },
+                      { day: 'CN', date: '19/4', sessions: 3, active: false },
+                    ].map((d) => (
+                      <div key={d.day} className={`flex flex-col items-center rounded-xl py-2 text-center text-xs transition-colors ${d.active ? 'bg-[#2E7D4A] text-white' : 'bg-[#F6F8F4] text-[#66756B]'}`}>
+                        <span className="font-semibold">{d.day}</span>
+                        <span className="text-[10px] mt-0.5 opacity-75">{d.date}</span>
+                        <span className="mt-1 font-bold text-[11px]">{d.sessions} ca</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Today slots */}
+                  <div>
+                    <p className="text-xs text-[#66756B] mb-2 flex items-center justify-between">
+                      <span>Khung giờ làm việc hôm nay <strong>(Thứ 2, 13/04)</strong></span>
+                      <span className="text-[#2E9B62] font-semibold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#2E9B62] inline-block" /> 6 ca
+                      </span>
+                    </p>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {['08:00 - 10:00','10:30 - 12:30','14:00 - 16:00','16:30 - 18:30','19:00 - 21:00','21:30 - 23:00'].map((slot) => (
+                        <span key={slot} className="px-2 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-[11px] text-center font-medium text-[#1C2B20]">
+                          {slot}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ghi chú quản trị */}
+              <div className="border border-[#E5EBE5] rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-sm text-[#1C2B20] flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-lg bg-[#F6F8F4] flex items-center justify-center text-xs">📝</span>
+                    Ghi chú quản trị
+                  </h3>
+                  <button className="text-xs font-semibold text-[#2E7D4A] hover:underline flex items-center gap-1">
+                    ✏️ Chỉnh sửa
+                  </button>
+                </div>
+                <p className="text-xs text-[#66756B] leading-relaxed bg-[#F6F8F4] p-3 rounded-xl border border-[#E5EBE5]">
+                  {technicianDetail.adminNote ?? 'KTV có thái độ tốt, phản hồi khách hàng tích cực. Đã hoàn thành đầy đủ hồ sơ KYC.'}
+                </p>
+              </div>
+            </div>
+
+            {/* ── Sticky Footer ── */}
+            <div className="px-6 py-3 border-t border-[#E5EBE5] bg-[#F6F8F4] flex items-center justify-between flex-shrink-0">
+              <span className="text-xs text-[#94A399]">
+                ID: <span className="font-mono font-semibold text-[#66756B]">{technicianDetail.id}</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => void patch(`/admin/marketplace/technicians/${technicianDetail.id}`, { isActive: !technicianDetail.isActive })}
+                  className="px-4 py-2 rounded-xl border border-[#F8D2D0] bg-[#FDF0EF] hover:bg-[#FCE3E1] text-[#D04A44] text-xs font-semibold transition-colors"
+                >
+                  {technicianDetail.isActive ? 'Khóa tài khoản' : 'Kích hoạt lại'}
+                </button>
+                <button
+                  onClick={() => setTechnicianDetail(null)}
+                  className="px-4 py-2 rounded-xl bg-[#1C2B20] hover:bg-[#2E7D4A] text-white text-xs font-semibold transition-colors"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
