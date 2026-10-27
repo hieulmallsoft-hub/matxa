@@ -192,6 +192,7 @@ model User {
   customerBookings Booking[] @relation("BookingCustomer")
   addresses Address[]
   promotionUsages PromotionUsage[]
+  promotionRecipients PromotionRecipient[]
   reviews Review[]
   technicianApplication TechnicianApplication?
   wallets               Wallet[]
@@ -552,10 +553,23 @@ model Promotion {
   isActive       Boolean          @default(true) @map("is_active")
   createdAt      DateTime         @default(now()) @map("created_at")
   usages         PromotionUsage[]
+  recipients     PromotionRecipient[]
   bookings       Booking[]
 
   @@index([isActive, startsAt, endsAt])
   @@map("promotions")
+}
+
+model PromotionRecipient {
+  promotionId String    @map("promotion_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([promotionId, userId])
+  @@index([userId])
+  @@map("promotion_recipients")
 }
 
 model Booking {

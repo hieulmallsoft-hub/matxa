@@ -55,7 +55,7 @@ export class MarketplaceService {
 
   async promotions(userId: string, query: PromotionListQueryDto) {
     const now = new Date();
-    const where = { isActive: true, startsAt: { lte: now }, endsAt: { gte: now } };
+    const where = { isActive: true, startsAt: { lte: now }, endsAt: { gte: now }, OR: [{ recipients: { none: {} } }, { recipients: { some: { userId } } }] };
     const [promotions, total] = await this.prisma.$transaction([
       this.prisma.promotion.findMany({
         where,

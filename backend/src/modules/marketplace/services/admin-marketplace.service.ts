@@ -265,6 +265,7 @@ export class AdminMarketplaceService {
         code: dto.code.trim().toUpperCase(),
         startsAt: new Date(dto.startsAt),
         endsAt: new Date(dto.endsAt),
+        ...(dto.customerIds?.length ? { recipients: { create: dto.customerIds.map((userId) => ({ userId })) } } : {}),
       },
     });
   }

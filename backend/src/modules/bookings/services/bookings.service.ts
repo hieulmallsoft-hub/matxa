@@ -1562,7 +1562,13 @@ export class BookingsService {
   private async validPromotion(userId: string, code: string, subtotal: number, db: Prisma.TransactionClient) {
     const now = new Date();
     const promotion = await db.promotion.findFirst({
-      where: { code: code.trim().toUpperCase(), isActive: true, startsAt: { lte: now }, endsAt: { gte: now } },
+      where: {
+        code: code.trim().toUpperCase(),
+        isActive: true,
+        startsAt: { lte: now },
+        endsAt: { gte: now },
+        OR: [{ recipients: { none: {} } }, { recipients: { some: { userId } } }],
+      },
     });
     if (!promotion) throw new BadRequestException('Ma khuyen mai khong hop le hoac da het han');
     if (subtotal < Number(promotion.minOrderAmount))

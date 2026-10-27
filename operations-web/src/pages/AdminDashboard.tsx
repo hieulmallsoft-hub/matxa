@@ -825,6 +825,7 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                       perUserLimit: Number(f.get('perUserLimit') || 1),
                       startsAt: new Date(String(f.get('startsAt'))).toISOString(),
                       endsAt: new Date(String(f.get('endsAt'))).toISOString(),
+                      customerIds: String(f.get('customerIds') || '').split(',').map((id) => id.trim()).filter(Boolean),
                     });
                   }}
                   className="space-y-3 text-xs"
@@ -837,6 +838,10 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                       placeholder="VD: SPAVIP2026"
                       className="w-full px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] focus:outline-none focus:border-[#2E7D4A]"
                     />
+                  </div>
+                  <div>
+                    <label className="font-semibold block mb-1">Gán cho khách cụ thể (tuỳ chọn)</label>
+                    <input name="customerIds" placeholder="User ID, cách nhau bằng dấu phẩy; để trống = tất cả khách" className="w-full px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5]" />
                   </div>
                   <div>
                     <label className="font-semibold block mb-1">Tên chương trình *</label>

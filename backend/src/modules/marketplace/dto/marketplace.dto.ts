@@ -295,6 +295,8 @@ export class CreatePromotionDto {
   @ApiPropertyOptional({ default: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) perUserLimit?: number;
   @ApiProperty() @IsDateString() startsAt!: string;
   @ApiProperty() @IsDateString() endsAt!: string;
+  @ApiPropertyOptional({ type: [String], description: 'User IDs duoc gan rieng; de trong thi ap dung cho tat ca khach' })
+  @IsOptional() @IsUUID('4', { each: true }) customerIds?: string[];
 }
 
 export class CreateTechnicianByAdminDto extends UpsertTechnicianProfileDto {
