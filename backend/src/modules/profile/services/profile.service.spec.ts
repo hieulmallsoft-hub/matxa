@@ -30,6 +30,7 @@ describe('ProfileService', () => {
     prisma.user.findUnique.mockResolvedValue(user);
     await expect(service.getMe(user.id)).resolves.toEqual({
       ...user,
+      customerCode: 'CUST-11111111',
       status: 'ACTIVE',
       email: null,
       phone: null,
