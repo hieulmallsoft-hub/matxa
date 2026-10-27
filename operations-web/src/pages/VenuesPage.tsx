@@ -630,6 +630,7 @@ export const VenuesPage: React.FC = () => {
                 />
               </div>
 
+              <button type="button" onClick={() => navigator.geolocation.getCurrentPosition((position) => setForm((current) => ({ ...current, latitude: String(position.coords.latitude), longitude: String(position.coords.longitude) })), () => window.alert('Không lấy được vị trí. Hãy cấp quyền vị trí cho trình duyệt.'))} className="w-full py-2 rounded-xl border border-dashed border-[#2E7D4A] text-[#2E7D4A] font-semibold hover:bg-[#EAF5EC]">Lấy vị trí hiện tại</button>
               {/* Lat + Long */}
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
