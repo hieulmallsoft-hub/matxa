@@ -112,7 +112,7 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
     try {
       await request('/admin/courses', {
         method: 'POST',
-        body: JSON.stringify({ title: f.get('title'), slug: f.get('slug'), description: f.get('description'), access: f.get('access'), isPublished: false }),
+        body: JSON.stringify({ title: f.get('title'), slug: f.get('slug'), description: f.get('description'), access: f.get('access'), isPublished: true }),
       });
       form.reset();
       notify('Đã tạo khóa học');
