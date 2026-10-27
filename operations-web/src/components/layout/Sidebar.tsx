@@ -13,7 +13,6 @@ import {
   MessageCircle,
   Bell,
   Settings,
-  Store,
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
@@ -45,37 +44,36 @@ interface NavGroup {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    groupTitle: 'Váº­n hÃ nh',
+    groupTitle: 'Vận hành',
     items: [
-      { id: 'dashboard', label: 'Tá»•ng quan', icon: LayoutDashboard },
-      { id: 'analytics', label: 'Doanh thu & BÃ¡o cÃ¡o', icon: LineChart },
-      { id: 'orders', label: 'Lá»‹ch Ä‘áº·t & ÄÆ¡n hÃ ng', icon: CalendarDays, badge: '8', badgeTone: 'primary' },
+      { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
+      { id: 'analytics', label: 'Doanh thu & Báo cáo', icon: LineChart },
+      { id: 'orders', label: 'Lịch đặt & Đơn hàng', icon: CalendarDays, badge: '8', badgeTone: 'primary' },
     ],
   },
   {
-    groupTitle: 'Quáº£n lÃ½',
+    groupTitle: 'Quản lý',
     items: [
-      { id: 'technicians', label: 'Ká»¹ thuáº­t viÃªn', icon: UsersRound },
-      { id: 'applications', label: 'Duyá»‡t há»“ sÆ¡ KTV', icon: UserCheck, badge: '3', badgeTone: 'warning' },
-      { id: 'venues', label: 'Ð?a di?m & Spa', icon: Store },
-      { id: 'catalog', label: 'Dá»‹ch vá»¥', icon: FolderTree },
-      { id: 'courses', label: 'KhÃ³a há»c Ä‘Ã o táº¡o', icon: GraduationCap },
+      { id: 'technicians', label: 'Kỹ thuật viên', icon: UsersRound },
+      { id: 'applications', label: 'Duyệt hồ sơ KTV', icon: UserCheck, badge: '3', badgeTone: 'warning' },
+      { id: 'catalog', label: 'Dịch vụ', icon: FolderTree },
+      { id: 'courses', label: 'Khóa học đào tạo', icon: GraduationCap },
     ],
   },
   {
-    groupTitle: 'KhÃ¡ch hÃ ng & Marketing',
+    groupTitle: 'Khách hàng & Marketing',
     items: [
-      { id: 'promotions', label: 'Khuyáº¿n mÃ£i & Banner', icon: Sparkles },
-      { id: 'customers', label: 'KhÃ¡ch hÃ ng', icon: HeartHandshake },
-      { id: 'messages', label: 'Tin nháº¯n CSKH', icon: MessageCircle, badge: '2', badgeTone: 'info' },
+      { id: 'promotions', label: 'Khuyến mãi & Banner', icon: Sparkles },
+      { id: 'customers', label: 'Khách hàng', icon: HeartHandshake },
+      { id: 'messages', label: 'Tin nhắn CSKH', icon: MessageCircle, badge: '2', badgeTone: 'info' },
     ],
   },
   {
-    groupTitle: 'Há»‡ thá»‘ng',
+    groupTitle: 'Hệ thống',
     items: [
-      { id: 'notifications', label: 'ThÃ´ng bÃ¡o há»‡ thá»‘ng', icon: Bell },
-      { id: 'settings', label: 'Cáº¥u hÃ¬nh há»‡ thá»‘ng', icon: Settings },
-      { id: 'technicianPolicy', label: 'ChÃ­nh sÃ¡ch KTV', icon: UserCheck },
+      { id: 'notifications', label: 'Thông báo hệ thống', icon: Bell },
+      { id: 'settings', label: 'Cấu hình hệ thống', icon: Settings },
+      { id: 'technicianPolicy', label: 'Chính sách KTV', icon: UserCheck },
     ],
   },
 ];
@@ -101,7 +99,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div
           className="flex items-center gap-3 overflow-hidden cursor-pointer"
           onClick={() => onNavigate('dashboard')}
-          title="Vá» trang Tá»•ng quan MATXXA"
+          title="Về trang Tổng quan MATXXA"
         >
           <div className="w-9 h-9 rounded-xl bg-[#2E7D4A] flex items-center justify-center flex-shrink-0 shadow-sm shadow-[#2E7D4A]/25">
             <Flower2 className="w-5 h-5 text-white" />
@@ -134,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <button
           onClick={onToggleCollapse}
-          title={isCollapsed ? 'Má»Ÿ rá»™ng thanh Ä‘iá»u hÆ°á»›ng' : 'Thu gá»n thanh Ä‘iá»u hÆ°á»›ng'}
+          title={isCollapsed ? 'Mở rộng thanh điều hướng' : 'Thu gọn thanh điều hướng'}
           className="p-1.5 rounded-lg text-[#94A399] hover:text-[#2E7D4A] hover:bg-[#F6F8F4] transition-colors"
         >
           {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -245,15 +243,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
               <div className="flex flex-col">
                 <span className="text-[11px] font-semibold text-[#1C2B20]">
-                  Há»‡ thá»‘ng hoáº¡t Ä‘á»™ng tá»‘t
+                  Hệ thống hoạt động tốt
                 </span>
-                <span className="text-[10px] text-[#66756B]">Sáºµn sÃ ng nháº­n lá»‹ch</span>
+                <span className="text-[10px] text-[#66756B]">Sẵn sàng nhận lịch</span>
               </div>
             </div>
             <ShieldCheck className="w-4 h-4 text-[#2E7D4A]" />
           </div>
         ) : (
-          <div className="flex justify-center py-1" title="Há»‡ thá»‘ng hoáº¡t Ä‘á»™ng tá»‘t">
+          <div className="flex justify-center py-1" title="Hệ thống hoạt động tốt">
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#2E9B62] opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#2E9B62]"></span>
