@@ -207,6 +207,7 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
   const [applications, setApplications] = useState<Page<TechnicianApplication> | null>(null);
   const [applicationAction, setApplicationAction] = useState<string | null>(null);
   const [applicationDetail, setApplicationDetail] = useState<any | null>(null);
+  const [technicianDetail, setTechnicianDetail] = useState<any | null>(null);
   const [appFilterTab, setAppFilterTab] = useState<'ALL' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED'>('ALL');
   const [promoTab, setPromoTab] = useState<'promos' | 'banners'>('promos');
   const [loading, setLoading] = useState(false);
@@ -476,9 +477,7 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => void request<any>(`/marketplace/technicians/${tech.id}`).then((detail) => {
-                              window.alert(`KTV: ${detail.displayName ?? tech.user.displayName ?? tech.id}\nKhu vực: ${detail.city ?? tech.city ?? 'Chưa cập nhật'}\nĐánh giá: ${Number(detail.averageRating ?? tech.averageRating ?? 0).toFixed(2)} (${detail.reviewCount ?? tech.reviewCount ?? 0})\nDịch vụ: ${(detail.services ?? []).map((item: any) => item.name).join(', ') || 'Chưa có dữ liệu'}`);
-                            }).catch((error) => notify(error instanceof Error ? error.message : 'Không thể tải chi tiết KTV', true))}
+                            onClick={() => void request<any>(`/marketplace/technicians/${tech.id}`).then(setTechnicianDetail).catch((error) => notify(error instanceof Error ? error.message : 'Không thể tải chi tiết KTV', true))}
                             className="px-2.5 py-1 rounded-lg text-xs font-semibold text-[#1C2B20] bg-[#F1F5EF] hover:bg-[#E5EBE5] transition-colors"
                           >
                             Chi tiết
@@ -1069,6 +1068,15 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
       {/* ── 6. KHÓA HỌC ĐÀO TẠO ── */}
       {tab === 'courses' && (
         <CourseManagementPanel notify={notify} />
+      )}
+      {technicianDetail && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setTechnicianDetail(null)}>
+          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 space-y-5" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between"><div><h2 className="text-xl font-bold">{technicianDetail.displayName ?? 'Kỹ thuật viên'}</h2><p className="text-sm text-gray-500">Kỹ thuật viên massage & spa</p></div><button onClick={() => setTechnicianDetail(null)} className="text-2xl">×</button></div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3"><div className="p-4 rounded-2xl bg-[#FFF8E8]"><b>{Number(technicianDetail.averageRating ?? 0).toFixed(2)} ★</b><p className="text-xs text-gray-500">Đánh giá trung bình</p></div><div className="p-4 rounded-2xl bg-[#F1F7FF]"><b>{technicianDetail.reviewCount ?? 0}</b><p className="text-xs text-gray-500">Lượt đánh giá</p></div><div className="p-4 rounded-2xl bg-[#EAF8EF]"><b>{technicianDetail.services?.length ?? 0}</b><p className="text-xs text-gray-500">Dịch vụ</p></div><div className="p-4 rounded-2xl bg-[#F5F1FF]"><b>{technicianDetail.city ?? '—'}</b><p className="text-xs text-gray-500">Khu vực</p></div></div>
+            <div className="grid md:grid-cols-2 gap-5"><section className="border rounded-2xl p-4"><h3 className="font-bold mb-3">Thông tin cơ bản</h3><p>Số điện thoại: {technicianDetail.phoneNumber ?? technicianDetail.user?.phoneNumber ?? 'Chưa cập nhật'}</p><p>Khu vực: {technicianDetail.city ?? '—'} {technicianDetail.district ?? ''}</p><p>Trạng thái: {technicianDetail.isAvailable ? 'Sẵn sàng nhận ca' : 'Đang bận'}</p></section><section className="border rounded-2xl p-4"><h3 className="font-bold mb-3">Danh sách dịch vụ</h3><div className="flex flex-wrap gap-2">{(technicianDetail.services ?? []).map((service: any) => <span key={service.id} className="px-3 py-2 rounded-xl bg-[#EAF8EF] text-sm">{service.name}</span>)}{!technicianDetail.services?.length && <span className="text-gray-500">Chưa có dữ liệu</span>}</div></section></div>
+          </div>
+        </div>
       )}
     </div>
   );
