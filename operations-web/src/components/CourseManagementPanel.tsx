@@ -548,7 +548,7 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
                               {mediaIcon(m.type)}
                               <span className="max-w-[120px] truncate">{m.title || (m.type === 'VIDEO' ? 'Video' : m.type === 'PDF' ? 'PDF' : 'Ảnh')}</span>
                               <Eye className="w-3 h-3 opacity-50" />
-                              <span role="button" onClick={(event) => { event.stopPropagation(); void removeMedia(m); }} className="ml-1 text-red-500 hover:text-red-700" title="Gỡ media">×</span>
+                              <button type="button" onClick={(event) => { event.stopPropagation(); void removeMedia(m); }} className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-red-50 px-1.5 text-sm font-bold leading-none text-red-500 hover:bg-red-100 hover:text-red-700" title="Gỡ media" aria-label="Gỡ media">×</button>
                             </button>
                           ))}
                         </div>
