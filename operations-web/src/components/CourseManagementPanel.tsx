@@ -220,6 +220,17 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
     } catch (err) { notify(err instanceof Error ? err.message : 'Không mở được media', true); }
   }
 
+  async function removeMedia(media: Media) {
+    if (!window.confirm('Gỡ media này khỏi bài học?')) return;
+    try {
+      await request(`/admin/courses/media/${media.id}`, { method: 'DELETE' });
+      notify('Đã gỡ media');
+      const fresh = await request<Course>(`/admin/courses/${selected?.id}`);
+      setSelected(fresh);
+      await load();
+    } catch (err) { notify(err instanceof Error ? err.message : 'Không gỡ được media', true); }
+  }
+
   return (
     <div className="flex gap-5 min-h-[600px]">
       {/* ── Sidebar: Course List ── */}
@@ -537,6 +548,7 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
                               {mediaIcon(m.type)}
                               <span className="max-w-[120px] truncate">{m.title || (m.type === 'VIDEO' ? 'Video' : m.type === 'PDF' ? 'PDF' : 'Ảnh')}</span>
                               <Eye className="w-3 h-3 opacity-50" />
+                              <span role="button" onClick={(event) => { event.stopPropagation(); void removeMedia(m); }} className="ml-1 text-red-500 hover:text-red-700" title="Gỡ media">×</span>
                             </button>
                           ))}
                         </div>

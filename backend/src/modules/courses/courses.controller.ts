@@ -37,5 +37,6 @@ export class AdminCoursesController {
   @Post('lessons/:id/media-upload')
   @UseInterceptors(FileInterceptor('file'))
   uploadMedia(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: any, @Body('type') type: string) { return this.courses.uploadMedia(id, file, type); }
+  @Delete('media/:id') removeMedia(@Param('id', ParseUUIDPipe) id: string) { return this.courses.removeMedia(id); }
   @Post('lessons/:id/media') createMedia(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateMediaDto) { return this.courses.createMedia(id, dto); }
 }

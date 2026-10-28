@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateCourseDto, CreateCoverUploadUrlDto, CreateLessonDto, CreateMediaDto, CreateMediaUploadUrlDto, UpdateCourseDto, UpdateLessonDto } from './dto/course.dto';
@@ -19,6 +19,13 @@ export class CoursesService {
     const { bucket, client } = this.storage();
     await client.send(new PutObjectCommand({ Bucket: bucket, Key: storageKey, Body: file.buffer, ContentType: file.mimetype }));
     return this.prisma.courseMedia.create({ data: { lessonId, type: type as any, storageKey, contentType: file.mimetype, title: file.originalname, fileSize: file.size } });
+  }
+  async removeMedia(id: string) {
+    const media = await this.prisma.courseMedia.findUnique({ where: { id } });
+    if (!media) throw new NotFoundException('Không tìm thấy media');
+    const { bucket, client } = this.storage();
+    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: media.storageKey }));
+    await this.prisma.courseMedia.delete({ where: { id } });
   }
   private storage() {
     const bucket = this.config.get<string>('S3_BUCKET'); const region = this.config.get<string>('S3_REGION');
