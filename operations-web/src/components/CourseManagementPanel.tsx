@@ -168,8 +168,9 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
 
   async function uploadCover(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const formElement = e.currentTarget;
     if (!selected) return;
-    const file = new FormData(e.currentTarget).get('file');
+    const file = new FormData(formElement).get('file');
     if (!(file instanceof File) || !file.size) return;
     setBusy(true);
     try {
@@ -184,14 +185,15 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
       const fresh = await request<Course>(`/admin/courses/${selected.id}`);
       setSelected(fresh);
       await load();
-      e.currentTarget.reset();
+      formElement.reset();
     } catch (err) { notify(err instanceof Error ? err.message : 'Không tải được ảnh bìa', true); }
     finally { setBusy(false); }
   }
 
   async function uploadMedia(e: FormEvent<HTMLFormElement>, lesson: Lesson) {
     e.preventDefault();
-    const file = new FormData(e.currentTarget).get('file');
+    const formElement = e.currentTarget;
+    const file = new FormData(formElement).get('file');
     if (!(file instanceof File) || !file.size) return;
     setBusy(true);
     try {
@@ -206,7 +208,7 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
       notify(`Đã tải ${type === 'VIDEO' ? 'video' : type === 'PDF' ? 'PDF' : 'ảnh'} lên bài học`);
       const fresh = await request<Course>(`/admin/courses/${selected?.id}`);
       setSelected(fresh);
-      e.currentTarget.reset();
+      formElement.reset();
     } catch (err) { notify(err instanceof Error ? err.message : 'Không tải được media', true); }
     finally { setBusy(false); }
   }
