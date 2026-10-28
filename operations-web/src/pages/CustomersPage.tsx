@@ -174,7 +174,7 @@ export const CustomersPage: React.FC = () => {
       />
 
       {/* 2. KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      {false && <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           label="Tổng số khách hàng"
           value="3.920 khách"
@@ -215,7 +215,7 @@ export const CustomersPage: React.FC = () => {
           tone="warning"
           sparkline={[420, 435, 448, 455, 468, 475, 480]}
         />
-      </div>
+      </div>}
 
       {/* 3. Filter Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-white rounded-2xl border border-[#E5EBE5] shadow-2xs">
@@ -225,7 +225,7 @@ export const CustomersPage: React.FC = () => {
           placeholder="Tìm tên khách hàng, số điện thoại, email..."
         />
 
-        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full">
+        {false && <div className="flex items-center gap-1.5 overflow-x-auto max-w-full">
           {[
             { key: 'ALL', label: 'Tất cả hạng' },
             { key: 'VIP Platinum', label: 'VIP Platinum' },
@@ -245,7 +245,7 @@ export const CustomersPage: React.FC = () => {
               {tab.label}
             </button>
           ))}
-        </div>
+        </div>}
       </div>
 
       {/* 4. Main Customer Table */}
