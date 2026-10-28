@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Users,
@@ -24,6 +24,7 @@ import { SectionCard } from '../components/common/SectionCard';
 import { SearchInput, FilterTabs } from '../components/common/FilterBar';
 import { DetailDrawer } from '../components/common/DetailDrawer';
 import { StatusBadge } from '../components/common/StatusBadge';
+import { request } from '../api/client';
 
 interface CustomerEntity {
   id: string;
@@ -115,11 +116,20 @@ const CUSTOMER_ENTITIES: CustomerEntity[] = [
 
 export const CustomersPage: React.FC = () => {
   const { addToast } = useToast();
+  const [customers, setCustomers] = useState<CustomerEntity[]>([]);
   const [search, setSearch] = useState('');
   const [selectedTier, setSelectedTier] = useState<string>('ALL');
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerEntity | null>(null);
 
-  const filtered = CUSTOMER_ENTITIES.filter((c) => {
+  useEffect(() => {
+    void request<{ items?: Array<{ id: string; displayName?: string | null; email?: string | null; phoneNumber?: string | null; status?: string; role?: string }> ; total?: number }>('/admin/marketplace/users?limit=100')
+      .then((result) => setCustomers((result.items ?? []).filter((user) => (user.role ?? '').toUpperCase() === 'CUSTOMER').map((user) => ({
+        id: user.id, name: user.displayName || 'Chưa cập nhật', phone: user.phoneNumber || 'Chưa cập nhật', email: user.email || '', tier: 'Thành viên mới', spent: 0, orders: 0, lastBooking: 'Chưa có', favoriteService: '', address: 'Chưa cập nhật', status: user.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE', avatar: '',
+      }))))
+      .catch((error) => addToast({ title: 'Không tải được khách hàng', message: error instanceof Error ? error.message : 'Vui lòng thử lại', type: 'error' }));
+  }, [addToast]);
+
+  const filtered = customers.filter((c) => {
     const matchSearch =
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.phone.includes(search) ||
