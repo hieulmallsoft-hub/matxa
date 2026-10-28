@@ -68,6 +68,14 @@ export class TechnicianContractService {
     const { bucket, client } = this.storage(); const storageKey = `technician-contracts/templates/${randomUUID()}.pdf`;
     return { uploadUrl: await getSignedUrl(client, new PutObjectCommand({ Bucket: bucket, Key: storageKey, ContentType: contentType }), { expiresIn: 600 }), storageKey, expiresIn: 600 };
   }
+  async uploadTemplateFile(file: any) {
+    if (!file?.buffer?.length || file.mimetype !== 'application/pdf') throw new BadRequestException('Mau hop dong phai la PDF');
+    const { bucket, client } = this.storage();
+    const storageKey = `technician-contracts/templates/${randomUUID()}.pdf`;
+    await client.send(new PutObjectCommand({ Bucket: bucket, Key: storageKey, ContentType: file.mimetype, Body: file.buffer }));
+    await this.prisma.contractTemplate.updateMany({ data: { isActive: false } });
+    return this.prisma.contractTemplate.create({ data: { storageKey, fileName: file.originalname, contentType: file.mimetype, isActive: true } });
+  }
   async setTemplate(storageKey: string, fileName: string, contentType: string) {
     if (!storageKey.startsWith('technician-contracts/templates/')) throw new BadRequestException('Storage key khong hop le');
     await this.prisma.contractTemplate.updateMany({ data: { isActive: false } });
