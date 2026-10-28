@@ -452,11 +452,13 @@ export class BookingsService {
     };
     const eligible = [] as any[];
     for (const candidate of candidates) {
-      const [slot, conflict] = await Promise.all([
+      const [slot, conflict, matchingServices] = await Promise.all([
         this.prisma.availabilitySlot.findFirst({ where: { technicianId: candidate.id, isAvailable: true, startAt: { lte: start }, endAt: { gte: end } } }),
         this.prisma.booking.findFirst({ where: { technicianId: candidate.id, status: 'CONFIRMED', scheduledStart: { lt: end }, scheduledEnd: { gt: start } }, select: { id: true } }),
+        this.prisma.technicianService.findMany({ where: { technicianId: candidate.id, isActive: true, catalogServiceId: { in: serviceIds }, modes: { has: dto.mode } }, select: { catalogServiceId: true, categoryId: true } }),
       ]);
-      if (!slot || conflict) continue;
+      const hasAllServices = services.every((service: any) => matchingServices.some((item: any) => item.catalogServiceId === service.id && item.categoryId === service.categoryId));
+      if (!slot || conflict || !hasAllServices) continue;
        eligible.push({ technicianId: candidate.id, displayName: candidate.user.displayName, avatarUrl: candidate.user.avatarUrl, city: candidate.city, district: candidate.district, distanceKm: distanceKm(candidate.latitude, candidate.longitude), rating: Number(candidate.averageRating), reviewCount: candidate.reviewCount });
     }
     eligible.sort((a, b) => {
