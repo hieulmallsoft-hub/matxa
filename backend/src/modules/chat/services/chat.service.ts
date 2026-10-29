@@ -30,9 +30,10 @@ export class ChatService {
     const technicianUserId = booking.technician!.userId;
     const participantKey = [booking.customerId, technicianUserId].sort().join(':');
     const selectionTemplate = await this.getNotificationTemplate('TECHNICIAN_SELECTED');
-    const selectionText = selectionTemplate?.isActive === false
-      ? 'TECHNICIAN_SELECTED'
-      : selectionTemplate?.body || 'Khách hàng đã chọn KTV cho đơn dịch vụ.';
+    const selectionText =
+      selectionTemplate?.isActive === false
+        ? 'TECHNICIAN_SELECTED'
+        : selectionTemplate?.body || 'Khách hàng đã chọn KTV cho đơn dịch vụ.';
     let conversation;
     try {
       conversation = await this.prisma.conversation.upsert({
@@ -84,14 +85,26 @@ export class ChatService {
       const ids = conversations.map((conversation) => conversation.id);
       const unread = ids.length
         ? await this.prisma.message.findMany({
-            where: { conversationId: { in: ids }, senderId: { not: userId }, recalledAt: null, readAt: null },
-            select: { conversationId: true },
+            where: { conversationId: { in: ids }, senderId: { not: userId }, recalledAt: null },
+            select: { conversationId: true, createdAt: true },
           })
         : [];
       const unreadByConversation = new Map<string, number>();
-      for (const message of unread) unreadByConversation.set(message.conversationId, (unreadByConversation.get(message.conversationId) ?? 0) + 1);
+      const lastReadByConversation = new Map(
+        conversations.map((conversation) => [
+          conversation.id,
+          conversation.members.find((member) => member.userId === userId)?.lastReadAt,
+        ]),
+      );
+      for (const message of unread) {
+        const lastReadAt = lastReadByConversation.get(message.conversationId);
+        if (!lastReadAt || message.createdAt > lastReadAt)
+          unreadByConversation.set(message.conversationId, (unreadByConversation.get(message.conversationId) ?? 0) + 1);
+      }
       return conversations.map((conversation) => {
-        const participant = conversation.members.find((member) => member.user.role !== 'ADMIN')?.user ?? conversation.members[0]?.user;
+        const participant =
+          conversation.members.find((member) => member.user.role === 'CUSTOMER')?.user ??
+          conversation.members.find((member) => member.user.role !== 'ADMIN')?.user;
         return {
           id: conversation.id,
           bookingId: conversation.bookingId,
@@ -110,7 +123,7 @@ export class ChatService {
           include: {
             members: {
               where: { userId: { not: userId } },
-              include: { user: { select: { id: true, displayName: true, avatarUrl: true } } },
+              include: { user: { select: { id: true, displayName: true, avatarUrl: true, role: true } } },
             },
             messages: { orderBy: { createdAt: 'desc' }, take: 1 },
           },
@@ -143,7 +156,8 @@ export class ChatService {
         visible.push({
           id: conversation.id,
           bookingId: conversation.bookingId,
-          participant: conversation.members[0]?.user,
+          participant:
+            conversation.members.find((member) => member.user.role !== 'ADMIN')?.user ?? conversation.members[0]?.user,
           lastMessage: conversation.messages[0] ?? null,
           lastMessageAt: conversation.lastMessageAt,
           unreadCount: unreadByConversation.get(conversation.id) ?? 0,
@@ -171,7 +185,9 @@ export class ChatService {
       this.prisma.message.count({ where }),
     ]);
     return {
-      items: await Promise.all(items.map(async (item) => this.withSignedMediaUrl(await this.withSystemMessageText(item)))),
+      items: await Promise.all(
+        items.map(async (item) => this.withSignedMediaUrl(await this.withSystemMessageText(item))),
+      ),
       total,
       page: query.page,
       limit: query.limit,
@@ -245,6 +261,16 @@ export class ChatService {
   async markRead(userId: string, conversationId: string) {
     const access = await this.ensureAccess(userId, conversationId);
     const now = new Date();
+    // Admin reads have their own cursor; they must not mark customer/KTV
+    // messages read on behalf of either participant.
+    if (access.isAdmin) {
+      await this.prisma.conversationMember.upsert({
+        where: { conversationId_userId: { conversationId, userId } },
+        create: { conversationId, userId, lastReadAt: now },
+        update: { lastReadAt: now, hiddenAt: null },
+      });
+      return { updated: 0, readAt: now };
+    }
     const result = await this.prisma.message.updateMany({
       where: { conversationId, senderId: { not: userId }, readAt: null },
       data: { readAt: now, deliveredAt: now },
@@ -280,7 +306,10 @@ export class ChatService {
       this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { bookingId: true } }),
     ]);
     if (!member) throw new ForbiddenException('Ban khong thuoc cuoc tro chuyen nay');
-    if (conversation?.bookingId) await this.bookingChatContext(userId, conversation.bookingId);
+    if (conversation?.bookingId) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+      if (user?.role !== 'ADMIN') await this.bookingChatContext(userId, conversation.bookingId);
+    }
     return member;
   }
 
@@ -292,7 +321,8 @@ export class ChatService {
     ]);
     if (!conversation) throw new NotFoundException('Cuoc tro chuyen khong ton tai');
     if (!member && user?.role !== 'ADMIN') throw new ForbiddenException('Ban khong co quyen xem cuoc tro chuyen');
-    if (member && conversation.bookingId) await this.bookingChatContext(userId, conversation.bookingId);
+    if (member && user?.role !== 'ADMIN' && conversation.bookingId)
+      await this.bookingChatContext(userId, conversation.bookingId);
     return { member, isAdmin: user?.role === 'ADMIN' };
   }
 
@@ -325,9 +355,11 @@ export class ChatService {
   private async getNotificationTemplate(type: string) {
     // Keep chat creation compatible with lightweight service mocks and older
     // deployments while the notification template API is being rolled out.
-    const getter = (this.notifications as NotificationsService & {
-      getTemplate?: (templateType: string) => Promise<{ body?: string; isActive?: boolean } | null>;
-    }).getTemplate;
+    const getter = (
+      this.notifications as NotificationsService & {
+        getTemplate?: (templateType: string) => Promise<{ body?: string; isActive?: boolean } | null>;
+      }
+    ).getTemplate;
     return typeof getter === 'function' ? getter.call(this.notifications, type) : null;
   }
 

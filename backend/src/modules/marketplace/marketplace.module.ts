@@ -19,9 +19,13 @@ import { ServiceCatalogService } from './services/service-catalog.service';
 import { MarketplaceGateway } from './gateways/marketplace.gateway';
 import { MarketplaceRealtimeService } from './services/marketplace-realtime.service';
 import { TechnicianContractService } from './services/technician-contract.service';
-import { AdminTechnicianContractController, TechnicianContractController } from './controllers/technician-contract.controller';
+import {
+  AdminTechnicianContractController,
+  TechnicianContractController,
+} from './controllers/technician-contract.controller';
 import { AdminVenueController, VenueController } from './controllers/venue.controller';
 import { VenueService } from './services/venue.service';
+import { VenueStorageService } from './services/venue-storage.service';
 
 @Module({
   imports: [AuthModule, NotificationsModule],
@@ -50,6 +54,7 @@ import { VenueService } from './services/venue.service';
     MarketplaceRealtimeService,
     TechnicianContractService,
     VenueService,
+    VenueStorageService,
   ],
   exports: [MarketplaceService, MarketplaceRealtimeService],
 })

@@ -1,450 +1,401 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import {
-  MessageSquare,
-  Send,
-  Sparkles,
-  User,
-  Phone,
-  Clock,
-  Check,
-  CheckCheck,
-  Search,
-  MapPin,
-  CalendarDays,
-  Tag,
-  Paperclip,
-} from 'lucide-react';
+import { Send, Search, RefreshCw, MessageSquare, Check } from 'lucide-react';
 import { useToast } from '../components/ui/ToastContainer';
 import { PageHeader } from '../components/common/PageHeader';
 import { request } from '../api/client';
 
-interface MessageThread {
+type Participant = { id: string; displayName?: string | null; avatarUrl?: string | null };
+type ApiMessage = {
   id: string;
-  participantId?: string;
-  sender: string;
-  phone: string;
-  tier: string;
-  avatar: string;
-  preview: string;
-  time: string;
-  unread: boolean;
-  address: string;
-  recentBooking: string;
-  messages: { sender: 'them' | 'me'; text: string; time: string }[];
-}
-
-type ApiConversation = {
+  senderId: string;
+  type: string;
+  text?: string | null;
+  createdAt: string;
+  mediaUrl?: string | null;
+  address?: string | null;
+  recalledAt?: string | null;
+};
+type Conversation = {
   id: string;
   bookingId?: string | null;
-  participant?: { id: string; displayName?: string | null; avatarUrl?: string | null; phone?: string | null } | null;
-  lastMessage?: { senderId: string; type: string; text?: string | null; createdAt: string; readAt?: string | null } | null;
+  participant?: Participant | null;
+  lastMessage?: ApiMessage | null;
   lastMessageAt?: string | null;
   unreadCount?: number;
 };
-type ApiMessage = { id: string; senderId: string; type: string; text?: string | null; createdAt: string };
-const formatTime = (value?: string | null) => value ? new Date(value).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '';
-const preview = (message?: { type: string; text?: string | null } | null) => message?.text || (message?.type === 'IMAGE' ? 'Đã gửi hình ảnh' : message?.type === 'LOCATION' ? 'Đã gửi vị trí' : 'Tin nhắn mới');
-const mapConversation = (row: ApiConversation): MessageThread => ({
-  id: row.id, participantId: row.participant?.id || '', sender: row.participant?.displayName || 'Khách hàng', phone: row.participant?.phone || '', tier: 'Khách hàng',
-  avatar: row.participant?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(row.participant?.displayName || 'KH')}`,
-  preview: preview(row.lastMessage), time: formatTime(row.lastMessageAt || row.lastMessage?.createdAt), unread: (row.unreadCount || 0) > 0,
-  address: 'Thông tin từ booking', recentBooking: row.bookingId ? `Booking ${row.bookingId.slice(0, 8)}` : 'Chưa có booking', messages: [],
-});
-const mapMessage = (message: ApiMessage, participantId: string) => ({ sender: message.senderId === participantId ? 'them' as const : 'me' as const, text: preview(message), time: formatTime(message.createdAt) });
-
-const INITIAL_THREADS: MessageThread[] = [
-  {
-    id: 'thread-1',
-    sender: 'Nguyễn Thị Lan Anh',
-    phone: '0901 888 234',
-    tier: 'VIP Platinum',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80',
-    preview: 'Kỹ thuật viên Mai Anh đã chuẩn bị tới nơi chưa em?',
-    time: '4 phút trước',
-    unread: true,
-    address: 'Quận 1, TP. Hồ Chí Minh',
-    recentBooking: 'Massage Cổ Vai Gáy 90p lúc 10:00',
-    messages: [
-      {
-        sender: 'them',
-        text: 'Chào admin, chị đã đặt lịch trị liệu cổ vai gáy 90 phút lúc 10h sáng nay tại Quận 1.',
-        time: '09:40',
-      },
-      {
-        sender: 'me',
-        text: 'Dạ MATXXA xin chào chị Lan Anh ạ! Ca đặt #BK-1048 của chị đã được phân công cho KTV Mai Anh.',
-        time: '09:42',
-      },
-      {
-        sender: 'them',
-        text: 'Kỹ thuật viên Mai Anh đã chuẩn bị tới nơi chưa em? Chị cần chuẩn bị không gian gì trước không?',
-        time: '09:48',
-      },
-    ],
-  },
-  {
-    id: 'thread-2',
-    sender: 'Trần Minh Hoàng',
-    phone: '0903 555 888',
-    tier: 'Gold Member',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-    preview: 'Cho mình hỏi gói Shiatsu bên bạn có massage chân không?',
-    time: '25 phút trước',
-    unread: false,
-    address: 'Quận 3, TP. Hồ Chí Minh',
-    recentBooking: 'Shiatsu Nhật Bản 60p',
-    messages: [
-      {
-        sender: 'them',
-        text: 'Cho mình hỏi liệu trình Shiatsu Nhật Bản có bao gồm bấm huyệt chân và vai không shop?',
-        time: '08:30',
-      },
-      {
-        sender: 'me',
-        text: 'Dạ liệu trình Shiatsu 60 phút sẽ tập trung kinh lạc toàn thân kết hợp bấm huyệt chân thảo dược anh Hoàng nhé!',
-        time: '08:35',
-      },
-      {
-        sender: 'them',
-        text: 'Ok cảm ơn shop, để mình đặt ca chiều nay.',
-        time: '08:38',
-      },
-    ],
-  },
-  {
-    id: 'thread-3',
-    sender: 'Lê Thu Hà',
-    phone: '0912 666 777',
-    tier: 'VIP Platinum',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-    preview: 'Dịch vụ của KTV Hương hôm qua rất tuyệt vời em nhé!',
-    time: '1 giờ trước',
-    unread: false,
-    address: 'Cầu Giấy, Hà Nội',
-    recentBooking: 'Combo VIP 120p',
-    messages: [
-      {
-        sender: 'them',
-        text: 'Dịch vụ của bạn KTV Hương hôm qua rất tuyệt vời em nhé, chị đã chấm 5 sao trên ứng dụng rồi.',
-        time: 'Hôm qua',
-      },
-      {
-        sender: 'me',
-        text: 'Dạ MATXXA chân thành cảm ơn chị Thu Hà! Chúc chị một ngày mới nhiều năng lượng và thư thái ạ.',
-        time: 'Hôm qua',
-      },
-    ],
-  },
-];
-
+const formatTime = (value?: string | null) =>
+  value
+    ? new Date(value).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
+    : '';
+const messageText = (message?: ApiMessage | null) => {
+  if (!message) return 'Chưa có tin nhắn';
+  if (message.recalledAt) return 'Tin nhắn đã được thu hồi';
+  return (
+    message.text ||
+    (message.type === 'IMAGE'
+      ? 'Đã gửi hình ảnh'
+      : message.type === 'LOCATION'
+        ? message.address || 'Đã gửi vị trí'
+        : 'Thông báo hệ thống')
+  );
+};
+const errorText = (error: unknown) => (error instanceof Error ? error.message : 'Không thể kết nối máy chủ');
 const QUICK_REPLIES = [
-  'Dạ KTV đang di chuyển và sẽ có mặt trước giờ hẹn 10 phút ạ!',
-  'Dạ anh/chị cần hỗ trợ thêm thông tin về gói dịch vụ nào ạ?',
-  'Dạ MATXXA đã ghi nhận yêu cầu và cập nhật cho kỹ thuật viên rồi ạ.',
-  'Dạ voucher ưu đãi 20% đã được áp dụng trực tiếp vào đơn của mình ạ.',
+  'Dạ MATXXA xin chào! Anh/chị cần hỗ trợ nội dung gì ạ?',
+  'Dạ anh/chị vui lòng chờ để bên em kiểm tra thông tin ạ.',
+  'Dạ cảm ơn anh/chị đã liên hệ MATXXA!',
 ];
+function Avatar({ participant }: { participant?: Participant | null }) {
+  return participant?.avatarUrl ? (
+    <img src={participant.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+  ) : (
+    <span className="w-10 h-10 rounded-full bg-[#EAF5EC] text-[#2E7D4A] flex items-center justify-center font-bold shrink-0">
+      {(participant?.displayName || 'KH').slice(0, 2).toUpperCase()}
+    </span>
+  );
+}
 
 export const MessagesPage: React.FC = () => {
   const { addToast } = useToast();
-  const [threads, setThreads] = useState<MessageThread[]>([]);
-  const [activeThreadId, setActiveThreadId] = useState<string>('');
+  const [threads, setThreads] = useState<Conversation[]>([]);
+  const [activeThreadId, setActiveThreadId] = useState('');
+  const [currentUserId, setCurrentUserId] = useState('');
   const [inputMessage, setInputMessage] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-
-  const emptyThread: MessageThread = {
-    id: '', participantId: '', sender: 'Chưa có hội thoại', phone: '', tier: '',
-    avatar: 'https://ui-avatars.com/api/?name=KH', preview: '', time: '', unread: false,
-    address: '', recentBooking: '', messages: [],
-  };
-  const activeThread = threads.find((t) => t.id === activeThreadId) || emptyThread;
+  const [listError, setListError] = useState('');
+  const [messageError, setMessageError] = useState('');
+  const [readError, setReadError] = useState('');
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [history, setHistory] = useState<{ conversationId: string; items: ApiMessage[] }>({
+    conversationId: '',
+    items: [],
+  });
+  const activeId = useRef(activeThreadId);
+  activeId.current = activeThreadId;
+  const sendingRef = useRef(false);
+  const sendVersion = useRef(0);
+  const scrollArea = useRef<HTMLDivElement>(null);
+  const activeThread = threads.find((thread) => thread.id === activeThreadId);
+  const messages = history.conversationId === activeThreadId ? history.items : [];
 
   useEffect(() => {
-    let cancelled = false;
-    request<ApiConversation[] | { items: ApiConversation[] }>('/conversations')
-      .then((payload) => {
-        if (cancelled) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    let userId = '';
+    setLoading(true);
+    const load = async () => {
+      try {
+        if (!userId) {
+          const user = await request<{ id: string; role: string }>('/auth/me', { signal: controller.signal });
+          if (user.role !== 'ADMIN') throw new Error('Vui lòng đăng nhập tài khoản quản trị để sử dụng hộp thư.');
+          userId = user.id;
+        }
+        const payload = await request<Conversation[] | { items: Conversation[] }>('/conversations', {
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
         const rows = Array.isArray(payload) ? payload : payload.items;
-        const mapped = rows.map(mapConversation);
-        setThreads(mapped);
-        setActiveThreadId(mapped[0]?.id || '');
-      })
-      .catch((error) => addToast({ title: 'Không tải được hội thoại', message: error instanceof Error ? error.message : 'Không thể tải dữ liệu', type: 'error' }))
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [addToast]);
+        setCurrentUserId(userId);
+        setThreads(rows);
+        setActiveThreadId((current) => (rows.some((row) => row.id === current) ? current : rows[0]?.id || ''));
+        setListError('');
+      } catch (error) {
+        if (!controller.signal.aborted) setListError(errorText(error));
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          timer = setTimeout(load, 5000);
+        }
+      }
+    };
+    void load();
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [refreshKey]);
 
   useEffect(() => {
-    if (!activeThreadId) return;
-    const thread = threads.find((item) => item.id === activeThreadId);
-    if (!thread) return;
-    let cancelled = false;
-    request<{ items: ApiMessage[] }>(`/conversations/${activeThreadId}/messages?page=1&limit=100`)
-      .then((response) => {
-        if (cancelled) return;
-        setThreads((current) => current.map((item) => item.id === activeThreadId
-          ? { ...item, unread: false, messages: [...response.items].reverse().map((message) => mapMessage(message, thread.participantId || '')) }
-          : item));
-        return request(`/conversations/${activeThreadId}/read`, { method: 'PATCH' });
-      })
-      .catch((error) => addToast({ title: 'Không tải được tin nhắn', message: error instanceof Error ? error.message : 'Không thể tải dữ liệu', type: 'error' }));
-    return () => { cancelled = true; };
-  }, [activeThreadId, addToast]);
+    setInputMessage('');
+    setMessageError('');
+    setReadError('');
+    if (!activeThreadId || !currentUserId) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    let lastReadMessageId: string | undefined;
+    setMessagesLoading(true);
+    const load = async () => {
+      const version = sendVersion.current;
+      try {
+        const response = await request<{ items: ApiMessage[] }>(
+          `/conversations/${activeThreadId}/messages?page=1&limit=100`,
+          { signal: controller.signal },
+        );
+        if (controller.signal.aborted || version !== sendVersion.current || sendingRef.current) return;
+        setHistory({ conversationId: activeThreadId, items: [...response.items].reverse() });
+        setMessageError('');
+        const latestIncoming = response.items.find((message) => message.senderId !== currentUserId);
+        if (latestIncoming && latestIncoming.id !== lastReadMessageId) {
+          try {
+            await request(`/conversations/${activeThreadId}/read`, { method: 'PATCH', signal: controller.signal });
+            if (controller.signal.aborted) return;
+            lastReadMessageId = latestIncoming.id;
+            setReadError('');
+            setThreads((rows) => rows.map((row) => (row.id === activeThreadId ? { ...row, unreadCount: 0 } : row)));
+          } catch (error) {
+            if (!controller.signal.aborted) setReadError(`Chưa đánh dấu đã đọc: ${errorText(error)}`);
+          }
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) setMessageError(errorText(error));
+      } finally {
+        if (!controller.signal.aborted) {
+          setMessagesLoading(false);
+          timer = setTimeout(load, 3000);
+        }
+      }
+    };
+    void load();
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [activeThreadId, currentUserId, refreshKey]);
 
-  const handleSendMessage = async (textToSend?: string) => {
-    const text = (textToSend || inputMessage).trim();
-    if (!text || !activeThreadId) return;
+  const lastMessageId = messages[messages.length - 1]?.id;
+  useEffect(() => {
+    const area = scrollArea.current;
+    if (area) area.scrollTop = area.scrollHeight;
+  }, [activeThreadId, lastMessageId]);
+
+  const handleSendMessage = async (quickReply?: string) => {
+    const text = (quickReply ?? inputMessage).trim();
+    const conversationId = activeThreadId;
+    if (!text || !conversationId || !currentUserId || sendingRef.current) return;
+    sendingRef.current = true;
+    sendVersion.current++;
+    setSending(true);
     try {
-      const message = await request<ApiMessage>(`/conversations/${activeThreadId}/messages`, {
-        method: 'POST', body: JSON.stringify({ type: 'TEXT', text }),
+      const message = await request<ApiMessage>(`/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ type: 'TEXT', text }),
       });
-      const participantId = threads.find((item) => item.id === activeThreadId)?.participantId || '';
-      setThreads((current) => current.map((item) => item.id === activeThreadId
-        ? { ...item, preview: text, time: 'Vừa xong', unread: false, messages: [...item.messages, mapMessage(message, participantId)] }
-        : item));
-      setInputMessage('');
-      addToast({ title: 'Đã gửi phản hồi', message: 'Tin nhắn đã được gửi đến khách hàng.', type: 'success' });
+      if (activeId.current === conversationId) {
+        setHistory((current) => ({
+          conversationId,
+          items: [
+            ...(current.conversationId === conversationId
+              ? current.items.filter((item) => item.id !== message.id)
+              : []),
+            message,
+          ],
+        }));
+        if (!quickReply) setInputMessage((current) => (current.trim() === text ? '' : current));
+        setMessageError('');
+      }
+      setThreads((rows) =>
+        rows.map((row) =>
+          row.id === conversationId ? { ...row, lastMessage: message, lastMessageAt: message.createdAt } : row,
+        ),
+      );
     } catch (error) {
-      addToast({ title: 'Không gửi được tin nhắn', message: error instanceof Error ? error.message : 'Không thể gửi tin nhắn', type: 'error' });
+      addToast({ title: 'Không gửi được tin nhắn', message: errorText(error), type: 'error' });
+    } finally {
+      sendingRef.current = false;
+      sendVersion.current++;
+      setSending(false);
     }
   };
-
-  const filteredThreads = threads.filter(
-    (t) =>
-      t.sender.toLowerCase().includes(search.toLowerCase()) ||
-      t.phone.includes(search) ||
-      t.preview.toLowerCase().includes(search.toLowerCase())
+  const query = search.trim().toLocaleLowerCase('vi-VN');
+  const filteredThreads = threads.filter((thread) =>
+    `${thread.participant?.displayName || ''} ${messageText(thread.lastMessage)} ${thread.bookingId || ''}`
+      .toLocaleLowerCase('vi-VN')
+      .includes(query),
   );
+  const unreadCount = threads.reduce((sum, thread) => sum + (thread.unreadCount || 0), 0);
+  const canSend = Boolean(activeThread && currentUserId && !sending && !loading && !messagesLoading);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-      className="space-y-6 pb-12"
-    >
-      {/* Page Header */}
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
       <PageHeader
         title="Tin nhắn CSKH"
-        subtitle="Hộp thư hỗ trợ trực tuyến, tư vấn đặt lịch và giải đáp thắc mắc khách hàng"
-        badge="1 tin nhắn mới"
+        subtitle="Trao đổi với khách hàng và kỹ thuật viên trong hội thoại đặt lịch"
+        badge={unreadCount ? `${unreadCount} tin chưa đọc` : undefined}
         badgeTone="blue"
-        breadcrumbs={[
-          { label: 'MATXXA' },
-          { label: 'Tin nhắn CSKH' },
-        ]}
+        breadcrumbs={[{ label: 'MATXXA' }, { label: 'Tin nhắn CSKH' }]}
+        actions={
+          <button
+            onClick={() => setRefreshKey((key) => key + 1)}
+            className="flex items-center gap-2 text-xs text-[#2E7D4A]"
+          >
+            <RefreshCw className="w-4 h-4" /> Tải lại
+          </button>
+        }
       />
-
-      {/* 3-Column Modern Inbox Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-220px)] min-h-[600px] max-h-[750px]">
-        {/* CỘT 1: Danh sách hội thoại (4 cols) */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-[#E5EBE5] shadow-[0_2px_12px_rgba(28,43,32,0.04)] overflow-hidden flex flex-col h-full">
-          {/* Search box */}
-          <div className="p-3.5 border-b border-[#E5EBE5]">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-[#94A399] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Tìm cuộc trò chuyện, SĐT..."
-                className="w-full pl-8 pr-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs text-[#1C2B20] placeholder-[#94A399] focus:outline-none focus:border-[#2E7D4A]"
-              />
-            </div>
-          </div>
-
-          {/* Thread list */}
-          <div className="flex-1 overflow-y-auto divide-y divide-[#F1F5EF]">
-            {loading && <div className="p-6 text-center text-xs text-[#66756B]">Äang táº£i há»™i thoáº¡i...</div>}
-            {!loading && filteredThreads.length === 0 && (
-              <div className="p-6 text-center text-xs text-[#66756B]">ChÆ°a cÃ³ há»™i thoáº¡i.</div>
-            )}
-            {!loading && filteredThreads.map((thread) => {
-              const isActive = thread.id === activeThreadId;
-              return (
-                <button
-                  key={thread.id}
-                  onClick={() => {
-                    setActiveThreadId(thread.id);
-                    setThreads((prev) =>
-                      prev.map((t) => (t.id === thread.id ? { ...t, unread: false } : t))
-                    );
-                  }}
-                  className={`w-full p-3.5 text-left flex items-start gap-3 transition-colors cursor-pointer ${
-                    isActive ? 'bg-[#EAF5EC]/60 border-l-4 border-l-[#2E7D4A]' : 'hover:bg-[#F6F8F4]'
-                  }`}
-                >
-                  <img
-                    src={thread.avatar}
-                    alt={thread.sender}
-                    className="w-10 h-10 rounded-full object-cover ring-1 ring-[#E5EBE5] flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-xs text-[#1C2B20] truncate">
-                        {thread.sender}
-                      </span>
-                      <span className="text-[10px] text-[#94A399] flex-shrink-0 font-mono">
-                        {thread.time}
-                      </span>
-                    </div>
-                    <p className={`text-xs mt-1 truncate ${thread.unread ? 'font-bold text-[#1C2B20]' : 'text-[#66756B]'}`}>
-                      {thread.preview}
-                    </p>
-                    <div className="flex items-center gap-1.5 mt-1.5">
-                      <span className="px-1.5 py-0.2 rounded text-[10px] bg-[#F1F5EF] text-[#66756B] font-semibold">
-                        {thread.tier}
-                      </span>
-                      {thread.unread && (
-                        <span className="w-2 h-2 rounded-full bg-[#2E7D4A] ml-auto" />
-                      )}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+      {listError && (
+        <div role="alert" className="p-3 rounded-xl bg-red-50 text-red-700 text-sm">
+          Không tải được hội thoại: {listError}. Kiểm tra đăng nhập rồi bấm Tải lại.
         </div>
-
-        {/* CỘT 2: Nội dung chat & Chat input (5 cols) */}
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-[#E5EBE5] shadow-[0_2px_12px_rgba(28,43,32,0.04)] overflow-hidden flex flex-col h-full">
-          {/* Chat Header */}
-          <div className="px-5 py-3.5 border-b border-[#E5EBE5] flex items-center justify-between bg-white">
-            <div className="flex items-center gap-3">
-              <img
-                src={activeThread.avatar}
-                alt={activeThread.sender}
-                className="w-9 h-9 rounded-full object-cover ring-1 ring-[#E5EBE5]"
-              />
-              <div>
-                <h3 className="font-bold text-xs text-[#1C2B20]">{activeThread.sender}</h3>
-                <span className="text-[11px] text-[#2E9B62] flex items-center gap-1 font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#2E9B62]" /> Đang trực tuyến
-                </span>
-              </div>
-            </div>
-
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#EAF5EC] text-[#2E7D4A]">
-              {activeThread.tier}
-            </span>
+      )}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:h-[calc(100dvh-280px)] lg:min-h-[420px]">
+        <aside className="lg:col-span-4 min-w-0 bg-white rounded-2xl border border-[#E5EBE5] overflow-hidden flex flex-col max-h-80 lg:max-h-none">
+          <div className="p-3.5 border-b border-[#E5EBE5] relative">
+            <Search className="w-4 h-4 absolute left-6 top-6 text-[#94A399]" />
+            <input
+              aria-label="Tìm hội thoại"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Tìm tên, nội dung, mã đặt lịch..."
+              className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs"
+            />
           </div>
-
-          {/* Messages Bubble Area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-[#FAFBF9]">
-            {activeThread.messages.map((msg, idx) => {
-              const isMe = msg.sender === 'me';
+          <div className="flex-1 overflow-y-auto divide-y divide-[#F1F5EF]">
+            {loading && <p className="p-6 text-xs text-[#66756B]">Đang tải hội thoại...</p>}
+            {!loading && !listError && filteredThreads.length === 0 && (
+              <p className="p-6 text-xs text-[#66756B]">
+                {search
+                  ? 'Không tìm thấy hội thoại phù hợp.'
+                  : 'Chưa có hội thoại. Hội thoại xuất hiện sau khi khách hoặc KTV mở chat từ đơn đã được gán KTV.'}
+              </p>
+            )}
+            {filteredThreads.map((thread) => (
+              <button
+                key={thread.id}
+                onClick={() => setActiveThreadId(thread.id)}
+                className={`w-full p-3.5 text-left flex gap-3 border-l-4 ${thread.id === activeThreadId ? 'bg-[#EAF5EC]/60 border-[#2E7D4A]' : 'border-transparent hover:bg-[#F6F8F4]'}`}
+              >
+                <Avatar participant={thread.participant} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold truncate">{thread.participant?.displayName || 'Khách hàng'}</p>
+                  <p className="text-xs text-[#66756B] truncate mt-1">{messageText(thread.lastMessage)}</p>
+                  <div className="flex justify-between gap-2 mt-1 text-[10px] text-[#94A399]">
+                    <span>{formatTime(thread.lastMessageAt || thread.lastMessage?.createdAt)}</span>
+                    {!!thread.unreadCount && <span className="text-[#2E7D4A] font-bold">{thread.unreadCount} mới</span>}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </aside>
+        <section className="lg:col-span-5 min-w-0 min-h-0 h-[560px] lg:h-auto bg-white rounded-2xl border border-[#E5EBE5] overflow-hidden flex flex-col">
+          <div className="px-4 py-3 border-b border-[#E5EBE5] flex items-center gap-3 shrink-0">
+            <Avatar participant={activeThread?.participant} />
+            <div>
+              <h3 className="font-bold text-xs">{activeThread?.participant?.displayName || 'Chọn hội thoại'}</h3>
+              <p className="text-[11px] text-[#66756B]">
+                {activeThread ? 'Tự cập nhật tin nhắn mỗi 3 giây' : 'Chọn khách hàng ở danh sách bên trái'}
+              </p>
+            </div>
+          </div>
+          {messageError && (
+            <p role="alert" className="p-3 text-xs text-red-700 bg-red-50">
+              Không tải được tin nhắn: {messageError}
+            </p>
+          )}
+          {readError && (
+            <p role="status" className="px-3 py-2 text-xs text-amber-700">
+              {readError}
+            </p>
+          )}
+          <div
+            ref={scrollArea}
+            aria-live="polite"
+            className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3.5 bg-[#FAFBF9]"
+          >
+            {messagesLoading && <p className="text-xs text-[#66756B]">Đang tải tin nhắn...</p>}
+            {!messagesLoading && !messageError && !messages.length && (
+              <div className="text-center text-[#66756B] py-10 text-xs">
+                <MessageSquare className="w-8 h-8 mx-auto mb-3" />
+                {activeThread ? 'Chưa có tin nhắn. Bạn có thể gửi lời chào.' : 'Chưa chọn hội thoại.'}
+              </div>
+            )}
+            {messages.map((message) => {
+              const isMe = message.senderId === currentUserId;
+              if (message.type === 'SYSTEM')
+                return (
+                  <p key={message.id} className="text-center text-[11px] text-[#66756B] py-2">
+                    {messageText(message)}
+                  </p>
+                );
               return (
-                <div
-                  key={idx}
-                  className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
-                >
+                <div key={message.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                   <div
-                    className={`max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed shadow-xs ${
-                      isMe
-                        ? 'bg-[#2E7D4A] text-white rounded-tr-none'
-                        : 'bg-white text-[#1C2B20] border border-[#E5EBE5] rounded-tl-none'
-                    }`}
+                    className={`max-w-[90%] p-3 rounded-2xl text-xs leading-relaxed break-words whitespace-pre-wrap ${isMe ? 'bg-[#2E7D4A] text-white' : 'bg-white border border-[#E5EBE5] text-[#1C2B20]'}`}
                   >
-                    {msg.text}
+                    {!message.recalledAt && message.type === 'IMAGE' && message.mediaUrl ? (
+                      <a href={message.mediaUrl} target="_blank" rel="noreferrer">
+                        <img src={message.mediaUrl} alt="Ảnh trong hội thoại" className="max-h-60 rounded-lg" />
+                      </a>
+                    ) : (
+                      messageText(message)
+                    )}
                   </div>
-                  <div className="flex items-center gap-1 mt-1 text-[10px] text-[#94A399]">
-                    <span>{msg.time}</span>
-                    {isMe && <CheckCheck className="w-3 h-3 text-[#2E7D4A]" />}
-                  </div>
+                  <span className="flex items-center gap-1 mt-1 text-[10px] text-[#94A399]">
+                    {formatTime(message.createdAt)}
+                    {isMe && <Check className="w-3 h-3" />}
+                  </span>
                 </div>
               );
             })}
           </div>
-
-          {/* Quick reply templates */}
-          <div className="p-2.5 bg-white border-t border-[#E5EBE5] flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-            {QUICK_REPLIES.map((reply, idx) => (
+          <div className="p-2.5 border-t border-[#E5EBE5] flex gap-1.5 overflow-x-auto shrink-0">
+            {QUICK_REPLIES.map((reply) => (
               <button
-                key={idx}
-                onClick={() => handleSendMessage(reply)}
-                className="px-2.5 py-1 rounded-lg text-[11px] bg-[#F6F8F4] hover:bg-[#EAF5EC] text-[#66756B] hover:text-[#2E7D4A] border border-[#E5EBE5] whitespace-nowrap transition-colors cursor-pointer"
+                key={reply}
+                disabled={!canSend}
+                onClick={() => void handleSendMessage(reply)}
+                className="px-2.5 py-1 rounded-lg text-[11px] bg-[#F6F8F4] text-[#66756B] border border-[#E5EBE5] whitespace-nowrap disabled:opacity-40"
               >
                 {reply}
               </button>
             ))}
           </div>
-
-          {/* Message input */}
           <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSendMessage();
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleSendMessage();
             }}
-            className="p-3 bg-white border-t border-[#E5EBE5] flex items-center gap-2"
+            className="p-3 border-t border-[#E5EBE5] flex items-center gap-2 shrink-0"
           >
             <input
-              type="text"
+              aria-label="Nội dung tin nhắn"
               value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="Nhập nội dung phản hồi khách hàng..."
-              className="flex-1 px-3.5 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs text-[#1C2B20] placeholder-[#94A399] focus:outline-none focus:border-[#2E7D4A]"
+              onChange={(event) => setInputMessage(event.target.value)}
+              maxLength={4000}
+              disabled={!activeThread || !currentUserId}
+              placeholder={activeThread ? 'Nhập nội dung phản hồi...' : 'Chọn hội thoại để gửi tin'}
+              className="flex-1 min-w-0 px-3.5 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs"
             />
             <button
               type="submit"
-              disabled={!inputMessage.trim()}
-              className="p-2 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white disabled:opacity-40 transition-colors cursor-pointer shadow-xs"
-              title="Gửi tin nhắn"
+              disabled={!canSend || !inputMessage.trim()}
+              title={sending ? 'Đang gửi...' : 'Gửi tin nhắn'}
+              className="p-2 rounded-xl bg-[#2E7D4A] text-white disabled:opacity-40 shrink-0"
             >
               <Send className="w-4 h-4" />
             </button>
           </form>
-        </div>
-
-        {/* CỘT 3: Thông tin nhanh khách hàng (3 cols) */}
-        <div className="lg:col-span-3 bg-white rounded-2xl border border-[#E5EBE5] shadow-[0_2px_12px_rgba(28,43,32,0.04)] p-5 space-y-4 overflow-y-auto h-full text-xs">
-          <div className="text-center pb-4 border-b border-[#E5EBE5]">
-            <img
-              src={activeThread.avatar}
-              alt={activeThread.sender}
-              className="w-16 h-16 rounded-full object-cover mx-auto ring-2 ring-[#EAF5EC] mb-2"
-            />
-            <h4 className="font-bold text-sm text-[#1C2B20]">{activeThread.sender}</h4>
-            <span className="text-[11px] text-[#66756B] block mt-0.5">{activeThread.phone}</span>
-            <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#FEF6E9] text-[#B87A14] border border-[#FBE3B8]">
-              {activeThread.tier}
-            </span>
+        </section>
+        <aside className="lg:col-span-3 min-w-0 bg-white rounded-2xl border border-[#E5EBE5] p-5 space-y-4 overflow-y-auto text-xs">
+          <div className="flex items-center gap-3">
+            <Avatar participant={activeThread?.participant} />
+            <strong>{activeThread?.participant?.displayName || 'Thông tin hội thoại'}</strong>
           </div>
-
-          <div className="space-y-3">
-            <div>
-              <span className="text-[11px] font-bold text-[#66756B] uppercase block mb-1">
-                Địa chỉ phục vụ
-              </span>
-              <p className="text-[#1C2B20] font-medium leading-relaxed">
-                {activeThread.address}
-              </p>
-            </div>
-
-            <div>
-              <span className="text-[11px] font-bold text-[#66756B] uppercase block mb-1">
-                Lịch đặt gần nhất
-              </span>
-              <div className="p-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5]">
-                <strong className="text-[#2E7D4A] block">{activeThread.recentBooking}</strong>
-                <span className="text-[10px] text-[#66756B]">KTV: Mai Anh (5.0★)</span>
-              </div>
-            </div>
-
-            <div>
-              <span className="text-[11px] font-bold text-[#66756B] uppercase block mb-1">
-                Ghi chú CSKH
-              </span>
-              <p className="text-[#66756B] text-[11px] leading-relaxed">
-                Khách thích lực vừa phải, tập trung cơ vai gáy, thường yêu cầu kỹ thuật viên mang theo tinh dầu oải hương.
-              </p>
-            </div>
+          <div>
+            <p className="text-[#66756B] mb-1">Mã đặt lịch</p>
+            <p className="break-all">{activeThread?.bookingId || 'Chưa có thông tin'}</p>
           </div>
-        </div>
+          <p className="text-[#66756B] leading-relaxed">
+            Hội thoại đặt lịch có thể gồm khách hàng, kỹ thuật viên và quản trị viên hỗ trợ. Tin nhắn gửi tại đây được
+            lưu vào hội thoại thật.
+          </p>
+        </aside>
       </div>
     </motion.div>
   );
 };
-
 export default MessagesPage;

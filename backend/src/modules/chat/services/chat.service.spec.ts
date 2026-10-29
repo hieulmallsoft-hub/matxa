@@ -148,6 +148,7 @@ describe('ChatService', () => {
 
   it('rejects an empty text message', async () => {
     conversationMember.findUnique.mockResolvedValue({ userId: 'user-1' });
+    conversation.findUnique.mockResolvedValue({ id: 'conversation-1', bookingId: null });
     await expect(service.sendMessage('user-1', 'conversation-1', { type: 'TEXT', text: '   ' })).rejects.toBeInstanceOf(
       BadRequestException,
     );
