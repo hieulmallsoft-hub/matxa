@@ -72,6 +72,36 @@ export class ChatService {
   }
 
   async listConversations(userId: string) {
+    const currentUser = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (currentUser?.role === 'ADMIN') {
+      const conversations = await this.prisma.conversation.findMany({
+        orderBy: { lastMessageAt: 'desc' },
+        include: {
+          members: { include: { user: { select: { id: true, displayName: true, avatarUrl: true, role: true } } } },
+          messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+        },
+      });
+      const ids = conversations.map((conversation) => conversation.id);
+      const unread = ids.length
+        ? await this.prisma.message.findMany({
+            where: { conversationId: { in: ids }, senderId: { not: userId }, recalledAt: null, readAt: null },
+            select: { conversationId: true },
+          })
+        : [];
+      const unreadByConversation = new Map<string, number>();
+      for (const message of unread) unreadByConversation.set(message.conversationId, (unreadByConversation.get(message.conversationId) ?? 0) + 1);
+      return conversations.map((conversation) => {
+        const participant = conversation.members.find((member) => member.user.role !== 'ADMIN')?.user ?? conversation.members[0]?.user;
+        return {
+          id: conversation.id,
+          bookingId: conversation.bookingId,
+          participant,
+          lastMessage: conversation.messages[0] ?? null,
+          lastMessageAt: conversation.lastMessageAt,
+          unreadCount: unreadByConversation.get(conversation.id) ?? 0,
+        };
+      });
+    }
     const memberships = await this.prisma.conversationMember.findMany({
       where: { userId, hiddenAt: null },
       orderBy: { conversation: { lastMessageAt: 'desc' } },
@@ -149,7 +179,7 @@ export class ChatService {
   }
 
   async sendMessage(userId: string, conversationId: string, dto: SendMessageDto, notify = true) {
-    await this.ensureMember(userId, conversationId);
+    await this.ensureAccess(userId, conversationId);
     this.validateMessage(conversationId, userId, dto);
     const conversation = await this.prisma.conversation.findUniqueOrThrow({
       where: { id: conversationId },
@@ -213,16 +243,18 @@ export class ChatService {
   }
 
   async markRead(userId: string, conversationId: string) {
-    await this.ensureMember(userId, conversationId);
+    const access = await this.ensureAccess(userId, conversationId);
     const now = new Date();
     const result = await this.prisma.message.updateMany({
       where: { conversationId, senderId: { not: userId }, readAt: null },
       data: { readAt: now, deliveredAt: now },
     });
-    await this.prisma.conversationMember.update({
-      where: { conversationId_userId: { conversationId, userId } },
-      data: { lastReadAt: now },
-    });
+    if (access.member) {
+      await this.prisma.conversationMember.update({
+        where: { conversationId_userId: { conversationId, userId } },
+        data: { lastReadAt: now },
+      });
+    }
     return { updated: result.count, readAt: now };
   }
 

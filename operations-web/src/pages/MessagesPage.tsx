@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   MessageSquare,
@@ -17,9 +17,11 @@ import {
 } from 'lucide-react';
 import { useToast } from '../components/ui/ToastContainer';
 import { PageHeader } from '../components/common/PageHeader';
+import { request } from '../api/client';
 
 interface MessageThread {
   id: string;
+  participantId?: string;
   sender: string;
   phone: string;
   tier: string;
@@ -31,6 +33,25 @@ interface MessageThread {
   recentBooking: string;
   messages: { sender: 'them' | 'me'; text: string; time: string }[];
 }
+
+type ApiConversation = {
+  id: string;
+  bookingId?: string | null;
+  participant?: { id: string; displayName?: string | null; avatarUrl?: string | null; phone?: string | null } | null;
+  lastMessage?: { senderId: string; type: string; text?: string | null; createdAt: string; readAt?: string | null } | null;
+  lastMessageAt?: string | null;
+  unreadCount?: number;
+};
+type ApiMessage = { id: string; senderId: string; type: string; text?: string | null; createdAt: string };
+const formatTime = (value?: string | null) => value ? new Date(value).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '';
+const preview = (message?: { type: string; text?: string | null } | null) => message?.text || (message?.type === 'IMAGE' ? 'Đã gửi hình ảnh' : message?.type === 'LOCATION' ? 'Đã gửi vị trí' : 'Tin nhắn mới');
+const mapConversation = (row: ApiConversation): MessageThread => ({
+  id: row.id, participantId: row.participant?.id || '', sender: row.participant?.displayName || 'Khách hàng', phone: row.participant?.phone || '', tier: 'Khách hàng',
+  avatar: row.participant?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(row.participant?.displayName || 'KH')}`,
+  preview: preview(row.lastMessage), time: formatTime(row.lastMessageAt || row.lastMessage?.createdAt), unread: (row.unreadCount || 0) > 0,
+  address: 'Thông tin từ booking', recentBooking: row.bookingId ? `Booking ${row.bookingId.slice(0, 8)}` : 'Chưa có booking', messages: [],
+});
+const mapMessage = (message: ApiMessage, participantId: string) => ({ sender: message.senderId === participantId ? 'them' as const : 'me' as const, text: preview(message), time: formatTime(message.createdAt) });
 
 const INITIAL_THREADS: MessageThread[] = [
   {
@@ -126,47 +147,67 @@ const QUICK_REPLIES = [
 
 export const MessagesPage: React.FC = () => {
   const { addToast } = useToast();
-  const [threads, setThreads] = useState<MessageThread[]>(INITIAL_THREADS);
-  const [activeThreadId, setActiveThreadId] = useState<string>('thread-1');
+  const [threads, setThreads] = useState<MessageThread[]>([]);
+  const [activeThreadId, setActiveThreadId] = useState<string>('');
   const [inputMessage, setInputMessage] = useState('');
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const activeThread = threads.find((t) => t.id === activeThreadId) || threads[0];
+  const emptyThread: MessageThread = {
+    id: '', participantId: '', sender: 'Chưa có hội thoại', phone: '', tier: '',
+    avatar: 'https://ui-avatars.com/api/?name=KH', preview: '', time: '', unread: false,
+    address: '', recentBooking: '', messages: [],
+  };
+  const activeThread = threads.find((t) => t.id === activeThreadId) || emptyThread;
 
-  const handleSendMessage = (textToSend?: string) => {
-    const text = textToSend || inputMessage;
-    if (!text.trim()) return;
-
-    const timeNow = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-
-    setThreads((prev) =>
-      prev.map((t) => {
-        if (t.id === activeThreadId) {
-          return {
-            ...t,
-            preview: `Bạn: ${text}`,
-            time: 'Vừa xong',
-            unread: false,
-            messages: [
-              ...t.messages,
-              {
-                sender: 'me',
-                text,
-                time: timeNow,
-              },
-            ],
-          };
-        }
-        return t;
+  useEffect(() => {
+    let cancelled = false;
+    request<ApiConversation[] | { items: ApiConversation[] }>('/conversations')
+      .then((payload) => {
+        if (cancelled) return;
+        const rows = Array.isArray(payload) ? payload : payload.items;
+        const mapped = rows.map(mapConversation);
+        setThreads(mapped);
+        setActiveThreadId(mapped[0]?.id || '');
       })
-    );
+      .catch((error) => addToast({ title: 'Không tải được hội thoại', message: error instanceof Error ? error.message : 'Không thể tải dữ liệu', type: 'error' }))
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [addToast]);
 
-    setInputMessage('');
-    addToast({
-      title: 'Đã gửi phản hồi',
-      message: 'Tin nhắn đã được gửi đến khách hàng.',
-      type: 'success',
-    });
+  useEffect(() => {
+    if (!activeThreadId) return;
+    const thread = threads.find((item) => item.id === activeThreadId);
+    if (!thread) return;
+    let cancelled = false;
+    request<{ items: ApiMessage[] }>(`/conversations/${activeThreadId}/messages?page=1&limit=100`)
+      .then((response) => {
+        if (cancelled) return;
+        setThreads((current) => current.map((item) => item.id === activeThreadId
+          ? { ...item, unread: false, messages: [...response.items].reverse().map((message) => mapMessage(message, thread.participantId || '')) }
+          : item));
+        return request(`/conversations/${activeThreadId}/read`, { method: 'PATCH' });
+      })
+      .catch((error) => addToast({ title: 'Không tải được tin nhắn', message: error instanceof Error ? error.message : 'Không thể tải dữ liệu', type: 'error' }));
+    return () => { cancelled = true; };
+  }, [activeThreadId, addToast]);
+
+  const handleSendMessage = async (textToSend?: string) => {
+    const text = (textToSend || inputMessage).trim();
+    if (!text || !activeThreadId) return;
+    try {
+      const message = await request<ApiMessage>(`/conversations/${activeThreadId}/messages`, {
+        method: 'POST', body: JSON.stringify({ type: 'TEXT', text }),
+      });
+      const participantId = threads.find((item) => item.id === activeThreadId)?.participantId || '';
+      setThreads((current) => current.map((item) => item.id === activeThreadId
+        ? { ...item, preview: text, time: 'Vừa xong', unread: false, messages: [...item.messages, mapMessage(message, participantId)] }
+        : item));
+      setInputMessage('');
+      addToast({ title: 'Đã gửi phản hồi', message: 'Tin nhắn đã được gửi đến khách hàng.', type: 'success' });
+    } catch (error) {
+      addToast({ title: 'Không gửi được tin nhắn', message: error instanceof Error ? error.message : 'Không thể gửi tin nhắn', type: 'error' });
+    }
   };
 
   const filteredThreads = threads.filter(
@@ -216,7 +257,11 @@ export const MessagesPage: React.FC = () => {
 
           {/* Thread list */}
           <div className="flex-1 overflow-y-auto divide-y divide-[#F1F5EF]">
-            {filteredThreads.map((thread) => {
+            {loading && <div className="p-6 text-center text-xs text-[#66756B]">Äang táº£i há»™i thoáº¡i...</div>}
+            {!loading && filteredThreads.length === 0 && (
+              <div className="p-6 text-center text-xs text-[#66756B]">ChÆ°a cÃ³ há»™i thoáº¡i.</div>
+            )}
+            {!loading && filteredThreads.map((thread) => {
               const isActive = thread.id === activeThreadId;
               return (
                 <button
