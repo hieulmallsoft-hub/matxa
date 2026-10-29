@@ -748,6 +748,10 @@ export class BookingsService {
         address: true,
         customer: { select: { id: true, displayName: true, avatarUrl: true, gender: true, nationality: true } },
         technician: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } },
+        applications: {
+          include: { technicianProfile: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } } },
+          orderBy: { createdAt: 'asc' },
+        },
         review: true,
       },
       orderBy: { scheduledStart: 'desc' },
@@ -1576,6 +1580,18 @@ export class BookingsService {
               cancelledBy: booking.cancelledByRole ?? null,
             }
           : null,
+      ...(booking.assignmentMode === 'OPEN_MARKETPLACE' && (isCustomer || booking.customerId === userId)
+        ? {
+            applications: (booking.applications ?? []).map((application: any) => ({
+              applicationId: application.id,
+              technicianId: application.technicianProfileId,
+              displayName: application.technicianProfile?.user?.displayName ?? null,
+              avatarUrl: application.technicianProfile?.user?.avatarUrl ?? null,
+              status: application.status,
+              appliedAt: application.appliedAt ?? application.createdAt,
+            })),
+          }
+        : {}),
     };
   }
 
