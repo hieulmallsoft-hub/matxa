@@ -580,7 +580,11 @@ export class BookingsService {
       },
       include: { items: { include: { catalogService: true } }, payment: true },
     });
-    void this.notifyEligibleTechniciansForOpenBooking(created);
+    // Complete the in-app notification fan-out before returning.  Previously
+    // this was fire-and-forget, so clients could immediately query jobs or
+    // notifications and observe only the first/none of the eligible KTVs
+    // while the asynchronous fan-out was still running.
+    await this.notifyEligibleTechniciansForOpenBooking(created);
     return {
       ...this.openBookingResponse(created, null, false),
       expiresInSeconds: Math.max(0, Math.floor((deadline.getTime() - Date.now()) / 1000)),

@@ -6,6 +6,14 @@ import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
 import { BookingsService } from '../services/bookings.service';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsIn } from 'class-validator';
+
+class UpdateComplaintStatusDto {
+  @ApiProperty({ enum: ['IN_REVIEW', 'RESOLVED', 'REJECTED'] })
+  @IsIn(['IN_REVIEW', 'RESOLVED', 'REJECTED'])
+  status!: 'IN_REVIEW' | 'RESOLVED' | 'REJECTED';
+}
 
 @ApiTags('Admin Complaints')
 @ApiBearerAuth('access-token')
@@ -15,5 +23,5 @@ import { BookingsService } from '../services/bookings.service';
 export class AdminComplaintsController {
   constructor(private readonly bookings: BookingsService) {}
   @Get() list(@Query('status') status?: string) { return this.bookings.listComplaints(status); }
-  @Patch(':id/status') update(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() body: { status: 'IN_REVIEW' | 'RESOLVED' | 'REJECTED' }) { return this.bookings.updateComplaintStatus(auth.sub, id, body.status); }
+  @Patch(':id/status') update(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateComplaintStatusDto) { return this.bookings.updateComplaintStatus(auth.sub, id, body.status); }
 }
