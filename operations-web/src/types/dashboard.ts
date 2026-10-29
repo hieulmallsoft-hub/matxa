@@ -15,6 +15,7 @@ export type PageId =
   | 'notifications'
   | 'settings'
   | 'technicianPolicy'
+  | 'complaints'
   | 'venues'
   | 'contracts';
 

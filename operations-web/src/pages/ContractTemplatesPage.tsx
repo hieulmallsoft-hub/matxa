@@ -142,7 +142,7 @@ export function ContractTemplatesPage() {
         title="Mẫu hợp đồng KTV"
         subtitle="Quản lý và cập nhật tài liệu hợp đồng pháp lý để Kỹ thuật viên xem và ký điện tử trên ứng dụng di động"
         badge="Pháp chế & Hợp đồng"
-        badgeTone="emerald"
+        badgeTone="green"
         breadcrumbs={[
           { label: 'MATXXA' },
           { label: 'Quản lý' },

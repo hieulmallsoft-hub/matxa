@@ -50,6 +50,7 @@ const PAGE_NAMES: Record<PageId, string> = {
   transactions: 'Sổ cái đối soát',
   messages: 'Tin nhắn CSKH',
   notifications: 'Thông báo hệ thống',
+  complaints: 'Khiếu nại booking',
   settings: 'Cấu hình hệ thống',
   technicianPolicy: 'Chính sách KTV',
   venues: 'Địa điểm & Spa',

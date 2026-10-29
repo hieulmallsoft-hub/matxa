@@ -17,6 +17,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { VenuesPage } from './pages/VenuesPage';
 import { ContractTemplatesPage } from './pages/ContractTemplatesPage';
 import { AdminDashboard } from './pages/AdminDashboard';
+import { ComplaintsPage } from './pages/ComplaintsPage';
 import { INITIAL_NOTIFICATIONS } from './data/mockData';
 import { PageId, NotificationItem } from './types/dashboard';
 import type { AuthResponse, AuthUser, Category } from './types/api';
@@ -215,6 +216,8 @@ function AppInner() {
         return <SettingsPage theme={theme} onToggleTheme={(t) => setTheme(t)} />;
       case 'technicianPolicy':
         return <SettingsPage theme={theme} onToggleTheme={(t) => setTheme(t)} initialCategory="technician" />;
+      case 'complaints':
+        return <ComplaintsPage />;
       case 'venues':
         return <VenuesPage />;
       case 'contracts':
