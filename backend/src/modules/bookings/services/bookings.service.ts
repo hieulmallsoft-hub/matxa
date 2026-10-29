@@ -1691,15 +1691,8 @@ export class BookingsService {
       await Promise.all(candidates.map(async (candidate) => {
         try {
           await this.assertOpenEligibility(this.prisma, booking, candidate.id);
-          // An OPEN booking is offered to every eligible technician at once.
-          // Persist the candidate application when broadcasting so the
-          // customer can immediately choose any notified technician without
-          // waiting for a separate technician-side apply request.
-          await this.prisma.bookingTechnicianApplication.upsert({
-            where: { bookingId_technicianProfileId: { bookingId: booking.id, technicianProfileId: candidate.id } },
-            create: { bookingId: booking.id, technicianProfileId: candidate.id, status: 'APPLIED', appliedAt: new Date() },
-            update: { status: 'APPLIED', appliedAt: new Date(), withdrawnAt: null, declinedAt: null, expiredAt: null },
-          });
+          // Broadcast to every eligible technician at once. An application
+          // is created only when that technician explicitly taps Apply.
           await this.notifyStatus(
             candidate.userId,
             booking.id,
