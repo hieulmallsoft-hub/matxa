@@ -17,12 +17,14 @@ import { PlatformFeePolicyService } from './platform-fee-policy.service';
 import { PayosService } from './payos.service';
 import { Optional } from '@nestjs/common';
 import { SettingsService } from '../../settings/settings.service';
+import { ComplaintStorageService } from './complaint-storage.service';
 import {
   BookingHistoryQueryDto,
   CancelBookingDto,
   CreateBookingDto,
   CreateOpenBookingDto,
   CreateReviewDto,
+  CreateComplaintDto,
   QuoteBookingDto,
   TechnicianJobQueryDto,
   UpdateBookingStatusDto,
@@ -41,6 +43,7 @@ export class BookingsService {
     @Optional() private readonly payos?: PayosService,
     private readonly realtime?: MarketplaceRealtimeService,
     private readonly settings?: SettingsService,
+    private readonly complaintStorage?: ComplaintStorageService,
   ) {}
 
   async quote(userId: string, dto: QuoteBookingDto, db: Prisma.TransactionClient = this.prisma) {
@@ -1207,6 +1210,54 @@ export class BookingsService {
         if (attempt === 2) throw new ConflictException('Danh gia dang duoc cap nhat, vui long thu lai');
       }
     }
+  }
+
+  async createComplaint(userId: string, id: string, dto: CreateComplaintDto) {
+    const booking = await this.prisma.booking.findFirst({
+      where: { id, customerId: userId },
+      select: { id: true, status: true, complaint: { select: { id: true } } },
+    });
+    if (!booking) throw new NotFoundException('Lich dat khong ton tai');
+    if (!['COMPLETED', 'CANCELLED'].includes(booking.status))
+      throw new BadRequestException('Chi co the khieu nai sau khi don hoan thanh hoac bi huy');
+    if (booking.complaint) throw new ConflictException('Lich dat da duoc tao khieu nai');
+    if (!dto.detail.trim()) throw new BadRequestException('Vui long nhap chi tiet khieu nai');
+    const evidence = dto.evidenceStorageKeys ?? [];
+    if (evidence.length && this.complaintStorage) await this.complaintStorage.validateKeys(id, userId, evidence);
+    try {
+      return await this.prisma.complaint.create({
+        data: {
+          bookingId: id,
+          customerId: userId,
+          reasonCode: dto.reasonCode,
+          detail: dto.detail.trim(),
+          contactEmail: dto.contactEmail.trim().toLowerCase(),
+          evidence: evidence.length
+            ? { create: evidence.map((storageKey) => ({ storageKey, mediaType: 'IMAGE' })) }
+            : undefined,
+        },
+        include: { evidence: true },
+      });
+    } catch (error) {
+      if ((error as { code?: string })?.code === 'P2002') throw new ConflictException('Lich dat da duoc tao khieu nai');
+      throw error;
+    }
+  }
+
+  async assertComplaintUploadAllowed(userId: string, id: string) {
+    const booking = await this.prisma.booking.findUnique({ where: { id }, select: { customerId: true, status: true } });
+    if (!booking || booking.customerId !== userId) throw new ForbiddenException('Ban khong co quyen tao minh chung cho lich dat nay');
+    if (booking.status !== 'COMPLETED' && booking.status !== 'CANCELLED') throw new BadRequestException('Chi co the gui minh chung sau khi lich dat hoan tat hoac bi huy');
+  }
+
+  listComplaints(status?: string) {
+    return this.prisma.complaint.findMany({ where: status ? { status: status as any } : undefined, include: { booking: { select: { id: true, status: true, totalAmount: true, scheduledStart: true } }, customer: { select: { id: true, displayName: true, avatarUrl: true } }, evidence: true }, orderBy: { createdAt: 'desc' } });
+  }
+
+  async updateComplaintStatus(adminId: string, id: string, status: 'IN_REVIEW' | 'RESOLVED' | 'REJECTED') {
+    const complaint = await this.prisma.complaint.findUnique({ where: { id }, select: { id: true } });
+    if (!complaint) throw new NotFoundException('Khieu nai khong ton tai');
+    return this.prisma.complaint.update({ where: { id }, data: { status } });
   }
 
   private async transition(

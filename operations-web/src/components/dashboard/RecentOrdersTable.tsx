@@ -37,21 +37,24 @@ export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ onSelectOr
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const matchesSearch =
-        order.id.toLowerCase().includes(search.toLowerCase()) ||
-        order.customer.name.toLowerCase().includes(search.toLowerCase()) ||
-        order.product.name.toLowerCase().includes(search.toLowerCase());
+        (order.id || '').toLowerCase().includes(search.toLowerCase()) ||
+        (order.customer?.name || '').toLowerCase().includes(search.toLowerCase()) ||
+        (order.product?.name || '').toLowerCase().includes(search.toLowerCase());
 
-      const matchesStatus = statusFilter === 'All' || order.status === statusFilter;
+      const matchesStatus =
+        statusFilter === 'All' ||
+        order.status === statusFilter ||
+        order.status?.toUpperCase() === statusFilter.toUpperCase();
 
       return matchesSearch && matchesStatus;
     }).sort((a, b) => {
       let comparison = 0;
       if (sortField === 'amount') {
-        comparison = a.amount - b.amount;
+        comparison = (a.amount || 0) - (b.amount || 0);
       } else if (sortField === 'customer') {
-        comparison = a.customer.name.localeCompare(b.customer.name);
+        comparison = (a.customer?.name || '').localeCompare(b.customer?.name || '');
       } else {
-        comparison = a.date.localeCompare(b.date);
+        comparison = (a.date || '').localeCompare(b.date || '');
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });

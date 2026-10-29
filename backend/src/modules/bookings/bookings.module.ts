@@ -15,6 +15,8 @@ import { BookingVnpayController, VnpayController } from './controllers/vnpay.con
 import { BookingPayosController, PayosWebhookController } from './controllers/payos.controller';
 import { PayosService } from './services/payos.service';
 import { SettingsModule } from '../settings/settings.module';
+import { ComplaintStorageService } from './services/complaint-storage.service';
+import { AdminComplaintsController } from './controllers/admin-complaints.controller';
 
 @Module({
   imports: [AuthModule, NotificationsModule, MarketplaceModule, SettingsModule],
@@ -25,6 +27,7 @@ import { SettingsModule } from '../settings/settings.module';
     BookingVnpayController,
     PayosWebhookController,
     BookingPayosController,
+    AdminComplaintsController,
   ],
   providers: [
     BookingsService,
@@ -35,6 +38,7 @@ import { SettingsModule } from '../settings/settings.module';
     BookingAutoCompletionService,
     PlatformFeePolicyService,
     PayosService,
+    ComplaintStorageService,
   ],
   exports: [PayosService],
 })

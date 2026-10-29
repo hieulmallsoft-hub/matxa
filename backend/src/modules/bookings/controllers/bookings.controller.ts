@@ -6,6 +6,7 @@ import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
 import { BookingsService } from '../services/bookings.service';
+import { ComplaintStorageService } from '../services/complaint-storage.service';
 import {
   BookingHistoryQueryDto,
   CancelBookingDto,
@@ -14,6 +15,7 @@ import {
   CreateUnifiedBookingDto,
   MatchTechniciansDto,
   CreateReviewDto,
+  CreateComplaintDto,
   QuoteBookingDto,
   SelectTechnicianDto,
   UpdateBookingStatusDto,
@@ -24,7 +26,7 @@ import {
 @UseGuards(AccessTokenGuard)
 @Controller('bookings')
 export class BookingsController {
-  constructor(private readonly bookings: BookingsService) {}
+  constructor(private readonly bookings: BookingsService, private readonly complaintStorage: ComplaintStorageService) {}
 
   @Post('quote')
   @ApiCreatedResponse({ type: BookingQuoteResponse })
@@ -192,5 +194,23 @@ export class BookingsController {
     @Body() dto: CreateReviewDto,
   ) {
     return this.bookings.review(auth.sub, id, dto);
+  }
+
+  @Post(':id/complaint')
+  @ApiOperation({ summary: 'Khach hang gui khieu nai ve lich dat' })
+  @ApiCreatedResponse({ schema: { type: 'object', properties: { id: { type: 'string' }, bookingId: { type: 'string' }, reasonCode: { type: 'string' }, status: { type: 'string' } } } })
+  complaint(
+    @CurrentAuth() auth: AccessTokenPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateComplaintDto,
+  ) {
+    return this.bookings.createComplaint(auth.sub, id, dto);
+  }
+
+  @Post(':id/complaint-evidence-upload-url')
+  @ApiOperation({ summary: 'Tao URL upload anh minh chung khieu nai' })
+  async complaintEvidenceUploadUrl(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: { contentType: string; size: number }) {
+    await this.bookings.assertComplaintUploadAllowed(auth.sub, id);
+    return this.complaintStorage.createUploadUrl(id, auth.sub, dto.contentType, dto.size);
   }
 }

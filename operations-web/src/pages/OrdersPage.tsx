@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   CalendarDays,
@@ -15,20 +15,104 @@ import {
   CreditCard,
   FileText,
   AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { RecentOrdersTable } from '../components/dashboard/RecentOrdersTable';
 import { CreateOrderModal } from '../components/dashboard/CreateOrderModal';
-import { OrderItem } from '../types/dashboard';
+import { OrderItem, OrderStatus } from '../types/dashboard';
 import { useToast } from '../components/ui/ToastContainer';
 import { PageHeader } from '../components/common/PageHeader';
 import { StatCard } from '../components/common/StatCard';
 import { DetailDrawer } from '../components/common/DetailDrawer';
 import { StatusBadge } from '../components/common/StatusBadge';
+import { request } from '../api/client';
+
+interface ApiBooking {
+  id: string;
+  status: string;
+  mode?: string;
+  scheduledStart: string;
+  scheduledEnd?: string;
+  totalAmount: number;
+  subtotal?: number;
+  customer?: { id?: string; displayName?: string | null; avatarUrl?: string | null; phoneNumber?: string | null };
+  technician?: { id?: string; user?: { id?: string; displayName?: string | null; avatarUrl?: string | null; phoneNumber?: string | null } };
+  items?: Array<{ id?: string; serviceName?: string; durationMinutes?: number; unitPrice?: number }>;
+  payment?: { method?: string; status?: string };
+  addressSnapshot?: { address?: string; city?: string; district?: string };
+  note?: string;
+}
 
 export const OrdersPage: React.FC = () => {
   const { addToast } = useToast();
+  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [rawBookings, setRawBookings] = useState<ApiBooking[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadBookings = () => {
+    setIsLoading(true);
+    void request<{ items?: ApiBooking[]; total?: number }>('/admin/marketplace/bookings?limit=100')
+      .then((res) => {
+        const items = res.items ?? [];
+        setRawBookings(items);
+        const mapped: OrderItem[] = items.map((b) => {
+          const customerName = b.customer?.displayName || 'Khách hàng';
+          const serviceName = b.items?.[0]?.serviceName || 'Dịch vụ Spa';
+          let normalizedStatus: OrderStatus = 'Pending';
+          const st = (b.status || '').toUpperCase();
+          if (st === 'COMPLETED') normalizedStatus = 'Completed';
+          else if (st === 'CONFIRMED' || st === 'PROCESSING' || st === 'IN_PROGRESS') normalizedStatus = 'Processing';
+          else if (st === 'CANCELLED' || st === 'EXPIRED') normalizedStatus = 'Cancelled';
+          else normalizedStatus = 'Pending';
+
+          const dateFormatted = b.scheduledStart
+            ? new Date(b.scheduledStart).toLocaleString('vi-VN', {
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : 'Chưa có';
+
+          return {
+            id: b.id.slice(0, 8),
+            customer: {
+              name: customerName,
+              email: b.customer?.phoneNumber || '',
+              avatar: b.customer?.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80',
+              initials: customerName.slice(0, 2).toUpperCase(),
+            },
+            product: {
+              name: serviceName,
+              sku: b.id.slice(0, 8),
+              category: b.mode === 'HOME' ? 'Tại nhà' : 'Tại cơ sở',
+            },
+            date: dateFormatted,
+            amount: b.totalAmount ?? 0,
+            payment: {
+              method: 'Credit Card',
+              cardLast4: b.payment?.method === 'CASH' ? 'Tiền mặt' : (b.payment?.method || 'VietQR'),
+            },
+            status: normalizedStatus,
+          };
+        });
+        setOrders(mapped);
+      })
+      .catch((error) => {
+        addToast({
+          title: 'Không tải được lịch đặt',
+          message: error instanceof Error ? error.message : 'Vui lòng thử lại',
+          type: 'error',
+        });
+      })
+      .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    loadBookings();
+  }, []);
 
   const handleExportCSV = () => {
     addToast({
@@ -48,6 +132,10 @@ export const OrdersPage: React.FC = () => {
     setSelectedOrder(null);
   };
 
+  const selectedRaw = selectedOrder
+    ? rawBookings.find((b) => b.id.startsWith(selectedOrder.id))
+    : null;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -60,7 +148,7 @@ export const OrdersPage: React.FC = () => {
       <PageHeader
         title="Lịch đặt & Đơn hàng"
         subtitle="Quản lý và điều phối tất cả các ca trị liệu massage & spa tại nhà"
-          badge="0 ca đang phục vụ"
+        badge={`${orders.filter((o) => o.status === 'Processing').length} ca đang phục vụ`}
         badgeTone="blue"
         breadcrumbs={[
           { label: 'MATXXA' },
@@ -68,6 +156,15 @@ export const OrdersPage: React.FC = () => {
         ]}
         actions={
           <div className="flex items-center gap-2">
+            <button
+              onClick={loadBookings}
+              disabled={isLoading}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#E5EBE5] text-xs font-semibold text-[#66756B] hover:text-[#1C2B20] hover:bg-[#F6F8F4] transition-all cursor-pointer shadow-2xs"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>Tải lại</span>
+            </button>
+
             <button
               onClick={handleExportCSV}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#E5EBE5] text-xs font-semibold text-[#66756B] hover:text-[#1C2B20] hover:bg-[#F6F8F4] transition-all cursor-pointer shadow-2xs"
@@ -87,54 +184,56 @@ export const OrdersPage: React.FC = () => {
         }
       />
 
-      {/* 2. Order Summary Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard
-          label="Tổng số lịch đặt tháng này"
-          value="0 lịch"
-          change={12.4}
-          isPositive={true}
-          caption="so với tháng 9"
-          icon={<CalendarDays className="w-5 h-5" />}
-          tone="primary"
-          sparkline={[98, 105, 112, 118, 122, 130, 134, 142]}
-        />
-        <StatCard
-          label="Giá trị đơn trung bình"
-          value="0 đ"
-          change={6.2}
-          isPositive={true}
-          caption="tăng 40.000 đ/đơn"
-          icon={<Sparkles className="w-5 h-5" />}
-          tone="success"
-          sparkline={[640, 650, 655, 660, 670, 675, 680]}
-        />
-        <StatCard
-          label="Tỷ lệ hoàn thành đúng giờ"
-          value="0%"
-          change={1.2}
-          isPositive={true}
-          caption="trung bình đến trước 10p"
-          icon={<CheckCircle2 className="w-5 h-5" />}
-          tone="info"
-          sparkline={[96.5, 97.0, 97.5, 98.0, 98.4, 98.6]}
-        />
-        <StatCard
-          label="Tỷ lệ hủy đơn"
-          value="0%"
-          change={-0.6}
-          isPositive={true}
-          caption="thấp hơn tiêu chuẩn ngành (5%)"
-          icon={<Clock className="w-5 h-5" />}
-          tone="warning"
-          sparkline={[2.4, 2.1, 1.9, 1.8, 1.6, 1.5, 1.4]}
-        />
-      </div>
+      {/* 2. Order Summary Metrics (hidden fake metrics similar to CustomersPage) */}
+      {false && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <StatCard
+            label="Tổng số lịch đặt tháng này"
+            value="0 lịch"
+            change={12.4}
+            isPositive={true}
+            caption="so với tháng 9"
+            icon={<CalendarDays className="w-5 h-5" />}
+            tone="primary"
+            sparkline={[98, 105, 112, 118, 122, 130, 134, 142]}
+          />
+          <StatCard
+            label="Giá trị đơn trung bình"
+            value="0 đ"
+            change={6.2}
+            isPositive={true}
+            caption="tăng 40.000 đ/đơn"
+            icon={<Sparkles className="w-5 h-5" />}
+            tone="success"
+            sparkline={[640, 650, 655, 660, 670, 675, 680]}
+          />
+          <StatCard
+            label="Tỷ lệ hoàn thành đúng giờ"
+            value="0%"
+            change={1.2}
+            isPositive={true}
+            caption="trung bình đến trước 10p"
+            icon={<CheckCircle2 className="w-5 h-5" />}
+            tone="info"
+            sparkline={[96.5, 97.0, 97.5, 98.0, 98.4, 98.6]}
+          />
+          <StatCard
+            label="Tỷ lệ hủy đơn"
+            value="0%"
+            change={-0.6}
+            isPositive={true}
+            caption="thấp hơn tiêu chuẩn ngành (5%)"
+            icon={<Clock className="w-5 h-5" />}
+            tone="warning"
+            sparkline={[2.4, 2.1, 1.9, 1.8, 1.6, 1.5, 1.4]}
+          />
+        </div>
+      )}
 
       {/* 3. Main Interactive Orders Table */}
-      <RecentOrdersTable onSelectOrder={setSelectedOrder} />
+      <RecentOrdersTable onSelectOrder={setSelectedOrder} orders={orders} />
 
-      {/* 4. Booking Detail Right Drawer (as requested in spec) */}
+      {/* 4. Booking Detail Right Drawer */}
       <DetailDrawer
         isOpen={!!selectedOrder}
         onClose={() => setSelectedOrder(null)}
@@ -179,14 +278,14 @@ export const OrdersPage: React.FC = () => {
                   </h4>
                   <div className="flex items-center gap-2 text-xs text-[#66756B] mt-0.5">
                     <Phone className="w-3.5 h-3.5 text-[#2E7D4A]" />
-                    <span>+84 901 888 999</span>
+                    <span>{selectedRaw?.customer?.phoneNumber || selectedOrder.customer.email || 'Chưa cập nhật'}</span>
                   </div>
                 </div>
               </div>
 
               <div className="pt-2 border-t border-[#E5EBE5] flex items-start gap-2 text-xs text-[#66756B]">
                 <MapPin className="w-3.5 h-3.5 text-[#2E7D4A] mt-0.5 flex-shrink-0" />
-                <span>Số 18, Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh</span>
+                <span>{selectedRaw?.addressSnapshot?.address || (selectedRaw?.addressSnapshot as any)?.street || 'Chưa có thông tin địa chỉ cụ thể'}</span>
               </div>
             </div>
 
@@ -199,7 +298,7 @@ export const OrdersPage: React.FC = () => {
                 <div>
                   <h5 className="font-bold text-sm text-[#1C2B20]">{selectedOrder.product.name}</h5>
                   <span className="text-xs text-[#66756B]">
-                    Thời lượng: 90 phút • Trị liệu thảo dược
+                    {selectedOrder.product.category}
                   </span>
                 </div>
                 <span className="font-bold text-sm text-[#2E7D4A]">
@@ -210,9 +309,14 @@ export const OrdersPage: React.FC = () => {
               <div className="p-3 rounded-lg bg-[#EAF5EC]/60 border border-[#D0E7D5] flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <User className="w-4 h-4 text-[#2E7D4A]" />
-                  <span>Kỹ thuật viên phụ trách: <strong>Lê Thu Hương (4.98★)</strong></span>
+                  <span>
+                    Kỹ thuật viên phụ trách:{' '}
+                    <strong>{selectedRaw?.technician?.user?.displayName || 'Chưa phân công'}</strong>
+                  </span>
                 </div>
-                <span className="text-[#2E7D4A] font-semibold">Đã nhận ca</span>
+                <span className="text-[#2E7D4A] font-semibold">
+                  {selectedRaw?.technician ? 'Đã nhận ca' : 'Chờ gán'}
+                </span>
               </div>
             </div>
 
@@ -223,11 +327,10 @@ export const OrdersPage: React.FC = () => {
               </span>
               <div className="space-y-3 relative pl-6 before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-[#E5EBE5]">
                 {[
-                  { time: '09:00', title: 'Khách hàng đặt lịch thành công', done: true },
-                  { time: '09:05', title: 'Hệ thống tự động gán KTV Lê Thu Hương', done: true },
-                  { time: '09:15', title: 'Kỹ thuật viên bắt đầu di chuyển', done: true },
-                  { time: '09:30', title: 'Đến nơi & bắt đầu thực hiện liệu trình', done: selectedOrder.status === 'Completed' || selectedOrder.status === 'Processing' },
-                  { time: '11:00', title: 'Hoàn thành dịch vụ & nghiệm thu', done: selectedOrder.status === 'Completed' },
+                  { time: selectedOrder.date, title: 'Khách hàng đặt lịch thành công', done: true },
+                  { time: '--:--', title: selectedRaw?.technician ? `Gán KTV ${selectedRaw.technician.user?.displayName}` : 'Chờ xác nhận / gán KTV', done: !!selectedRaw?.technician },
+                  { time: '--:--', title: 'Kỹ thuật viên thực hiện liệu trình', done: selectedOrder.status === 'Completed' || selectedOrder.status === 'Processing' },
+                  { time: '--:--', title: 'Hoàn thành dịch vụ & thanh toán', done: selectedOrder.status === 'Completed' },
                 ].map((step, idx) => (
                   <div key={idx} className="relative text-xs">
                     <span
@@ -254,10 +357,12 @@ export const OrdersPage: React.FC = () => {
               </div>
               <div className="flex justify-between text-[#66756B]">
                 <span>Trạng thái thanh toán:</span>
-                <span className="font-semibold text-[#2E9B62]">Đã thanh toán đủ</span>
+                <span className="font-semibold text-[#2E9B62]">
+                  {selectedRaw?.payment?.status === 'PAID' ? 'Đã thanh toán đủ' : (selectedRaw?.payment?.status === 'UNPAID' ? 'Chưa thanh toán (Thu tiền mặt)' : 'Chờ xử lý')}
+                </span>
               </div>
               <div className="pt-2 border-t border-[#E5EBE5] text-[#66756B]">
-                <strong>Ghi chú:</strong> Khách hay đau mỏi cơ cổ vai gáy, mong muốn tập trung kỹ vùng bả vai và gáy, dùng tinh dầu sả chanh.
+                <strong>Ghi chú:</strong> {selectedRaw?.note || 'Không có ghi chú thêm.'}
               </div>
             </div>
           </div>
@@ -268,6 +373,7 @@ export const OrdersPage: React.FC = () => {
       <CreateOrderModal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
+        onOrderCreated={(newOrder) => setOrders((prev) => [newOrder, ...prev])}
       />
     </motion.div>
   );

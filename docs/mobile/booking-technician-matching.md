@@ -109,7 +109,7 @@ Body:
 }
 ```
 
-Backend kiểm tra lại điều kiện, tạo booking ở trạng thái chờ KTV xác nhận và trả về `id`, `status`, thời gian, tổng tiền và thông tin thanh toán.
+Backend kiểm tra lại điều kiện, **tạo đơn và gán đơn cho đúng KTV đã chọn** ở trạng thái chờ KTV xác nhận. Đơn phải xuất hiện trong danh sách việc của KTV qua `GET /api/technician/jobs`. Backend đồng thời lưu thông báo `BOOKING_CREATED` để báo cho KTV; notification không thay thế cho bản ghi đơn.
 
 Không gửi `assignmentMode` hoặc `serviceIds`.
 
@@ -185,3 +185,49 @@ POST /api/bookings/{bookingId}/select-technician
 POST /api/technician/jobs/{bookingId}/apply
 POST /api/technician/jobs/{bookingId}/withdraw
 ```
+
+## 8. Quy trình test trên Swagger
+
+### Bước 1: KTV tạo khoảng thời gian rảnh
+
+Đăng nhập Swagger bằng token KTV:
+
+```http
+POST /api/technician/availability
+```
+
+```json
+{
+  "startAt": "2026-12-01T09:00:00+07:00",
+  "endAt": "2026-12-01T12:00:00+07:00"
+}
+```
+
+### Bước 2: Customer tìm KTV
+
+Đăng nhập bằng token customer:
+
+```http
+POST /api/bookings/matching-technicians
+```
+
+Nếu `items` rỗng thì không có KTV nào thỏa điều kiện dịch vụ, khu vực, mode và availability.
+
+### Bước 3: Customer đặt KTV
+
+Gửi các ID thực tế từ catalog/matching và thêm `technicianId`:
+
+```http
+POST /api/bookings
+```
+
+Booking thành công trả về `201`, `status: "PENDING"` và `bookingId`. `PENDING` nghĩa là đơn đang chờ KTV xác nhận.
+
+### Bước 4: KTV xem và nhận đơn
+
+```http
+GET /api/technician/jobs
+POST /api/technician/jobs/{bookingId}/accept
+```
+
+Matching dùng token customer; availability/jobs/accept dùng token KTV.
