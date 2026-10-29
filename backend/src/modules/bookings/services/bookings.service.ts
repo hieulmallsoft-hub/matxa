@@ -478,14 +478,18 @@ export class BookingsService {
     const catalogOptions = await this.prisma.serviceCatalogPriceOption.findMany({ where: { id: { in: dto.items.map((item: any) => item.priceOptionId) }, isActive: true } });
     const selected = await this.prisma.technicianService.findMany({ where: { technicianId: dto.technicianId, catalogServiceId: { in: serviceIds }, isActive: true }, include: { priceOptions: { where: { isActive: true } } } });
     if (selected.length !== serviceIds.length) throw new BadRequestException('KTV khong co dich vu phu hop');
-    const priceOptionIds = dto.items.map((item: any) => {
+    dto.items.forEach((item: any) => {
       const service = selected.find((candidate: any) => candidate.catalogServiceId === item.catalogServiceId)!;
       const catalogOption = catalogOptions.find((candidate: any) => candidate.id === item.priceOptionId);
       const option = service.priceOptions.find((candidate: any) => candidate.durationMinutes === catalogOption?.durationMinutes) ?? service.priceOptions[0];
       if (!option) throw new BadRequestException('KTV chua co goi gia');
-      return option.id;
     });
-    return this.create(userId, { ...dto, serviceIds: selected.map((item: any) => item.id), priceOptionIds, technicianId: dto.technicianId } as any);
+    // A technician selected in the first screen is the customer's preferred
+    // technician, not a final assignment. Keep the booking open so every
+    // other eligible technician receives the same opportunity to apply. The
+    // customer finalizes the assignment later through select-technician.
+    const { technicianId: _preferredTechnicianId, ...openDto } = dto;
+    return this.createOpen(userId, openDto as CreateOpenBookingDto);
   }
 
   async createOpen(userId: string, dto: CreateOpenBookingDto) {
