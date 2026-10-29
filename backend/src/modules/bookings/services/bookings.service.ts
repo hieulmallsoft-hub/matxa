@@ -488,11 +488,11 @@ export class BookingsService {
     // technician, not a final assignment. Keep the booking open so every
     // other eligible technician receives the same opportunity to apply. The
     // customer finalizes the assignment later through select-technician.
-    const { technicianId: _preferredTechnicianId, ...openDto } = dto;
-    return this.createOpen(userId, openDto as CreateOpenBookingDto);
+    const { technicianId, ...openDto } = dto;
+    return this.createOpen(userId, openDto as CreateOpenBookingDto, technicianId);
   }
 
-  async createOpen(userId: string, dto: CreateOpenBookingDto) {
+  async createOpen(userId: string, dto: CreateOpenBookingDto, requestedTechnicianId?: string) {
     const start = new Date(dto.scheduledStart);
     if (!Number.isFinite(start.getTime()) || start <= new Date())
       throw new BadRequestException('Thoi gian dat lich phai o tuong lai');
@@ -551,6 +551,7 @@ export class BookingsService {
     const created = await this.prisma.booking.create({
       data: {
         customerId: userId,
+        requestedTechnicianId,
         assignmentMode: 'OPEN_MARKETPLACE',
         status: 'OPEN',
         mode: dto.mode,
@@ -869,7 +870,7 @@ export class BookingsService {
         continue;
       visible.push(
         booking.assignmentMode === 'OPEN_MARKETPLACE'
-          ? this.openBookingResponse(booking, app?.status ?? null, Boolean(app?.status === 'SELECTED'), true)
+          ? this.openBookingResponse(booking, app?.status ?? null, Boolean(app?.status === 'SELECTED'), true, profile.id)
           : this.technicianJobResponse(this.withHistoricalAddress(booking), userId),
       );
     }
@@ -886,16 +887,16 @@ export class BookingsService {
         const application = await this.prisma.bookingTechnicianApplication.findUnique({
           where: { bookingId_technicianProfileId: { bookingId: id, technicianProfileId: profile.id } },
         });
-        return this.openBookingResponse(expired, application?.status ?? null, false, true);
+        return this.openBookingResponse(expired, application?.status ?? null, false, true, profile.id);
       }
       const application = await this.prisma.bookingTechnicianApplication.findUnique({
         where: { bookingId_technicianProfileId: { bookingId: id, technicianProfileId: profile.id } },
       });
       if (booking.status === 'EXPIRED' && !application)
-        return this.openBookingResponse(booking, 'EXPIRED', false, true);
+        return this.openBookingResponse(booking, 'EXPIRED', false, true, profile.id);
       if (booking.status === 'OPEN' && !application) await this.assertOpenEligibility(this.prisma, booking, profile.id);
       else if (!application) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
-      return this.openBookingResponse(booking, application?.status ?? null, application?.status === 'SELECTED', true);
+      return this.openBookingResponse(booking, application?.status ?? null, application?.status === 'SELECTED', true, profile.id);
     }
     if (booking.technician?.userId !== userId) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
     return this.technicianJobResponse(booking, userId);
@@ -1109,6 +1110,7 @@ export class BookingsService {
           assignmentMode: 'OPEN_MARKETPLACE',
           status: 'OPEN',
           technicianId: null,
+          requestedTechnicianId: booking.technicianId,
           applicationDeadlineAt: fallbackDeadline,
           expiredAt: null,
         },
@@ -1398,6 +1400,7 @@ export class BookingsService {
     applicationStatus: string | null,
     selected: boolean,
     includeTechnicianPricing = false,
+    viewerTechnicianId?: string,
   ) {
     const effectiveApplicationStatus =
       applicationStatus ??
@@ -1410,6 +1413,8 @@ export class BookingsService {
       bookingId: booking.id,
       id: booking.id,
       assignmentMode: booking.assignmentMode,
+      requestedTechnicianId: booking.requestedTechnicianId ?? null,
+      ...(viewerTechnicianId ? this.technicianRequestMetadata(booking, viewerTechnicianId) : {}),
       bookingStatus: booking.status,
       applicationStatus: effectiveApplicationStatus,
       scheduledAt: booking.scheduledStart,
@@ -1603,6 +1608,7 @@ export class BookingsService {
     const base = this.historyResponse(booking, userId);
     return {
       ...base,
+      ...this.technicianRequestMetadata(booking, booking.technicianId),
       jobState: booking.status === 'PENDING' ? 'NEW' : booking.status === 'CONFIRMED' ? 'ACCEPTED' : booking.status,
       canAccept: booking.status === 'PENDING',
       canDecline: booking.status === 'PENDING',
@@ -1617,6 +1623,18 @@ export class BookingsService {
           }
         : null,
       pricing: this.technicianPricing(booking),
+    };
+  }
+
+  private technicianRequestMetadata(booking: any, viewerTechnicianId: string) {
+    const requestedTechnicianId = booking.requestedTechnicianId ??
+      (booking.assignmentMode === 'DIRECT' ? booking.technicianId : null);
+    const isRequestedTechnician = Boolean(requestedTechnicianId && requestedTechnicianId === viewerTechnicianId);
+    return {
+      requestedTechnicianId: requestedTechnicianId ?? null,
+      isRequestedTechnician,
+      requestType: isRequestedTechnician ? 'CUSTOMER_REQUEST' : 'MARKETPLACE',
+      requestLabel: isRequestedTechnician ? 'Khách đặt bạn' : 'Yêu cầu mới',
     };
   }
 

@@ -1,5 +1,11 @@
 # Mobile: tìm KTV và đặt lịch
 
+> Cập nhật luồng hiện tại: `POST /api/bookings` lưu KTV khách yêu cầu vào
+> `requestedTechnicianId` và tạo đơn `OPEN_MARKETPLACE` để các KTV phù hợp ứng
+> tuyển. Xem [phân biệt người nhận yêu cầu](booking-request-recipient.md) để hiển
+> thị “Khách đặt bạn” / “Yêu cầu mới”. Các mô tả tạo đơn trực tiếp `PENDING`
+> bên dưới là tài liệu luồng cũ.
+
 Mobile dùng một luồng duy nhất: user chọn thông tin dịch vụ, xem danh sách KTV phù hợp, chọn một KTV rồi đặt lịch. Mobile không gửi `assignmentMode` và không dùng luồng KTV ứng tuyển.
 
 ## Xác thực
