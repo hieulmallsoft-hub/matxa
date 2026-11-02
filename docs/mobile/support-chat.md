@@ -1,8 +1,45 @@
 # Mobile: chat hỗ trợ khách–admin
 
-Admin chọn khách trong web **Tin nhắn CSKH → Tạo cuộc trò chuyện**. Backend mở
-hội thoại `SUPPORT`, mỗi khách một hội thoại dùng chung với CSKH, không cần booking.
-Mobile không truyền ID admin hay KTV. Các request dùng Bearer access token của khách.
+Mỗi khách có **một** hội thoại `SUPPORT` dùng chung với toàn bộ CSKH, không cần booking.
+Khách tự mở từ app, hoặc admin mở trong web **Tin nhắn CSKH → Tạo cuộc trò chuyện**;
+cả hai cách đều ra cùng một hội thoại. Mobile không truyền ID admin hay KTV.
+Các request dùng Bearer access token của khách.
+
+## Mở chat hỗ trợ (nút "Chat ngay")
+
+```http
+POST /api/conversations/support
+```
+
+Không cần body. Backend lấy khách từ token, trả hội thoại hỗ trợ của khách: lần đầu thì
+tạo mới, các lần sau trả lại đúng hội thoại cũ kèm lịch sử. Gọi nhiều lần vẫn an toàn.
+
+```json
+{
+  "id": "conversation-uuid",
+  "type": "SUPPORT",
+  "supportCustomerId": "customer-user-uuid",
+  "bookingId": null,
+  "participant": {"id":"support","displayName":"MATXXA CSKH","avatarUrl":null,"role":"ADMIN"},
+  "lastMessageAt": "2026-11-02T08:00:00.000Z"
+}
+```
+
+Dùng `id` cho các API tin nhắn, đã đọc và socket bên dưới. KTV gọi API này nhận `403`.
+Admin gọi kèm `{"customerId":"UUID khách"}`.
+
+## Tin hệ thống: lời chào và CSKH tham gia
+
+Tin `type: "SYSTEM"` trong hội thoại hỗ trợ có thêm `systemEvent`, `text` là nội dung hiển thị sẵn:
+
+| `systemEvent` | Khi nào | Gợi ý hiển thị (Figma) |
+|---|---|---|
+| `SUPPORT_WELCOME` | Tự tạo khi hội thoại được mở lần đầu | Bong bóng CSKH: "MATXXA CSKH có thể giúp gì cho bạn?" |
+| `SUPPORT_AGENT_JOINED` | Ngay trước tin trả lời đầu tiên của admin | Dòng giữa màn hình: "MATXXA CSKH đã tham gia cuộc trò chuyện" |
+
+Hiển thị theo `systemEvent`, không theo `senderId`: tin `SUPPORT_WELCOME` có `senderId` là ID
+khách nhưng không phải tin khách gửi. Dòng "thời gian phản hồi lâu hơn bình thường" trong
+Figma là chữ cố định trên app, backend không gửi.
 
 ## Hộp thư và lịch sử
 
@@ -27,7 +64,8 @@ Response là mảng, không có wrapper `items`:
 ]
 ```
 
-Mảng rỗng nghĩa là admin chưa mở hội thoại với khách. Hiển thị chưa có cuộc trò chuyện.
+Mảng rỗng nghĩa là khách chưa từng mở chat (hoặc lịch sử đã bị xoá do không hoạt động).
+Bấm "Chat ngay" gọi `POST /api/conversations/support` để mở.
 `participant.id = support` là định danh hiển thị CSKH, không phải UUID tài khoản.
 Không sử dụng endpoint tạo chat booking cho màn Hỗ trợ.
 
@@ -86,6 +124,8 @@ Không cần body. Gọi khi đang mở và xem tin. Cursor đọc của admin r
 
 Socket.IO namespace `/chat`, xác thực `auth: {token: accessToken}`. Khi mở màn hình,
 gửi `conversation.open` với `{conversationId}`; nghe `message.created` và gộp theo `id`.
+Với tin trả lời đầu tiên của admin, socket phát tin `SUPPORT_AGENT_JOINED` trước rồi mới
+đến tin trả lời. Response REST của admin có thêm `joinMessage`; mobile không cần dùng trường này.
 Khi rời màn hình gửi `conversation.close`. Tin admin gửi REST trên web cũng phát
 `message.created`. Chỉ gắn tin vào màn hình có đúng `conversationId`.
 
@@ -97,10 +137,14 @@ Push cần device token hợp lệ và cấu hình FCM; tin vẫn lưu khi thi�
 ## Lưu trữ và quyền truy cập
 
 Hội thoại/thành viên/tin lưu tại database server (`conversations`, `conversation_members`,
-`messages`), ảnh ở S3. Đóng app, đăng xuất, đổi máy không xóa lịch sử. Không tự xóa theo thời gian.
-`DELETE /api/conversations/{id}` chỉ ẩn ở phía khách. Admin mở lại hoặc tin mới sẽ
-hiện lại hội thoại hỗ trợ với lịch sử đầy đủ.
+`messages`), ảnh ở S3. Đóng app, đăng xuất, đổi máy không xóa lịch sử.
+
+**Tự xoá:** hội thoại hỗ trợ không có tin mới trong `SUPPORT_CHAT_RETENTION_DAYS` ngày
+(mặc định 90) bị xoá hẳn cùng toàn bộ tin, cả phía khách lẫn admin. Khách nhắn lại sau đó
+sẽ bắt đầu hội thoại mới có lời chào. Đặt biến này bằng `0` để giữ vĩnh viễn.
+
+`DELETE /api/conversations/{id}` chỉ ẩn ở phía khách. Khách mở lại chat hoặc có tin mới
+sẽ hiện lại hội thoại hỗ trợ với lịch sử đầy đủ (trừ khi đã bị tự xoá).
 
 Chỉ chính khách và admin được xem/gửi/upload. Khách khác hoặc KTV nhận `403`.
-Chỉ ADMIN gọi `POST /api/conversations/support` với `{"customerId":"UUID khách"}`.
-Mobile không tự tạo hội thoại. Chức năng hiện tại không có chatbot tự trả lời.
+Chức năng hiện tại không có chatbot tự trả lời; lời chào là tin hệ thống cố định.

@@ -65,12 +65,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // Admin uses REST while Mobile may be listening on Socket.IO.
   // Once persisted, a socket delivery failure must not report the send as failed.
-  async publishRestMessage(message: { conversationId: string; senderId: string }) {
+  async publishRestMessage(message: { conversationId: string; senderId: string; joinMessage?: unknown }) {
     if (!this.server) return;
     try {
       const recipients = await this.chat.recipientIds(message.senderId, message.conversationId);
-      this.server.to([`conversation:${message.conversationId}`, ...recipients.map((id) => `user:${id}`)])
-        .emit('message.created', message);
+      const rooms = [`conversation:${message.conversationId}`, ...recipients.map((id) => `user:${id}`)];
+      if (message.joinMessage) this.server.to(rooms).emit('message.created', message.joinMessage);
+      this.server.to(rooms).emit('message.created', message);
     } catch (error) {
       this.logger.warn(`Khong phat duoc tin REST qua socket: ${error instanceof Error ? error.message : 'unknown'}`);
     }
@@ -112,7 +113,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     if (recipientOnline) await this.chat.markDelivered(message.id);
     this.chat.notifyInBackground(userId, dto.conversationId, message.id, dto, !recipientViewingConversation);
-    this.server.to([`conversation:${dto.conversationId}`, ...recipientRooms]).emit('message.created', message);
+    const rooms = [`conversation:${dto.conversationId}`, ...recipientRooms];
+    if ('joinMessage' in message) this.server.to(rooms).emit('message.created', message.joinMessage);
+    this.server.to(rooms).emit('message.created', message);
     return { event: 'message.sent', data: message };
   }
 

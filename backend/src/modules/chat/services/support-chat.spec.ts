@@ -16,7 +16,13 @@ describe('support conversations', () => {
         findUniqueOrThrow: jest.fn().mockResolvedValue(thread), update: jest.fn(), findMany: jest.fn().mockResolvedValue([]),
       },
       conversationMember: { upsert: jest.fn().mockResolvedValue({ userId: actorId }), findUnique: jest.fn().mockResolvedValue(member), updateMany: jest.fn(), update: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
-      message: { create: jest.fn().mockResolvedValue({ id: 'message', conversationId: thread.id, senderId: actorId, type: 'TEXT', text: 'Hello', mediaKey: null }), findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0), updateMany: jest.fn() },
+      message: {
+        create: jest.fn(({ data }) => Promise.resolve(data.type === 'SYSTEM'
+          ? { id: 'joined', conversationId: thread.id, senderId: actorId, type: 'SYSTEM', text: data.text, mediaKey: null }
+          : { id: 'message', conversationId: thread.id, senderId: actorId, type: 'TEXT', text: 'Hello', mediaKey: null })),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0), updateMany: jest.fn(),
+      },
       booking: { findUnique: jest.fn() },
     };
     prisma.$transaction = jest.fn((arg) => typeof arg === 'function' ? arg(prisma) : Promise.all(arg));
@@ -42,11 +48,57 @@ describe('support conversations', () => {
     expect(prisma.booking.findUnique).not.toHaveBeenCalled();
   });
 
-  it('rejects non-admin creation and non-customer targets', async () => {
-    const { service, prisma } = setup('CUSTOMER');
-    await expect(service.createSupportConversation('admin', 'customer')).rejects.toBeInstanceOf(ForbiddenException);
-    prisma.user.findUnique.mockResolvedValue({ role: 'ADMIN', status: 'ACTIVE' });
-    await expect(service.createSupportConversation('admin', 'other-admin')).rejects.toBeInstanceOf(BadRequestException);
+  it('greets the customer only when the thread is first created', async () => {
+    const { prisma, service } = setup();
+    await service.createSupportConversation('admin', 'customer');
+    const upsert = prisma.conversation.upsert.mock.calls[0][0];
+    expect(upsert.update).toEqual({});
+    expect(upsert.create.messages).toEqual({ create: { senderId: 'customer', type: 'SYSTEM', text: 'SUPPORT_WELCOME' } });
+  });
+
+  it('lets a customer open only their own thread without choosing an id', async () => {
+    const { prisma, service } = setup('CUSTOMER', null, 'customer');
+    const opened = await service.createSupportConversation('customer', 'someone-else');
+    expect(prisma.conversation.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { supportCustomerId: 'customer' } }));
+    expect(prisma.conversationMember.upsert).toHaveBeenCalledTimes(1);
+    expect(opened.participant).toMatchObject({ id: 'support', displayName: 'MATXXA CSKH' });
+  });
+
+  it('rejects technicians, admins without a customer, and non-customer targets', async () => {
+    const { service } = setup('TECHNICIAN', null, 'tech');
+    await expect(service.createSupportConversation('tech')).rejects.toBeInstanceOf(ForbiddenException);
+    const admin = setup();
+    await expect(admin.service.createSupportConversation('admin')).rejects.toBeInstanceOf(BadRequestException);
+    admin.prisma.user.findUnique.mockResolvedValue({ role: 'ADMIN', status: 'ACTIVE' });
+    await expect(admin.service.createSupportConversation('admin', 'other-admin')).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('adds a single "CSKH joined" event before the first admin reply', async () => {
+    const { service, prisma } = setup();
+    const sent: any = await service.sendMessage('admin', thread.id, { type: 'TEXT', text: 'Hello' }, false);
+    expect(sent.joinMessage).toMatchObject({ type: 'SYSTEM', systemEvent: 'SUPPORT_AGENT_JOINED', text: 'MATXXA CSKH đã tham gia cuộc trò chuyện' });
+    const [joined, reply] = prisma.message.create.mock.calls.map((call: any) => call[0].data);
+    expect(joined.createdAt.getTime()).toBeLessThan(reply.createdAt.getTime());
+
+    prisma.message.create.mockClear();
+    prisma.message.findFirst.mockResolvedValue({ id: 'joined' });
+    const again: any = await service.sendMessage('admin', thread.id, { type: 'TEXT', text: 'Hello' }, false);
+    expect(again.joinMessage).toBeUndefined();
+    expect(prisma.message.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('never adds a join event for customer messages', async () => {
+    const { service, prisma } = setup('CUSTOMER', { userId: 'customer' }, 'customer');
+    const sent: any = await service.sendMessage('customer', thread.id, { type: 'TEXT', text: 'Hello' }, false);
+    expect(sent.joinMessage).toBeUndefined();
+    expect(prisma.message.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('exposes support system events with display text in history', async () => {
+    const { service, prisma } = setup('CUSTOMER', { userId: 'customer' }, 'customer');
+    prisma.message.findMany.mockResolvedValue([{ id: 'w', type: 'SYSTEM', text: 'SUPPORT_WELCOME', mediaKey: null }]);
+    const page = await service.listMessages('customer', thread.id, { page: 1, limit: 30 });
+    expect(page.items[0]).toMatchObject({ systemEvent: 'SUPPORT_WELCOME', text: 'MATXXA CSKH có thể giúp gì cho bạn?' });
   });
 
   it.each(['customer', 'admin', 'admin-2'])('allows the customer and CSKH to send (%s)', async (actor) => {

@@ -23,8 +23,6 @@ import {
 } from '@nestjs/swagger';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
-import { RolesGuard } from '../../auth/guards/roles.guard';
-import { Roles } from '../../auth/decorators/roles.decorator';
 import { ChatGateway } from '../gateways/chat.gateway';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
 import { ChatStorageService } from '../services/chat-storage.service';
@@ -52,9 +50,9 @@ export class ChatController {
   ) {}
 
   @Post('support')
-  @UseGuards(RolesGuard)
-  @Roles('ADMIN')
-  @ApiOperation({ summary: 'Admin chon khach hang de mo hoac tao chat CSKH; khong can booking' })
+  @ApiOperation({
+    summary: 'Mo hoac tao chat CSKH: khach mo hoi thoai cua chinh minh (khong can body); admin truyen customerId',
+  })
   @ApiCreatedResponse({ type: ConversationModel })
   createSupport(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateSupportConversationDto) {
     return this.chat.createSupportConversation(auth.sub, dto.customerId);

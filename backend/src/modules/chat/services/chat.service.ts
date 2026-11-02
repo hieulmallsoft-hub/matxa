@@ -5,6 +5,15 @@ import { ChatStorageService } from './chat-storage.service';
 import { CreateConversationDto, EditMessageDto, ListMessagesDto, SendMessageDto } from '../dto/chat.dto';
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000;
+const SUPPORT_PARTICIPANT = { id: 'support', displayName: 'MATXXA CSKH', avatarUrl: null, role: 'ADMIN' };
+// Support SYSTEM messages store a stable event code in `text`; responses expose it as
+// `systemEvent` and replace `text` with the display copy.
+const SUPPORT_WELCOME = 'SUPPORT_WELCOME';
+const SUPPORT_AGENT_JOINED = 'SUPPORT_AGENT_JOINED';
+const SUPPORT_SYSTEM_TEXT: Record<string, string> = {
+  [SUPPORT_WELCOME]: 'MATXXA CSKH có thể giúp gì cho bạn?',
+  [SUPPORT_AGENT_JOINED]: 'MATXXA CSKH đã tham gia cuộc trò chuyện',
+};
 
 @Injectable()
 export class ChatService {
@@ -23,10 +32,15 @@ export class ChatService {
     throw new BadRequestException('Chi ho tro tao chat theo booking');
   }
 
-  async createSupportConversation(adminId: string, customerId: string) {
-    const admin = await this.prisma.user.findUnique({ where: { id: adminId }, select: { role: true, status: true } });
-    if (admin?.role !== 'ADMIN' || admin.status !== 'ACTIVE')
-      throw new ForbiddenException('Chi admin duoc tao hoi thoai ho tro');
+  /** An admin opens the thread of a chosen customer; a customer opens their own. */
+  async createSupportConversation(actorId: string, requestedCustomerId?: string) {
+    const actor = await this.prisma.user.findUnique({ where: { id: actorId }, select: { role: true, status: true } });
+    if (actor?.status !== 'ACTIVE' || !['ADMIN', 'CUSTOMER'].includes(actor.role))
+      throw new ForbiddenException('Chi admin hoac khach hang duoc mo hoi thoai ho tro');
+    const isAdmin = actor.role === 'ADMIN';
+    // A customer can only open their own thread, whatever customerId the body carries.
+    const customerId = isAdmin ? requestedCustomerId : actorId;
+    if (!customerId) throw new BadRequestException('Vui long chon khach hang');
     const customer = await this.prisma.user.findUnique({
       where: { id: customerId }, select: { id: true, role: true, status: true, displayName: true, avatarUrl: true },
     });
@@ -38,9 +52,10 @@ export class ChatService {
         where: { supportCustomerId: customerId },
         update: {},
         create: { type: 'SUPPORT', supportCustomerId: customerId, customerId,
-          participantKey: `support:${customerId}`, lastMessageAt: new Date() },
+          participantKey: `support:${customerId}`, lastMessageAt: new Date(),
+          messages: { create: { senderId: customerId, type: 'SYSTEM', text: SUPPORT_WELCOME } } },
       });
-      for (const userId of [customerId, adminId]) {
+      for (const userId of isAdmin ? [customerId, actorId] : [customerId]) {
         await tx.conversationMember.upsert({
           where: { conversationId_userId: { conversationId: thread.id, userId } },
           create: { conversationId: thread.id, userId }, update: { hiddenAt: null },
@@ -49,7 +64,10 @@ export class ChatService {
       return thread;
     });
     return { id: conversation.id, type: conversation.type, supportCustomerId: customerId,
-      bookingId: null, participant: { id: customer.id, displayName: customer.displayName, avatarUrl: customer.avatarUrl },
+      bookingId: null,
+      participant: isAdmin
+        ? { id: customer.id, displayName: customer.displayName, avatarUrl: customer.avatarUrl }
+        : SUPPORT_PARTICIPANT,
       lastMessageAt: conversation.lastMessageAt };
   }
 
@@ -143,7 +161,7 @@ export class ChatService {
           supportCustomerId: conversation.supportCustomerId ?? null,
           bookingId: conversation.bookingId,
           participant,
-          lastMessage: conversation.messages[0] ?? null,
+          lastMessage: conversation.messages[0] ? this.withSupportSystemText(conversation.messages[0]) : null,
           lastMessageAt: conversation.lastMessageAt,
           unreadCount: unreadByConversation.get(conversation.id) ?? 0,
         };
@@ -193,9 +211,9 @@ export class ChatService {
           supportCustomerId: conversation.supportCustomerId ?? null,
           bookingId: conversation.bookingId,
           participant: conversation.type === 'SUPPORT'
-            ? { id: 'support', displayName: 'MATXXA CSKH', avatarUrl: null, role: 'ADMIN' }
+            ? SUPPORT_PARTICIPANT
             : conversation.members.find((member) => member.user.role !== 'ADMIN')?.user ?? conversation.members[0]?.user,
-          lastMessage: conversation.messages[0] ?? null,
+          lastMessage: conversation.messages[0] ? this.withSupportSystemText(conversation.messages[0]) : null,
           lastMessageAt: conversation.lastMessageAt,
           unreadCount: unreadByConversation.get(conversation.id) ?? 0,
         });
@@ -233,14 +251,29 @@ export class ChatService {
   }
 
   async sendMessage(userId: string, conversationId: string, dto: SendMessageDto, notify = true) {
-    await this.ensureAccess(userId, conversationId);
+    const { isAdmin } = await this.ensureAccess(userId, conversationId);
     this.validateMessage(conversationId, userId, dto);
     const conversation = await this.prisma.conversation.findUniqueOrThrow({
       where: { id: conversationId },
-      select: { bookingId: true },
+      select: { bookingId: true, type: true },
     });
     const now = new Date();
+    let joinMessage: Awaited<ReturnType<typeof this.prisma.message.create>> | undefined;
     const message = await this.prisma.$transaction(async (tx) => {
+      // The first admin reply in a support thread is preceded by a "CSKH joined" event.
+      if (conversation.type === 'SUPPORT' && isAdmin) {
+        const joined = await tx.message.findFirst({
+          where: { conversationId, type: 'SYSTEM', text: SUPPORT_AGENT_JOINED },
+          select: { id: true },
+        });
+        if (!joined)
+          joinMessage = await tx.message.create({
+            include: { sender: { select: { id: true, displayName: true, avatarUrl: true, role: true } } },
+            // PostgreSQL now() is fixed per transaction, so order the pair explicitly.
+            data: { conversationId, senderId: userId, type: 'SYSTEM', text: SUPPORT_AGENT_JOINED,
+              createdAt: new Date(now.getTime() - 1) },
+          });
+      }
       const created = await tx.message.create({
         include: { sender: { select: { id: true, displayName: true, avatarUrl: true, role: true } } },
         data: {
@@ -256,6 +289,7 @@ export class ChatService {
           // A booking message always belongs to the conversation's booking.
           // Never accept a booking id from the client.
           bookingId: conversation.bookingId,
+          createdAt: now,
         },
       });
       await tx.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: now } });
@@ -263,7 +297,9 @@ export class ChatService {
       return created;
     });
     if (notify) this.notifyInBackground(userId, conversationId, message.id, dto, true);
-    return this.withSignedMediaUrl(message);
+    const sent = await this.withSignedMediaUrl(message);
+    // Callers publish joinMessage over the socket before the reply itself.
+    return joinMessage ? { ...sent, joinMessage: this.withSupportSystemText(joinMessage) } : sent;
   }
 
   async markDelivered(messageId: string) {
@@ -404,7 +440,14 @@ export class ChatService {
     return { ...message, mediaUrl: await this.storage.createReadUrl(message.mediaKey) };
   }
 
+  private withSupportSystemText<T extends { type: string; text: string | null }>(message: T) {
+    if (message.type !== 'SYSTEM' || !message.text || !(message.text in SUPPORT_SYSTEM_TEXT)) return message;
+    return { ...message, systemEvent: message.text, text: SUPPORT_SYSTEM_TEXT[message.text] };
+  }
+
   private async withSystemMessageText<T extends { type: string; text: string | null }>(message: T) {
+    if (message.type === 'SYSTEM' && message.text && message.text in SUPPORT_SYSTEM_TEXT)
+      return this.withSupportSystemText(message);
     if (message.type !== 'SYSTEM' || message.text !== 'TECHNICIAN_SELECTED') return message;
     const template = await this.getNotificationTemplate('TECHNICIAN_SELECTED');
     if (template?.isActive === false) return message;

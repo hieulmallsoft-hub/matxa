@@ -19,7 +19,8 @@ export class CreateConversationDto {
 }
 
 export class CreateSupportConversationDto {
-  @ApiProperty({ description: 'ID user CUSTOMER được admin chọn để hỗ trợ' }) @IsUUID() customerId!: string;
+  @ApiPropertyOptional({ description: 'Chỉ admin: ID user CUSTOMER cần hỗ trợ. Khách hàng bỏ trống, backend lấy từ token.' })
+  @IsOptional() @IsUUID() customerId?: string;
 }
 
 export class ListConversationsDto {
