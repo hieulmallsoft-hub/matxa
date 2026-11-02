@@ -26,6 +26,20 @@ import { DetailDrawer } from '../components/common/DetailDrawer';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { request } from '../api/client';
 
+// Customers without a photo (or with a broken URL) get their initials instead of a broken image.
+function CustomerAvatar({ src, name, className }: { src: string; name: string; className: string }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  if (src && !failed)
+    return <img src={src} alt={name} onError={() => setFailed(true)} className={`${className} rounded-full object-cover shrink-0`} />;
+  const initials = name.split(/\s+/).filter(Boolean).slice(-2).map((word) => word[0]).join('').toUpperCase() || '?';
+  return (
+    <div className={`${className} rounded-full shrink-0 bg-[#EAF5EC] text-[#2E7D4A] font-bold flex items-center justify-center`}>
+      {initials}
+    </div>
+  );
+}
+
 interface CustomerEntity {
   id: string;
   name: string;
@@ -122,9 +136,9 @@ export const CustomersPage: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerEntity | null>(null);
 
   useEffect(() => {
-    void request<{ items?: Array<{ id: string; displayName?: string | null; email?: string | null; phoneNumber?: string | null; status?: string; role?: string }> ; total?: number }>('/admin/marketplace/users?limit=100')
+    void request<{ items?: Array<{ id: string; displayName?: string | null; avatarUrl?: string | null; email?: string | null; phoneNumber?: string | null; status?: string; role?: string }> ; total?: number }>('/admin/marketplace/users?limit=100')
       .then((result) => setCustomers((result.items ?? []).filter((user) => (user.role ?? '').toUpperCase() === 'CUSTOMER').map((user) => ({
-        id: user.id, name: user.displayName || 'Chưa cập nhật', phone: user.phoneNumber || 'Chưa cập nhật', email: user.email || '', tier: 'Thành viên mới', spent: 0, orders: 0, lastBooking: 'Chưa có', favoriteService: '', address: 'Chưa cập nhật', status: user.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE', avatar: '',
+        id: user.id, name: user.displayName || 'Chưa cập nhật', phone: user.phoneNumber || 'Chưa cập nhật', email: user.email || '', tier: 'Thành viên mới', spent: 0, orders: 0, lastBooking: 'Chưa có', favoriteService: '', address: 'Chưa cập nhật', status: user.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE', avatar: user.avatarUrl || '',
       }))))
       .catch((error) => addToast({ title: 'Không tải được khách hàng', message: error instanceof Error ? error.message : 'Vui lòng thử lại', type: 'error' }));
   }, [addToast]);
@@ -273,10 +287,10 @@ export const CustomersPage: React.FC = () => {
                 >
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-3">
-                      <img
+                      <CustomerAvatar
                         src={cust.avatar}
-                        alt={cust.name}
-                        className="w-9 h-9 rounded-full object-cover ring-1 ring-[#E5EBE5]"
+                        name={cust.name}
+                        className="w-9 h-9 text-xs ring-1 ring-[#E5EBE5]"
                       />
                       <div>
                         <div className="font-bold text-xs text-[#1C2B20]">{cust.name}</div>
@@ -348,10 +362,10 @@ export const CustomersPage: React.FC = () => {
           <div className="space-y-6">
             {/* Profile Avatar Card */}
             <div className="p-4 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] flex items-center gap-4">
-              <img
+              <CustomerAvatar
                 src={selectedCustomer.avatar}
-                alt={selectedCustomer.name}
-                className="w-16 h-16 rounded-full object-cover ring-2 ring-[#EAF5EC]"
+                name={selectedCustomer.name}
+                className="w-16 h-16 text-lg ring-2 ring-[#EAF5EC]"
               />
               <div className="space-y-1">
                 <h4 className="font-bold text-base text-[#1C2B20]">{selectedCustomer.name}</h4>
