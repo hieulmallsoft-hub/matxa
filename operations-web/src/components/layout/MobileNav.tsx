@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Flower2, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { NAV_GROUPS, matchesNav, type CountKey } from '../../navigation';
 import type { PageId } from '../../types/dashboard';
-import { SearchBox } from '../ui/kit';
+import { BrandLogo, SearchBox } from '../ui/kit';
 
 interface MobileNavProps {
   isOpen: boolean;
@@ -35,7 +35,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose, currentPa
             <div className="h-16 px-4 flex items-center justify-between border-b border-surface-border">
               <div className="flex items-center gap-3">
                 <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#3C9A5E] to-primary flex items-center justify-center">
-                  <Flower2 className="w-5 h-5 text-white" />
+                  <BrandLogo className="w-6 h-6 text-white" />
                 </span>
                 <span className="font-extrabold text-content-primary">MATXXA</span>
               </div>

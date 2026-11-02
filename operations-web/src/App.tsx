@@ -1,13 +1,13 @@
 import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
-import { AlertCircle, ArrowRight, Flower2, Lock, Mail } from 'lucide-react';
+import { AlertCircle, ArrowRight, Lock, Mail } from 'lucide-react';
 import { Sidebar, COLLAPSED_WIDTH, EXPANDED_WIDTH } from './components/layout/Sidebar';
 import { Navbar } from './components/layout/Navbar';
 import { MobileNav } from './components/layout/MobileNav';
 import { CommandPalette } from './components/layout/CommandPalette';
 import { ToastProvider, useToast } from './components/ui/ToastContainer';
 import { TopProgress } from './components/ui/TopProgress';
-import { Button, Field, FormError, Input, SkeletonRows } from './components/ui/kit';
+import { BrandLogo, Button, Field, FormError, Input, SkeletonRows } from './components/ui/kit';
 // Each page is its own chunk, loaded the first time it is opened.
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then((module) => ({ default: module.AnalyticsPage })));
@@ -95,7 +95,7 @@ function LoginScreen({ onLoggedIn, notice }: { onLoggedIn: (user: AuthUser) => v
         ))}
         <div className="relative flex items-center gap-3">
           <span className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
-            <Flower2 className="w-6 h-6" />
+            <BrandLogo className="w-7 h-7 text-white" />
           </span>
           <span className="text-xl font-extrabold tracking-wide">MATXXA</span>
         </div>
@@ -116,7 +116,7 @@ function LoginScreen({ onLoggedIn, notice }: { onLoggedIn: (user: AuthUser) => v
         >
           <div className="lg:hidden flex items-center gap-2 mb-2">
             <span className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-              <Flower2 className="w-5 h-5 text-white" />
+              <BrandLogo className="w-6 h-6 text-white" />
             </span>
             <span className="font-extrabold">MATXXA</span>
           </div>

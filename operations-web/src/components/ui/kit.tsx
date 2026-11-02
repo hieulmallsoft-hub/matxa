@@ -402,3 +402,19 @@ export function DemoDataNotice({ what = 'Các số liệu trên trang này' }: {
     </motion.div>
   );
 }
+
+/**
+ * Brand mark from public/logo.png used as a mask, so it takes the current text colour
+ * (white on the green tile, green on light backgrounds).
+ */
+export function BrandLogo({ className }: { className?: string }) {
+  const url = `url(${import.meta.env.BASE_URL}logo.png)`;
+  return (
+    <span
+      role="img"
+      aria-label="MATXXA"
+      className={cx('inline-block bg-current shrink-0', className)}
+      style={{ WebkitMaskImage: url, maskImage: url, WebkitMaskSize: 'contain', maskSize: 'contain', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat', WebkitMaskPosition: 'center', maskPosition: 'center' }}
+    />
+  );
+}

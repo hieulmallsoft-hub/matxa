@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Flower2, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import { BrandLogo } from '../ui/kit';
 import { NAV_GROUPS, matchesNav, type CountKey, type NavItem } from '../../navigation';
 import type { PageId } from '../../types/dashboard';
 
@@ -95,7 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCol
             whileHover={{ rotate: 18, scale: 1.05 }}
             className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#3C9A5E] to-primary flex items-center justify-center shrink-0 shadow-md shadow-primary/30"
           >
-            <Flower2 className="w-5 h-5 text-white" />
+            <BrandLogo className="w-6 h-6 text-white" />
           </motion.span>
           <AnimatePresence initial={false}>
             {!isCollapsed && (
