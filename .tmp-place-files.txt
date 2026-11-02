@@ -1,0 +1,13 @@
+C:\Users\Admin\matxa\operations-web\src\components\dashboard\RevenueAnalytics.tsx
+C:\Users\Admin\matxa\operations-web\src\pages\AnalyticsPage.tsx
+C:\Users\Admin\matxa\operations-web\src\pages\ComplaintsPage.tsx
+C:\Users\Admin\matxa\operations-web\src\pages\ContractTemplatesPage.tsx
+C:\Users\Admin\matxa\operations-web\src\pages\CustomersPage.tsx
+C:\Users\Admin\matxa\operations-web\src\pages\MessagesPage.tsx
+C:\Users\Admin\matxa\operations-web\src\pages\NotificationsPage.tsx
+C:\Users\Admin\matxa\operations-web\src\pages\OrdersPage.tsx
+C:\Users\Admin\matxa\operations-web\src\pages\PaymentsPage.tsx
+C:\Users\Admin\matxa\operations-web\src\pages\ProductsPage.tsx
+C:\Users\Admin\matxa\operations-web\src\pages\SettingsPage.tsx
+C:\Users\Admin\matxa\operations-web\src\pages\TransactionsPage.tsx
+C:\Users\Admin\matxa\operations-web\src\pages\VenuesPage.tsx
