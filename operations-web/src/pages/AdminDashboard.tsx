@@ -1,4 +1,8 @@
 import { FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { NAV_ITEMS, normalizeSearch } from '../navigation';
+import { Badge, Button, Card, Empty, Field, FormGrid, FormSection, Input, SearchBox, Select, SkeletonRows, Tabs, Textarea } from '../components/ui/kit';
+import { DetailDrawer } from '../components/common/DetailDrawer';
 import { request } from '../api/client';
 import { TechnicianPricingPanel } from '../components/TechnicianPricingPanel';
 import { CourseManagementPanel } from '../components/CourseManagementPanel';
@@ -24,6 +28,7 @@ import {
   UsersRound,
   Tag,
   Image as ImageIcon,
+  RefreshCw,
 } from 'lucide-react';
 import type { Category } from '../types/api';
 import { PageHeader } from '../components/common/PageHeader';
@@ -109,6 +114,8 @@ type Promotion = {
   minOrderAmount?: number;
   maxDiscount?: number;
   usageLimit?: number;
+  perUserLimit?: number;
+  usedCount?: number;
   isActive: boolean;
   startsAt: string;
   endsAt: string;
@@ -143,64 +150,26 @@ function formatServiceModes(modes?: string[] | null) {
   return modes.map((mode) => serviceModeLabels[mode] || mode).join(', ');
 }
 
+const NAV_DESCRIPTIONS: Record<string, string> = {
+  ...Object.fromEntries(NAV_ITEMS.map((item) => [item.id, item.description])),
+  pricing: 'Giá từng dịch vụ theo kỹ thuật viên',
+};
+
 const money = (value: number) => `${new Intl.NumberFormat('vi-VN').format(value)} đ`;
 const date = (value: string) => new Date(value).toLocaleString('vi-VN');
+const shortDate = (value: string) => new Date(value).toLocaleDateString('vi-VN');
 
-const FALLBACK_DASHBOARD: Dashboard = {
-  todayBookings: 24,
-  activeTechnicians: 38,
-  averageRating: 4.94,
-  reviewCount: 618,
-  completedBookingsThisMonth: 540,
-  revenueThisMonth: 215800000,
+/** Running / upcoming / expired / off, from the dates and the on-off switch. */
+const promotionState = (promo: { isActive: boolean; startsAt: string; endsAt: string }) => {
+  const now = Date.now();
+  if (!promo.isActive) return { label: 'Đã tắt', tone: 'gray' as const };
+  if (new Date(promo.endsAt).getTime() <= now) return { label: 'Hết hạn', tone: 'gray' as const };
+  if (new Date(promo.startsAt).getTime() > now) return { label: 'Sắp diễn ra', tone: 'blue' as const };
+  return { label: 'Đang chạy', tone: 'green' as const };
 };
-
-const FALLBACK_CATEGORIES: Category[] = [
-  { id: 'cat-1', name: 'Massage Trị liệu Cổ Vai Gáy', slug: 'massage-co-vai-gay' },
-  { id: 'cat-2', name: 'Trị Liệu Toàn Thân & Shiatsu', slug: 'shiatsu-fullbody' },
-  { id: 'cat-3', name: 'Chăm sóc Da Mặt & Thải Độc', slug: 'facial-detox' },
-  { id: 'cat-4', name: 'Bấm Huyệt Chân Thảo Dược', slug: 'foot-reflexology' },
-];
-
-const FALLBACK_TECHNICIANS: Page<Technician> = {
-  total: 5,
-  page: 1,
-  limit: 30,
-  items: [
-    { id: 'tech-1', user: { id: 'u-1', displayName: 'Nguyễn Thị Mai', status: 'ACTIVE', phoneNumber: '0901 888 123' }, isActive: true, isVerified: true, isAvailable: true, averageRating: 4.95, reviewCount: 142, _count: { services: 5 }, city: 'TP. Hồ Chí Minh' },
-    { id: 'tech-2', user: { id: 'u-2', displayName: 'Trần Văn Hoàng', status: 'ACTIVE', phoneNumber: '0902 444 555' }, isActive: true, isVerified: true, isAvailable: true, averageRating: 4.91, reviewCount: 98, _count: { services: 4 }, city: 'Đà Nẵng' },
-    { id: 'tech-3', user: { id: 'u-3', displayName: 'Lê Thu Hương', status: 'ACTIVE', phoneNumber: '0903 666 777' }, isActive: true, isVerified: true, isAvailable: false, averageRating: 4.98, reviewCount: 210, _count: { services: 6 }, city: 'TP. Hồ Chí Minh' },
-    { id: 'tech-4', user: { id: 'u-4', displayName: 'Phạm Minh Tuấn', status: 'ACTIVE', phoneNumber: '0904 111 222' }, isActive: true, isVerified: true, isAvailable: true, averageRating: 4.88, reviewCount: 76, _count: { services: 3 }, city: 'Hà Nội' },
-    { id: 'tech-5', user: { id: 'u-5', displayName: 'Vũ Thị Ngọc', status: 'ACTIVE', phoneNumber: '0905 999 888' }, isActive: true, isVerified: true, isAvailable: true, averageRating: 4.92, reviewCount: 115, _count: { services: 4 }, city: 'Hà Nội' },
-  ],
-};
-
-const FALLBACK_APPLICATIONS: Page<TechnicianApplication> = {
-  total: 3,
-  page: 1,
-  limit: 30,
-  items: [
-    { id: 'app-1', status: 'UNDER_REVIEW', displayName: 'Đặng Thanh Thảo', city: 'Hà Nội', district: 'Cầu Giấy', supportedModes: ['HOME_VISIT', 'STUDIO'], rejectionReason: null, user: { id: 'u-6', displayName: 'Đặng Thanh Thảo', phoneNumber: '0912 345 678' } },
-    { id: 'app-2', status: 'SUBMITTED', displayName: 'Bùi Đức Anh', city: 'Hồ Chí Minh', district: 'Quận 1', supportedModes: ['HOME_VISIT'], rejectionReason: null, user: { id: 'u-7', displayName: 'Bùi Đức Anh', phoneNumber: '0933 111 222' } },
-    { id: 'app-3', status: 'APPROVED', displayName: 'Phan Thùy Linh', city: 'Đà Nẵng', district: 'Hải Châu', supportedModes: ['STUDIO'], rejectionReason: null, user: { id: 'u-8', displayName: 'Phan Thùy Linh', phoneNumber: '0988 555 444' } },
-  ],
-};
-
-const FALLBACK_PROMOTIONS: Promotion[] = [
-  { id: 'pr-1', code: 'MATXANEW2026', name: 'Giảm 20% đặt lịch lần đầu', type: 'PERCENT', value: 20, isActive: true, startsAt: '2026-01-01T00:00:00Z', endsAt: '2026-12-31T23:59:59Z' },
-  { id: 'pr-2', code: 'VIPWELLNESS', name: 'Giảm 100.000đ thành viên VIP', type: 'FIXED', value: 100000, isActive: true, startsAt: '2026-01-01T00:00:00Z', endsAt: '2026-12-31T23:59:59Z' },
-];
-
-const FALLBACK_BANNERS: Banner[] = [
-  { id: 'ban-1', title: 'Ưu đãi liệu trình Shiatsu mùa thu đông', subtitle: 'Giảm ngay 20% cho khách hàng mới', imageUrl: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&auto=format&fit=crop&q=80', isActive: true, sortOrder: 1 },
-  { id: 'ban-2', title: 'Kỹ thuật viên 5 sao tại nhà - An tâm trị liệu', subtitle: 'Đội ngũ KTV chứng chỉ chuẩn y khoa', imageUrl: 'https://images.unsplash.com/photo-1600334089648-b0d9d3028eb2?w=800&auto=format&fit=crop&q=80', isActive: true, sortOrder: 2 },
-];
 
 export function AdminDashboard({ notify, refreshCategories, tab, setTab, refreshKey }: Props) {
-  const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [users, setUsers] = useState<Page<User> | null>(null);
-  const [bookings, setBookings] = useState<Page<Booking> | null>(null);
   const [technicians, setTechnicians] = useState<Page<Technician> | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
@@ -211,59 +180,67 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
   const [appFilterTab, setAppFilterTab] = useState<'ALL' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED'>('ALL');
   const [promoTab, setPromoTab] = useState<'promos' | 'banners'>('promos');
   const [loading, setLoading] = useState(false);
+  const [technicianQuery, setTechnicianQuery] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [promoDrawer, setPromoDrawer] = useState<'promo' | 'banner' | null>(null);
+  const [promoQuery, setPromoQuery] = useState('');
+  const [promoCode, setPromoCode] = useState('');
+  const [discountType, setDiscountType] = useState<'PERCENT' | 'FIXED'>('PERCENT');
+  const [bannerPreview, setBannerPreview] = useState('');
+  const [rejecting, setRejecting] = useState<TechnicianApplication | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
+  // Each tab loads only what it shows; failures are reported instead of leaving stale data.
   const load = useCallback(async () => {
     setLoading(true);
+    const sources: Record<string, () => Promise<void>> = {
+      technicians: async () => setTechnicians(await request<Page<Technician>>('/admin/marketplace/technicians?limit=100')),
+      pricing: async () => setTechnicians(await request<Page<Technician>>('/admin/marketplace/technicians?limit=100')),
+      applications: async () =>
+        setApplications(await request<Page<TechnicianApplication>>('/admin/marketplace/technician-applications?limit=100')),
+      catalog: async () => setCategories(await request<Category[]>('/admin/marketplace/categories')),
+      promotions: async () => {
+        const [nextBanners, nextPromotions] = await Promise.all([
+          request<Banner[]>('/admin/marketplace/banners'),
+          request<Promotion[]>('/admin/marketplace/promotions'),
+        ]);
+        setBanners(nextBanners ?? []);
+        setPromotions(nextPromotions ?? []);
+      },
+    };
     try {
-      const [
-        nextDashboard,
-        nextCategories,
-        nextUsers,
-        nextBookings,
-        nextTechnicians,
-        nextBanners,
-        nextPromotions,
-        nextApplications,
-      ] = await Promise.all([
-        request<Dashboard>('/admin/marketplace/dashboard'),
-        request<Category[]>('/admin/marketplace/categories'),
-        request<Page<User>>('/admin/marketplace/users?limit=30'),
-        request<Page<Booking>>('/admin/marketplace/bookings?limit=30'),
-        request<Page<Technician>>('/admin/marketplace/technicians?limit=30'),
-        request<Banner[]>('/admin/marketplace/banners'),
-        request<Promotion[]>('/admin/marketplace/promotions'),
-        request<Page<TechnicianApplication>>('/admin/marketplace/technician-applications?limit=30'),
-      ]);
-      if (nextDashboard) setDashboard(nextDashboard);
-      if (nextCategories?.length) setCategories(nextCategories);
-      if (nextUsers?.items?.length) setUsers(nextUsers);
-      if (nextBookings?.items?.length) setBookings(nextBookings);
-      if (nextTechnicians?.items?.length) setTechnicians(nextTechnicians);
-      if (nextBanners?.length) setBanners(nextBanners);
-      if (nextPromotions?.length) setPromotions(nextPromotions);
-      if (nextApplications?.items?.length) setApplications(nextApplications);
-    } catch {
+      await sources[tab]?.();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Không tải được dữ liệu', true);
     } finally {
       setLoading(false);
     }
-  }, []);
+    // notify is recreated by the parent each render; reloading on it would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   useEffect(() => {
     void load();
   }, [load, refreshKey]);
 
+  /** Posts a form; resolves true on success so a drawer can close itself. */
   async function save(event: FormEvent<HTMLFormElement>, path: string, body: unknown) {
     event.preventDefault();
     // React clears currentTarget once the handler yields, so keep the form before awaiting.
     const formElement = event.currentTarget;
+    setSaving(true);
     try {
       await request(path, { method: 'POST', body: JSON.stringify(body) });
       formElement.reset();
       notify('Đã lưu dữ liệu thành công.');
       await load();
       await refreshCategories();
+      return true;
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Không thể lưu dữ liệu', true);
+      return false;
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -289,13 +266,18 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
     }
   }
 
-  async function reviewApplication(application: TechnicianApplication, action: 'review' | 'approve' | 'reject') {
-    let body: unknown = undefined;
-    if (action === 'reject') {
-      const reason = window.prompt('Lý do từ chối hồ sơ KTV:');
-      if (!reason?.trim()) return;
-      body = { reason: reason.trim() };
+  async function reviewApplication(
+    application: TechnicianApplication,
+    action: 'review' | 'approve' | 'reject',
+    reason?: string,
+  ) {
+    // Rejecting needs a reason the applicant will see; collect it in a dialog first.
+    if (action === 'reject' && !reason?.trim()) {
+      setRejectReason('');
+      setRejecting(application);
+      return;
     }
+    const body = action === 'reject' ? { reason: reason!.trim() } : undefined;
     setApplicationAction(application.id);
     try {
       await request(`/admin/marketplace/technician-applications/${application.id}/${action}`, {
@@ -312,6 +294,7 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
       if (applicationDetail && applicationDetail.id === application.id) {
         setApplicationDetail(null);
       }
+      setRejecting(null);
       await load();
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Không thể xử lý hồ sơ', true);
@@ -349,6 +332,23 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
     }
   };
 
+  const technicianItems = technicians?.items ?? [];
+  const technicianStats = (() => {
+    const reviews = technicianItems.reduce((sum, tech) => sum + (tech.reviewCount ?? 0), 0);
+    const weighted = technicianItems.reduce((sum, tech) => sum + Number(tech.averageRating ?? 0) * (tech.reviewCount ?? 0), 0);
+    const available = technicianItems.filter((tech) => tech.isActive && tech.isAvailable).length;
+    return {
+      total: technicians?.total ?? technicianItems.length,
+      available,
+      busy: technicianItems.length - available,
+      reviews,
+      rating: reviews ? weighted / reviews : 0,
+    };
+  })();
+  const visibleTechnicians = technicianItems.filter((tech) =>
+    normalizeSearch(`${tech.user.displayName ?? ''} ${tech.user.phoneNumber ?? ''} ${tech.city ?? ''}`).includes(normalizeSearch(technicianQuery)),
+  );
+
   const filteredApplications = applications?.items.filter((app) => {
     if (appFilterTab === 'ALL') return true;
     return app.status === appFilterTab;
@@ -359,30 +359,13 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
       {/* Page Header */}
       <PageHeader
         title={getPageTitle()}
-        subtitle="Quản lý thông tin, phê duyệt và giám sát trực tiếp từ hệ thống MATXXA"
-        badge={loading ? 'Đang đồng bộ...' : 'Hệ thống sẵn sàng'}
-        badgeTone="green"
-        breadcrumbs={[
-          { label: 'MATXXA' },
-          { label: getPageTitle() },
-        ]}
+        subtitle={tab in NAV_DESCRIPTIONS ? NAV_DESCRIPTIONS[tab] : undefined}
         actions={
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => void load()}
-              className="px-3.5 py-2 rounded-xl bg-white border border-[#E5EBE5] text-xs font-semibold text-[#66756B] hover:text-[#1C2B20] hover:bg-[#F6F8F4] transition-colors shadow-2xs cursor-pointer"
-            >
-              Làm mới dữ liệu
-            </button>
-            {tab !== 'catalog' && (
-              <button
-                onClick={() => setTab('catalog')}
-                className="px-4 py-2 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
-              >
-                Quản lý catalog
-              </button>
-            )}
-          </div>
+          tab !== 'courses' && tab !== 'catalog' ? (
+            <Button icon={<RefreshCw className="w-4 h-4" />} loading={loading} onClick={() => void load()}>
+              Tải lại
+            </Button>
+          ) : undefined
         }
       />
 
@@ -393,29 +376,29 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
               label="Tổng kỹ thuật viên"
-              value={`${technicians?.total ?? 5} KTV`}
+              value={technicianStats.total}
               caption="toàn hệ thống"
               icon={<UsersRound className="w-5 h-5" />}
               tone="primary"
             />
             <StatCard
-              label="Đang hoạt động"
-              value={`${technicians?.items.filter((t) => t.isActive && t.isAvailable).length ?? 4} KTV`}
-              caption="sẵn sàng nhận ca"
+              label="Sẵn sàng nhận ca"
+              value={technicianStats.available}
+              caption="đang bật và rảnh"
               icon={<UserCheck className="w-5 h-5" />}
               tone="success"
             />
             <StatCard
-              label="Đang phục vụ / bận"
-              value="8 KTV"
-              caption="đang thực hiện ca"
+              label="Đang bận / tạm ẩn"
+              value={technicianStats.busy}
+              caption="bận hoặc đã tắt hiển thị"
               icon={<Clock className="w-5 h-5" />}
               tone="info"
             />
             <StatCard
               label="Đánh giá trung bình"
-              value="4.92 ★"
-              caption="từ 618 khách hàng"
+              value={technicianStats.reviews ? `${technicianStats.rating.toFixed(2)} ★` : 'Chưa có'}
+              caption={`từ ${technicianStats.reviews.toLocaleString('vi-VN')} đánh giá`}
               icon={<Star className="w-5 h-5" />}
               tone="warning"
             />
@@ -424,7 +407,8 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
           {/* Technicians Table */}
           <SectionCard
             title="Danh sách kỹ thuật viên"
-            subtitle="Đội ngũ kỹ thuật viên massage & spa đã qua đào tạo và xác minh KYC"
+            subtitle={`${visibleTechnicians.length} / ${technicianItems.length} kỹ thuật viên`}
+            action={<SearchBox value={technicianQuery} onChange={setTechnicianQuery} placeholder="Tìm tên, SĐT, khu vực..." className="w-60" />}
             noPadding
           >
             <div className="overflow-x-auto">
@@ -441,7 +425,7 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F1F5EF] text-sm text-[#1C2B20]">
-                  {technicians?.items.map((tech) => (
+                  {visibleTechnicians.map((tech) => (
                     <tr key={tech.id} className="hover:bg-[#F6F8F4] transition-colors h-16">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
@@ -455,10 +439,10 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                         </div>
                       </td>
                       <td className="py-3 px-4 font-mono text-xs text-[#66756B]">
-                        {tech.user.phoneNumber || '0901 *** 888'}
+                        {tech.user.phoneNumber || '—'}
                       </td>
                       <td className="py-3 px-4 text-xs font-medium">
-                        {tech.city || 'TP. Hồ Chí Minh'}
+                        {tech.city || '—'}
                       </td>
                       <td className="py-3 px-4 text-xs font-semibold text-[#2E7D4A]">
                         {tech._count.services} gói dịch vụ
@@ -578,7 +562,7 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                         {app.user.phoneNumber || '0912 *** 888'}
                       </td>
                       <td className="py-3 px-4 text-xs">
-                        {app.district ? `${app.district}, ` : ''}{app.city || 'TP. Hồ Chí Minh'}
+                        {app.district ? `${app.district}, ` : ''}{app.city || 'Chưa cập nhật'}
                       </td>
                       <td className="py-3 px-4 text-xs font-medium text-[#2E7D4A]">
                         {formatServiceModes(app.supportedModes)}
@@ -792,289 +776,326 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
 
       {/* ── 3. KHUYẾN MÃI & BANNER ── */}
       {tab === 'promotions' && (
-        <div className="space-y-6">
-          <div className="flex items-center gap-2 p-1 bg-[#F1F5EF] rounded-xl border border-[#E5EBE5] max-w-fit">
-            <button
-              onClick={() => setPromoTab('promos')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                promoTab === 'promos' ? 'bg-white text-[#2E7D4A] shadow-xs' : 'text-[#66756B]'
-              }`}
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <Tabs
+              value={promoTab}
+              onChange={setPromoTab}
+              items={[
+                { value: 'promos', label: 'Mã giảm giá', count: promotions.length, icon: <Tag className="w-3.5 h-3.5" /> },
+                { value: 'banners', label: 'Banner ứng dụng', count: banners.length, icon: <ImageIcon className="w-3.5 h-3.5" /> },
+              ]}
+            />
+            {promoTab === 'promos' && (
+              <SearchBox value={promoQuery} onChange={setPromoQuery} placeholder="Tìm mã hoặc tên chương trình..." className="flex-1 min-w-[200px] max-w-md" />
+            )}
+            <Button
+              variant="primary"
+              className="ml-auto"
+              icon={<Plus className="w-4 h-4" />}
+              onClick={() => {
+                setPromoCode('');
+                setDiscountType('PERCENT');
+                setBannerPreview('');
+                setPromoDrawer(promoTab === 'promos' ? 'promo' : 'banner');
+              }}
             >
-              Mã giảm giá & Voucher
-            </button>
-            <button
-              onClick={() => setPromoTab('banners')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                promoTab === 'banners' ? 'bg-white text-[#2E7D4A] shadow-xs' : 'text-[#66756B]'
-              }`}
-            >
-              Banner quảng cáo ứng dụng
-            </button>
+              {promoTab === 'promos' ? 'Tạo mã giảm giá' : 'Đăng banner'}
+            </Button>
           </div>
 
           {promoTab === 'promos' ? (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Form tạo mã voucher */}
-              <SectionCard
-                title="Tạo mã ưu đãi mới"
-                subtitle="Cấu hình voucher giảm giá trực tiếp cho khách hàng"
-                className="lg:col-span-1"
-              >
-                <form
-                  onSubmit={(event) => {
-                    const f = form(event);
-                    void save(event, '/admin/marketplace/promotions', {
-                      code: f.get('code'),
-                      name: f.get('name'),
-                      type: f.get('type'),
-                      value: Number(f.get('value')),
-                      minOrderAmount: Number(f.get('minOrderAmount') || 0),
-                      maxDiscount: f.get('maxDiscount') ? Number(f.get('maxDiscount')) : undefined,
-                      usageLimit: f.get('usageLimit') ? Number(f.get('usageLimit')) : undefined,
-                      perUserLimit: Number(f.get('perUserLimit') || 1),
-                      startsAt: new Date(String(f.get('startsAt'))).toISOString(),
-                      endsAt: new Date(String(f.get('endsAt'))).toISOString(),
-                      customerIds: String(f.get('customerIds') || '').split(',').map((id) => id.trim()).filter(Boolean),
-                      description: String(f.get('description') || '').trim() || undefined,
-                      terms: String(f.get('terms') || '').trim() || undefined,
-                      note: String(f.get('note') || '').trim() || undefined,
-                    });
-                  }}
-                  className="space-y-3 text-xs"
-                >
-                  <div>
-                    <label className="font-semibold block mb-1">Mã voucher *</label>
-                    <input
-                      name="code"
-                      required
-                      placeholder="VD: SPAVIP2026"
-                      className="w-full px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] focus:outline-none focus:border-[#2E7D4A]"
+            (() => {
+              const visible = promotions.filter((promo) => normalizeSearch(`${promo.code} ${promo.name}`).includes(normalizeSearch(promoQuery)));
+              if (loading && !promotions.length) return <SkeletonRows rows={4} />;
+              if (!visible.length)
+                return (
+                  <Card>
+                    <Empty
+                      icon={<Tag className="w-6 h-6" />}
+                      title={promotions.length ? 'Không có mã khớp tìm kiếm' : 'Chưa có mã giảm giá'}
+                      description="Mã giảm giá áp dụng khi khách đặt lịch trong ứng dụng, và có thể gắn làm ưu đãi của một địa điểm."
                     />
-                  </div>
-                  <div>
-                    <label className="font-semibold block mb-1">Gán cho khách cụ thể (tuỳ chọn)</label>
-                    <input name="customerIds" placeholder="User ID, cách nhau bằng dấu phẩy; để trống = tất cả khách" className="w-full px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5]" />
-                  </div>
-                  <div>
-                    <label className="font-semibold block mb-1">Tên chương trình *</label>
-                    <input
-                      name="name"
-                      required
-                      placeholder="VD: Ưu đãi đầu xuân 20%"
-                      className="w-full px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] focus:outline-none focus:border-[#2E7D4A]"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="font-semibold block mb-1">Loại giảm giá</label>
-                      <select
-                        name="type"
-                        className="w-full px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] focus:outline-none focus:border-[#2E7D4A]"
+                  </Card>
+                );
+              return (
+                <motion.div layout className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {visible.map((promo, index) => {
+                    const state = promotionState(promo);
+                    return (
+                      <motion.article
+                        key={promo.id}
+                        layout
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0, transition: { delay: Math.min(index, 8) * 0.03 } }}
+                        className="relative rounded-2xl bg-white border border-surface-border overflow-hidden hover:shadow-card-hover transition-shadow"
                       >
-                        <option value="PERCENT">Phần trăm (%)</option>
-                        <option value="FIXED">Số tiền (VNĐ)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="font-semibold block mb-1">Giá trị *</label>
-                      <input
-                        name="value"
-                        type="number"
-                        min="0"
-                        required
-                        placeholder="20"
-                        className="w-full px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] focus:outline-none focus:border-[#2E7D4A]"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="font-semibold block mb-1">Bắt đầu *</label>
-                      <input
-                        name="startsAt"
-                        type="datetime-local"
-                        required
-                        className="w-full px-2 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5]"
-                      />
-                    </div>
-                    <div>
-                      <label className="font-semibold block mb-1">Kết thúc *</label>
-                      <input
-                        name="endsAt"
-                        type="datetime-local"
-                        required
-                        className="w-full px-2 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5]"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-[#66756B]">
-                    3 mục dưới hiển thị ở màn ưu đãi khi mã được gắn vào một địa điểm.
-                  </p>
-                  {[
-                    { name: 'description', label: 'Thông tin', max: 5000 },
-                    { name: 'terms', label: 'Điều khoản và điều kiện', max: 5000 },
-                    { name: 'note', label: 'Lưu ý', max: 2000 },
-                  ].map((field) => (
-                    <div key={field.name}>
-                      <label className="font-semibold block mb-1">{field.label}</label>
-                      <textarea
-                        name={field.name}
-                        rows={2}
-                        maxLength={field.max}
-                        className="w-full px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] focus:outline-none focus:border-[#2E7D4A]"
-                      />
-                    </div>
-                  ))}
-                  <button
-                    type="submit"
-                    className="w-full mt-2 py-2.5 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white font-semibold transition-colors"
-                  >
-                    Tạo mã khuyến mãi
-                  </button>
-                </form>
-              </SectionCard>
-
-              {/* Danh sách voucher */}
-              <SectionCard
-                title="Voucher đang hoạt động"
-                subtitle={`${promotions.length} mã ưu đãi trong hệ thống`}
-                className="lg:col-span-2"
-                noPadding
-              >
-                <div className="divide-y divide-[#F1F5EF]">
-                  {promotions.map((promo) => (
-                    <div key={promo.id} className="p-4 flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#FEF6E9] text-[#F2A93B] flex items-center justify-center font-bold">
-                          <Tag className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-sm text-[#2E7D4A]">{promo.code}</span>
-                            <StatusBadge status={promo.isActive ? 'ACTIVE' : 'INACTIVE'} size="sm" />
+                        {/* Ticket edge */}
+                        <div className={`h-1.5 ${state.tone === 'green' ? 'bg-gradient-to-r from-primary to-[#7FC796]' : state.tone === 'blue' ? 'bg-status-info' : 'bg-[#D0DCD1]'}`} />
+                        <div className="p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-mono font-bold text-base text-primary tracking-wider truncate">{promo.code}</p>
+                              <p className="text-sm font-semibold text-content-primary truncate">{promo.name}</p>
+                            </div>
+                            <Badge tone={state.tone} dot>{state.label}</Badge>
                           </div>
-                          <p className="text-xs text-[#1C2B20] font-semibold mt-0.5">{promo.name}</p>
-                          <span className="text-[11px] text-[#94A399]">
-                            {promo.type === 'PERCENT' ? `Giảm ${promo.value}%` : `Giảm ${money(promo.value)}`}
-                          </span>
+                          <p className="text-2xl font-extrabold text-content-primary">
+                            {promo.type === 'PERCENT' ? `-${Number(promo.value)}%` : `-${money(Number(promo.value))}`}
+                          </p>
+                          <div className="text-[11px] text-content-secondary space-y-0.5">
+                            <p>{shortDate(promo.startsAt)} → {shortDate(promo.endsAt)}</p>
+                            <p>
+                              Đã dùng {promo.usedCount ?? 0}
+                              {promo.usageLimit ? ` / ${promo.usageLimit}` : ' (không giới hạn)'}
+                              {Number(promo.minOrderAmount ?? 0) > 0 && ` · đơn từ ${money(Number(promo.minOrderAmount))}`}
+                            </p>
+                          </div>
+                          {promo.usageLimit ? (
+                            <div className="h-1.5 rounded-full bg-surface-muted overflow-hidden">
+                              <motion.div
+                                className="h-full bg-primary rounded-full"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${Math.min(100, ((promo.usedCount ?? 0) / promo.usageLimit) * 100)}%` }}
+                                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                              />
+                            </div>
+                          ) : null}
+                          <div className="flex gap-2 pt-1">
+                            <Button size="sm" variant={promo.isActive ? 'danger' : 'soft'} onClick={() => void patch(`/admin/marketplace/promotions/${promo.id}`, { isActive: !promo.isActive })}>
+                              {promo.isActive ? 'Tắt mã' : 'Bật mã'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                void navigator.clipboard?.writeText(promo.code);
+                                notify(`Đã sao chép mã ${promo.code}`);
+                              }}
+                            >
+                              Sao chép mã
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-
-                      <button
-                        onClick={() => void patch(`/admin/marketplace/promotions/${promo.id}`, { isActive: !promo.isActive })}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-                          promo.isActive
-                            ? 'border border-[#F8D2D0] text-[#D04A44] hover:bg-[#FDF0EF]'
-                            : 'bg-[#EAF5EC] text-[#2E7D4A] hover:bg-[#DDF0E1]'
-                        }`}
-                      >
-                        {promo.isActive ? 'Tắt mã' : 'Bật mã'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </SectionCard>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Form tạo banner */}
-              <SectionCard
-                title="Đăng banner mới"
-                subtitle="Banner hiển thị trên trang chủ ứng dụng người dùng"
-                className="lg:col-span-1"
-              >
-                <form
-                  onSubmit={(event) => {
-                    const f = form(event);
-                    void save(event, '/admin/marketplace/banners', {
-                      title: f.get('title'),
-                      subtitle: f.get('subtitle') || undefined,
-                      imageUrl: f.get('imageUrl'),
-                      actionUrl: f.get('actionUrl') || undefined,
-                      sortOrder: Number(f.get('sortOrder') || 0),
-                    });
-                  }}
-                  className="space-y-3 text-xs"
+                      </motion.article>
+                    );
+                  })}
+                </motion.div>
+              );
+            })()
+          ) : banners.length ? (
+            <motion.div layout className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {banners.map((banner, index) => (
+                <motion.article
+                  key={banner.id}
+                  layout
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0, transition: { delay: Math.min(index, 8) * 0.03 } }}
+                  className="group rounded-2xl bg-white border border-surface-border overflow-hidden"
                 >
-                  <div>
-                    <label className="font-semibold block mb-1">Tiêu đề banner *</label>
-                    <input
-                      name="title"
-                      required
-                      placeholder="VD: Liệu trình Shiatsu thư giãn"
-                      className="w-full px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5]"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold block mb-1">Mô tả phụ</label>
-                    <input
-                      name="subtitle"
-                      placeholder="VD: Trải nghiệm chuẩn y khoa"
-                      className="w-full px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5]"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold block mb-1">Đường dẫn ảnh (URL) *</label>
-                    <input
-                      name="imageUrl"
-                      type="url"
-                      required
-                      placeholder="https://..."
-                      className="w-full px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5]"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="w-full mt-2 py-2.5 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white font-semibold transition-colors"
-                  >
-                    Đăng banner
-                  </button>
-                </form>
-              </SectionCard>
-
-              {/* Danh sách banner */}
-              <SectionCard
-                title="Banner đang hiển thị"
-                subtitle="Xem trước và quản lý vị trí hiển thị"
-                className="lg:col-span-2"
-                noPadding
-              >
-                <div className="divide-y divide-[#F1F5EF]">
-                  {banners.map((banner) => (
-                    <div key={banner.id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={banner.imageUrl}
-                          alt={banner.title}
-                          className="w-24 h-16 rounded-xl object-cover ring-1 ring-[#E5EBE5] flex-shrink-0"
-                        />
-                        <div>
-                          <h4 className="font-bold text-xs text-[#1C2B20]">{banner.title}</h4>
-                          <p className="text-[11px] text-[#66756B] mt-0.5">{banner.subtitle || 'Không có mô tả'}</p>
-                          <StatusBadge status={banner.isActive ? 'ACTIVE' : 'INACTIVE'} size="sm" />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-end sm:self-auto">
-                        <button
-                          onClick={() => void patch(`/admin/marketplace/banners/${banner.id}`, { isActive: !banner.isActive })}
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#F6F8F4] hover:bg-[#EEF2EC] text-[#1C2B20]"
-                        >
-                          {banner.isActive ? 'Ẩn' : 'Hiện'}
-                        </button>
-                        <button
-                          onClick={() => void remove(`/admin/marketplace/banners/${banner.id}`)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#E05B55] hover:bg-[#FDF0EF]"
-                        >
-                          Xóa
-                        </button>
-                      </div>
+                  <div className="relative aspect-[16/7] bg-surface-subtle overflow-hidden">
+                    <img src={banner.imageUrl} alt={banner.title} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute bottom-3 left-3 right-3 text-white">
+                      <p className="font-bold text-sm truncate">{banner.title}</p>
+                      {banner.subtitle && <p className="text-[11px] text-white/80 truncate">{banner.subtitle}</p>}
                     </div>
-                  ))}
-                </div>
-              </SectionCard>
-            </div>
+                    <span className="absolute top-2 right-2">
+                      <Badge tone={banner.isActive ? 'green' : 'gray'} dot>{banner.isActive ? 'Đang hiển thị' : 'Đã ẩn'}</Badge>
+                    </span>
+                  </div>
+                  <div className="p-3 flex gap-2">
+                    <Button size="sm" onClick={() => void patch(`/admin/marketplace/banners/${banner.id}`, { isActive: !banner.isActive })}>
+                      {banner.isActive ? 'Ẩn' : 'Hiện'}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="ml-auto text-status-danger" onClick={() => void remove(`/admin/marketplace/banners/${banner.id}`)}>
+                      Xóa
+                    </Button>
+                  </div>
+                </motion.article>
+              ))}
+            </motion.div>
+          ) : (
+            <Card>
+              <Empty icon={<ImageIcon className="w-6 h-6" />} title="Chưa có banner" description="Banner hiển thị ở trang chủ ứng dụng khách hàng." />
+            </Card>
           )}
+
+          <DetailDrawer
+            isOpen={promoDrawer === 'promo'}
+            onClose={() => !saving && setPromoDrawer(null)}
+            title="Tạo mã giảm giá"
+            subtitle="Các mục có dấu * là bắt buộc"
+            width="xl"
+            footer={
+              <>
+                <Button onClick={() => setPromoDrawer(null)} disabled={saving}>Hủy</Button>
+                <Button type="submit" form="promo-form" variant="primary" loading={saving}>Tạo mã</Button>
+              </>
+            }
+          >
+            <form
+              id="promo-form"
+              className="space-y-4"
+              onSubmit={(event) => {
+                const f = form(event);
+                const optionalNumber = (key: string) => (f.get(key) ? Number(f.get(key)) : undefined);
+                void save(event, '/admin/marketplace/promotions', {
+                  code: f.get('code'),
+                  name: f.get('name'),
+                  type: f.get('type'),
+                  value: Number(f.get('value')),
+                  minOrderAmount: Number(f.get('minOrderAmount') || 0),
+                  maxDiscount: optionalNumber('maxDiscount'),
+                  usageLimit: optionalNumber('usageLimit'),
+                  perUserLimit: Number(f.get('perUserLimit') || 1),
+                  startsAt: new Date(String(f.get('startsAt'))).toISOString(),
+                  endsAt: new Date(String(f.get('endsAt'))).toISOString(),
+                  customerIds: String(f.get('customerIds') || '').split(/[\s,]+/).map((id) => id.trim()).filter(Boolean),
+                  description: String(f.get('description') || '').trim() || undefined,
+                  terms: String(f.get('terms') || '').trim() || undefined,
+                  note: String(f.get('note') || '').trim() || undefined,
+                }).then((ok) => ok && setPromoDrawer(null));
+              }}
+            >
+              <FormSection title="Mã & tên chương trình" icon={<Tag className="w-4 h-4" />}>
+                <FormGrid>
+                  <Field label="Mã voucher" required hint="Khách nhập mã này khi đặt lịch. Tự viết hoa.">
+                    <div className="flex gap-2">
+                      <Input
+                        name="code"
+                        required
+                        maxLength={50}
+                        value={promoCode}
+                        onChange={(event) => setPromoCode(event.target.value.toUpperCase().replace(/\s/g, ''))}
+                        placeholder="SPAVIP2026"
+                        className="font-mono tracking-wider"
+                      />
+                      <Button onClick={() => setPromoCode(`MX${Math.random().toString(36).slice(2, 8).toUpperCase()}`)} title="Tạo mã ngẫu nhiên">
+                        Ngẫu nhiên
+                      </Button>
+                    </div>
+                  </Field>
+                  <Field label="Tên chương trình" required>
+                    <Input name="name" required maxLength={150} placeholder="Ưu đãi đầu xuân 20%" />
+                  </Field>
+                </FormGrid>
+              </FormSection>
+
+              <FormSection title="Mức giảm" icon={<DollarSign className="w-4 h-4" />}>
+                <FormGrid>
+                  <Field label="Loại giảm giá">
+                    <Select name="type" value={discountType} onChange={(event) => setDiscountType(event.target.value as 'PERCENT' | 'FIXED')}>
+                      <option value="PERCENT">Phần trăm (%)</option>
+                      <option value="FIXED">Số tiền (VNĐ)</option>
+                    </Select>
+                  </Field>
+                  <Field label={discountType === 'PERCENT' ? 'Giảm bao nhiêu %' : 'Giảm bao nhiêu tiền (VNĐ)'} required>
+                    <Input name="value" type="number" required min={0} max={discountType === 'PERCENT' ? 100 : undefined} step={discountType === 'PERCENT' ? 1 : 1000} placeholder={discountType === 'PERCENT' ? '20' : '50000'} />
+                  </Field>
+                  <Field label="Đơn tối thiểu (VNĐ)" hint="Để trống = mọi đơn.">
+                    <Input name="minOrderAmount" type="number" min={0} step={1000} placeholder="0" />
+                  </Field>
+                  {discountType === 'PERCENT' && (
+                    <Field label="Giảm tối đa (VNĐ)" hint="Để trống = không giới hạn.">
+                      <Input name="maxDiscount" type="number" min={0} step={1000} placeholder="100000" />
+                    </Field>
+                  )}
+                </FormGrid>
+              </FormSection>
+
+              <FormSection title="Thời gian & giới hạn" icon={<CalendarCheck className="w-4 h-4" />}>
+                <FormGrid>
+                  <Field label="Bắt đầu" required>
+                    <Input name="startsAt" type="datetime-local" required />
+                  </Field>
+                  <Field label="Kết thúc" required>
+                    <Input name="endsAt" type="datetime-local" required />
+                  </Field>
+                  <Field label="Tổng lượt dùng" hint="Để trống = không giới hạn.">
+                    <Input name="usageLimit" type="number" min={1} placeholder="500" />
+                  </Field>
+                  <Field label="Lượt dùng mỗi khách">
+                    <Input name="perUserLimit" type="number" min={1} defaultValue={1} />
+                  </Field>
+                </FormGrid>
+              </FormSection>
+
+              <FormSection title="Đối tượng áp dụng" icon={<Users className="w-4 h-4" />} collapsible defaultOpen={false} description="Mặc định áp dụng cho tất cả khách">
+                <Field label="Chỉ dành cho các khách này" hint="Dán User ID (xem ở trang Khách hàng), cách nhau bằng dấu phẩy hoặc xuống dòng. Để trống = tất cả khách.">
+                  <Textarea name="customerIds" rows={3} className="font-mono text-xs" placeholder="6b2ff86e-1e4c-4e0b-8b69-33b288a50efe" />
+                </Field>
+              </FormSection>
+
+              <FormSection title="Nội dung trên ứng dụng" icon={<FileText className="w-4 h-4" />} collapsible defaultOpen={false} description="Hiện ở màn ưu đãi khi mã gắn vào một địa điểm">
+                <Field label="Thông tin">
+                  <Textarea name="description" maxLength={5000} />
+                </Field>
+                <Field label="Điều khoản và điều kiện">
+                  <Textarea name="terms" maxLength={5000} />
+                </Field>
+                <Field label="Lưu ý">
+                  <Textarea name="note" maxLength={2000} rows={2} />
+                </Field>
+              </FormSection>
+            </form>
+          </DetailDrawer>
+
+          <DetailDrawer
+            isOpen={promoDrawer === 'banner'}
+            onClose={() => !saving && setPromoDrawer(null)}
+            title="Đăng banner mới"
+            subtitle="Banner hiển thị ở trang chủ ứng dụng khách hàng"
+            width="lg"
+            footer={
+              <>
+                <Button onClick={() => setPromoDrawer(null)} disabled={saving}>Hủy</Button>
+                <Button type="submit" form="banner-form" variant="primary" loading={saving}>Đăng banner</Button>
+              </>
+            }
+          >
+            <form
+              id="banner-form"
+              className="space-y-4"
+              onSubmit={(event) => {
+                const f = form(event);
+                void save(event, '/admin/marketplace/banners', {
+                  title: f.get('title'),
+                  subtitle: f.get('subtitle') || undefined,
+                  imageUrl: f.get('imageUrl'),
+                  actionUrl: f.get('actionUrl') || undefined,
+                  sortOrder: Number(f.get('sortOrder') || 0),
+                }).then((ok) => ok && setPromoDrawer(null));
+              }}
+            >
+              <div className="relative aspect-[16/7] rounded-2xl overflow-hidden bg-surface-subtle border border-surface-border flex items-center justify-center">
+                {bannerPreview ? (
+                  <img src={bannerPreview} alt="Xem trước banner" className="w-full h-full object-cover" onError={() => setBannerPreview('')} />
+                ) : (
+                  <span className="text-xs text-content-tertiary flex flex-col items-center gap-1">
+                    <ImageIcon className="w-6 h-6" /> Xem trước ảnh banner
+                  </span>
+                )}
+              </div>
+              <Field label="Đường dẫn ảnh (URL)" required hint="Tỷ lệ khuyến nghị 16:7.">
+                <Input name="imageUrl" type="url" required placeholder="https://..." onBlur={(event) => setBannerPreview(event.target.value)} />
+              </Field>
+              <Field label="Tiêu đề" required>
+                <Input name="title" required placeholder="Liệu trình Shiatsu thư giãn" />
+              </Field>
+              <Field label="Mô tả phụ">
+                <Input name="subtitle" placeholder="Trải nghiệm chuẩn y khoa" />
+              </Field>
+              <FormGrid>
+                <Field label="Liên kết khi bấm" hint="Tùy chọn.">
+                  <Input name="actionUrl" placeholder="matxa://..." />
+                </Field>
+                <Field label="Thứ tự hiển thị" hint="Số nhỏ hiện trước.">
+                  <Input name="sortOrder" type="number" defaultValue={0} />
+                </Field>
+              </FormGrid>
+            </form>
+          </DetailDrawer>
         </div>
       )}
 
@@ -1171,7 +1192,7 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                   </h3>
                   <div className="space-y-3 text-xs">
                     {[
-                      { label: 'Số điện thoại', value: technicianDetail.phoneNumber ?? technicianDetail.user?.phoneNumber ?? '0901 *** 888', mono: true },
+                      { label: 'Số điện thoại', value: technicianDetail.phoneNumber ?? technicianDetail.user?.phoneNumber ?? 'Chưa cập nhật', mono: true },
                       { label: 'Khu vực hoạt động', value: `${technicianDetail.city ?? 'Hà Nội'}${technicianDetail.district ? ` (${technicianDetail.district})` : ''}` },
                       { label: 'Kinh nghiệm', value: technicianDetail.experienceYears ? `${technicianDetail.experienceYears} năm` : 'Trên 3 năm', bold: true },
                       { label: 'Trạng thái hoạt động', value: technicianDetail.isAvailable ? 'Sẵn sàng nhận ca' : 'Đang bận', green: true },
@@ -1232,7 +1253,7 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                   <div className="flex items-end gap-4">
                     <div>
                       <div className="text-4xl font-bold text-[#1C2B20]">
-                        {Number(technicianDetail.averageRating ?? 4.92).toFixed(2)}
+                        {Number(technicianDetail.averageRating ?? 0).toFixed(2)}
                         <span className="text-lg text-[#66756B] font-normal"> /5</span>
                       </div>
                       <div className="flex items-center gap-0.5 mt-1">
@@ -1240,7 +1261,7 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                           <Star key={s} className="w-4 h-4 fill-[#F2A93B] text-[#F2A93B]" />
                         ))}
                       </div>
-                      <p className="text-[11px] text-[#94A399] mt-1">Từ {technicianDetail.reviewCount ?? 618} đánh giá của khách hàng</p>
+                      <p className="text-[11px] text-[#94A399] mt-1">Từ {technicianDetail.reviewCount ?? 0} đánh giá của khách hàng</p>
                     </div>
                   </div>
                   <div className="space-y-1.5">
@@ -1364,6 +1385,40 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
           </div>
         </div>
       )}
+      <AnimatePresence>
+        {rejecting && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setRejecting(null)} className="fixed inset-0 bg-content-primary/40 backdrop-blur-sm" />
+            <motion.form
+              role="dialog"
+              aria-modal="true"
+              aria-label="Từ chối hồ sơ"
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97 }}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void reviewApplication(rejecting, 'reject', rejectReason);
+              }}
+              className="relative w-full max-w-md bg-white rounded-2xl border border-surface-border shadow-modal p-6 space-y-4"
+            >
+              <div>
+                <h2 className="text-lg font-bold">Từ chối hồ sơ KTV</h2>
+                <p className="text-xs text-content-secondary mt-1">{rejecting.displayName ?? 'Ứng viên'} sẽ thấy lý do này trong ứng dụng.</p>
+              </div>
+              <Field label="Lý do từ chối" required>
+                <Textarea autoFocus required rows={4} maxLength={1000} value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} placeholder="VD: Ảnh CCCD bị mờ, vui lòng chụp lại." />
+              </Field>
+              <div className="flex justify-end gap-2">
+                <Button onClick={() => setRejecting(null)} disabled={applicationAction !== null}>Hủy</Button>
+                <Button type="submit" variant="danger" loading={applicationAction === rejecting.id} disabled={!rejectReason.trim()}>
+                  Từ chối hồ sơ
+                </Button>
+              </div>
+            </motion.form>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

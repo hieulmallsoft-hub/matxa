@@ -1,29 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Search,
-  LayoutDashboard,
-  LineChart,
-  CalendarDays,
-  UsersRound,
-  UserCheck,
-  FolderTree,
-  GraduationCap,
-  Sparkles,
-  HeartHandshake,
-  MessageCircle,
-  Bell,
-  Settings,
-  Plus,
-  ArrowRight,
-} from 'lucide-react';
-import { PageId } from '../../types/dashboard';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowRight, CornerDownLeft, MessageCirclePlus, Plus, Search, Sparkles, Store } from 'lucide-react';
+import { NAV_ITEMS, normalizeSearch } from '../../navigation';
+import type { PageId } from '../../types/dashboard';
 
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigate: (page: PageId) => void;
-  onTriggerAction: (actionName: string) => void;
 }
 
 interface PaletteItem {
@@ -32,280 +16,141 @@ interface PaletteItem {
   subtitle: string;
   icon: React.ReactNode;
   category: 'Trang' | 'Thao tác nhanh';
-  action: () => void;
+  page: PageId;
+  search: string;
 }
 
-export const CommandPalette: React.FC<CommandPaletteProps> = ({
-  isOpen,
-  onClose,
-  onNavigate,
-  onTriggerAction,
-}) => {
+const QUICK_ACTIONS: Array<Omit<PaletteItem, 'search' | 'category'>> = [
+  { id: 'act-promo', title: 'Tạo mã khuyến mãi', subtitle: 'Mở form tạo voucher', icon: <Sparkles className="w-4 h-4 text-status-warning" />, page: 'promotions' },
+  { id: 'act-venue', title: 'Thêm địa điểm / spa', subtitle: 'Mở form thêm địa điểm', icon: <Store className="w-4 h-4 text-primary" />, page: 'venues' },
+  { id: 'act-service', title: 'Thêm dịch vụ', subtitle: 'Mở danh mục dịch vụ', icon: <Plus className="w-4 h-4 text-primary" />, page: 'catalog' },
+  { id: 'act-chat', title: 'Nhắn tin hỗ trợ khách', subtitle: 'Mở hộp thư CSKH', icon: <MessageCirclePlus className="w-4 h-4 text-status-info" />, page: 'messages' },
+];
+
+const ITEMS: PaletteItem[] = [
+  ...NAV_ITEMS.map((item) => {
+    const Icon = item.icon;
+    return {
+      id: `nav-${item.id}`,
+      title: item.label,
+      subtitle: item.description,
+      icon: <Icon className="w-4 h-4 text-primary" />,
+      category: 'Trang' as const,
+      page: item.id,
+      search: normalizeSearch(`${item.label} ${item.description} ${item.keywords ?? ''}`),
+    };
+  }),
+  ...QUICK_ACTIONS.map((action) => ({
+    ...action,
+    category: 'Thao tác nhanh' as const,
+    search: normalizeSearch(`${action.title} ${action.subtitle}`),
+  })),
+];
+
+export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, onNavigate }) => {
   const [query, setQuery] = useState('');
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selected, setSelected] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  const items: PaletteItem[] = [
-    {
-      id: 'nav-dashboard',
-      title: 'Đến trang Tổng quan',
-      subtitle: 'Xem tóm tắt tình hình vận hành hôm nay',
-      icon: <LayoutDashboard className="w-4 h-4 text-[#2E7D4A]" />,
-      category: 'Trang',
-      action: () => {
-        onNavigate('dashboard');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-analytics',
-      title: 'Đến trang Doanh thu & Báo cáo',
-      subtitle: 'Biểu đồ doanh thu, top dịch vụ & hiệu quả KTV',
-      icon: <LineChart className="w-4 h-4 text-[#2E9B62]" />,
-      category: 'Trang',
-      action: () => {
-        onNavigate('analytics');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-orders',
-      title: 'Đến trang Lịch đặt & Đơn hàng',
-      subtitle: 'Quản lý lịch hẹn, điều phối và xác nhận booking',
-      icon: <CalendarDays className="w-4 h-4 text-[#4285D4]" />,
-      category: 'Trang',
-      action: () => {
-        onNavigate('orders');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-technicians',
-      title: 'Đến trang Kỹ thuật viên',
-      subtitle: 'Danh sách KTV, đánh giá, lịch làm việc',
-      icon: <UsersRound className="w-4 h-4 text-[#2E7D4A]" />,
-      category: 'Trang',
-      action: () => {
-        onNavigate('technicians');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-applications',
-      title: 'Đến trang Duyệt hồ sơ KTV',
-      subtitle: 'Xét duyệt đơn đăng ký, CCCD và chứng chỉ',
-      icon: <UserCheck className="w-4 h-4 text-[#F2A93B]" />,
-      category: 'Trang',
-      action: () => {
-        onNavigate('applications');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-catalog',
-      title: 'Đến trang Catalog dịch vụ',
-      subtitle: 'Quản lý danh mục gói massage & bảng giá',
-      icon: <FolderTree className="w-4 h-4 text-[#2E7D4A]" />,
-      category: 'Trang',
-      action: () => {
-        onNavigate('catalog');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-courses',
-      title: 'Đến trang Khóa học đào tạo',
-      subtitle: 'Bài giảng và tài liệu chuyên môn cho KTV',
-      icon: <GraduationCap className="w-4 h-4 text-[#4285D4]" />,
-      category: 'Trang',
-      action: () => {
-        onNavigate('courses');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-promotions',
-      title: 'Đến trang Khuyến mãi & Banner',
-      subtitle: 'Voucher giảm giá, ưu đãi và banner ứng dụng',
-      icon: <Sparkles className="w-4 h-4 text-[#F2A93B]" />,
-      category: 'Trang',
-      action: () => {
-        onNavigate('promotions');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-customers',
-      title: 'Đến trang Khách hàng',
-      subtitle: 'Danh bạ khách hàng và lịch sử đặt dịch vụ',
-      icon: <HeartHandshake className="w-4 h-4 text-[#E05B55]" />,
-      category: 'Trang',
-      action: () => {
-        onNavigate('customers');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-messages',
-      title: 'Đến trang Tin nhắn CSKH',
-      subtitle: 'Hộp thư hỗ trợ và giải đáp thắc mắc khách hàng',
-      icon: <MessageCircle className="w-4 h-4 text-[#4285D4]" />,
-      category: 'Trang',
-      action: () => {
-        onNavigate('messages');
-        onClose();
-      },
-    },
-    // Quick Actions
-    {
-      id: 'act-create-order',
-      title: 'Tạo lịch đặt mới',
-      subtitle: 'Đặt lịch massage/spa trực tiếp cho khách hàng',
-      icon: <Plus className="w-4 h-4 text-[#2E7D4A]" />,
-      category: 'Thao tác nhanh',
-      action: () => {
-        onTriggerAction('create-order');
-        onClose();
-      },
-    },
-    {
-      id: 'act-add-service',
-      title: 'Thêm gói dịch vụ mới',
-      subtitle: 'Tạo dịch vụ trị liệu mới vào catalog hệ thống',
-      icon: <Plus className="w-4 h-4 text-[#2E7D4A]" />,
-      category: 'Thao tác nhanh',
-      action: () => {
-        onTriggerAction('add-service');
-        onClose();
-      },
-    },
-    {
-      id: 'act-create-promotion',
-      title: 'Tạo mã khuyến mãi',
-      subtitle: 'Tạo voucher giảm giá cho chiến dịch mới',
-      icon: <Sparkles className="w-4 h-4 text-[#F2A93B]" />,
-      category: 'Thao tác nhanh',
-      action: () => {
-        onTriggerAction('create-promotion');
-        onClose();
-      },
-    },
-  ];
-
-  const filtered = items.filter(
-    (item) =>
-      item.title.toLowerCase().includes(query.toLowerCase()) ||
-      item.subtitle.toLowerCase().includes(query.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    const needle = normalizeSearch(query);
+    return needle ? ITEMS.filter((item) => item.search.includes(needle)) : ITEMS;
+  }, [query]);
 
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
+    if (!isOpen) return;
+    setQuery('');
+    setSelected(0);
+    const timer = window.setTimeout(() => inputRef.current?.focus(), 40);
+    return () => window.clearTimeout(timer);
   }, [isOpen]);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isOpen) return;
-      if (e.key === 'Escape') {
-        onClose();
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev + 1) % (filtered.length || 1));
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev - 1 + filtered.length) % (filtered.length || 1));
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (filtered[selectedIndex]) {
-          filtered[selectedIndex].action();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, selectedIndex, filtered, onClose]);
+    listRef.current?.querySelector(`[data-index="${selected}"]`)?.scrollIntoView({ block: 'nearest' });
+  }, [selected]);
 
+  const run = (item?: PaletteItem) => {
+    if (!item) return;
+    onNavigate(item.page);
+    onClose();
+  };
+
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Escape') onClose();
+    else if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setSelected((index) => (index + 1) % Math.max(filtered.length, 1));
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setSelected((index) => (index - 1 + filtered.length) % Math.max(filtered.length, 1));
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      run(filtered[selected]);
+    }
+  };
+
+  let lastCategory = '';
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4">
-          {/* Backdrop */}
+        <div className="fixed inset-0 z-[80] flex items-start justify-center pt-[12vh] p-4" onKeyDown={onKeyDown}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-content-primary/40 backdrop-blur-sm" />
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-[#1C2B20]/45 backdrop-blur-sm"
-          />
-
-          {/* Modal Panel */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: -10 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Tìm nhanh"
+            initial={{ opacity: 0, scale: 0.96, y: -12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -10 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-            className="relative w-full max-w-xl bg-white rounded-2xl border border-[#E5EBE5] shadow-[0_20px_50px_rgba(28,43,32,0.16)] overflow-hidden z-10"
+            exit={{ opacity: 0, scale: 0.97, y: -8 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 380 }}
+            className="relative w-full max-w-xl bg-white rounded-2xl border border-surface-border shadow-modal overflow-hidden"
           >
-            {/* Search Input Box */}
-            <div className="flex items-center px-4 border-b border-[#E5EBE5]">
-              <Search className="w-5 h-5 text-[#94A399]" />
+            <div className="flex items-center gap-2 px-4 border-b border-surface-border">
+              <Search className="w-5 h-5 text-content-tertiary" />
               <input
                 ref={inputRef}
-                type="text"
                 value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setSelectedIndex(0);
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setSelected(0);
                 }}
-                placeholder="Gõ lệnh tìm kiếm chức năng, dịch vụ, lịch đặt..."
-                className="w-full px-3.5 py-4 bg-transparent text-sm text-[#1C2B20] placeholder-[#94A399] focus:outline-none"
+                placeholder="Tìm trang hoặc thao tác (gõ không dấu cũng được)..."
+                className="w-full py-4 bg-transparent text-sm text-content-primary placeholder:text-content-tertiary focus:outline-none"
               />
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#F1F5EF] text-[#66756B] border border-[#E5EBE5]">
-                ESC để đóng
-              </span>
+              <kbd className="text-[10px] px-2 py-0.5 rounded-md bg-surface-subtle text-content-secondary border border-surface-border">Esc</kbd>
             </div>
-
-            {/* List */}
-            <div className="max-h-80 overflow-y-auto p-2 space-y-1">
-              {filtered.length === 0 ? (
-                <div className="p-8 text-center text-xs text-[#94A399]">
-                  Không tìm thấy kết quả nào phù hợp với từ khóa "{query}"
-                </div>
-              ) : (
-                filtered.map((item, idx) => {
-                  const isSelected = selectedIndex === idx;
-                  return (
+            <div ref={listRef} className="max-h-[52vh] overflow-y-auto p-2">
+              {!filtered.length && <p className="p-8 text-center text-xs text-content-tertiary">Không có kết quả cho "{query}"</p>}
+              {filtered.map((item, index) => {
+                const header = item.category !== lastCategory ? item.category : null;
+                lastCategory = item.category;
+                const active = index === selected;
+                return (
+                  <React.Fragment key={item.id}>
+                    {header && <p className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-content-tertiary">{header}</p>}
                     <button
-                      key={item.id}
-                      onClick={item.action}
-                      onMouseEnter={() => setSelectedIndex(idx)}
-                      className={`w-full flex items-center justify-between p-3 rounded-xl text-left transition-colors cursor-pointer ${
-                        isSelected ? 'bg-[#EAF5EC] text-[#1C2B20]' : 'hover:bg-[#F6F8F4] text-[#1C2B20]'
-                      }`}
+                      data-index={index}
+                      onClick={() => run(item)}
+                      onMouseMove={() => setSelected(index)}
+                      className={`relative w-full flex items-center gap-3 p-2.5 rounded-xl text-left ${active ? 'text-content-primary' : 'text-content-primary'}`}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-white border border-[#E5EBE5] flex items-center justify-center flex-shrink-0 shadow-2xs">
-                          {item.icon}
-                        </div>
-                        <div className="truncate">
-                          <div className="text-xs font-bold">{item.title}</div>
-                          <div className="text-[11px] text-[#66756B] truncate">
-                            {item.subtitle}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#F1F5EF] text-[#66756B]">
-                          {item.category}
-                        </span>
-                        <ArrowRight className={`w-3.5 h-3.5 ${isSelected ? 'text-[#2E7D4A]' : 'text-slate-300'}`} />
-                      </div>
+                      {active && <motion.span layoutId="palette-active" className="absolute inset-0 rounded-xl bg-primary-soft" transition={{ type: 'spring', stiffness: 600, damping: 40 }} />}
+                      <span className="relative w-8 h-8 rounded-lg bg-white border border-surface-border flex items-center justify-center shrink-0">{item.icon}</span>
+                      <span className="relative min-w-0 flex-1">
+                        <span className="block text-sm font-semibold truncate">{item.title}</span>
+                        <span className="block text-[11px] text-content-secondary truncate">{item.subtitle}</span>
+                      </span>
+                      {active ? <CornerDownLeft className="relative w-4 h-4 text-primary" /> : <ArrowRight className="relative w-3.5 h-3.5 text-content-tertiary" />}
                     </button>
-                  );
-                })
-              )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+            <div className="px-4 py-2 border-t border-surface-borderSubtle text-[11px] text-content-tertiary flex gap-4">
+              <span>↑↓ di chuyển</span>
+              <span>Enter mở</span>
+              <span>Esc đóng</span>
             </div>
           </motion.div>
         </div>

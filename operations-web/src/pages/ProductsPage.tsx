@@ -4,6 +4,7 @@ import { Package, Plus, Star, RefreshCw, Sparkles, AlertCircle, CheckCircle2 } f
 import { TOP_PRODUCTS } from '../data/mockData';
 import { useToast } from '../components/ui/ToastContainer';
 import { PageHeader } from '../components/common/PageHeader';
+import { DemoDataNotice } from '../components/ui/kit';
 import { StatCard } from '../components/common/StatCard';
 
 export const ProductsPage: React.FC = () => {
@@ -59,6 +60,7 @@ export const ProductsPage: React.FC = () => {
           </button>
         }
       />
+      <DemoDataNotice />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

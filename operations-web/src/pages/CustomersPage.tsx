@@ -1,428 +1,331 @@
-import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import {
-  Users,
-  UserPlus,
-  Search,
-  Mail,
-  Phone,
-  Shield,
-  Star,
-  DollarSign,
-  HeartHandshake,
-  CalendarDays,
-  Sparkles,
-  Award,
-  ChevronRight,
-  Clock,
-  MessageCircle,
-} from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ChevronLeft, ChevronRight, Copy, HeartHandshake, Lock, Mail, MessageCirclePlus, Phone, RefreshCw, Unlock } from 'lucide-react';
+import { request } from '../api/client';
 import { useToast } from '../components/ui/ToastContainer';
 import { PageHeader } from '../components/common/PageHeader';
-import { StatCard } from '../components/common/StatCard';
-import { SectionCard } from '../components/common/SectionCard';
-import { SearchInput, FilterTabs } from '../components/common/FilterBar';
 import { DetailDrawer } from '../components/common/DetailDrawer';
-import { StatusBadge } from '../components/common/StatusBadge';
-import { request } from '../api/client';
+import { useConfirm } from '../components/ui/useConfirm';
+import { AnimatedNumber, Badge, Button, Card, Empty, Reveal, RevealItem, SearchBox, SkeletonRows, Tabs } from '../components/ui/kit';
 
-// Customers without a photo (or with a broken URL) get their initials instead of a broken image.
-function CustomerAvatar({ src, name, className }: { src: string; name: string; className: string }) {
+type UserStatus = 'ACTIVE' | 'BLOCKED' | 'DELETED';
+type Customer = {
+  id: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  email: string | null;
+  phoneNumber: string | null;
+  providers: string[];
+  status: UserStatus;
+  createdAt: string;
+};
+type Page = { items: Customer[]; total: number; page: number; limit: number };
+
+const PAGE_SIZE = 20;
+const PROVIDER_LABEL: Record<string, string> = { EMAIL: 'Email', PHONE: 'SĐT', GOOGLE: 'Google', APPLE: 'Apple', FACEBOOK: 'Facebook' };
+const STATUS_BADGE: Record<UserStatus, { label: string; tone: 'green' | 'red' | 'gray' }> = {
+  ACTIVE: { label: 'Hoạt động', tone: 'green' },
+  BLOCKED: { label: 'Đã khóa', tone: 'red' },
+  DELETED: { label: 'Đã xóa', tone: 'gray' },
+};
+const errorText = (error: unknown) => (error instanceof Error ? error.message : 'Không kết nối được máy chủ');
+
+/** Photo when available and loadable, otherwise initials. */
+function CustomerAvatar({ src, name, className }: { src?: string | null; name: string; className: string }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [src]);
   if (src && !failed)
     return <img src={src} alt={name} onError={() => setFailed(true)} className={`${className} rounded-full object-cover shrink-0`} />;
   const initials = name.split(/\s+/).filter(Boolean).slice(-2).map((word) => word[0]).join('').toUpperCase() || '?';
   return (
-    <div className={`${className} rounded-full shrink-0 bg-[#EAF5EC] text-[#2E7D4A] font-bold flex items-center justify-center`}>
-      {initials}
-    </div>
+    <div className={`${className} rounded-full shrink-0 bg-primary-soft text-primary font-bold flex items-center justify-center`}>{initials}</div>
   );
 }
 
-interface CustomerEntity {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-  tier: 'VIP Platinum' | 'Gold Member' | 'Silver' | 'Thành viên mới';
-  spent: number;
-  orders: number;
-  lastBooking: string;
-  favoriteService: string;
-  address: string;
-  status: 'ACTIVE' | 'INACTIVE';
-  avatar: string;
+/** Debounces a value so typing does not fire a request per keystroke. */
+function useDebounced<T>(value: T, delay = 350) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
 }
-
-const CUSTOMER_ENTITIES: CustomerEntity[] = [
-  {
-    id: 'CUST-1049',
-    name: 'Nguyễn Thị Lan Anh',
-    phone: '0901 888 234',
-    email: 'lananh.nguyen@wellness.vn',
-    tier: 'VIP Platinum',
-    spent: 18450000,
-    orders: 24,
-    lastBooking: 'Hôm nay, 09:30',
-    favoriteService: 'Massage Trị Liệu Cổ Vai Gáy Chuyên Sâu',
-    address: 'Quận 1, TP. Hồ Chí Minh',
-    status: 'ACTIVE',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'CUST-1048',
-    name: 'Trần Minh Hoàng',
-    phone: '0903 555 888',
-    email: 'hoang.tran@techcorp.vn',
-    tier: 'Gold Member',
-    spent: 9800000,
-    orders: 14,
-    lastBooking: 'Hôm qua, 15:00',
-    favoriteService: 'Massage Shiatsu Nhật Bản & Bấm Huyệt',
-    address: 'Quận 3, TP. Hồ Chí Minh',
-    status: 'ACTIVE',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'CUST-1047',
-    name: 'Lê Thu Hà',
-    phone: '0912 666 777',
-    email: 'ha.lethu@creative.com',
-    tier: 'VIP Platinum',
-    spent: 24600000,
-    orders: 31,
-    lastBooking: '2 ngày trước',
-    favoriteService: 'Combo Thư Giãn Toàn Diện 120 Phút',
-    address: 'Cầu Giấy, Hà Nội',
-    status: 'ACTIVE',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'CUST-1046',
-    name: 'Phạm Tuấn Anh',
-    phone: '0988 222 333',
-    email: 'anh.pham@apex.vn',
-    tier: 'Silver',
-    spent: 4200000,
-    orders: 6,
-    lastBooking: '4 ngày trước',
-    favoriteService: 'Massage Đá Nóng Himalaya Phục Hồi',
-    address: 'Ba Đình, Hà Nội',
-    status: 'ACTIVE',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'CUST-1045',
-    name: 'Vũ Quỳnh Trang',
-    phone: '0933 999 111',
-    email: 'trang.vu@fashion.vn',
-    tier: 'Thành viên mới',
-    spent: 1250000,
-    orders: 1,
-    lastBooking: '1 tuần trước',
-    favoriteService: 'Chăm Sóc Da Mặt Nâng Cơ Chuyên Sâu',
-    address: 'Hải Châu, Đà Nẵng',
-    status: 'ACTIVE',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-  },
-];
 
 export const CustomersPage: React.FC = () => {
   const { addToast } = useToast();
-  const [customers, setCustomers] = useState<CustomerEntity[]>([]);
+  const { confirm, dialog } = useConfirm();
   const [search, setSearch] = useState('');
-  const [selectedTier, setSelectedTier] = useState<string>('ALL');
-  const [selectedCustomer, setSelectedCustomer] = useState<CustomerEntity | null>(null);
+  const [status, setStatus] = useState<'ALL' | UserStatus>('ALL');
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState<Page | null>(null);
+  const [totals, setTotals] = useState({ all: 0, active: 0, blocked: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selected, setSelected] = useState<Customer | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const query = useDebounced(search.trim());
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams({ role: 'CUSTOMER', page: String(page), limit: String(PAGE_SIZE) });
+    if (query) params.set('search', query);
+    if (status !== 'ALL') params.set('status', status);
+    try {
+      setData(await request<Page>(`/admin/marketplace/users?${params}`));
+      setError('');
+    } catch (loadError) {
+      setError(errorText(loadError));
+    } finally {
+      setLoading(false);
+    }
+  }, [page, query, status]);
+
+  const loadTotals = useCallback(async () => {
+    const count = (extra: string) =>
+      request<Page>(`/admin/marketplace/users?role=CUSTOMER&limit=1${extra}`).then((result) => result.total).catch(() => 0);
+    const [all, active, blocked] = await Promise.all([count(''), count('&status=ACTIVE'), count('&status=BLOCKED')]);
+    setTotals({ all, active, blocked });
+  }, []);
 
   useEffect(() => {
-    void request<{ items?: Array<{ id: string; displayName?: string | null; avatarUrl?: string | null; email?: string | null; phoneNumber?: string | null; status?: string; role?: string }> ; total?: number }>('/admin/marketplace/users?limit=100')
-      .then((result) => setCustomers((result.items ?? []).filter((user) => (user.role ?? '').toUpperCase() === 'CUSTOMER').map((user) => ({
-        id: user.id, name: user.displayName || 'Chưa cập nhật', phone: user.phoneNumber || 'Chưa cập nhật', email: user.email || '', tier: 'Thành viên mới', spent: 0, orders: 0, lastBooking: 'Chưa có', favoriteService: '', address: 'Chưa cập nhật', status: user.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE', avatar: user.avatarUrl || '',
-      }))))
-      .catch((error) => addToast({ title: 'Không tải được khách hàng', message: error instanceof Error ? error.message : 'Vui lòng thử lại', type: 'error' }));
-  }, [addToast]);
+    void load();
+  }, [load]);
+  useEffect(() => {
+    void loadTotals();
+  }, [loadTotals]);
+  // A new search or filter starts from the first page.
+  useEffect(() => setPage(1), [query, status]);
 
-  const filtered = customers.filter((c) => {
-    const matchSearch =
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search) ||
-      c.email.toLowerCase().includes(search.toLowerCase());
-    const matchTier = selectedTier === 'ALL' || c.tier === selectedTier;
-    return matchSearch && matchTier;
-  });
+  const setUserStatus = async (customer: Customer, next: 'ACTIVE' | 'BLOCKED') => {
+    if (
+      next === 'BLOCKED' &&
+      !(await confirm({
+        title: 'Khóa tài khoản?',
+        message: `${customer.displayName || 'Khách hàng'} sẽ không đăng nhập và đặt lịch được cho tới khi mở khóa.`,
+        confirmText: 'Khóa tài khoản',
+      }))
+    )
+      return;
+    setBusy(customer.id);
+    try {
+      await request(`/admin/marketplace/users/${customer.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: next }) });
+      const updated = { ...customer, status: next };
+      setData((current) => current && { ...current, items: current.items.map((item) => (item.id === customer.id ? updated : item)) });
+      setSelected((current) => (current?.id === customer.id ? updated : current));
+      void loadTotals();
+      addToast({ title: next === 'BLOCKED' ? 'Đã khóa tài khoản' : 'Đã mở khóa tài khoản', message: customer.displayName ?? customer.id, type: 'success' });
+    } catch (statusError) {
+      addToast({ title: 'Không đổi được trạng thái', message: errorText(statusError), type: 'error' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const openSupportChat = async (customer: Customer) => {
+    setBusy(customer.id);
+    try {
+      await request('/conversations/support', { method: 'POST', body: JSON.stringify({ customerId: customer.id }) });
+      window.location.hash = '/messages';
+    } catch (chatError) {
+      addToast({ title: 'Không mở được chat', message: errorText(chatError), type: 'error' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const copyId = (id: string) => {
+    void navigator.clipboard?.writeText(id);
+    addToast({ title: 'Đã sao chép User ID', message: id, type: 'success' });
+  };
+
+  const items = data?.items ?? [];
+  const pages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-      className="space-y-6 pb-12"
-    >
-      {/* 1. Header */}
+    <div className="space-y-6">
+      {dialog}
       <PageHeader
-        title="Quản lý Khách hàng"
-        subtitle="Danh sách khách hàng, lịch sử sử dụng dịch vụ và phân hạng hội viên"
-        badge="3.920 hội viên"
-        badgeTone="green"
-        breadcrumbs={[
-          { label: 'MATXXA' },
-          { label: 'Khách hàng' },
-        ]}
+        title="Khách hàng"
+        subtitle="Tìm theo tên, email, số điện thoại hoặc dán User ID"
         actions={
-          <button
-            onClick={() =>
-              addToast({
-                title: 'Thêm khách hàng',
-                message: 'Vui lòng nhập thông tin khách hàng tại biểu mẫu liên kết.',
-                type: 'info',
-              })
-            }
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white text-xs font-semibold shadow-sm transition-all cursor-pointer"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>+ Thêm khách hàng mới</span>
-          </button>
+          <Button icon={<RefreshCw className="w-4 h-4" />} loading={loading} onClick={() => { void load(); void loadTotals(); }}>
+            Tải lại
+          </Button>
         }
       />
 
-      {/* 2. KPI Cards */}
-      {false && <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard
-          label="Tổng số khách hàng"
-          value="3.920 khách"
-          change={15.8}
-          isPositive={true}
-          caption="toàn hệ thống"
-          icon={<Users className="w-5 h-5" />}
-          tone="primary"
-          sparkline={[310, 325, 340, 355, 370, 382, 392]}
-        />
-        <StatCard
-          label="Khách mới tháng này"
-          value="535 khách"
-          change={22.4}
-          isPositive={true}
-          caption="tăng trưởng 22%"
-          icon={<UserPlus className="w-5 h-5" />}
-          tone="success"
-          sparkline={[410, 435, 460, 485, 510, 525, 535]}
-        />
-        <StatCard
-          label="Khách hàng quay lại"
-          value="88.8%"
-          change={3.2}
-          isPositive={true}
-          caption="tỷ lệ giữ chân cao"
-          icon={<HeartHandshake className="w-5 h-5" />}
-          tone="info"
-          sparkline={[84, 85, 86, 86.8, 87.5, 88.2, 88.8]}
-        />
-        <StatCard
-          label="Khách VIP Platinum"
-          value="480 khách"
-          change={8.5}
-          isPositive={true}
-          caption="đóng góp 62% doanh thu"
-          icon={<Award className="w-5 h-5" />}
-          tone="warning"
-          sparkline={[420, 435, 448, 455, 468, 475, 480]}
-        />
-      </div>}
-
-      {/* 3. Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-white rounded-2xl border border-[#E5EBE5] shadow-2xs">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Tìm tên khách hàng, số điện thoại, email..."
-        />
-
-        {false && <div className="flex items-center gap-1.5 overflow-x-auto max-w-full">
-          {[
-            { key: 'ALL', label: 'Tất cả hạng' },
-            { key: 'VIP Platinum', label: 'VIP Platinum' },
-            { key: 'Gold Member', label: 'Gold Member' },
-            { key: 'Silver', label: 'Silver' },
-            { key: 'Thành viên mới', label: 'Thành viên mới' },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setSelectedTier(tab.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
-                selectedTier === tab.key
-                  ? 'bg-[#EAF5EC] text-[#2E7D4A]'
-                  : 'text-[#66756B] hover:text-[#1C2B20] hover:bg-[#F6F8F4]'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>}
-      </div>
-
-      {/* 4. Main Customer Table */}
-      <SectionCard title="Danh sách khách hàng" subtitle={`${filtered.length} tài khoản khách hàng`} noPadding>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#F6F8F4] text-[#66756B] uppercase font-semibold border-b border-[#E5EBE5]">
-              <tr>
-                <th className="py-3 px-4">Khách hàng</th>
-                <th className="py-3 px-4">Số điện thoại</th>
-                <th className="py-3 px-4">Khu vực</th>
-                <th className="py-3 px-4">Số đơn</th>
-                <th className="py-3 px-4 text-right">Tổng chi tiêu</th>
-                <th className="py-3 px-4">Lần đặt gần nhất</th>
-                <th className="py-3 px-4">Hạng thành viên</th>
-                <th className="py-3 px-4 text-right">Hồ sơ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#F1F5EF] text-sm text-[#1C2B20]">
-              {filtered.map((cust) => (
-                <tr
-                  key={cust.id}
-                  onClick={() => setSelectedCustomer(cust)}
-                  className="hover:bg-[#F6F8F4] transition-colors cursor-pointer h-16 group"
-                >
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-3">
-                      <CustomerAvatar
-                        src={cust.avatar}
-                        name={cust.name}
-                        className="w-9 h-9 text-xs ring-1 ring-[#E5EBE5]"
-                      />
-                      <div>
-                        <div className="font-bold text-xs text-[#1C2B20]">{cust.name}</div>
-                        <div className="text-[11px] text-[#94A399] font-mono">{cust.id}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 font-mono text-xs text-[#66756B]">
-                    {cust.phone}
-                  </td>
-                  <td className="py-3 px-4 text-xs font-medium text-[#66756B]">
-                    {cust.address}
-                  </td>
-                  <td className="py-3 px-4 font-bold text-xs text-[#2E7D4A]">
-                    {cust.orders} đơn
-                  </td>
-                  <td className="py-3 px-4 text-right font-bold text-xs text-[#1C2B20]">
-                    {new Intl.NumberFormat('vi-VN').format(cust.spent)} đ
-                  </td>
-                  <td className="py-3 px-4 text-xs text-[#66756B] whitespace-nowrap">
-                    {cust.lastBooking}
-                  </td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
-                        cust.tier === 'VIP Platinum'
-                          ? 'bg-[#FEF6E9] text-[#B87A14] border-[#FBE3B8]'
-                          : cust.tier === 'Gold Member'
-                          ? 'bg-[#EAF5EC] text-[#2E7D4A] border-[#D0E7D5]'
-                          : 'bg-[#F1F5EF] text-[#66756B] border-[#E5EBE5]'
-                      }`}
-                    >
-                      {cust.tier}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedCustomer(cust);
-                      }}
-                      className="px-2.5 py-1 rounded-lg text-xs font-semibold text-[#2E7D4A] bg-[#EAF5EC] hover:bg-[#DDF0E1] transition-colors"
-                    >
-                      Xem chi tiết
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </SectionCard>
-
-      {/* 5. Customer Detail Drawer */}
-      <DetailDrawer
-        isOpen={!!selectedCustomer}
-        onClose={() => setSelectedCustomer(null)}
-        title={selectedCustomer ? `Hồ sơ khách hàng • ${selectedCustomer.name}` : ''}
-        subtitle="Thông tin chi tiết, lịch sử sử dụng dịch vụ và dịch vụ yêu thích"
-        badge={
-          selectedCustomer ? (
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FEF6E9] text-[#B87A14] border border-[#FBE3B8]">
-              {selectedCustomer.tier}
-            </span>
-          ) : undefined
-        }
-      >
-        {selectedCustomer && (
-          <div className="space-y-6">
-            {/* Profile Avatar Card */}
-            <div className="p-4 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] flex items-center gap-4">
-              <CustomerAvatar
-                src={selectedCustomer.avatar}
-                name={selectedCustomer.name}
-                className="w-16 h-16 text-lg ring-2 ring-[#EAF5EC]"
-              />
-              <div className="space-y-1">
-                <h4 className="font-bold text-base text-[#1C2B20]">{selectedCustomer.name}</h4>
-                <div className="text-xs text-[#66756B] flex items-center gap-3">
-                  <span>SĐT: {selectedCustomer.phone}</span>
-                  <span>•</span>
-                  <span>{selectedCustomer.address}</span>
-                </div>
-                <div className="text-[11px] text-[#2E7D4A] font-semibold">
-                  Hội viên thân thiết từ tháng 01/2026
-                </div>
-              </div>
-            </div>
-
-            {/* Spent & Orders Stats */}
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3.5 rounded-xl bg-white border border-[#E5EBE5] space-y-1">
-                <span className="text-[#66756B] block">Tổng chi tiêu</span>
-                <span className="font-bold text-base text-[#2E7D4A]">
-                  {new Intl.NumberFormat('vi-VN').format(selectedCustomer.spent)} đ
-                </span>
-              </div>
-              <div className="p-3.5 rounded-xl bg-white border border-[#E5EBE5] space-y-1">
-                <span className="text-[#66756B] block">Tổng số ca phục vụ</span>
-                <span className="font-bold text-base text-[#1C2B20]">
-                  {selectedCustomer.orders} lịch đặt
-                </span>
-              </div>
-            </div>
-
-            {/* Favorite Service */}
-            <div className="p-4 rounded-xl bg-white border border-[#E5EBE5] space-y-2">
-              <span className="text-xs font-bold text-[#66756B] uppercase tracking-wider block">
-                Dịch vụ yêu thích
+      <Reveal className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { label: 'Tổng khách hàng', value: totals.all, tone: 'bg-primary-soft text-primary', icon: <HeartHandshake className="w-5 h-5" /> },
+          { label: 'Đang hoạt động', value: totals.active, tone: 'bg-status-successBg text-status-success', icon: <Unlock className="w-5 h-5" /> },
+          { label: 'Đã khóa', value: totals.blocked, tone: 'bg-status-dangerBg text-status-danger', icon: <Lock className="w-5 h-5" /> },
+        ].map((stat) => (
+          <RevealItem key={stat.label}>
+            <div className="p-4 rounded-2xl bg-white border border-surface-border flex items-center gap-3">
+              <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${stat.tone}`}>{stat.icon}</span>
+              <span>
+                <span className="block text-xs text-content-secondary">{stat.label}</span>
+                <span className="block text-xl font-bold tabular-nums"><AnimatedNumber value={stat.value} /></span>
               </span>
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg bg-[#EAF5EC] text-[#2E7D4A] flex items-center justify-center">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="font-bold text-xs text-[#1C2B20]">{selectedCustomer.favoriteService}</div>
-                  <div className="text-[11px] text-[#94A399]">Đã đặt 18 lần trong năm nay</div>
-                </div>
-              </div>
             </div>
+          </RevealItem>
+        ))}
+      </Reveal>
 
-            {/* CSKH & Notes */}
-            <div className="p-4 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] space-y-2 text-xs">
-              <span className="font-bold text-[#1C2B20] block">Ghi chú chăm sóc khách hàng:</span>
-              <p className="text-[#66756B] leading-relaxed">
-                Khách thích kỹ thuật viên Lê Thu Hương hoặc Nguyễn Thị Mai. Ưu tiên khung giờ buổi tối từ 19:00 - 21:00. Yêu cầu khăn và ga giường tinh dầu quế.
-              </p>
+      <Card bodyClassName="p-0">
+        <div className="p-4 flex flex-wrap items-center gap-3 border-b border-surface-borderSubtle">
+          <SearchBox value={search} onChange={setSearch} placeholder="Tìm tên, email, SĐT hoặc User ID..." className="flex-1 min-w-[220px]" />
+          <Tabs
+            value={status}
+            onChange={setStatus}
+            items={[
+              { value: 'ALL', label: 'Tất cả' },
+              { value: 'ACTIVE', label: 'Hoạt động' },
+              { value: 'BLOCKED', label: 'Đã khóa' },
+            ]}
+          />
+        </div>
+
+        {error ? (
+          <div role="alert" className="m-4 p-3 rounded-xl bg-status-dangerBg text-[#B9403A] text-sm">Không tải được khách hàng: {error}</div>
+        ) : loading && !data ? (
+          <div className="p-4"><SkeletonRows rows={6} /></div>
+        ) : !items.length ? (
+          <Empty icon={<HeartHandshake className="w-6 h-6" />} title={query || status !== 'ALL' ? 'Không có khách khớp bộ lọc' : 'Chưa có khách hàng'} description={query ? `Không tìm thấy "${query}".` : undefined} />
+        ) : (
+          <div className={`overflow-x-auto transition-opacity ${loading ? 'opacity-60' : ''}`}>
+            <table className="w-full text-left text-sm">
+              <thead className="bg-surface-subtle text-[11px] uppercase tracking-wide text-content-secondary">
+                <tr>
+                  <th className="py-3 px-4 font-semibold">Khách hàng</th>
+                  <th className="py-3 px-4 font-semibold">Liên hệ</th>
+                  <th className="py-3 px-4 font-semibold">Đăng nhập bằng</th>
+                  <th className="py-3 px-4 font-semibold">Tham gia</th>
+                  <th className="py-3 px-4 font-semibold">Trạng thái</th>
+                  <th className="py-3 px-4" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-borderSubtle">
+                <AnimatePresence initial={false}>
+                  {items.map((customer, index) => {
+                    const name = customer.displayName || 'Chưa đặt tên';
+                    const badge = STATUS_BADGE[customer.status] ?? STATUS_BADGE.ACTIVE;
+                    return (
+                      <motion.tr
+                        key={customer.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1, transition: { delay: Math.min(index, 10) * 0.02 } }}
+                        onClick={() => setSelected(customer)}
+                        className="hover:bg-surface-subtle cursor-pointer transition-colors"
+                      >
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <CustomerAvatar src={customer.avatarUrl} name={name} className="w-9 h-9 text-xs" />
+                            <div className="min-w-0">
+                              <p className={`font-semibold truncate ${customer.displayName ? '' : 'text-content-tertiary italic'}`}>{name}</p>
+                              <button
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  copyId(customer.id);
+                                }}
+                                title="Sao chép User ID"
+                                className="text-[11px] font-mono text-content-tertiary hover:text-primary inline-flex items-center gap-1"
+                              >
+                                {customer.id.slice(0, 8)}… <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-xs text-content-secondary">
+                          <p>{customer.phoneNumber || '—'}</p>
+                          <p className="truncate max-w-[220px]">{customer.email || ''}</p>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex flex-wrap gap-1">
+                            {customer.providers.map((provider) => (
+                              <Badge key={provider}>{PROVIDER_LABEL[provider] ?? provider}</Badge>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-xs text-content-secondary whitespace-nowrap">{new Date(customer.createdAt).toLocaleDateString('vi-VN')}</td>
+                        <td className="py-3 px-4"><Badge tone={badge.tone} dot>{badge.label}</Badge></td>
+                        <td className="py-3 px-4 text-right">
+                          <ChevronRight className="w-4 h-4 text-content-tertiary inline" />
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </AnimatePresence>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {data && data.total > PAGE_SIZE && (
+          <div className="p-4 border-t border-surface-borderSubtle flex items-center justify-between gap-3 text-xs text-content-secondary">
+            <span>
+              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, data.total)} / {data.total.toLocaleString('vi-VN')} khách
+            </span>
+            <div className="flex items-center gap-2">
+              <Button size="sm" icon={<ChevronLeft className="w-3.5 h-3.5" />} disabled={page <= 1 || loading} onClick={() => setPage((value) => value - 1)}>Trước</Button>
+              <span className="tabular-nums">{page} / {pages}</span>
+              <Button size="sm" disabled={page >= pages || loading} onClick={() => setPage((value) => value + 1)}>Sau <ChevronRight className="w-3.5 h-3.5" /></Button>
             </div>
           </div>
         )}
+      </Card>
+
+      <DetailDrawer
+        isOpen={Boolean(selected)}
+        onClose={() => setSelected(null)}
+        title={selected?.displayName || 'Khách hàng'}
+        subtitle={selected ? `Tham gia ${new Date(selected.createdAt).toLocaleDateString('vi-VN')}` : ''}
+        badge={selected && <Badge tone={STATUS_BADGE[selected.status]?.tone ?? 'gray'} dot>{STATUS_BADGE[selected.status]?.label}</Badge>}
+        width="md"
+        footer={
+          selected && (
+            <>
+              {selected.status === 'BLOCKED' ? (
+                <Button variant="soft" icon={<Unlock className="w-4 h-4" />} loading={busy === selected.id} onClick={() => void setUserStatus(selected, 'ACTIVE')}>Mở khóa</Button>
+              ) : (
+                <Button variant="danger" icon={<Lock className="w-4 h-4" />} loading={busy === selected.id} onClick={() => void setUserStatus(selected, 'BLOCKED')}>Khóa tài khoản</Button>
+              )}
+              <Button variant="primary" icon={<MessageCirclePlus className="w-4 h-4" />} disabled={busy !== null || selected.status !== 'ACTIVE'} onClick={() => void openSupportChat(selected)}>
+                Nhắn tin hỗ trợ
+              </Button>
+            </>
+          )
+        }
+      >
+        {selected && (
+          <div className="space-y-5">
+            <div className="flex items-center gap-4 p-4 rounded-2xl bg-surface-subtle border border-surface-border">
+              <CustomerAvatar src={selected.avatarUrl} name={selected.displayName || '?'} className="w-16 h-16 text-lg ring-2 ring-white" />
+              <div className="min-w-0">
+                <p className="font-bold text-base truncate">{selected.displayName || 'Chưa đặt tên'}</p>
+                <button onClick={() => copyId(selected.id)} className="text-[11px] font-mono text-content-secondary hover:text-primary inline-flex items-center gap-1 break-all text-left">
+                  {selected.id} <Copy className="w-3 h-3 shrink-0" />
+                </button>
+              </div>
+            </div>
+            <ul className="space-y-2 text-sm">
+              <li className="flex items-center gap-2"><Phone className="w-4 h-4 text-primary" />{selected.phoneNumber || 'Chưa có số điện thoại'}</li>
+              <li className="flex items-center gap-2"><Mail className="w-4 h-4 text-primary" />{selected.email || 'Chưa có email'}</li>
+            </ul>
+            <div>
+              <p className="text-xs font-semibold text-content-secondary mb-1.5">Đăng nhập bằng</p>
+              <div className="flex flex-wrap gap-1.5">
+                {selected.providers.length ? selected.providers.map((provider) => <Badge key={provider}>{PROVIDER_LABEL[provider] ?? provider}</Badge>) : <span className="text-sm text-content-tertiary">—</span>}
+              </div>
+            </div>
+            <p className="text-xs text-content-secondary leading-relaxed">
+              Dùng User ID để gán mã khuyến mãi riêng cho khách này (trang Khuyến mãi → Đối tượng áp dụng).
+            </p>
+          </div>
+        )}
       </DetailDrawer>
-    </motion.div>
+    </div>
   );
 };
 

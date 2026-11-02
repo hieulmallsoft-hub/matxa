@@ -17,9 +17,37 @@ import {
   BadgeCheck,
   Phone,
   Ticket,
+  Clock,
+  Copy,
+  Store,
 } from 'lucide-react';
 import { request } from '../api/client';
 import { useToast } from '../components/ui/ToastContainer';
+import { AnimatePresence, motion } from 'framer-motion';
+import { PageHeader } from '../components/common/PageHeader';
+import { DetailDrawer } from '../components/common/DetailDrawer';
+import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import {
+  AnimatedNumber,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  Empty,
+  Field,
+  FormError,
+  FormGrid,
+  FormSection,
+  Input,
+  Reveal,
+  RevealItem,
+  SearchBox,
+  Select,
+  SkeletonRows,
+  Tabs,
+  Textarea,
+  controlClass,
+} from '../components/ui/kit';
 
 type Category = 'MASSAGE_SPA' | 'CONSULTATION';
 type Offer = { id: string; code: string; title: string; discountLabel: string; endsAt: string };
@@ -73,8 +101,6 @@ const DAYS = [
   { value: 6, label: 'Thứ Bảy' },
   { value: 0, label: 'Chủ nhật' },
 ];
-const inputClass =
-  'w-full min-w-0 px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-sm focus:outline-none focus:border-[#2E7D4A]';
 const actionClass =
   'inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-[#E5EBE5] text-xs hover:bg-[#F6F8F4] disabled:opacity-40';
 const money = (value: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
@@ -181,15 +207,6 @@ function VenueReviews({ venueId, onRatingChange }: { venueId: string; onRatingCh
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block min-w-0">
-      <span className="block text-xs font-semibold text-[#66756B] mb-1">{label}</span>
-      {children}
-    </label>
-  );
-}
-
 export const VenuesPage: React.FC = () => {
   const { addToast } = useToast();
   const [items, setItems] = useState<Venue[]>([]);
@@ -210,8 +227,9 @@ export const VenuesPage: React.FC = () => {
   const [status, setStatus] = useState('all');
   const [locating, setLocating] = useState(false);
   const [promotions, setPromotions] = useState<PromotionOption[]>([]);
+  const [formOpen, setFormOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<Venue | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const formRef = useRef<HTMLDivElement>(null);
   const uploadCache = useRef(new Map<File, string>());
   const savingRef = useRef(false);
 
@@ -246,6 +264,7 @@ export const VenuesPage: React.FC = () => {
   }, [files]);
 
   const reset = () => {
+    setFormOpen(false);
     setForm(newForm());
     setEditingId(null);
     setFiles([]);
@@ -289,8 +308,20 @@ export const VenuesPage: React.FC = () => {
         ...venue.hours.find((hour) => hour.dayOfWeek === day.value),
       })),
     });
-    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setFormOpen(true);
   };
+  const openCreate = () => {
+    reset();
+    setFormOpen(true);
+  };
+  // Copies Monday's schedule to every day, the common case for spas.
+  const applyMondayToAll = () =>
+    setForm((current) => {
+      const monday = current.hours.find((hour) => hour.dayOfWeek === 1);
+      return monday
+        ? { ...current, hours: current.hours.map((hour) => ({ ...hour, openTime: monday.openTime, closeTime: monday.closeTime, isClosed: monday.isClosed })) }
+        : current;
+    });
   const textField = (
     key: 'name' | 'description' | 'address' | 'city' | 'district' | 'latitude' | 'longitude' | 'images' | 'phone',
   ) => ({
@@ -382,13 +413,13 @@ export const VenuesPage: React.FC = () => {
   };
 
   const remove = async (venue: Venue) => {
-    if (!window.confirm(`Xóa địa điểm “${venue.name}”?`)) return;
     setBusyId(venue.id);
     try {
       await request(`/admin/venues/${venue.id}`, { method: 'DELETE' });
       setItems((current) => current.filter((item) => item.id !== venue.id));
       setSelected(null);
       if (editingId === venue.id) reset();
+      setConfirmDelete(null);
       addToast({ title: 'Đã xóa địa điểm', type: 'success' });
     } catch (error) {
       addToast({ title: 'Không xóa được địa điểm', message: errorText(error), type: 'error' });
@@ -473,514 +504,438 @@ export const VenuesPage: React.FC = () => {
           .includes(search.toLocaleLowerCase('vi-VN')),
     )
     .sort((a, b) => (sort === 'rating' ? b.rating - a.rating : a.name.localeCompare(b.name, 'vi')));
+  const counts = {
+    total: items.length,
+    active: items.filter((venue) => venue.isActive).length,
+    hidden: items.filter((venue) => !venue.isActive).length,
+    offers: items.filter((venue) => venue.offer).length,
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold">Địa điểm &amp; Spa</h1>
-          <p className="text-xs text-[#66756B] mt-1">Quản lý địa điểm hiển thị trên ứng dụng MATXXA</p>
-        </div>
-        <button className={actionClass} onClick={() => void load()} disabled={loading || submitting}>
-          <RefreshCw className="w-4 h-4" /> Tải lại
-        </button>
-      </div>
+      <PageHeader
+        title="Địa điểm & Spa"
+        subtitle="Quản lý spa, phòng tham vấn hiển thị trên ứng dụng MATXXA"
+        actions={
+          <>
+            <Button icon={<RefreshCw className="w-4 h-4" />} onClick={() => void load()} loading={loading}>
+              Tải lại
+            </Button>
+            <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
+              Thêm địa điểm
+            </Button>
+          </>
+        }
+      />
+
       {loadError && (
-        <div role="alert" className="p-3 rounded-xl bg-red-50 text-red-700 text-sm">
-          Không tải được địa điểm: {loadError}. Đăng nhập admin và kiểm tra server đã chạy migration mới.
+        <div role="alert" className="p-3 rounded-xl bg-status-dangerBg border border-[#F8D2D0] text-[#B9403A] text-sm">
+          Không tải được địa điểm: {loadError}
         </div>
       )}
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 items-start">
-        <div ref={formRef} className="xl:col-span-2 bg-white border border-[#E5EBE5] rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#E5EBE5] flex justify-between items-center">
-            <h2 className="font-bold text-sm">{editingId ? 'Chỉnh sửa địa điểm' : 'Thêm địa điểm mới'}</h2>
-            {editingId && (
-              <button className={actionClass} onClick={reset} disabled={submitting}>
-                Hủy sửa
-              </button>
-            )}
+
+      <Reveal className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Tổng địa điểm', value: counts.total, icon: <MapPin className="w-5 h-5" />, tone: 'bg-primary-soft text-primary' },
+          { label: 'Đang hiển thị', value: counts.active, icon: <Eye className="w-5 h-5" />, tone: 'bg-status-successBg text-status-success' },
+          { label: 'Đã ẩn', value: counts.hidden, icon: <EyeOff className="w-5 h-5" />, tone: 'bg-surface-muted text-content-secondary' },
+          { label: 'Có ưu đãi', value: counts.offers, icon: <Ticket className="w-5 h-5" />, tone: 'bg-status-dangerBg text-status-danger' },
+        ].map((stat) => (
+          <RevealItem key={stat.label}>
+            <div className="p-4 rounded-2xl bg-white border border-surface-border flex items-center gap-3">
+              <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${stat.tone}`}>{stat.icon}</span>
+              <span>
+                <span className="block text-xs text-content-secondary">{stat.label}</span>
+                <span className="block text-xl font-bold tabular-nums">
+                  <AnimatedNumber value={stat.value} />
+                </span>
+              </span>
+            </div>
+          </RevealItem>
+        ))}
+      </Reveal>
+
+      <Card bodyClassName="p-4 space-y-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <Tabs
+            value={category}
+            onChange={setCategory}
+            items={CATEGORIES.map((item) => ({
+              value: item.key,
+              label: item.label,
+              icon: <item.icon className="w-3.5 h-3.5" />,
+              count: items.filter((venue) => venue.category === item.key).length,
+            }))}
+          />
+          <SearchBox value={search} onChange={setSearch} placeholder="Tìm tên, địa chỉ..." className="flex-1 min-w-[200px]" />
+          <div className="flex flex-wrap gap-2">
+            <Select aria-label="Lọc thành phố" value={city} onChange={(event) => setCity(event.target.value)} className="py-2 text-xs">
+              <option value="">Mọi thành phố</option>
+              {cities.map((value) => (
+                <option key={value}>{value}</option>
+              ))}
+            </Select>
+            <Select aria-label="Lọc trạng thái" value={status} onChange={(event) => setStatus(event.target.value)} className="py-2 text-xs">
+              <option value="all">Mọi trạng thái</option>
+              <option value="active">Đang hiển thị</option>
+              <option value="hidden">Đã ẩn</option>
+            </Select>
+            <Select aria-label="Sắp xếp" value={sort} onChange={(event) => setSort(event.target.value)} className="py-2 text-xs">
+              <option value="name">Tên A–Z</option>
+              <option value="rating">Đánh giá cao nhất</option>
+            </Select>
           </div>
-          <form onSubmit={(event) => void save(event)} className="p-5 space-y-4">
-            <fieldset disabled={submitting || locating} className="space-y-4 disabled:opacity-60">
-              <Field label="Tên địa điểm *">
-                <input required maxLength={200} className={inputClass} {...textField('name')} />
+        </div>
+
+        {loading && !items.length ? (
+          <SkeletonRows rows={3} />
+        ) : !filtered.length ? (
+          <Empty
+            icon={<MapPin className="w-6 h-6" />}
+            title={items.length ? 'Không có địa điểm khớp bộ lọc' : 'Chưa có địa điểm nào'}
+            description={items.length ? 'Thử đổi danh mục, thành phố hoặc từ khóa.' : 'Thêm địa điểm đầu tiên để hiển thị trên ứng dụng.'}
+            action={!items.length && <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={openCreate}>Thêm địa điểm</Button>}
+          />
+        ) : (
+          <motion.div layout className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <AnimatePresence initial={false}>
+              {filtered.map((venue, index) => (
+                <motion.article
+                  key={venue.id}
+                  layout
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0, transition: { delay: Math.min(index, 8) * 0.03 } }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  className="group rounded-2xl border border-surface-border bg-white overflow-hidden hover:shadow-card-hover hover:border-[#D0DCD1] transition-[box-shadow,border-color]"
+                >
+                  <button onClick={() => setSelected(venue)} className="block w-full text-left">
+                    <div className="relative h-36 bg-surface-subtle overflow-hidden">
+                      {venue.images[0] ? (
+                        <img src={venue.images[0]} alt={venue.name} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      ) : (
+                        <ImageIcon className="w-8 h-8 text-content-tertiary absolute inset-0 m-auto" />
+                      )}
+                      {venue.offer && (
+                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-status-danger text-white text-[11px] font-bold shadow">{venue.offer.discountLabel}</span>
+                      )}
+                      <span className="absolute top-2 right-2">
+                        <Badge tone={venue.isActive ? 'green' : 'gray'} dot>{venue.isActive ? 'Đang hiển thị' : 'Đã ẩn'}</Badge>
+                      </span>
+                    </div>
+                    <div className="p-4 space-y-1.5">
+                      <h3 className="font-bold text-sm flex items-center gap-1 min-w-0">
+                        <span className="truncate">{venue.name}</span>
+                        {venue.isVerified && <BadgeCheck className="w-4 h-4 text-primary shrink-0" />}
+                      </h3>
+                      <p className="text-xs text-content-secondary truncate">{venue.address} · {venue.city}</p>
+                      <p className="text-xs flex items-center gap-1 text-content-secondary">
+                        <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
+                        {venue.reviewCount ? <><b className="text-content-primary">{venue.rating.toFixed(1)}</b> ({venue.reviewCount} đánh giá)</> : 'Chưa có đánh giá'}
+                        <span className="mx-1">·</span>
+                        {venue.services.length} dịch vụ
+                      </p>
+                    </div>
+                  </button>
+                  <div className="px-4 pb-4 flex gap-2">
+                    <Button size="sm" variant="soft" icon={<Pencil className="w-3.5 h-3.5" />} disabled={submitting || busyId !== null} onClick={() => edit(venue)}>
+                      Sửa
+                    </Button>
+                    <Button size="sm" loading={busyId === venue.id} icon={venue.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />} disabled={submitting || (busyId !== null && busyId !== venue.id)} onClick={() => void toggle(venue)}>
+                      {venue.isActive ? 'Ẩn' : 'Hiện'}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="ml-auto text-status-danger" aria-label={`Xóa ${venue.name}`} icon={<Trash2 className="w-3.5 h-3.5" />} disabled={submitting || busyId !== null} onClick={() => setConfirmDelete(venue)} />
+                  </div>
+                </motion.article>
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </Card>
+
+      <DetailDrawer
+        isOpen={formOpen}
+        onClose={() => !submitting && reset()}
+        title={editingId ? 'Chỉnh sửa địa điểm' : 'Thêm địa điểm mới'}
+        subtitle="Các mục có dấu * là bắt buộc"
+        width="xl"
+        footer={
+          <div className="w-full space-y-3">
+            <FormError message={saveError} />
+            <div className="flex justify-end gap-2">
+              <Button onClick={reset} disabled={submitting}>Hủy</Button>
+              <Button type="submit" form="venue-form" variant="primary" loading={submitting} disabled={locating}>
+                {submitting ? 'Đang lưu...' : editingId ? 'Lưu thay đổi' : 'Thêm địa điểm'}
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <form id="venue-form" onSubmit={(event) => void save(event)}>
+          <fieldset disabled={submitting || locating} className="space-y-4">
+            <FormSection title="Thông tin cơ bản" icon={<Store className="w-4 h-4" />}>
+              <Field label="Tên địa điểm" required>
+                <Input required maxLength={200} placeholder="VD: Mạc Thị - Spa cho Nam" {...textField('name')} />
               </Field>
               <Field label="Danh mục">
-                <select
-                  className={inputClass}
-                  value={form.category}
-                  onChange={(event) => setForm((current) => ({ ...current, category: event.target.value as Category }))}
-                >
+                <Select value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value as Category }))}>
                   {CATEGORIES.map((item) => (
-                    <option key={item.key} value={item.key}>
-                      {item.label}
-                    </option>
+                    <option key={item.key} value={item.key}>{item.label}</option>
                   ))}
-                </select>
+                </Select>
               </Field>
-              <Field label="Mô tả">
-                <textarea rows={3} maxLength={5000} className={inputClass} {...textField('description')} />
+              <Field label="Mô tả" hint="Giới thiệu ngắn hiển thị trên app.">
+                <Textarea maxLength={5000} {...textField('description')} />
               </Field>
-              <Field label="Địa chỉ *">
-                <input required maxLength={1000} className={inputClass} {...textField('address')} />
+            </FormSection>
+
+            <FormSection title="Vị trí" description="Địa chỉ và tọa độ dùng để tính khoảng cách, chỉ đường" icon={<MapPin className="w-4 h-4" />}>
+              <Field label="Địa chỉ" required>
+                <Input required maxLength={1000} placeholder="Số nhà, đường, phường" {...textField('address')} />
               </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Thành phố *">
-                  <input
-                    required
-                    maxLength={100}
-                    placeholder="HN / HCM..."
-                    className={inputClass}
-                    {...textField('city')}
-                  />
+              <FormGrid>
+                <Field label="Thành phố" required>
+                  <Input required maxLength={100} placeholder="HN, HCM..." {...textField('city')} />
                 </Field>
                 <Field label="Quận / Huyện">
-                  <input maxLength={100} className={inputClass} {...textField('district')} />
+                  <Input maxLength={100} {...textField('district')} />
                 </Field>
+                <Field label="Vĩ độ" required>
+                  <Input required type="number" min={-90} max={90} step="any" placeholder="21.0285" {...textField('latitude')} />
+                </Field>
+                <Field label="Kinh độ" required>
+                  <Input required type="number" min={-180} max={180} step="any" placeholder="105.8542" {...textField('longitude')} />
+                </Field>
+              </FormGrid>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" icon={<Navigation className="w-3.5 h-3.5" />} loading={locating} onClick={locate}>
+                  {locating ? 'Đang lấy vị trí...' : 'Lấy vị trí hiện tại'}
+                </Button>
+                {form.latitude && form.longitude && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${form.latitude},${form.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary hover:underline"
+                  >
+                    <MapPin className="w-3.5 h-3.5" /> Kiểm tra trên Google Maps
+                  </a>
+                )}
               </div>
-              <Field label='Số điện thoại (nút "Gọi" trên app)'>
-                <input
-                  type="tel"
-                  maxLength={20}
-                  placeholder="VD: 0901 234 567"
-                  pattern="\+?[0-9 .\-]{6,20}"
-                  className={inputClass}
-                  {...textField('phone')}
-                />
-              </Field>
-              <Field label="Ưu đãi hiển thị (mã khuyến mãi)">
-                <select
-                  className={inputClass}
-                  value={form.promotionId}
-                  onChange={(event) => setForm((current) => ({ ...current, promotionId: event.target.value }))}
-                >
-                  <option value="">Không có ưu đãi</option>
-                  {promotions.map((promotion) => (
-                    <option key={promotion.id} value={promotion.id}>
-                      {promotion.code} · {promotion.name}
-                      {!promotion.isActive || new Date(promotion.endsAt) <= new Date() ? ' (đã tắt/hết hạn)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.isVerified}
-                  onChange={(event) => setForm((current) => ({ ...current, isVerified: event.target.checked }))}
-                />
-                Địa điểm đã xác minh (hiện dấu tích xanh)
-              </label>
-              <button type="button" onClick={locate} className={`${actionClass} w-full`}>
-                <Navigation className="w-4 h-4" />
-                {locating ? 'Đang lấy vị trí...' : 'Lấy vị trí hiện tại'}
+              <p className="text-[11px] text-content-secondary">Mẹo: trên Google Maps, nhấp chuột phải vào địa điểm để sao chép tọa độ.</p>
+            </FormSection>
+
+            <FormSection title="Liên hệ & hiển thị trên app" icon={<Phone className="w-4 h-4" />}>
+              <FormGrid>
+                <Field label="Số điện thoại" hint='Để trống thì app ẩn nút "Gọi".'>
+                  <Input type="tel" maxLength={20} placeholder="0901 234 567" pattern="\+?[0-9 .\-]{6,20}" {...textField('phone')} />
+                </Field>
+                <Field label="Ưu đãi (mã khuyến mãi)" hint="Chỉ hiện trên app khi mã đang bật và còn hạn.">
+                  <Select value={form.promotionId} onChange={(event) => setForm((current) => ({ ...current, promotionId: event.target.value }))}>
+                    <option value="">Không có ưu đãi</option>
+                    {promotions.map((promotion) => (
+                      <option key={promotion.id} value={promotion.id}>
+                        {promotion.code} · {promotion.name}
+                        {!promotion.isActive || new Date(promotion.endsAt) <= new Date() ? ' (đã tắt/hết hạn)' : ''}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              </FormGrid>
+              <Checkbox label="Địa điểm đã xác minh" hint="Hiện dấu tích xanh cạnh tên." checked={form.isVerified} onChange={(isVerified) => setForm((current) => ({ ...current, isVerified }))} />
+              <Checkbox label="Hiển thị trên ứng dụng" hint="Tắt để ẩn tạm thời mà không xóa." checked={form.isActive} onChange={(isActive) => setForm((current) => ({ ...current, isActive }))} />
+            </FormSection>
+
+            <FormSection title="Ảnh" description="Tối đa 10 ảnh, JPEG/PNG/WebP, 5 MB mỗi ảnh. Ảnh đầu tiên là ảnh bìa." icon={<ImageIcon className="w-4 h-4" />}>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="w-full rounded-2xl border-2 border-dashed border-[#D0DCD1] bg-surface-subtle hover:bg-primary-light hover:border-primary/40 transition-colors py-6 flex flex-col items-center gap-1.5 text-content-secondary"
+              >
+                <Upload className="w-6 h-6 text-primary" />
+                <span className="text-sm font-semibold text-content-primary">{files.length ? `${files.length} ảnh mới đã chọn` : 'Chọn ảnh từ máy tính'}</span>
+                <span className="text-[11px]">Ảnh được tải lên khi bấm Lưu</span>
               </button>
-              <p className="text-xs text-[#66756B]">Nhập tọa độ của địa điểm nếu bạn đang ở vị trí khác.</p>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Vĩ độ *">
-                  <input
-                    required
-                    type="number"
-                    min={-90}
-                    max={90}
-                    step="any"
-                    className={inputClass}
-                    {...textField('latitude')}
-                  />
-                </Field>
-                <Field label="Kinh độ *">
-                  <input
-                    required
-                    type="number"
-                    min={-180}
-                    max={180}
-                    step="any"
-                    className={inputClass}
-                    {...textField('longitude')}
-                  />
-                </Field>
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-[#66756B]">Ảnh địa điểm (tối đa 10 ảnh, 5 MB/ảnh)</p>
-                <button type="button" onClick={() => fileRef.current?.click()} className={`${actionClass} w-full`}>
-                  <Upload className="w-4 h-4" />
-                  {files.length ? `${files.length} ảnh mới đã chọn` : 'Chọn ảnh từ máy tính'}
-                </button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  multiple
-                  onChange={selectFiles}
-                  className="hidden"
-                />
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={selectFiles} className="hidden" />
+              {previews.length > 0 && (
                 <div className="flex gap-2 flex-wrap">
                   {previews.map((url, index) => (
-                    <div key={url} className="relative">
-                      <img src={url} alt={`Ảnh mới ${index + 1}`} className="w-16 h-16 rounded-lg object-cover" />
+                    <motion.div key={url} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative">
+                      <img src={url} alt={`Ảnh mới ${index + 1}`} className="w-20 h-20 rounded-xl object-cover border border-surface-border" />
                       <button
                         type="button"
-                        title="Bỏ ảnh"
+                        aria-label="Bỏ ảnh"
                         onClick={() => setFiles((current) => current.filter((_, i) => i !== index))}
-                        className="absolute top-0 right-0 bg-white rounded-full"
+                        className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-white shadow border border-surface-border flex items-center justify-center hover:text-status-danger"
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-3.5 h-3.5" />
                       </button>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
-                <Field label="URL ảnh đã lưu hoặc URL ảnh khác (mỗi dòng một URL)">
-                  <textarea rows={3} placeholder="https://..." className={inputClass} {...textField('images')} />
-                </Field>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-semibold text-sm">Dịch vụ</h3>
-                  <button
-                    type="button"
-                    className={actionClass}
-                    disabled={form.services.length >= 100}
-                    onClick={() =>
-                      setForm((current) => ({
-                        ...current,
-                        services: [...current.services, { name: '', durationMinutes: 60, price: 0 }],
-                      }))
-                    }
-                  >
-                    <Plus className="w-3 h-3" />
-                    Thêm
-                  </button>
-                </div>
-                {form.services.length === 0 && <p className="text-xs text-[#66756B]">Chưa thêm dịch vụ.</p>}
+              )}
+              <Field label="URL ảnh đã lưu / ảnh khác" hint="Mỗi dòng một URL bắt đầu bằng http:// hoặc https://">
+                <Textarea placeholder="https://..." className="font-mono text-xs" {...textField('images')} />
+              </Field>
+            </FormSection>
+
+            <FormSection title={`Dịch vụ (${form.services.length})`} description="Hiển thị ở mục Dịch vụ trên app" icon={<Sparkles className="w-4 h-4" />}>
+              <AnimatePresence initial={false}>
                 {form.services.map((service, index) => (
-                  <div key={index} className="p-3 rounded-xl border border-[#E5EBE5] space-y-2">
-                    <div className="flex gap-2">
-                      <input
-                        aria-label={`Tên dịch vụ ${index + 1}`}
-                        required
-                        maxLength={200}
-                        placeholder="Tên dịch vụ"
-                        value={service.name}
-                        onChange={(event) => setService(index, { name: event.target.value })}
-                        className={inputClass}
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_110px_140px_auto] gap-2 items-end p-3 rounded-xl bg-surface-subtle border border-surface-border">
+                      <Field label={`Tên dịch vụ ${index + 1}`} className="col-span-1">
+                        <Input required maxLength={200} placeholder="Massage toàn thân" value={service.name} onChange={(event) => setService(index, { name: event.target.value })} className="bg-white" />
+                      </Field>
+                      <Field label="Phút" className="order-3 sm:order-none">
+                        <Input required type="number" min={1} max={1440} value={service.durationMinutes} onChange={(event) => setService(index, { durationMinutes: Number(event.target.value) })} className="bg-white" />
+                      </Field>
+                      <Field label="Giá (VND)" className="order-4 sm:order-none">
+                        <Input required type="number" min={0} max={1000000000} step={1000} value={service.price} onChange={(event) => setService(index, { price: Number(event.target.value) })} className="bg-white" />
+                      </Field>
+                      <Button
+                        variant="ghost"
+                        aria-label={`Bỏ dịch vụ ${index + 1}`}
+                        className="text-status-danger mb-0.5"
+                        icon={<X className="w-4 h-4" />}
+                        onClick={() => setForm((current) => ({ ...current, services: current.services.filter((_, i) => i !== index) }))}
                       />
-                      <button
-                        type="button"
-                        title="Bỏ dịch vụ"
-                        onClick={() =>
-                          setForm((current) => ({
-                            ...current,
-                            services: current.services.filter((_, i) => i !== index),
-                          }))
-                        }
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Field label="Thời lượng (phút)">
-                        <input
-                          required
-                          type="number"
-                          min={1}
-                          max={1440}
-                          value={service.durationMinutes}
-                          onChange={(event) => setService(index, { durationMinutes: Number(event.target.value) })}
-                          className={inputClass}
-                        />
-                      </Field>
-                      <Field label="Giá (VND)">
-                        <input
-                          required
-                          type="number"
-                          min={0}
-                          max={1000000000}
-                          value={service.price}
-                          onChange={(event) => setService(index, { price: Number(event.target.value) })}
-                          className={inputClass}
-                        />
-                      </Field>
-                    </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
-              <div className="space-y-2">
-                <h3 className="font-semibold text-sm">Giờ mở cửa</h3>
+              </AnimatePresence>
+              <Button
+                size="sm"
+                variant="soft"
+                icon={<Plus className="w-3.5 h-3.5" />}
+                disabled={form.services.length >= 100}
+                onClick={() => setForm((current) => ({ ...current, services: [...current.services, { name: '', durationMinutes: 60, price: 0 }] }))}
+              >
+                Thêm dịch vụ
+              </Button>
+            </FormSection>
+
+            <FormSection title="Giờ mở cửa" icon={<Clock className="w-4 h-4" />}>
+              <div className="divide-y divide-surface-borderSubtle rounded-xl border border-surface-border">
                 {form.hours.map((hour, index) => (
-                  <div key={hour.dayOfWeek} className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="w-16">{DAYS[index].label}</span>
-                    <label className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        checked={!!hour.isClosed}
-                        onChange={(event) => setHour(index, { isClosed: event.target.checked })}
-                      />
-                      Đóng cửa
+                  <div key={hour.dayOfWeek} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                    <span className="w-20 text-sm font-medium">{DAYS[index].label}</span>
+                    <label className="inline-flex items-center gap-2 text-xs text-content-secondary">
+                      <input type="checkbox" checked={!hour.isClosed} onChange={(event) => setHour(index, { isClosed: !event.target.checked })} className="accent-[#2E7D4A] w-4 h-4" />
+                      Mở cửa
                     </label>
-                    {!hour.isClosed && (
-                      <>
-                        <input
-                          aria-label={`Giờ mở ${DAYS[index].label}`}
-                          type="time"
-                          required
-                          value={hour.openTime || ''}
-                          onChange={(event) => setHour(index, { openTime: event.target.value })}
-                          className="border rounded-lg p-1"
-                        />
-                        <span>–</span>
-                        <input
-                          aria-label={`Giờ đóng ${DAYS[index].label}`}
-                          type="time"
-                          required
-                          value={hour.closeTime || ''}
-                          onChange={(event) => setHour(index, { closeTime: event.target.value })}
-                          className="border rounded-lg p-1"
-                        />
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))}
-                />
-                Hiển thị địa điểm trên ứng dụng
-              </label>
-            </fieldset>
-            {saveError && (
-              <p role="alert" className="p-3 bg-red-50 text-red-700 rounded-xl text-xs">
-                {saveError}
-              </p>
-            )}
-            <button
-              type="submit"
-              disabled={submitting || locating}
-              className="w-full py-3 rounded-xl bg-[#2E7D4A] text-white font-bold text-sm disabled:opacity-50"
-            >
-              {submitting ? 'Đang lưu địa điểm...' : editingId ? 'Lưu thay đổi' : 'Thêm địa điểm'}
-            </button>
-          </form>
-        </div>
-        <div className="xl:col-span-3 space-y-4 min-w-0">
-          <div className="bg-white border border-[#E5EBE5] rounded-2xl p-4 space-y-2">
-            <h3 className="font-bold text-sm mb-3">Danh mục địa điểm</h3>
-            {CATEGORIES.map((item) => (
-              <button
-                key={item.key}
-                onClick={() => setCategory(item.key)}
-                className={`w-full flex gap-3 items-center p-3 rounded-xl border text-left ${category === item.key ? 'border-[#2E7D4A] bg-[#EAF5EC]' : 'border-[#E5EBE5]'}`}
-              >
-                <item.icon className="w-5 h-5 text-[#2E7D4A]" />
-                <span className="flex-1 text-sm font-semibold">{item.label}</span>
-                <span className="text-xs text-[#66756B]">
-                  {items.filter((venue) => venue.category === item.key).length}
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="bg-white border border-[#E5EBE5] rounded-2xl p-4 space-y-3">
-            <div className="flex flex-wrap gap-2">
-              <input
-                aria-label="Tìm địa điểm"
-                placeholder="Tìm tên, địa chỉ..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className={`${inputClass} flex-1 basis-40`}
-              />
-              <select
-                aria-label="Lọc thành phố"
-                value={city}
-                onChange={(event) => setCity(event.target.value)}
-                className={actionClass}
-              >
-                <option value="">Tất cả thành phố</option>
-                {cities.map((value) => (
-                  <option key={value}>{value}</option>
-                ))}
-              </select>
-              <select
-                aria-label="Lọc trạng thái"
-                value={status}
-                onChange={(event) => setStatus(event.target.value)}
-                className={actionClass}
-              >
-                <option value="all">Mọi trạng thái</option>
-                <option value="active">Đang hiển thị</option>
-                <option value="hidden">Đã ẩn</option>
-              </select>
-              <select
-                aria-label="Sắp xếp"
-                value={sort}
-                onChange={(event) => setSort(event.target.value)}
-                className={actionClass}
-              >
-                <option value="name">Tên A–Z</option>
-                <option value="rating">Đánh giá cao nhất</option>
-              </select>
-            </div>
-            <p className="text-xs text-[#66756B]">{loading ? 'Đang tải địa điểm...' : `${filtered.length} địa điểm`}</p>
-            {!loading && !loadError && !filtered.length && (
-              <div className="py-10 text-center text-[#66756B]">
-                <MapPin className="w-9 h-9 mx-auto mb-3" />
-                <p className="text-sm">Chưa có địa điểm phù hợp.</p>
-                <p className="text-xs mt-1">Thêm địa điểm hoặc thay đổi bộ lọc.</p>
-              </div>
-            )}
-            {filtered.map((venue) => (
-              <div key={venue.id} className="p-3 border border-[#E5EBE5] rounded-xl space-y-3">
-                <button onClick={() => setSelected(venue)} className="w-full flex gap-3 text-left">
-                  <div className="w-20 h-20 rounded-xl bg-[#F6F8F4] overflow-hidden shrink-0">
-                    {venue.images[0] ? (
-                      <img src={venue.images[0]} alt={venue.name} className="w-full h-full object-cover" />
+                    {hour.isClosed ? (
+                      <span className="text-xs font-semibold text-status-danger ml-auto">Đóng cửa</span>
                     ) : (
-                      <ImageIcon className="w-7 h-7 m-6 text-[#94A399]" />
+                      <span className="ml-auto inline-flex items-center gap-2">
+                        <input aria-label={`Giờ mở ${DAYS[index].label}`} type="time" required value={hour.openTime || ''} onChange={(event) => setHour(index, { openTime: event.target.value })} className={`${controlClass} w-auto py-1.5`} />
+                        <span className="text-content-tertiary">–</span>
+                        <input aria-label={`Giờ đóng ${DAYS[index].label}`} type="time" required value={hour.closeTime || ''} onChange={(event) => setHour(index, { closeTime: event.target.value })} className={`${controlClass} w-auto py-1.5`} />
+                      </span>
                     )}
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-sm truncate flex items-center gap-1">
-                      {venue.name}
-                      {venue.isVerified && <BadgeCheck className="w-4 h-4 text-[#2E7D4A] shrink-0" />}
-                      {venue.offer && (
-                        <span className="ml-1 px-1.5 py-0.5 rounded bg-red-600 text-white text-[10px]">
-                          {venue.offer.discountLabel}
-                        </span>
-                      )}
-                    </h3>
-                    <p className="text-xs text-[#66756B] mt-1">
-                      {venue.address} · {venue.city}
-                    </p>
-                    <p className="text-xs mt-1 flex items-center gap-1">
-                      <Star className="w-3 h-3 text-amber-500" />
-                      {venue.reviewCount
-                        ? `${venue.rating.toFixed(1)} (${venue.reviewCount} đánh giá)`
-                        : 'Chưa có đánh giá'}
-                    </p>
-                    <p className={`text-xs mt-1 ${venue.isActive ? 'text-[#2E7D4A]' : 'text-[#94A399]'}`}>
-                      {venue.isActive ? 'Đang hiển thị' : 'Đã ẩn'}
-                    </p>
-                  </div>
-                </button>
-                <div className="flex flex-wrap gap-2">
-                  <button className={actionClass} disabled={submitting || busyId !== null} onClick={() => edit(venue)}>
-                    <Pencil className="w-3 h-3" />
-                    Sửa
-                  </button>
-                  <button
-                    className={actionClass}
-                    disabled={submitting || busyId !== null}
-                    onClick={() => void toggle(venue)}
-                  >
-                    {venue.isActive ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                    {venue.isActive ? 'Ẩn' : 'Hiển thị'}
-                  </button>
-                  <button
-                    className={`${actionClass} text-red-600`}
-                    disabled={submitting || busyId !== null}
-                    onClick={() => void remove(venue)}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    Xóa
-                  </button>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
-      {selected && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-          onClick={() => setSelected(null)}
-        >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-label={selected.name}
-            onClick={(event) => event.stopPropagation()}
-            className="bg-white rounded-2xl p-5 w-full max-w-xl max-h-[90dvh] overflow-y-auto space-y-4"
-          >
-            <div className="flex justify-between items-center">
-              <h2 className="font-bold text-lg">{selected.name}</h2>
-              <button onClick={() => setSelected(null)} title="Đóng">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="flex gap-2 overflow-x-auto">
-              {selected.images.map((url, index) => (
-                <img
-                  key={`${url}-${index}`}
-                  src={url}
-                  alt={`Ảnh địa điểm ${index + 1}`}
-                  className="w-48 h-36 rounded-xl object-cover"
-                />
-              ))}
-            </div>
-            <p className="text-sm whitespace-pre-wrap">{selected.description || 'Chưa có mô tả.'}</p>
-            <p className="text-sm">
-              {selected.address} · {selected.district} · {selected.city}
-            </p>
-            <p className="text-sm inline-flex items-center gap-2">
-              <Phone className="w-4 h-4" />
-              {selected.phone || 'Chưa có số điện thoại — nút "Gọi" trên app sẽ ẩn'}
-            </p>
-            {selected.offer ? (
-              <p className="text-sm inline-flex items-center gap-2">
-                <Ticket className="w-4 h-4" />
-                {selected.offer.title} ({selected.offer.code}) · hiệu lực đến {dateText(selected.offer.endsAt)}
-              </p>
-            ) : (
-              selected.promotionId && (
-                <p className="text-xs text-amber-700">Mã ưu đãi đã gắn nhưng đang tắt hoặc hết hạn nên app không hiện.</p>
-              )
+              <Button size="sm" variant="ghost" icon={<Copy className="w-3.5 h-3.5" />} onClick={applyMondayToAll}>
+                Áp dụng giờ Thứ Hai cho cả tuần
+              </Button>
+            </FormSection>
+          </fieldset>
+        </form>
+      </DetailDrawer>
+
+      <DetailDrawer
+        isOpen={Boolean(selected)}
+        onClose={() => setSelected(null)}
+        title={selected?.name ?? ''}
+        subtitle={selected ? `${selected.address} · ${selected.city}` : ''}
+        badge={selected && <Badge tone={selected.isActive ? 'green' : 'gray'} dot>{selected.isActive ? 'Đang hiển thị' : 'Đã ẩn'}</Badge>}
+        width="lg"
+        footer={
+          selected && (
+            <Button variant="primary" icon={<Pencil className="w-4 h-4" />} disabled={submitting} onClick={() => edit(selected)}>
+              Chỉnh sửa địa điểm
+            </Button>
+          )
+        }
+      >
+        {selected && (
+          <div className="space-y-5">
+            {selected.images.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1 snap-x">
+                {selected.images.map((url, index) => (
+                  <img key={`${url}-${index}`} src={url} alt={`Ảnh ${index + 1}`} className="w-56 h-40 rounded-xl object-cover snap-start shrink-0" />
+                ))}
+              </div>
             )}
-            <a
-              href={`https://www.google.com/maps/search/?api=1&query=${selected.latitude},${selected.longitude}`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm text-[#2E7D4A] inline-flex gap-2 items-center"
-            >
-              <Navigation className="w-4 h-4" />
-              Mở vị trí trên bản đồ
-            </a>
-            <div>
+            <p className="text-sm whitespace-pre-wrap text-content-secondary">{selected.description || 'Chưa có mô tả.'}</p>
+            <div className="grid sm:grid-cols-2 gap-3 text-sm">
+              <p className="inline-flex items-center gap-2"><Phone className="w-4 h-4 text-primary" />{selected.phone || 'Chưa có số điện thoại'}</p>
+              <a href={`https://www.google.com/maps/search/?api=1&query=${selected.latitude},${selected.longitude}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-primary hover:underline">
+                <Navigation className="w-4 h-4" /> Mở trên bản đồ
+              </a>
+            </div>
+            {selected.offer ? (
+              <div className="p-3 rounded-xl bg-status-dangerBg border border-[#F8D2D0] text-sm flex items-center gap-2">
+                <Ticket className="w-4 h-4 text-status-danger" />
+                {selected.offer.title} ({selected.offer.code}) · đến {dateText(selected.offer.endsAt)}
+              </div>
+            ) : (
+              selected.promotionId && <p className="text-xs text-[#A86A0C]">Mã ưu đãi đã gắn nhưng đang tắt hoặc hết hạn nên app không hiện.</p>
+            )}
+            <section>
               <h3 className="font-bold text-sm mb-2">Dịch vụ</h3>
               {selected.services.length ? (
-                selected.services.map((service, index) => (
-                  <p key={index} className="text-sm py-1">
-                    {service.name} · {service.durationMinutes} phút · {money(service.price)}
-                  </p>
-                ))
+                <ul className="divide-y divide-surface-borderSubtle rounded-xl border border-surface-border">
+                  {selected.services.map((service, index) => (
+                    <li key={index} className="flex justify-between gap-3 px-3 py-2 text-sm">
+                      <span>{service.name}</span>
+                      <span className="text-content-secondary whitespace-nowrap">{service.durationMinutes} phút · <b className="text-content-primary">{money(service.price)}</b></span>
+                    </li>
+                  ))}
+                </ul>
               ) : (
-                <p className="text-sm text-[#66756B]">Chưa có dịch vụ.</p>
+                <p className="text-sm text-content-secondary">Chưa có dịch vụ.</p>
               )}
-            </div>
-            <div>
+            </section>
+            <section>
               <h3 className="font-bold text-sm mb-2">Giờ mở cửa</h3>
-              {DAYS.map((day) => {
-                const hour = selected.hours.find((value) => value.dayOfWeek === day.value);
-                return (
-                  <p key={day.value} className="flex justify-between text-sm py-1">
-                    <span>{day.label}</span>
-                    <span>
-                      {!hour ? 'Chưa cập nhật' : hour.isClosed ? 'Đóng cửa' : `${hour.openTime} – ${hour.closeTime}`}
-                    </span>
-                  </p>
-                );
-              })}
-            </div>
-            <div>
+              <ul className="rounded-xl border border-surface-border divide-y divide-surface-borderSubtle">
+                {DAYS.map((day) => {
+                  const hour = selected.hours.find((value) => value.dayOfWeek === day.value);
+                  return (
+                    <li key={day.value} className="flex justify-between px-3 py-1.5 text-sm">
+                      <span>{day.label}</span>
+                      <span className={hour?.isClosed ? 'text-status-danger font-medium' : 'text-content-secondary'}>
+                        {!hour ? 'Chưa cập nhật' : hour.isClosed ? 'Đóng cửa' : `${hour.openTime} – ${hour.closeTime}`}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+            <section>
               <h3 className="font-bold text-sm mb-2">Đánh giá của khách</h3>
               <VenueReviews venueId={selected.id} onRatingChange={() => void load()} />
-            </div>
-            <button className={actionClass} disabled={submitting} onClick={() => edit(selected)}>
-              <Pencil className="w-4 h-4" />
-              Chỉnh sửa địa điểm
-            </button>
-          </section>
-        </div>
-      )}
+            </section>
+          </div>
+        )}
+      </DetailDrawer>
+
+      <ConfirmDialog
+        isOpen={Boolean(confirmDelete)}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => confirmDelete && void remove(confirmDelete)}
+        isLoading={busyId !== null}
+        title="Xóa địa điểm?"
+        message={`“${confirmDelete?.name ?? ''}” sẽ bị gỡ khỏi admin và ứng dụng. Muốn ẩn tạm thời thì dùng nút Ẩn.`}
+        confirmText="Xóa địa điểm"
+      />
     </div>
   );
 };

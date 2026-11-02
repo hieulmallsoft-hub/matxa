@@ -1,4 +1,6 @@
 import React, { ReactNode } from 'react';
+import { motion } from 'framer-motion';
+import { fadeUp } from '../ui/kit';
 
 export interface SectionCardProps {
   title?: string;
@@ -20,7 +22,10 @@ export const SectionCard: React.FC<SectionCardProps> = ({
   noPadding = false,
 }) => {
   return (
-    <div
+    <motion.div
+      variants={fadeUp}
+      initial="hidden"
+      animate="show"
       className={`rounded-2xl bg-white border border-[#E5EBE5] shadow-[0_2px_12px_rgba(28,43,32,0.04)] overflow-hidden ${className}`}
     >
       {(title || action) && (
@@ -43,7 +48,7 @@ export const SectionCard: React.FC<SectionCardProps> = ({
       )}
 
       <div className={noPadding ? '' : 'p-5 sm:p-6'}>{children}</div>
-    </div>
+    </motion.div>
   );
 };
 

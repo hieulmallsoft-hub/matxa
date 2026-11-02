@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { request } from '../api/client';
+import { useConfirm } from './ui/useConfirm';
 import {
   BookOpen,
   Clock,
@@ -78,6 +79,7 @@ const mediaIcon = (type: string) => {
 };
 
 export function CourseManagementPanel({ notify }: { notify: (message: string, error?: boolean) => void }) {
+  const { confirm, dialog } = useConfirm();
   const [courses, setCourses] = useState<Course[]>(FALLBACK_COURSES);
   const [selected, setSelected] = useState<Course | null>(FALLBACK_COURSES[0]);
   const [editing, setEditing] = useState(false);
@@ -138,7 +140,8 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
   }
 
   async function removeCourse() {
-    if (!selected || !window.confirm(`Xóa khóa học "${selected.title}" cùng toàn bộ bài học và media?`)) return;
+    if (!selected) return;
+    if (!(await confirm({ title: "Xóa khóa học?", message: `"${selected.title}" cùng toàn bộ bài học và media sẽ bị xóa.`, confirmText: "Xóa khóa học" }))) return;
     try {
       await request(`/admin/courses/${selected.id}`, { method: 'DELETE' });
       notify('Đã xóa khóa học');
@@ -222,7 +225,7 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
   }
 
   async function removeMedia(media: Media) {
-    if (!window.confirm('Gỡ media này khỏi bài học?')) return;
+    if (!(await confirm({ title: "Gỡ media?", message: "Media này sẽ bị gỡ khỏi bài học.", confirmText: "Gỡ media" }))) return;
     try {
       await request(`/admin/courses/media/${media.id}`, { method: 'DELETE' });
       notify('Đã gỡ media');
@@ -234,6 +237,7 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
 
   return (
     <div className="flex gap-5 min-h-[600px]">
+      {dialog}
       {/* ── Sidebar: Course List ── */}
       <div className="w-72 flex-shrink-0 flex flex-col gap-3">
         {/* Create new button */}

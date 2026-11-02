@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { CreditCard, CheckCircle2, Wallet, RefreshCw, QrCode, Smartphone, Banknote, ShieldCheck } from 'lucide-react';
 import { useToast } from '../components/ui/ToastContainer';
 import { PageHeader } from '../components/common/PageHeader';
+import { DemoDataNotice } from '../components/ui/kit';
 import { StatCard } from '../components/common/StatCard';
 import { StatusBadge } from '../components/common/StatusBadge';
 
@@ -88,6 +89,7 @@ export const PaymentsPage: React.FC = () => {
           </button>
         }
       />
+      <DemoDataNotice />
 
       {/* Gateway Balances */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

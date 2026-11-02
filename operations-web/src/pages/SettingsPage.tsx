@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../components/ui/ToastContainer';
 import { request } from '../api/client';
+import { Button } from '../components/ui/kit';
 import { PageHeader } from '../components/common/PageHeader';
 import { SectionCard } from '../components/common/SectionCard';
 
@@ -103,16 +104,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         await request('/admin/settings/commission', { method: 'PATCH', body: JSON.stringify({ technicianSharePercent: share }) });
       }
       setIsSaving(false);
-      addToast({
-        title: 'Đã lưu thay đổi',
-        message: 'Cấu hình hệ thống đã được cập nhật thành công.',
-        type: 'success',
-      });
+      addToast({ title: 'Đã lưu chính sách KTV', message: `KTV nhận ${techCommissionRate}% giá trị dịch vụ.`, type: 'success' });
     } catch (error) {
       setIsSaving(false);
       addToast({ title: 'Không thể lưu thay đổi', message: error instanceof Error ? error.message : 'Vui lòng thử lại', type: 'error' });
     }
   };
+
+  // Only these categories are stored on the server. The rest are layout only for now,
+  // so they are read-only and never report a successful save.
+  const SAVED_ON_SERVER: SettingCategory[] = ['technician', 'notifications'];
+  const persisted = SAVED_ON_SERVER.includes(activeCategory);
 
   const categories = [
     { id: 'brand', label: 'Thông tin hệ thống', icon: Store, desc: 'Tên thương hiệu, hotline, email CSKH' },
@@ -135,12 +137,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
       <PageHeader
         title="Cấu hình hệ thống"
         subtitle="Quản lý thông số vận hành, cổng thanh toán và chính sách kỹ thuật viên"
-        badge="Phiên bản 3.4"
-        badgeTone="green"
-        breadcrumbs={[
-          { label: 'MATXXA' },
-          { label: 'Cấu hình hệ thống' },
-        ]}
       />
 
       {/* Settings Layout with Sidebar & Content */}
@@ -168,8 +164,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                   <Icon className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className={`text-xs font-bold ${isActive ? 'text-[#1C2B20]' : 'text-[#1C2B20]'}`}>
+                  <div className="text-xs font-bold text-[#1C2B20] flex items-center gap-1.5 flex-wrap">
                     {cat.label}
+                    {!SAVED_ON_SERVER.includes(cat.id as SettingCategory) && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-[#FEF6E9] text-[#A86A0C] text-[9px] font-semibold">Chưa lưu được</span>
+                    )}
                   </div>
                   <div className="text-[11px] text-[#66756B] mt-0.5">{cat.desc}</div>
                 </div>
@@ -180,6 +179,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
 
         {/* Right: Form Settings */}
         <div className="md:col-span-8 bg-white rounded-2xl border border-[#E5EBE5] p-6 shadow-2xs space-y-6">
+          {!persisted && (
+            <div role="note" className="p-3 rounded-xl bg-[#FEF6E9] border border-[#FBE3B8] text-xs text-[#A86A0C] leading-relaxed">
+              Mục này chưa được kết nối máy chủ nên chỉ để xem, chưa chỉnh sửa và lưu được. Các giá trị hiển thị là mặc định của giao diện, không phải cấu hình thật.
+            </div>
+          )}
+          <fieldset disabled={!persisted} className="space-y-6 min-w-0 disabled:opacity-70">
           {/* 1. THÔNG TIN HỆ THỐNG */}
           {activeCategory === 'brand' && (
             <div className="space-y-5">
@@ -405,33 +410,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
               </div>
             </div>
           )}
+          </fieldset>
         </div>
       </div>
 
       {/* Sticky Bottom Save Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-[#E5EBE5] py-3.5 px-6 shadow-lg flex items-center justify-between max-w-[1600px] mx-auto">
-        <span className="text-xs text-[#66756B] hidden sm:inline">
-          Các thay đổi sẽ được áp dụng ngay sau khi lưu.
-        </span>
-
-        <div className="flex items-center gap-3 ml-auto">
-          <button
-            onClick={() => setActiveCategory('brand')}
-            className="px-4 py-2 rounded-xl border border-[#E5EBE5] text-xs font-semibold text-[#66756B] hover:text-[#1C2B20] hover:bg-[#F6F8F4] transition-colors"
-          >
-            Hủy thay đổi
-          </button>
-          <button
-            onClick={handleSaveAll}
-            disabled={isSaving}
-            className="px-6 py-2 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white text-xs font-semibold shadow-md shadow-[#2E7D4A]/20 transition-all flex items-center gap-2 cursor-pointer"
-          >
-            {isSaving && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-            <Save className="w-4 h-4" />
-            <span>{isSaving ? 'Đang lưu...' : 'Lưu tất cả thay đổi'}</span>
-          </button>
+      {activeCategory === 'technician' && (
+        <div className="sticky bottom-4 z-20 flex items-center justify-between gap-3 rounded-2xl bg-white/95 backdrop-blur-md border border-[#E5EBE5] py-3 px-5 shadow-lg">
+          <span className="text-xs text-[#66756B] hidden sm:inline">Tỷ lệ mới áp dụng cho các đơn được nhận sau khi lưu.</span>
+          <Button variant="primary" className="ml-auto" loading={isSaving} icon={<Save className="w-4 h-4" />} onClick={() => void handleSaveAll()}>
+            {isSaving ? 'Đang lưu...' : 'Lưu chính sách KTV'}
+          </Button>
         </div>
-      </div>
+      )}
     </motion.div>
   );
 };

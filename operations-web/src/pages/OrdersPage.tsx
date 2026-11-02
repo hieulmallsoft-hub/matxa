@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   CalendarDays,
   Plus,
@@ -18,7 +18,6 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { RecentOrdersTable } from '../components/dashboard/RecentOrdersTable';
-import { CreateOrderModal } from '../components/dashboard/CreateOrderModal';
 import { OrderItem, OrderStatus } from '../types/dashboard';
 import { useToast } from '../components/ui/ToastContainer';
 import { PageHeader } from '../components/common/PageHeader';
@@ -26,6 +25,7 @@ import { StatCard } from '../components/common/StatCard';
 import { DetailDrawer } from '../components/common/DetailDrawer';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { request } from '../api/client';
+import { Button, Field, Textarea } from '../components/ui/kit';
 
 interface ApiBooking {
   id: string;
@@ -62,7 +62,6 @@ export const OrdersPage: React.FC = () => {
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [rawBookings, setRawBookings] = useState<ApiBooking[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadBookings = () => {
@@ -128,27 +127,63 @@ export const OrdersPage: React.FC = () => {
     loadBookings();
   }, []);
 
-  const handleExportCSV = () => {
-    addToast({
-      title: 'Xuất dữ liệu thành công',
-      message: 'Danh sách lịch đặt (.csv) đã được tải xuống thành công.',
-      type: 'success',
-    });
-  };
-
-  const handleUpdateStatus = (newStatus: string) => {
-    if (!selectedOrder) return;
-    addToast({
-      title: 'Cập nhật trạng thái',
-      message: `Đơn hàng ${selectedOrder.id} đã chuyển sang trạng thái "${newStatus}".`,
-      type: 'success',
-    });
-    setSelectedOrder(null);
-  };
-
   const selectedRaw = selectedOrder
     ? rawBookings.find((b) => b.id.startsWith(selectedOrder.id))
     : null;
+
+  const handleExportCSV = () => {
+    if (!rawBookings.length) {
+      addToast({ title: 'Chưa có dữ liệu để xuất', type: 'warning' });
+      return;
+    }
+    const cell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const header = ['Mã đơn', 'Trạng thái', 'Khách hàng', 'SĐT khách', 'KTV', 'Dịch vụ', 'Bắt đầu', 'Tổng tiền (VND)', 'Thanh toán', 'Địa chỉ'];
+    const rows = rawBookings.map((booking) => [
+      booking.id,
+      booking.status,
+      booking.customer?.displayName,
+      booking.customer?.phoneNumber,
+      booking.technician?.user?.displayName,
+      (booking.items ?? []).map((item) => item.serviceName).join(' + '),
+      booking.scheduledStart ? new Date(booking.scheduledStart).toLocaleString('vi-VN') : '',
+      Number(booking.totalAmount ?? 0),
+      [booking.payment?.method, booking.payment?.status].filter(Boolean).join(' / '),
+      [booking.addressSnapshot?.address, booking.addressSnapshot?.district, booking.addressSnapshot?.city].filter(Boolean).join(', '),
+    ]);
+    // BOM so Excel opens the UTF-8 Vietnamese text correctly.
+    const csv = '\uFEFF' + [header, ...rows].map((row) => row.map(cell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `lich-dat-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    addToast({ title: 'Đã xuất file CSV', message: `${rawBookings.length} lịch đặt`, type: 'success' });
+  };
+
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const cancelBooking = async () => {
+    if (!selectedRaw || !cancelReason.trim()) return;
+    setCancelling(true);
+    try {
+      await request(`/bookings/${selectedRaw.id}/cancel`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reasonCode: 'OTHER', reasonText: cancelReason.trim() }),
+      });
+      addToast({ title: 'Đã hủy lịch đặt', message: `Đơn ${selectedRaw.id.slice(0, 8)} đã được hủy và khách sẽ nhận thông báo.`, type: 'success' });
+      setCancelOpen(false);
+      setCancelReason('');
+      setSelectedOrder(null);
+      loadBookings();
+    } catch (error) {
+      addToast({ title: 'Không hủy được lịch đặt', message: error instanceof Error ? error.message : 'Vui lòng thử lại', type: 'error' });
+    } finally {
+      setCancelling(false);
+    }
+  };
+
 
   return (
     <motion.div
@@ -187,13 +222,6 @@ export const OrdersPage: React.FC = () => {
               <span>Xuất CSV</span>
             </button>
 
-            <button
-              onClick={() => setIsCreateOpen(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white text-xs font-semibold shadow-sm shadow-[#2E7D4A]/25 transition-all cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>+ Tạo lịch đặt mới</span>
-            </button>
           </div>
         }
       />
@@ -255,21 +283,12 @@ export const OrdersPage: React.FC = () => {
         subtitle="Thông tin khách hàng, gói trị liệu và tiến trình thực hiện"
         badge={selectedOrder ? <StatusBadge status={selectedOrder.status} size="sm" /> : undefined}
         footer={
-          selectedOrder && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleUpdateStatus('Đã hủy')}
-                className="px-3.5 py-2 rounded-xl border border-[#F8D2D0] bg-[#FDF0EF] text-[#D04A44] hover:bg-[#FCE3E1] text-xs font-semibold transition-colors"
-              >
-                Hủy lịch đặt
-              </button>
-              <button
-                onClick={() => handleUpdateStatus('Hoàn thành')}
-                className="px-4 py-2 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
-              >
-                Xác nhận hoàn thành
-              </button>
-            </div>
+          selectedRaw && ['OPEN', 'PENDING', 'CONFIRMED'].includes(selectedRaw.status) ? (
+            <Button variant="danger" onClick={() => setCancelOpen(true)}>
+              Hủy lịch đặt
+            </Button>
+          ) : (
+            <span className="text-xs text-[#66756B]">Đơn đã kết thúc, không còn thao tác.</span>
           )
         }
       >
@@ -424,12 +443,38 @@ export const OrdersPage: React.FC = () => {
         )}
       </DetailDrawer>
 
-      {/* 5. Create Order Modal */}
-      <CreateOrderModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onOrderCreated={(newOrder) => setOrders((prev) => [newOrder, ...prev])}
-      />
+      <AnimatePresence>
+        {cancelOpen && selectedRaw && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !cancelling && setCancelOpen(false)} className="fixed inset-0 bg-[#1C2B20]/40 backdrop-blur-sm" />
+            <motion.form
+              role="dialog"
+              aria-modal="true"
+              aria-label="Hủy lịch đặt"
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97 }}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void cancelBooking();
+              }}
+              className="relative w-full max-w-md bg-white rounded-2xl border border-[#E5EBE5] shadow-modal p-6 space-y-4"
+            >
+              <div>
+                <h2 className="text-lg font-bold">Hủy lịch đặt {selectedRaw.id.slice(0, 8)}?</h2>
+                <p className="text-xs text-[#66756B] mt-1">Khách và KTV (nếu có) sẽ nhận thông báo kèm lý do. Không thể hoàn tác.</p>
+              </div>
+              <Field label="Lý do hủy" required>
+                <Textarea autoFocus required rows={3} maxLength={500} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="VD: Khách yêu cầu hủy qua hotline." />
+              </Field>
+              <div className="flex justify-end gap-2">
+                <Button onClick={() => setCancelOpen(false)} disabled={cancelling}>Giữ lại</Button>
+                <Button type="submit" variant="danger" loading={cancelling} disabled={!cancelReason.trim()}>Hủy lịch đặt</Button>
+              </div>
+            </motion.form>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

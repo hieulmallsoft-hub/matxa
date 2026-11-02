@@ -18,6 +18,7 @@ import {
 import { NotificationItem } from '../types/dashboard';
 import { useToast } from '../components/ui/ToastContainer';
 import { PageHeader } from '../components/common/PageHeader';
+import { DemoDataNotice } from '../components/ui/kit';
 import { SectionCard } from '../components/common/SectionCard';
 
 interface SpaNotification {
@@ -150,6 +151,7 @@ export const NotificationsPage: React.FC = () => {
           </div>
         }
       />
+      <DemoDataNotice />
 
       {/* Severity Filter Tabs */}
       <div className="flex items-center gap-1.5 p-1 bg-[#F1F5EF] rounded-xl border border-[#E5EBE5] max-w-fit">

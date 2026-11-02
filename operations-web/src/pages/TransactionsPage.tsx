@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeftRight, Search, CheckCircle2, Copy, FileText, Download, Clock } from 'lucide-react';
 import { useToast } from '../components/ui/ToastContainer';
 import { PageHeader } from '../components/common/PageHeader';
+import { DemoDataNotice } from '../components/ui/kit';
 import { StatusBadge } from '../components/common/StatusBadge';
 
 const TRANSACTION_ROWS = [
@@ -125,6 +126,7 @@ export const TransactionsPage: React.FC = () => {
           </button>
         }
       />
+      <DemoDataNotice />
 
       {/* Main Ledger Card */}
       <div className="bg-white border border-[#E5EBE5] rounded-2xl shadow-sm overflow-hidden">

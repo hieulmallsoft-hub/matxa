@@ -29,6 +29,7 @@ import {
   Cell,
 } from 'recharts';
 import { PageHeader } from '../components/common/PageHeader';
+import { DemoDataNotice } from '../components/ui/kit';
 import { StatCard } from '../components/common/StatCard';
 import { SectionCard } from '../components/common/SectionCard';
 import { StatusBadge } from '../components/common/StatusBadge';
@@ -158,9 +159,9 @@ export const AnalyticsPage: React.FC = () => {
 
   const handleExportReport = () => {
     addToast({
-      title: 'Xuất báo cáo thành công',
-      message: 'Báo cáo doanh thu định dạng Excel (.xlsx) đã được tải xuống.',
-      type: 'success',
+      title: 'Chưa xuất được',
+      message: 'Trang này đang dùng dữ liệu minh họa nên chưa có file để tải.',
+      type: 'warning',
     });
   };
 
@@ -194,6 +195,7 @@ export const AnalyticsPage: React.FC = () => {
           </button>
         }
       />
+      <DemoDataNotice />
 
       {/* 2. KPI Cards Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">

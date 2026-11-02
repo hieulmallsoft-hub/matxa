@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { AnimatedNumber, fadeUp } from '../ui/kit';
 
 export interface StatCardProps {
   label?: string;
@@ -63,8 +64,10 @@ export const StatCard: React.FC<StatCardProps> = ({
 
   return (
     <motion.div
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.2 }}
+      variants={fadeUp}
+      initial="hidden"
+      animate="show"
+      whileHover={{ y: -3 }}
       onClick={onClick}
       className={`p-5 rounded-2xl bg-white border border-[#E5EBE5] shadow-[0_2px_12px_rgba(28,43,32,0.04)] hover:shadow-[0_8px_24px_rgba(46,125,74,0.08)] hover:border-[#D0DCD1] transition-all flex flex-col justify-between ${
         onClick ? 'cursor-pointer' : ''
@@ -75,8 +78,8 @@ export const StatCard: React.FC<StatCardProps> = ({
           <span className="text-xs font-medium text-[#66756B] block tracking-wide">
             {displayLabel}
           </span>
-          <div className="text-2xl sm:text-3xl font-bold text-[#1C2B20] mt-1.5 tracking-tight font-sans">
-            {value}
+          <div className="text-2xl sm:text-3xl font-bold text-[#1C2B20] mt-1.5 tracking-tight font-sans tabular-nums">
+            {typeof value === 'number' ? <AnimatedNumber value={value} /> : value}
           </div>
         </div>
 

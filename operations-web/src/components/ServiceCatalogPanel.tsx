@@ -1,5 +1,6 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useConfirm } from './ui/useConfirm';
 import {
   Sparkles,
   Plus,
@@ -62,6 +63,7 @@ export function ServiceCatalogPanel({
   categories: Category[];
   notify: (message: string, error?: boolean) => void;
 }) {
+  const { confirm, dialog } = useConfirm();
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -164,7 +166,7 @@ export function ServiceCatalogPanel({
   }
 
   async function remove(item: CatalogItem) {
-    if (!window.confirm(`Xóa dịch vụ “${item.name}” khỏi catalog chung? Thao tác này không thể hoàn tác.`)) return;
+    if (!(await confirm({ title: "Xóa dịch vụ?", message: `“${item.name}” sẽ bị xóa khỏi catalog chung. Thao tác này không thể hoàn tác.`, confirmText: "Xóa dịch vụ" }))) return;
     try {
       await request(`/admin/service-catalog/${item.id}`, { method: 'DELETE' });
       notify('Đã xóa dịch vụ thành công');
@@ -202,6 +204,7 @@ export function ServiceCatalogPanel({
 
   return (
     <div className="space-y-6">
+      {dialog}
       {/* 1. Main Header Card */}
       <div className="bg-white rounded-3xl border border-[#E5EBE5] p-6 sm:p-7 shadow-[0_2px_16px_rgba(28,43,32,0.04)]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#E5EBE5]">
