@@ -478,7 +478,8 @@ button:not([class*="bg-"]):not([class*="text-"]):hover {
   box-shadow: 0 8px 28px rgba(34,160,74,0.50);
   transform: none;
 }
-button:active { transform: none; box-shadow: 0 3px 12px rgba(34,160,74,0.30); }
+/* Only the legacy unstyled buttons get the green press glow. */
+button:not([class*="bg-"]):not([class*="text-"]):active { transform: none; box-shadow: 0 3px 12px rgba(34,160,74,0.30); }
 button:disabled { opacity: 0.52; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 button:not(:disabled):active { transform: none; }
 button:focus-visible, input:focus-visible, select:focus-visible,

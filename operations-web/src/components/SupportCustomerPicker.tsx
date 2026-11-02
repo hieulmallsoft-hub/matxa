@@ -32,7 +32,7 @@ export function SupportCustomerPicker({ onClose, onSelect, busy }: {
       <div className="bg-white rounded-2xl w-full max-w-xl max-h-[85vh] flex flex-col shadow-xl">
         <div className="p-5 border-b flex items-center justify-between">
           <div><h2 id="support-picker-title" className="font-bold text-lg">Chọn khách để chat hỗ trợ</h2><p className="text-xs text-[#66756B] mt-1">Mở lại lịch sử nếu khách đã có hội thoại CSKH.</p></div>
-          <button type="button" onClick={onClose} disabled={busy} aria-label="Đóng" className="p-2"><X size={20} /></button>
+          <button type="button" onClick={onClose} disabled={busy} aria-label="Đóng" className="p-2 bg-transparent text-content-secondary"><X size={20} /></button>
         </div>
         <div className="p-4 relative"><Search className="absolute left-7 top-7 text-[#94A399]" size={16} /><input autoFocus value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Tên, số điện thoại, email hoặc ID user..." aria-label="Tìm khách hàng để chat" className="w-full border rounded-xl pl-10 pr-3 py-2.5 text-sm" /></div>
         <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-2">

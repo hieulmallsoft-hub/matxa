@@ -210,7 +210,7 @@ export function FormSection({ title, description, icon, children, collapsible, d
   return (
     <section className={cx('rounded-2xl border border-surface-border bg-white p-4 sm:p-5', className)}>
       {collapsible ? (
-        <button type="button" className="w-full" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
+        <button type="button" className="w-full bg-transparent text-left" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
           {header}
         </button>
       ) : (

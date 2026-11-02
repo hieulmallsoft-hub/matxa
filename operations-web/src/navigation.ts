@@ -20,7 +20,7 @@ import {
 import type { PageId } from './types/dashboard';
 
 /** Live counters shown as menu badges; see useAdminCounts. */
-export type CountKey = 'pendingBookings' | 'pendingApplications' | 'unreadSupport';
+export type CountKey = 'pendingBookings' | 'pendingApplications' | 'unreadSupport' | 'unreadNotifications';
 
 export interface NavItem {
   id: PageId;
@@ -70,7 +70,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Hệ thống',
     items: [
-      { id: 'notifications', label: 'Thông báo hệ thống', description: 'Mẫu thông báo gửi người dùng', icon: Bell, keywords: 'push template' },
+      { id: 'notifications', label: 'Thông báo hệ thống', description: 'Hồ sơ mới, khiếu nại, đơn hết hạn, tin nhắn', icon: Bell, keywords: 'thong bao canh bao', count: 'unreadNotifications' },
       { id: 'complaints', label: 'Khiếu nại', description: 'Khiếu nại về đơn dịch vụ', icon: ShieldCheck, keywords: 'complaint' },
       { id: 'technicianPolicy', label: 'Chính sách KTV', description: 'Tỷ lệ hoa hồng và chính sách KTV', icon: Scale, keywords: 'hoa hong commission' },
       { id: 'settings', label: 'Cấu hình hệ thống', description: 'Thông tin nền tảng và cấu hình', icon: Settings, keywords: 'setting cai dat' },

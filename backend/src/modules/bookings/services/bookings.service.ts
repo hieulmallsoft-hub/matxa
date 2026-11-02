@@ -1063,6 +1063,12 @@ export class BookingsService {
       const recipients = [result.customerId, ...result.technicianUserIds];
       for (const recipient of recipients)
         void this.notifyStatus(recipient, bookingId, 'BOOKING_EXPIRED', 'Đơn đã hết hạn', 'Đơn OPEN chưa được chọn KTV trước hạn ứng tuyển.');
+      void this.notifications.notifyAdmins?.(
+        'ADMIN_BOOKING_EXPIRED',
+        'Đơn hết hạn chưa có KTV',
+        `Đơn ${bookingId.slice(0, 8)} hết hạn ứng tuyển (${result.technicianUserIds.length} KTV đã ứng tuyển). Có thể cần liên hệ khách.`,
+        'admin://orders',
+      );
     }
     return result;
   }
@@ -1240,7 +1246,7 @@ export class BookingsService {
     const evidence = dto.evidenceStorageKeys ?? [];
     if (evidence.length && this.complaintStorage) await this.complaintStorage.validateKeys(id, userId, evidence);
     try {
-      return await this.prisma.complaint.create({
+      const complaint = await this.prisma.complaint.create({
         data: {
           bookingId: id,
           customerId: userId,
@@ -1253,6 +1259,13 @@ export class BookingsService {
         },
         include: { evidence: true },
       });
+      void this.notifications.notifyAdmins?.(
+        'ADMIN_COMPLAINT_CREATED',
+        'Khiếu nại mới',
+        `Đơn ${id.slice(0, 8)}: ${dto.detail.trim().slice(0, 120)}`,
+        'admin://complaints',
+      );
+      return complaint;
     } catch (error) {
       if ((error as { code?: string })?.code === 'P2002') throw new ConflictException('Lich dat da duoc tao khieu nai');
       throw error;

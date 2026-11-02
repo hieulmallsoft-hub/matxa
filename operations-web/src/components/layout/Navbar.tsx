@@ -18,6 +18,7 @@ const TASKS: Array<{ key: CountKey; page: PageId; label: string; icon: React.Rea
   { key: 'pendingBookings', page: 'orders', label: 'đơn đang chờ KTV nhận', icon: <CalendarClock className="w-4 h-4" /> },
   { key: 'pendingApplications', page: 'applications', label: 'hồ sơ KTV chờ duyệt', icon: <UserCheck className="w-4 h-4" /> },
   { key: 'unreadSupport', page: 'messages', label: 'tin nhắn CSKH chưa đọc', icon: <MessageCircle className="w-4 h-4" /> },
+  { key: 'unreadNotifications', page: 'notifications', label: 'thông báo chưa đọc', icon: <Bell className="w-4 h-4" /> },
 ];
 
 /** Closes a popover on outside click or Escape. */

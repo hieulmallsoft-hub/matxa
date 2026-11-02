@@ -164,4 +164,22 @@ export class NotificationsService {
   create(userId: string, type: string, title: string, body: string, actionUrl?: string) {
     return this.prisma.notification.create({ data: { userId, type, title, body, actionUrl } });
   }
+
+  /**
+   * In-app notice for every active admin (web "Thông báo hệ thống"). Best-effort: a failure
+   * is logged and never breaks the action that triggered it.
+   */
+  async notifyAdmins(type: string, title: string, body: string, actionUrl?: string) {
+    try {
+      const admins = await this.prisma.user.findMany({ where: { role: 'ADMIN', status: 'ACTIVE' }, select: { id: true } });
+      if (!admins.length) return 0;
+      const result = await this.prisma.notification.createMany({
+        data: admins.map((admin) => ({ userId: admin.id, type, title, body, actionUrl })),
+      });
+      return result.count;
+    } catch (error) {
+      this.logger.warn(`Khong tao duoc thong bao admin ${type}: ${error instanceof Error ? error.message : 'unknown'}`);
+      return 0;
+    }
+  }
 }

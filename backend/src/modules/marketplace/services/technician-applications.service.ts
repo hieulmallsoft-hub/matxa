@@ -123,6 +123,12 @@ export class TechnicianApplicationsService {
       create: { applicationId: app.id, status: 'PENDING_VERIFICATION' },
       update: { status: 'PENDING_VERIFICATION', rejectionReason: null },
     });
+    void this.notifications.notifyAdmins?.(
+      'ADMIN_APPLICATION_SUBMITTED',
+      'Hồ sơ KTV mới chờ duyệt',
+      `${app.displayName} vừa nộp hồ sơ đăng ký kỹ thuật viên.`,
+      'admin://applications',
+    );
     return result;
   }
   list(query: { status?: string; page: number; limit: number }) {

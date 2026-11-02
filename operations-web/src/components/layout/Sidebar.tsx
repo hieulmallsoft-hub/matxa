@@ -91,7 +91,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCol
       className="hidden md:flex flex-col h-screen fixed top-0 left-0 z-40 bg-white border-r border-surface-border shadow-[2px_0_16px_rgba(28,43,32,0.03)]"
     >
       <div className="h-[66px] flex items-center justify-between gap-2 px-4 border-b border-surface-border">
-        <button onClick={() => onNavigate('dashboard')} className="flex items-center gap-3 min-w-0" title="Về Tổng quan">
+        <button onClick={() => onNavigate('dashboard')} className="flex items-center gap-3 min-w-0 bg-transparent text-left" title="Về Tổng quan">
           <motion.span
             whileHover={{ rotate: 18, scale: 1.05 }}
             className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#3C9A5E] to-primary flex items-center justify-center shrink-0 shadow-md shadow-primary/30"
