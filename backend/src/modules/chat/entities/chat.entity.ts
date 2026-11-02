@@ -4,12 +4,14 @@ export class ChatUserModel {
   @ApiProperty() id!: string;
   @ApiPropertyOptional() displayName?: string;
   @ApiPropertyOptional() avatarUrl?: string;
+  @ApiPropertyOptional() role?: string;
 }
 
 export class MessageModel {
   @ApiProperty() id!: string;
   @ApiProperty() conversationId!: string;
   @ApiProperty() senderId!: string;
+  @ApiPropertyOptional({ type: ChatUserModel }) sender?: ChatUserModel;
   @ApiProperty({ enum: ['TEXT', 'IMAGE', 'LOCATION', 'SYSTEM'] }) type!: string;
   @ApiPropertyOptional() text?: string;
   @ApiPropertyOptional() mediaUrl?: string;
@@ -27,6 +29,8 @@ export class MessageModel {
 
 export class ConversationModel {
   @ApiProperty() id!: string;
+  @ApiProperty({ enum: ['BOOKING', 'SUPPORT', 'LEGACY'] }) type!: string;
+  @ApiPropertyOptional({ nullable: true }) supportCustomerId?: string;
   @ApiPropertyOptional() bookingId?: string;
   @ApiProperty({ type: ChatUserModel }) participant!: ChatUserModel;
   @ApiPropertyOptional({ type: MessageModel }) lastMessage?: MessageModel;

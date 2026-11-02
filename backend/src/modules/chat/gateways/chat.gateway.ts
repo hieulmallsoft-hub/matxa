@@ -63,6 +63,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.debug(`Chat socket disconnected: ${client.id}`);
   }
 
+  // Admin uses REST while Mobile may be listening on Socket.IO.
+  // Once persisted, a socket delivery failure must not report the send as failed.
+  async publishRestMessage(message: { conversationId: string; senderId: string }) {
+    if (!this.server) return;
+    try {
+      const recipients = await this.chat.recipientIds(message.senderId, message.conversationId);
+      this.server.to([`conversation:${message.conversationId}`, ...recipients.map((id) => `user:${id}`)])
+        .emit('message.created', message);
+    } catch (error) {
+      this.logger.warn(`Khong phat duoc tin REST qua socket: ${error instanceof Error ? error.message : 'unknown'}`);
+    }
+  }
+
   @SubscribeMessage('conversation.open')
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   async open(@ConnectedSocket() client: AuthSocket, @MessageBody() dto: SocketConversationDto) {

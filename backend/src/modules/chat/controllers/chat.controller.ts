@@ -23,11 +23,16 @@ import {
 } from '@nestjs/swagger';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator';
 import { AccessTokenGuard } from '../../auth/guards/access-token.guard';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
+import { ChatGateway } from '../gateways/chat.gateway';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
 import { ChatStorageService } from '../services/chat-storage.service';
 import { ChatService } from '../services/chat.service';
 import {
   CreateConversationDto,
+  CreateSupportConversationDto,
+  ListConversationsDto,
   CreateUploadUrlDto,
   EditMessageDto,
   ListMessagesDto,
@@ -43,7 +48,17 @@ export class ChatController {
   constructor(
     private readonly chat: ChatService,
     private readonly storage: ChatStorageService,
+    private readonly gateway: ChatGateway,
   ) {}
+
+  @Post('support')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Admin chon khach hang de mo hoac tao chat CSKH; khong can booking' })
+  @ApiCreatedResponse({ type: ConversationModel })
+  createSupport(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateSupportConversationDto) {
+    return this.chat.createSupportConversation(auth.sub, dto.customerId);
+  }
 
   @Post()
   @ApiOperation({ summary: 'Deprecated: chat moi phai duoc tao theo booking' })
@@ -62,8 +77,8 @@ export class ChatController {
   @Get()
   @ApiOperation({ summary: 'Lay danh sach cuoc tro chuyen' })
   @ApiOkResponse({ type: [ConversationModel] })
-  list(@CurrentAuth() auth: AccessTokenPayload) {
-    return this.chat.listConversations(auth.sub);
+  list(@CurrentAuth() auth: AccessTokenPayload, @Query() query: ListConversationsDto) {
+    return this.chat.listConversations(auth.sub, query.type);
   }
 
   @Get(':id/messages')
@@ -80,8 +95,10 @@ export class ChatController {
   @Post(':id/messages')
   @ApiOperation({ summary: 'Gui tin nhan text, anh hoac vi tri' })
   @ApiCreatedResponse({ type: MessageModel })
-  send(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SendMessageDto) {
-    return this.chat.sendMessage(auth.sub, id, dto);
+  async send(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SendMessageDto) {
+    const message = await this.chat.sendMessage(auth.sub, id, dto);
+    await this.gateway.publishRestMessage(message);
+    return message;
   }
 
   @Post(':id/image-upload-url')

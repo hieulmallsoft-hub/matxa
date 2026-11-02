@@ -18,6 +18,15 @@ export class CreateConversationDto {
   @ApiProperty() @IsUUID() participantId!: string;
 }
 
+export class CreateSupportConversationDto {
+  @ApiProperty({ description: 'ID user CUSTOMER được admin chọn để hỗ trợ' }) @IsUUID() customerId!: string;
+}
+
+export class ListConversationsDto {
+  @ApiPropertyOptional({ enum: ['BOOKING', 'SUPPORT', 'LEGACY'] })
+  @IsOptional() @IsIn(['BOOKING', 'SUPPORT', 'LEGACY']) type?: 'BOOKING' | 'SUPPORT' | 'LEGACY';
+}
+
 export class ListMessagesDto {
   @ApiPropertyOptional({ default: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
   @ApiPropertyOptional({ default: 30, maximum: 100 })

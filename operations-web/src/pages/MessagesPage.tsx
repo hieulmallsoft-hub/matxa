@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Search, RefreshCw, MessageSquare, Check } from 'lucide-react';
+import { Send, Search, RefreshCw, MessageSquare, Check, Plus, ImagePlus } from 'lucide-react';
+import { SupportCustomerPicker } from '../components/SupportCustomerPicker';
 import { useToast } from '../components/ui/ToastContainer';
 import { PageHeader } from '../components/common/PageHeader';
 import { request } from '../api/client';
@@ -9,6 +10,7 @@ type Participant = { id: string; displayName?: string | null; avatarUrl?: string
 type ApiMessage = {
   id: string;
   senderId: string;
+  sender?: Participant & { role?: string };
   type: string;
   text?: string | null;
   createdAt: string;
@@ -18,6 +20,8 @@ type ApiMessage = {
 };
 type Conversation = {
   id: string;
+  type?: 'SUPPORT' | 'BOOKING' | 'LEGACY';
+  supportCustomerId?: string | null;
   bookingId?: string | null;
   participant?: Participant | null;
   lastMessage?: ApiMessage | null;
@@ -41,6 +45,9 @@ const messageText = (message?: ApiMessage | null) => {
   );
 };
 const errorText = (error: unknown) => (error instanceof Error ? error.message : 'Không thể kết nối máy chủ');
+const mergeMessages = (previous: ApiMessage[], incoming: ApiMessage[]) =>
+  [...new Map([...previous, ...incoming].map((message) => [message.id, message])).values()]
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 const QUICK_REPLIES = [
   'Dạ MATXXA xin chào! Anh/chị cần hỗ trợ nội dung gì ạ?',
   'Dạ anh/chị vui lòng chờ để bên em kiểm tra thông tin ạ.',
@@ -69,6 +76,12 @@ export const MessagesPage: React.FC = () => {
   const [readError, setReadError] = useState('');
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const olderPage = useRef(1);
+  const imageInput = useRef<HTMLInputElement>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [history, setHistory] = useState<{ conversationId: string; items: ApiMessage[] }>({
     conversationId: '',
@@ -94,7 +107,7 @@ export const MessagesPage: React.FC = () => {
           if (user.role !== 'ADMIN') throw new Error('Vui lòng đăng nhập tài khoản quản trị để sử dụng hộp thư.');
           userId = user.id;
         }
-        const payload = await request<Conversation[] | { items: Conversation[] }>('/conversations', {
+        const payload = await request<Conversation[] | { items: Conversation[] }>('/conversations?type=SUPPORT', {
           signal: controller.signal,
         });
         if (controller.signal.aborted) return;
@@ -123,6 +136,8 @@ export const MessagesPage: React.FC = () => {
     setInputMessage('');
     setMessageError('');
     setReadError('');
+    olderPage.current = 1;
+    setHistoryTotal(0);
     if (!activeThreadId || !currentUserId) return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
@@ -131,12 +146,14 @@ export const MessagesPage: React.FC = () => {
     const load = async () => {
       const version = sendVersion.current;
       try {
-        const response = await request<{ items: ApiMessage[] }>(
+        const response = await request<{ items: ApiMessage[]; total: number }>(
           `/conversations/${activeThreadId}/messages?page=1&limit=100`,
           { signal: controller.signal },
         );
         if (controller.signal.aborted || version !== sendVersion.current || sendingRef.current) return;
-        setHistory({ conversationId: activeThreadId, items: [...response.items].reverse() });
+        setHistory((current) => ({ conversationId: activeThreadId,
+          items: mergeMessages(current.conversationId === activeThreadId ? current.items : [], response.items) }));
+        setHistoryTotal(response.total);
         setMessageError('');
         const latestIncoming = response.items.find((message) => message.senderId !== currentUserId);
         if (latestIncoming && latestIncoming.id !== lastReadMessageId) {
@@ -210,6 +227,60 @@ export const MessagesPage: React.FC = () => {
       setSending(false);
     }
   };
+
+  const handleCreateSupport = async (customerId: string) => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const thread = await request<Conversation>('/conversations/support', { method: 'POST', body: JSON.stringify({ customerId }) });
+      setThreads((rows) => [thread, ...rows.filter((row) => row.id !== thread.id)]);
+      setActiveThreadId(thread.id);
+      setPickerOpen(false);
+      setRefreshKey((key) => key + 1);
+    } catch (error) { addToast({ title: 'Không mở được chat hỗ trợ', message: errorText(error), type: 'error' }); }
+    finally { setCreating(false); }
+  };
+
+  const loadOlder = async () => {
+    const conversationId = activeThreadId;
+    if (!conversationId || loadingOlder) return;
+    setLoadingOlder(true);
+    const page = olderPage.current + 1;
+    try {
+      const response = await request<{ items: ApiMessage[]; total: number }>(`/conversations/${conversationId}/messages?page=${page}&limit=100`);
+      if (activeId.current !== conversationId) return;
+      setHistory((current) => current.conversationId === conversationId
+        ? { conversationId, items: mergeMessages(current.items, response.items) } : current);
+      setHistoryTotal(response.total);
+      olderPage.current = page;
+    } catch (error) { addToast({ title: 'Không tải được lịch sử cũ', message: errorText(error), type: 'error' }); }
+    finally { setLoadingOlder(false); }
+  };
+
+  const handleSendImage = async (file: File) => {
+    const conversationId = activeThreadId;
+    if (!conversationId || !currentUserId || sendingRef.current) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
+      addToast({ title: 'Ảnh không hợp lệ', message: 'Chọn ảnh JPG, PNG hoặc WebP tối đa 10 MB.', type: 'error' });
+      return;
+    }
+    sendingRef.current = true; sendVersion.current++; setSending(true);
+    try {
+      const upload = await request<{ uploadUrl: string; mediaKey: string }>(`/conversations/${conversationId}/image-upload-url`, {
+        method: 'POST', body: JSON.stringify({ fileName: file.name, contentType: file.type, size: file.size }),
+      });
+      const result = await fetch(upload.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+      if (!result.ok) throw new Error('Tải ảnh lên không thành công');
+      const message = await request<ApiMessage>(`/conversations/${conversationId}/messages`, {
+        method: 'POST', body: JSON.stringify({ type: 'IMAGE', mediaKey: upload.mediaKey }),
+      });
+      if (activeId.current === conversationId) setHistory((current) => ({ conversationId, items: [
+        ...(current.conversationId === conversationId ? current.items.filter((item) => item.id !== message.id) : []), message,
+      ] }));
+      setThreads((rows) => rows.map((row) => row.id === conversationId ? { ...row, lastMessage: message, lastMessageAt: message.createdAt } : row));
+    } catch (error) { addToast({ title: 'Không gửi được ảnh', message: errorText(error), type: 'error' }); }
+    finally { sendingRef.current = false; sendVersion.current++; setSending(false); if (imageInput.current) imageInput.current.value = ''; }
+  };
   const query = search.trim().toLocaleLowerCase('vi-VN');
   const filteredThreads = threads.filter((thread) =>
     `${thread.participant?.displayName || ''} ${messageText(thread.lastMessage)} ${thread.bookingId || ''}`
@@ -223,17 +294,20 @@ export const MessagesPage: React.FC = () => {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
       <PageHeader
         title="Tin nhắn CSKH"
-        subtitle="Trao đổi với khách hàng và kỹ thuật viên trong hội thoại đặt lịch"
+        subtitle="Chọn khách hàng để tư vấn và lưu lịch sử hỗ trợ trực tiếp với CSKH"
         badge={unreadCount ? `${unreadCount} tin chưa đọc` : undefined}
         badgeTone="blue"
         breadcrumbs={[{ label: 'MATXXA' }, { label: 'Tin nhắn CSKH' }]}
         actions={
+          <div className="flex items-center gap-4">
+          <button disabled={!currentUserId} onClick={() => setPickerOpen(true)} className="flex items-center gap-2 rounded-xl bg-[#2E7D4A] text-white px-4 py-2.5 text-sm font-semibold disabled:opacity-40"><Plus size={18} /> Tạo cuộc trò chuyện</button>
           <button
             onClick={() => setRefreshKey((key) => key + 1)}
             className="flex items-center gap-2 text-xs text-[#2E7D4A]"
           >
             <RefreshCw className="w-4 h-4" /> Tải lại
           </button>
+          </div>
         }
       />
       {listError && (
@@ -259,7 +333,7 @@ export const MessagesPage: React.FC = () => {
               <p className="p-6 text-xs text-[#66756B]">
                 {search
                   ? 'Không tìm thấy hội thoại phù hợp.'
-                  : 'Chưa có hội thoại. Hội thoại xuất hiện sau khi khách hoặc KTV mở chat từ đơn đã được gán KTV.'}
+                  : 'Chưa có hội thoại hỗ trợ. Bấm “Tạo cuộc trò chuyện” để chọn khách hàng.'}
               </p>
             )}
             {filteredThreads.map((thread) => (
@@ -307,6 +381,7 @@ export const MessagesPage: React.FC = () => {
             className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3.5 bg-[#FAFBF9]"
           >
             {messagesLoading && <p className="text-xs text-[#66756B]">Đang tải tin nhắn...</p>}
+            {messages.length < historyTotal && <button type="button" onClick={() => void loadOlder()} disabled={loadingOlder} className="block mx-auto px-4 py-2 rounded-xl border text-xs text-[#2E7D4A]">{loadingOlder ? 'Đang tải...' : 'Xem tin nhắn cũ hơn'}</button>}
             {!messagesLoading && !messageError && !messages.length && (
               <div className="text-center text-[#66756B] py-10 text-xs">
                 <MessageSquare className="w-8 h-8 mx-auto mb-3" />
@@ -323,6 +398,7 @@ export const MessagesPage: React.FC = () => {
                 );
               return (
                 <div key={message.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                  {message.sender?.role === 'ADMIN' && <span className="text-[10px] text-[#66756B] mb-1">{isMe ? 'Bạn · CSKH' : `${message.sender.displayName || 'Admin'} · CSKH`}</span>}
                   <div
                     className={`max-w-[90%] p-3 rounded-2xl text-xs leading-relaxed break-words whitespace-pre-wrap ${isMe ? 'bg-[#2E7D4A] text-white' : 'bg-white border border-[#E5EBE5] text-[#1C2B20]'}`}
                   >
@@ -361,6 +437,8 @@ export const MessagesPage: React.FC = () => {
             }}
             className="p-3 border-t border-[#E5EBE5] flex items-center gap-2 shrink-0"
           >
+            <input ref={imageInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleSendImage(file); }} />
+            <button type="button" disabled={!canSend} onClick={() => imageInput.current?.click()} aria-label="Gửi ảnh" className="p-2 rounded-xl border text-[#2E7D4A] disabled:opacity-40"><ImagePlus size={20} /></button>
             <input
               aria-label="Nội dung tin nhắn"
               value={inputMessage}
@@ -386,15 +464,15 @@ export const MessagesPage: React.FC = () => {
             <strong>{activeThread?.participant?.displayName || 'Thông tin hội thoại'}</strong>
           </div>
           <div>
-            <p className="text-[#66756B] mb-1">Mã đặt lịch</p>
-            <p className="break-all">{activeThread?.bookingId || 'Chưa có thông tin'}</p>
+            <p className="text-[#66756B] mb-1">Mã khách hàng</p>
+            <p className="break-all">{activeThread?.supportCustomerId || activeThread?.participant?.id || 'Chưa chọn khách'}</p>
           </div>
           <p className="text-[#66756B] leading-relaxed">
-            Hội thoại đặt lịch có thể gồm khách hàng, kỹ thuật viên và quản trị viên hỗ trợ. Tin nhắn gửi tại đây được
-            lưu vào hội thoại thật.
+            Lịch sử hỗ trợ được lưu trên server. Các admin có thể tiếp tục xử lý cùng một hội thoại; mỗi tin nhắn lưu rõ người gửi.
           </p>
         </aside>
       </div>
+      {pickerOpen && <SupportCustomerPicker onClose={() => setPickerOpen(false)} onSelect={handleCreateSupport} busy={creating} />}
     </motion.div>
   );
 };

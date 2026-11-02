@@ -57,6 +57,8 @@ export class AdminMarketplaceService {
       ...(search?.trim()
         ? {
             OR: [
+              ...(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.trim())
+                ? [{ id: search.trim() }] : []),
               { displayName: { contains: search.trim(), mode: 'insensitive' as const } },
               { identities: { some: { email: { contains: search.trim(), mode: 'insensitive' as const } } } },
               { identities: { some: { phoneNumber: { contains: search.trim() } } } },

@@ -23,6 +23,36 @@ export class ChatService {
     throw new BadRequestException('Chi ho tro tao chat theo booking');
   }
 
+  async createSupportConversation(adminId: string, customerId: string) {
+    const admin = await this.prisma.user.findUnique({ where: { id: adminId }, select: { role: true, status: true } });
+    if (admin?.role !== 'ADMIN' || admin.status !== 'ACTIVE')
+      throw new ForbiddenException('Chi admin duoc tao hoi thoai ho tro');
+    const customer = await this.prisma.user.findUnique({
+      where: { id: customerId }, select: { id: true, role: true, status: true, displayName: true, avatarUrl: true },
+    });
+    if (!customer || customer.role !== 'CUSTOMER' || customer.status !== 'ACTIVE')
+      throw new BadRequestException('Vui long chon khach hang dang hoat dong');
+    const conversation = await this.prisma.$transaction(async (tx) => {
+      // A unique customer key makes reopening and concurrent creation idempotent.
+      const thread = await tx.conversation.upsert({
+        where: { supportCustomerId: customerId },
+        update: {},
+        create: { type: 'SUPPORT', supportCustomerId: customerId, customerId,
+          participantKey: `support:${customerId}`, lastMessageAt: new Date() },
+      });
+      for (const userId of [customerId, adminId]) {
+        await tx.conversationMember.upsert({
+          where: { conversationId_userId: { conversationId: thread.id, userId } },
+          create: { conversationId: thread.id, userId }, update: { hiddenAt: null },
+        });
+      }
+      return thread;
+    });
+    return { id: conversation.id, type: conversation.type, supportCustomerId: customerId,
+      bookingId: null, participant: { id: customer.id, displayName: customer.displayName, avatarUrl: customer.avatarUrl },
+      lastMessageAt: conversation.lastMessageAt };
+  }
+
   /** Opens the only permitted chat for a booking. Participants are always
    * derived from Booking; the client never supplies a technician/customer id. */
   async createBookingConversation(userId: string, bookingId: string) {
@@ -41,6 +71,7 @@ export class ChatService {
         update: {},
         create: {
           bookingId,
+          type: 'BOOKING',
           customerId: booking.customerId,
           technicianUserId,
           participantKey,
@@ -72,10 +103,11 @@ export class ChatService {
     return conversation;
   }
 
-  async listConversations(userId: string) {
+  async listConversations(userId: string, type?: 'BOOKING' | 'SUPPORT' | 'LEGACY') {
     const currentUser = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     if (currentUser?.role === 'ADMIN') {
       const conversations = await this.prisma.conversation.findMany({
+        where: type ? { type } : undefined,
         orderBy: { lastMessageAt: 'desc' },
         include: {
           members: { include: { user: { select: { id: true, displayName: true, avatarUrl: true, role: true } } } },
@@ -107,6 +139,8 @@ export class ChatService {
           conversation.members.find((member) => member.user.role !== 'ADMIN')?.user;
         return {
           id: conversation.id,
+          type: conversation.type ?? (conversation.bookingId ? 'BOOKING' : 'LEGACY'),
+          supportCustomerId: conversation.supportCustomerId ?? null,
           bookingId: conversation.bookingId,
           participant,
           lastMessage: conversation.messages[0] ?? null,
@@ -116,7 +150,7 @@ export class ChatService {
       });
     }
     const memberships = await this.prisma.conversationMember.findMany({
-      where: { userId, hiddenAt: null },
+      where: { userId, hiddenAt: null, ...(type ? { conversation: { type } } : {}) },
       orderBy: { conversation: { lastMessageAt: 'desc' } },
       include: {
         conversation: {
@@ -155,9 +189,12 @@ export class ChatService {
         await this.ensureMember(userId, conversation.id);
         visible.push({
           id: conversation.id,
+          type: conversation.type ?? (conversation.bookingId ? 'BOOKING' : 'LEGACY'),
+          supportCustomerId: conversation.supportCustomerId ?? null,
           bookingId: conversation.bookingId,
-          participant:
-            conversation.members.find((member) => member.user.role !== 'ADMIN')?.user ?? conversation.members[0]?.user,
+          participant: conversation.type === 'SUPPORT'
+            ? { id: 'support', displayName: 'MATXXA CSKH', avatarUrl: null, role: 'ADMIN' }
+            : conversation.members.find((member) => member.user.role !== 'ADMIN')?.user ?? conversation.members[0]?.user,
           lastMessage: conversation.messages[0] ?? null,
           lastMessageAt: conversation.lastMessageAt,
           unreadCount: unreadByConversation.get(conversation.id) ?? 0,
@@ -173,11 +210,12 @@ export class ChatService {
     const access = await this.ensureAccess(userId, conversationId);
     const where = {
       conversationId,
-      ...(access.member?.hiddenAt ? { createdAt: { gt: access.member.hiddenAt } } : {}),
+      ...(access.member?.hiddenAt && access.conversation.type !== 'SUPPORT' ? { createdAt: { gt: access.member.hiddenAt } } : {}),
     };
     const [items, total] = await this.prisma.$transaction([
       this.prisma.message.findMany({
         where,
+        include: { sender: { select: { id: true, displayName: true, avatarUrl: true, role: true } } },
         orderBy: { createdAt: 'desc' },
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -204,6 +242,7 @@ export class ChatService {
     const now = new Date();
     const message = await this.prisma.$transaction(async (tx) => {
       const created = await tx.message.create({
+        include: { sender: { select: { id: true, displayName: true, avatarUrl: true, role: true } } },
         data: {
           conversationId,
           senderId: userId,
@@ -293,6 +332,14 @@ export class ChatService {
   }
 
   async recipientIds(userId: string, conversationId: string) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId }, select: { type: true, supportCustomerId: true },
+    });
+    if (conversation?.type === 'SUPPORT') {
+      if (userId !== conversation.supportCustomerId) return conversation.supportCustomerId ? [conversation.supportCustomerId] : [];
+      const admins = await this.prisma.user.findMany({ where: { role: 'ADMIN', status: 'ACTIVE' }, select: { id: true } });
+      return admins.map((admin) => admin.id);
+    }
     const members = await this.prisma.conversationMember.findMany({
       where: { conversationId, userId: { not: userId } },
       select: { userId: true },
@@ -303,8 +350,18 @@ export class ChatService {
   async ensureMember(userId: string, conversationId: string) {
     const [member, conversation] = await Promise.all([
       this.prisma.conversationMember.findUnique({ where: { conversationId_userId: { conversationId, userId } } }),
-      this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { bookingId: true } }),
+      this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { bookingId: true, type: true, supportCustomerId: true } }),
     ]);
+    if (conversation?.type === 'SUPPORT') {
+      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+      if (user?.role === 'ADMIN') {
+        return this.prisma.conversationMember.upsert({
+          where: { conversationId_userId: { conversationId, userId } },
+          create: { conversationId, userId }, update: {},
+        });
+      }
+      if (conversation.supportCustomerId !== userId) throw new ForbiddenException('Ban khong thuoc hoi thoai ho tro nay');
+    }
     if (!member) throw new ForbiddenException('Ban khong thuoc cuoc tro chuyen nay');
     if (conversation?.bookingId) {
       const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
@@ -317,13 +374,15 @@ export class ChatService {
     const [member, user, conversation] = await Promise.all([
       this.prisma.conversationMember.findUnique({ where: { conversationId_userId: { conversationId, userId } } }),
       this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } }),
-      this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { id: true, bookingId: true } }),
+      this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { id: true, bookingId: true, type: true, supportCustomerId: true } }),
     ]);
     if (!conversation) throw new NotFoundException('Cuoc tro chuyen khong ton tai');
     if (!member && user?.role !== 'ADMIN') throw new ForbiddenException('Ban khong co quyen xem cuoc tro chuyen');
+    if (conversation.type === 'SUPPORT' && user?.role !== 'ADMIN' && conversation.supportCustomerId !== userId)
+      throw new ForbiddenException('Ban khong thuoc hoi thoai ho tro nay');
     if (member && user?.role !== 'ADMIN' && conversation.bookingId)
       await this.bookingChatContext(userId, conversation.bookingId);
-    return { member, isAdmin: user?.role === 'ADMIN' };
+    return { member, isAdmin: user?.role === 'ADMIN', conversation };
   }
 
   private validateMessage(conversationId: string, userId: string, dto: SendMessageDto) {
@@ -420,9 +479,10 @@ export class ChatService {
     const [sender, recipients, conversation] = await Promise.all([
       this.prisma.user.findUnique({ where: { id: senderId }, select: { displayName: true } }),
       this.recipientIds(senderId, conversationId),
-      this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { bookingId: true } }),
+      this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { bookingId: true, type: true, supportCustomerId: true } }),
     ]);
-    const title = sender?.displayName ?? 'Bạn có tin nhắn mới';
+    const title = conversation?.type === 'SUPPORT' && senderId !== conversation.supportCustomerId
+      ? 'MATXXA CSKH' : sender?.displayName ?? 'Bạn có tin nhắn mới';
     const body =
       dto.type === 'TEXT'
         ? dto.text!.trim().slice(0, 200)
@@ -440,6 +500,7 @@ export class ChatService {
             type: 'CHAT_MESSAGE_RECEIVED',
             conversationId,
             messageId,
+            ...(conversation?.type ? { conversationType: conversation.type } : {}),
             ...(conversation?.bookingId ? { bookingId: conversation.bookingId } : {}),
           });
       }),

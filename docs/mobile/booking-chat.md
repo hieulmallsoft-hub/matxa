@@ -1,5 +1,8 @@
 # Booking chat
 
+For customer–admin support without a booking, use [Support chat](support-chat.md).
+Support conversations have `type: SUPPORT` and are opened by Admin selecting a customer.
+
 Base URL: `/api`. All endpoints require `Authorization: Bearer <accessToken>`.
 
 ## When chat is available
