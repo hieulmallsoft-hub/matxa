@@ -1,12 +1,8 @@
 # Mobile: tìm KTV và đặt lịch
 
-> Cập nhật luồng hiện tại: `POST /api/bookings` lưu KTV khách yêu cầu vào
-> `requestedTechnicianId` và tạo đơn `OPEN_MARKETPLACE` để các KTV phù hợp ứng
-> tuyển. Xem [phân biệt người nhận yêu cầu](booking-request-recipient.md) để hiển
-> thị “Khách đặt bạn” / “Yêu cầu mới”. Các mô tả tạo đơn trực tiếp `PENDING`
-> bên dưới là tài liệu luồng cũ.
+User chọn thông tin dịch vụ, xem danh sách KTV phù hợp, chọn KTV ban đầu rồi đặt lịch. Mobile gửi `technicianId` nhưng không gửi `assignmentMode`. Backend lưu lựa chọn ban đầu ở `requestedTechnicianId`, mở đơn cho các KTV phù hợp ứng tuyển đồng thời; khách chốt một ứng viên sau đó.
 
-Mobile dùng một luồng duy nhất: user chọn thông tin dịch vụ, xem danh sách KTV phù hợp, chọn một KTV rồi đặt lịch. Mobile không gửi `assignmentMode` và không dùng luồng KTV ứng tuyển.
+Chi tiết phân loại card “Khách đặt bạn” và “Yêu cầu mới”: [Hướng dẫn mobile](booking-request-recipient.md).
 
 ## Xác thực
 
@@ -115,13 +111,13 @@ Body:
 }
 ```
 
-Backend kiểm tra lại điều kiện, **tạo đơn và gán đơn cho đúng KTV đã chọn** ở trạng thái chờ KTV xác nhận. Đơn phải xuất hiện trong danh sách việc của KTV qua `GET /api/technician/jobs`. Backend đồng thời lưu thông báo `BOOKING_CREATED` để báo cho KTV; notification không thay thế cho bản ghi đơn.
+Backend tạo booking `OPEN`, `assignmentMode = OPEN_MARKETPLACE`, `technicianId = null` và lưu KTV chọn ban đầu ở `requestedTechnicianId`. Các KTV phù hợp cùng nhận cơ hội ứng tuyển qua `GET /api/technician/jobs`. Chưa gán đơn cuối cùng ở bước này.
 
 Không gửi `assignmentMode` hoặc `serviceIds`.
 
 ## 3. Thông báo cho KTV
 
-Khi tạo booking thành công, backend lưu thông báo `BOOKING_CREATED` cho tài khoản KTV và gửi push FCM nếu KTV đã đăng ký device token. Thông báo trong hệ thống vẫn được lưu khi KTV không mở app, mất mạng hoặc tắt máy.
+Khi tạo booking mở thành công, backend lưu `OPEN_BOOKING_AVAILABLE` cho các KTV đủ điều kiện đồng thời và gửi push FCM nếu có device token. KTV khách chọn ban đầu thấy `requestType = CUSTOMER_REQUEST`, nhãn “Khách đặt bạn”; KTV phù hợp khác thấy `requestType = MARKETPLACE`, nhãn “Yêu cầu mới”. Thông báo trong hệ thống vẫn được lưu khi KTV không mở app, mất mạng hoặc tắt máy.
 
 Khi app mở lại, mobile KTV đồng bộ:
 
@@ -135,11 +131,13 @@ KTV xem đơn:
 GET /api/technician/jobs
 ```
 
-KTV xác nhận đơn:
+KTV ứng tuyển (không có body):
 
 ```http
-POST /api/technician/jobs/{bookingId}/accept
+POST /api/technician/jobs/{bookingId}/apply
 ```
+
+Customer lấy `GET /api/bookings/{bookingId}`, đọc `applications` rồi chốt bằng `POST /api/bookings/{bookingId}/select-technician` với body `{"applicationId":"ID ứng tuyển"}`. Backend gán `technicianId` cuối cùng, chuyển booking thành `CONFIRMED`; KTV thắng có `isSelected = true`, các ứng viên còn lại thành `NOT_SELECTED`.
 
 ## 4. Hủy booking
 
@@ -181,16 +179,17 @@ Thu nhập KTV: 450.000đ
 
 Nếu ví không đủ số dư, thao tác nhận/chọn KTV bị từ chối và booking không được xác nhận. Giao dịch trừ tiền được lưu trong lịch sử ví với mã tham chiếu booking.
 
-## 7. API không dùng trong luồng mới
+## 7. API ứng tuyển và chốt KTV
 
-Mobile không dùng các API marketplace cũ:
+Các API dùng trong giai đoạn chờ:
 
 ```text
-POST /api/bookings/open
 POST /api/bookings/{bookingId}/select-technician
 POST /api/technician/jobs/{bookingId}/apply
 POST /api/technician/jobs/{bookingId}/withdraw
 ```
+
+`POST /api/technician/jobs/{bookingId}/accept` dành cho đơn DIRECT cũ. Luồng OPEN dùng `apply` rồi customer chốt bằng `select-technician`.
 
 ## 8. Quy trình test trên Swagger
 
@@ -227,13 +226,13 @@ Gửi các ID thực tế từ catalog/matching và thêm `technicianId`:
 POST /api/bookings
 ```
 
-Booking thành công trả về `201`, `status: "PENDING"` và `bookingId`. `PENDING` nghĩa là đơn đang chờ KTV xác nhận.
+Booking thành công trả về `201`, `bookingStatus: "OPEN"`, `bookingId`, `requestedTechnicianId`. Dùng cả hai token KTV để kiểm tra cùng booking xuất hiện, với hai `requestType` khác nhau.
 
 ### Bước 4: KTV xem và nhận đơn
 
 ```http
 GET /api/technician/jobs
-POST /api/technician/jobs/{bookingId}/accept
+POST /api/technician/jobs/{bookingId}/apply
 ```
 
-Matching dùng token customer; availability/jobs/accept dùng token KTV.
+Matching và chốt ứng viên dùng token customer; availability/jobs/apply dùng token KTV. Quy trình test đầy đủ có trong [hướng dẫn phân loại card](booking-request-recipient.md).

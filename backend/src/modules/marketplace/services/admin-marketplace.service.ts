@@ -119,6 +119,14 @@ export class AdminMarketplaceService {
         include: {
           customer: { select: { id: true, displayName: true, avatarUrl: true } },
           technician: { select: { id: true, user: { select: { id: true, displayName: true, avatarUrl: true } } } },
+          applications: {
+            orderBy: { createdAt: 'asc' },
+            include: {
+              technicianProfile: {
+                select: { id: true, user: { select: { id: true, displayName: true, avatarUrl: true } } },
+              },
+            },
+          },
           items: { select: { id: true, serviceId: true, serviceName: true, durationMinutes: true, unitPrice: true } },
           payment: { select: { method: true, status: true } },
         },
@@ -140,6 +148,16 @@ export class AdminMarketplaceService {
           feePolicyVersion: booking.feePolicyVersion,
           currency: 'VND',
         },
+        applications: booking.applications.map((application) => ({
+          applicationId: application.id,
+          technicianId: application.technicianProfileId,
+          displayName: application.technicianProfile?.user?.displayName ?? null,
+          avatarUrl: application.technicianProfile?.user?.avatarUrl ?? null,
+          status: application.status,
+          isSelected: application.status === 'SELECTED',
+          isApplicant: application.status === 'APPLIED',
+          appliedAt: application.createdAt,
+        })),
         items: booking.items.map((item) => ({ ...item, unitPrice: number(item.unitPrice) })),
       })),
       total,

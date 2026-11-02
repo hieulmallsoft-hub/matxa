@@ -15,12 +15,17 @@ theo token KTV đang xem, dùng cho cả thẻ danh sách và màn chi tiết:
 | `requestType` | `CUSTOMER_REQUEST` | `MARKETPLACE` |
 | `requestLabel` | `Khách đặt bạn` | `Yêu cầu mới` |
 
+`isApplicant = true` khi KTV đang ứng tuyển (`APPLIED`); `isSelected = true`
+khi KTV đã được chốt cuối cùng (`SELECTED`). Hai trạng thái này độc lập với
+`isRequestedTechnician`: khách có thể yêu cầu Đức ban đầu nhưng chốt FFtools.
+
 Mobile dùng `requestType` để chọn kiểu thẻ (cam cho `CUSTOMER_REQUEST`, xanh
 cho `MARKETPLACE`) và `requestLabel` để hiển thị nhãn. Không suy luận người
 được khách yêu cầu từ `applicationStatus` hay `technicianId` được gán cuối cùng.
 Trạng thái `SELECTED` vẫn có nghĩa khách đã chọn ứng viên để thực hiện dịch vụ.
 
 Nút ứng tuyển tiếp tục dựa vào `canApply`; từ chối dựa vào `canDecline`.
+Trong luồng OPEN, chỉ KTV khách yêu cầu ban đầu có `canDecline = true` khi còn được ứng tuyển.
 Metadata này không cấp thêm quyền nhận đơn, xem liên hệ hay bỏ qua bước khách chọn.
 Notification vẫn dùng `OPEN_BOOKING_AVAILABLE`; khi mở thông báo, mobile tải chi
 tiết đơn để lấy nhãn theo KTV đang xem.
@@ -33,6 +38,4 @@ có KTV rõ ràng. Khi đơn `DIRECT` chuyển sang marketplace, lựa chọn ba
 Triển khai backend: chạy `npm run db:deploy`, `npm run db:generate` và build
 lại backend. Repo này không chứa app mobile; mobile cần dùng các field trên để render.
 
-Tài liệu này cập nhật cách phân biệt người nhận theo luồng marketplace hiện tại;
-phần mô tả tạo đơn `PENDING` trực tiếp trong `booking-technician-matching.md`
-không phản ánh luồng hiện tại.
+Xem [luồng đặt lịch và ứng tuyển](booking-technician-matching.md) để tích hợp toàn bộ quy trình.

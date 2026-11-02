@@ -41,6 +41,8 @@ export class TechnicianJobsController {
               bookingStatus: { type: 'string' },
               requestedTechnicianId: { type: 'string', nullable: true, description: 'ID profile KTV khách yêu cầu ban đầu; khác KTV được gán cuối cùng.' },
               isRequestedTechnician: { type: 'boolean' },
+              isSelected: { type: 'boolean', description: 'KTV duoc chot cuoi cung' },
+              isApplicant: { type: 'boolean', description: 'KTV dang ung tuyen APPLIED' },
               requestType: { type: 'string', enum: ['CUSTOMER_REQUEST', 'MARKETPLACE'] },
               requestLabel: { type: 'string', example: 'Khách đặt bạn' },
               customer: {
@@ -79,6 +81,8 @@ export class TechnicianJobsController {
         bookingStatus: { type: 'string' },
         requestedTechnicianId: { type: 'string', nullable: true },
         isRequestedTechnician: { type: 'boolean' },
+        isSelected: { type: 'boolean' },
+        isApplicant: { type: 'boolean' },
         requestType: { type: 'string', enum: ['CUSTOMER_REQUEST', 'MARKETPLACE'] },
         requestLabel: { type: 'string', example: 'Khách đặt bạn' },
         customer: { type: 'object' },

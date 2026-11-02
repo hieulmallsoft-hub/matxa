@@ -30,6 +30,10 @@ import { request } from '../api/client';
 interface ApiBooking {
   id: string;
   status: string;
+  assignmentMode?: string;
+  applicationStatus?: string | null;
+  isSelected?: boolean;
+  isApplicant?: boolean;
   mode?: string;
   scheduledStart: string;
   scheduledEnd?: string;
@@ -37,6 +41,16 @@ interface ApiBooking {
   subtotal?: number;
   customer?: { id?: string; displayName?: string | null; avatarUrl?: string | null; phoneNumber?: string | null };
   technician?: { id?: string; user?: { id?: string; displayName?: string | null; avatarUrl?: string | null; phoneNumber?: string | null } };
+  applications?: Array<{
+    applicationId?: string;
+    technicianId?: string;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    status?: string;
+    isSelected?: boolean;
+    isApplicant?: boolean;
+    appliedAt?: string;
+  }>;
   items?: Array<{ id?: string; serviceName?: string; durationMinutes?: number; unitPrice?: number }>;
   payment?: { method?: string; status?: string };
   addressSnapshot?: { address?: string; city?: string; district?: string };
@@ -318,6 +332,47 @@ export const OrdersPage: React.FC = () => {
                   {selectedRaw?.technician ? 'Đã nhận ca' : 'Chờ gán'}
                 </span>
               </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-white border border-[#E5EBE5] space-y-3 shadow-2xs">
+              <span className="text-xs font-bold text-[#66756B] uppercase tracking-wider block">
+                KTV được chọn / ứng tuyển
+              </span>
+              {selectedRaw?.technician && (
+                <div className="p-3 rounded-lg bg-[#EAF5EC] border border-[#B9DEC2] text-xs">
+                  <div className="font-bold text-[#1C2B20]">KTV đã được chọn</div>
+                  <div className="text-[#2E7D4A] mt-1">{selectedRaw.technician.user?.displayName || 'Chưa cập nhật tên'}</div>
+                </div>
+              )}
+              {selectedRaw?.applications?.length ? (
+                <div className="space-y-2">
+                  {selectedRaw.applications.map((application, index) => {
+                    const labels: Record<string, string> = {
+                      SELECTED: 'Đã được chọn',
+                      APPLIED: 'Đã ứng tuyển – chờ khách chọn',
+                      NOT_SELECTED: 'Không được chọn',
+                      WITHDRAWN: 'Đã rút ứng tuyển',
+                      DECLINED: 'Đã từ chối',
+                      EXPIRED: 'Đã hết hạn',
+                    };
+                    const isSelected = application.isSelected || application.status === 'SELECTED';
+                    const label = labels[application.status || ''] || application.status || 'Không rõ trạng thái';
+                    return (
+                      <div key={application.applicationId || application.technicianId || index} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-[#F6F8F4] border border-[#E5EBE5] text-xs">
+                        <div className="min-w-0">
+                          <div className="font-semibold text-[#1C2B20] truncate">{application.displayName || 'KTV chưa cập nhật tên'}</div>
+                          <div className="text-[#66756B] mt-1">{isSelected ? 'KTV đã được chọn' : label}</div>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2 py-1 font-semibold ${isSelected ? 'bg-[#DFF3E4] text-[#217A3D]' : application.status === 'APPLIED' ? 'bg-[#FFF3D6] text-[#9A6700]' : 'bg-[#EEF1EE] text-[#66756B]'}`}>
+                          {isSelected ? 'ĐÃ CHỌN' : label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : !selectedRaw?.technician ? (
+                <div className="text-xs text-[#94A399]">Chưa có KTV được chọn hoặc ứng tuyển.</div>
+              ) : null}
             </div>
 
             {/* Timeline Booking */}

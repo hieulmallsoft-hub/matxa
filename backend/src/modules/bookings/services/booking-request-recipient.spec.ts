@@ -64,6 +64,7 @@ describe('booking request recipient', () => {
       expect(response).toMatchObject({
         requestedTechnicianId: 'preferred-profile', isRequestedTechnician: expected,
         requestType, requestLabel, canApply: true, applicationStatus: null,
+        isSelected: false, isApplicant: false, canDecline: expected,
       });
     }
   });
@@ -82,5 +83,25 @@ describe('booking request recipient', () => {
       { ...booking, requestedTechnicianId: undefined }, null, false, true, 'preferred-profile',
     );
     expect(response).toMatchObject({ requestedTechnicianId: null, isRequestedTechnician: false, requestLabel: 'Yêu cầu mới' });
+  });
+
+  it('keeps the initial request label while the technician is applying', () => {
+    const { service } = setup();
+    const response = (service as any).openBookingResponse(booking, 'APPLIED', false, false, 'preferred-profile');
+    expect(response).toMatchObject({
+      requestType: 'CUSTOMER_REQUEST', isRequestedTechnician: true,
+      isSelected: false, isApplicant: true, canApply: false, canDecline: false, canWithdraw: true,
+    });
+  });
+
+  it('marks a finalized alternative separately from the initial request', () => {
+    const { service } = setup();
+    const response = (service as any).openBookingResponse(
+      { ...booking, status: 'CONFIRMED', technicianId: 'other-profile' }, 'SELECTED', true, false, 'other-profile',
+    );
+    expect(response).toMatchObject({
+      requestType: 'MARKETPLACE', isRequestedTechnician: false,
+      isSelected: true, isApplicant: false, canApply: false, canDecline: false,
+    });
   });
 });
