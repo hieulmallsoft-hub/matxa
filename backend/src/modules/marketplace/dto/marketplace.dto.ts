@@ -297,6 +297,12 @@ export class CreatePromotionDto {
   @ApiProperty() @IsDateString() endsAt!: string;
   @ApiPropertyOptional({ type: [String], description: 'User IDs duoc gan rieng; de trong thi ap dung cho tat ca khach' })
   @IsOptional() @IsUUID('4', { each: true }) customerIds?: string[];
+  @ApiPropertyOptional({ description: 'Muc "Thong tin" tren man uu dai cua app' })
+  @IsOptional() @IsString() @MaxLength(5000) description?: string;
+  @ApiPropertyOptional({ description: 'Muc "Dieu khoan va dieu kien"' })
+  @IsOptional() @IsString() @MaxLength(5000) terms?: string;
+  @ApiPropertyOptional({ description: 'Muc "Luu y"' })
+  @IsOptional() @IsString() @MaxLength(2000) note?: string;
 }
 
 export class CreateTechnicianByAdminDto extends UpsertTechnicianProfileDto {

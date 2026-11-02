@@ -1,8 +1,24 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
-import { CreateVenueDto, UpdateVenueDto, VenueQueryDto, VenueHourDto } from '../dto/venue.dto';
+import { CreateVenueDto, UpdateVenueDto, VENUE_CATEGORIES, VenueQueryDto, VenueHourDto } from '../dto/venue.dto';
 
-const include = { services: { where: { isActive: true } }, hours: { orderBy: { dayOfWeek: 'asc' as const } } };
+const include = {
+  services: { where: { isActive: true } },
+  hours: { orderBy: { dayOfWeek: 'asc' as const } },
+  promotion: true,
+};
+
+const EARTH_RADIUS_KM = 6371;
+const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+
+/** Great-circle distance in km, rounded to one decimal like the app shows ("1.7 km"). */
+const distanceKm = (fromLat: number, fromLng: number, toLat: number, toLng: number) => {
+  const dLat = toRadians(toLat - fromLat);
+  const dLng = toRadians(toLng - fromLng);
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos(toRadians(fromLat)) * Math.cos(toRadians(toLat)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
+};
 
 @Injectable()
 export class VenueService {
@@ -13,26 +29,31 @@ export class VenueService {
       where: {
         deletedAt: null,
         ...(includeInactive ? {} : { isActive: true }),
-        ...(query.category ? { category: query.category } : {}),
+        category: query.category ?? { in: [...VENUE_CATEGORIES] },
         ...(query.city ? { city: query.city } : {}),
         ...(query.district ? { district: query.district } : {}),
         ...(query.search ? { name: { contains: query.search, mode: 'insensitive' } } : {}),
+        ...(query.minRating ? { rating: { gte: query.minRating } } : {}),
       },
       include,
       orderBy: [{ rating: 'desc' }, { reviewCount: 'desc' }],
     });
-    return venues.map((venue) => this.response(venue));
+    const items = venues.map((venue) => this.response(venue, query));
+    if (query.sort === 'distance' && this.hasOrigin(query))
+      items.sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
+    return items;
   }
 
-  async detail(id: string) {
+  async detail(id: string, origin: Pick<VenueQueryDto, 'latitude' | 'longitude'> = {}) {
     const venue = await this.prisma.venue.findFirst({ where: { id, isActive: true, deletedAt: null }, include });
     if (!venue) throw new NotFoundException('Không tìm thấy địa điểm');
-    return this.response(venue);
+    return this.response(venue, origin);
   }
 
   async create(dto: CreateVenueDto) {
     const { services, hours, ...venue } = dto;
     this.validateHours(hours);
+    await this.assertPromotion(dto.promotionId);
     const created = await this.prisma.venue.create({
       data: {
         ...venue,
@@ -50,6 +71,7 @@ export class VenueService {
     if (!current) throw new NotFoundException('Không tìm thấy địa điểm');
     const { services, hours, ...data } = dto;
     this.validateHours(hours);
+    await this.assertPromotion(dto.promotionId);
     // Nested writes are atomic: replacing hours/services cannot leave a half-saved venue.
     const updated = await this.prisma.venue.update({
       where: { id },
@@ -70,6 +92,12 @@ export class VenueService {
     return { id, deleted: true };
   }
 
+  private async assertPromotion(promotionId?: string | null) {
+    if (!promotionId) return;
+    const promotion = await this.prisma.promotion.findUnique({ where: { id: promotionId }, select: { id: true } });
+    if (!promotion) throw new BadRequestException('Mã khuyến mãi không tồn tại');
+  }
+
   private validateHours(hours?: VenueHourDto[] | null) {
     if (!hours) return;
     if (new Set(hours.map((hour) => hour.dayOfWeek)).size !== hours.length)
@@ -88,12 +116,47 @@ export class VenueService {
     }));
   }
 
-  private response(venue: any) {
+  private hasOrigin(origin: Pick<VenueQueryDto, 'latitude' | 'longitude'>) {
+    return origin.latitude !== undefined && origin.longitude !== undefined;
+  }
+
+  /** Only a running, active promotion is shown as the venue's offer. */
+  private offer(promotion: any, now = new Date()) {
+    if (!promotion?.isActive || new Date(promotion.startsAt) > now || new Date(promotion.endsAt) <= now) return null;
+    const value = Number(promotion.value);
     return {
-      ...venue,
+      id: promotion.id,
+      code: promotion.code,
+      title: promotion.name,
+      type: promotion.type,
+      value,
+      discountLabel: promotion.type === 'PERCENT' ? `-${value}%` : `-${value.toLocaleString('vi-VN')}đ`,
+      minOrderAmount: Number(promotion.minOrderAmount ?? 0),
+      maxDiscount: promotion.maxDiscount === null || promotion.maxDiscount === undefined ? null : Number(promotion.maxDiscount),
+      startsAt: promotion.startsAt,
+      endsAt: promotion.endsAt,
+      description: promotion.description ?? null,
+      terms: promotion.terms ?? null,
+      note: promotion.note ?? null,
+    };
+  }
+
+  private response(venue: any, origin: Pick<VenueQueryDto, 'latitude' | 'longitude'> = {}) {
+    const { promotion, ...rest } = venue;
+    const latitude = Number(venue.latitude);
+    const longitude = Number(venue.longitude);
+    return {
+      ...rest,
       rating: Number(venue.rating),
-      latitude: Number(venue.latitude),
-      longitude: Number(venue.longitude),
+      latitude,
+      longitude,
+      phone: venue.phone ?? null,
+      isVerified: Boolean(venue.isVerified),
+      promotionId: venue.promotionId ?? null,
+      offer: this.offer(promotion),
+      distanceKm: this.hasOrigin(origin)
+        ? distanceKm(origin.latitude!, origin.longitude!, latitude, longitude)
+        : null,
       services: (venue.services ?? []).map((service: any) => ({ ...service, price: Number(service.price) })),
     };
   }

@@ -14,12 +14,29 @@ import {
   Image as ImageIcon,
   Sparkles,
   Stethoscope,
-  BookOpen,
+  BadgeCheck,
+  Phone,
+  Ticket,
 } from 'lucide-react';
 import { request } from '../api/client';
 import { useToast } from '../components/ui/ToastContainer';
 
-type Category = 'MASSAGE_SPA' | 'CONSULTATION' | 'TRAINING';
+type Category = 'MASSAGE_SPA' | 'CONSULTATION';
+type Offer = { id: string; code: string; title: string; discountLabel: string; endsAt: string };
+type PromotionOption = { id: string; code: string; name: string; isActive: boolean; endsAt: string };
+type Review = {
+  id: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  isHidden: boolean;
+  reviewer: { displayName: string | null };
+};
+type ReviewPage = {
+  items: Review[];
+  total: number;
+  summary: { average: number; count: number; distribution: Record<string, number> };
+};
 type Service = { name: string; durationMinutes: number; price: number; catalogServiceId?: string };
 type Hour = { dayOfWeek: number; openTime?: string | null; closeTime?: string | null; isClosed?: boolean };
 type Venue = {
@@ -38,11 +55,14 @@ type Venue = {
   rating: number;
   reviewCount: number;
   isActive: boolean;
+  phone: string | null;
+  isVerified: boolean;
+  promotionId: string | null;
+  offer: Offer | null;
 };
 const CATEGORIES = [
   { key: 'MASSAGE_SPA' as Category, label: 'Massage / Spa', icon: Sparkles },
   { key: 'CONSULTATION' as Category, label: 'Phòng tham vấn', icon: Stethoscope },
-  { key: 'TRAINING' as Category, label: 'Địa điểm đào tạo', icon: BookOpen },
 ];
 const DAYS = [
   { value: 1, label: 'Thứ Hai' },
@@ -70,6 +90,9 @@ const newForm = () => ({
   longitude: '',
   images: '',
   isActive: true,
+  phone: '',
+  isVerified: false,
+  promotionId: '',
   services: [] as Service[],
   hours: DAYS.map((day): Hour => ({ dayOfWeek: day.value, openTime: '09:00', closeTime: '22:00', isClosed: false })),
 });
@@ -82,8 +105,81 @@ const normalize = (venue: Venue): Venue => ({
   longitude: Number(venue.longitude),
   images: venue.images || [],
   hours: venue.hours || [],
+  phone: venue.phone ?? null,
+  isVerified: Boolean(venue.isVerified),
+  promotionId: venue.promotionId ?? null,
+  offer: venue.offer ?? null,
   services: (venue.services || []).map((service) => ({ ...service, price: Number(service.price) })),
 });
+
+const dateText = (value: string) => new Date(value).toLocaleDateString('vi-VN');
+
+/** Admin view of a venue's reviews: real names, hidden ones included, toggle visibility. */
+function VenueReviews({ venueId, onRatingChange }: { venueId: string; onRatingChange: () => void }) {
+  const { addToast } = useToast();
+  const [page, setPage] = useState<ReviewPage | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    try {
+      setPage(await request<ReviewPage>(`/admin/venues/${venueId}/reviews?limit=50`));
+      setError('');
+    } catch (loadError) {
+      setError(errorText(loadError));
+    }
+  }, [venueId]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  const toggle = async (review: Review) => {
+    setBusy(review.id);
+    try {
+      await request(`/admin/venues/reviews/${review.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isHidden: !review.isHidden }),
+      });
+      await load();
+      onRatingChange();
+    } catch (toggleError) {
+      addToast({ title: 'Không cập nhật được đánh giá', message: errorText(toggleError), type: 'error' });
+    } finally {
+      setBusy(null);
+    }
+  };
+  if (error) return <p className="text-xs text-red-700">Không tải được đánh giá: {error}</p>;
+  if (!page) return <p className="text-xs text-[#66756B]">Đang tải đánh giá...</p>;
+  return (
+    <div className="space-y-2">
+      <p className="text-sm">
+        <Star className="w-4 h-4 inline text-amber-500" /> {page.summary.average.toFixed(1)} / 5 ·{' '}
+        {page.summary.count} đánh giá đang hiển thị
+      </p>
+      {!page.items.length && <p className="text-sm text-[#66756B]">Chưa có đánh giá.</p>}
+      {page.items.map((review) => (
+        <div
+          key={review.id}
+          className={`p-3 rounded-xl border border-[#E5EBE5] text-sm space-y-1 ${review.isHidden ? 'opacity-60' : ''}`}
+        >
+          <div className="flex justify-between gap-2">
+            <span className="font-semibold">{review.reviewer.displayName || 'Khách hàng'}</span>
+            <span className="text-amber-500">{'★'.repeat(review.rating)}</span>
+          </div>
+          {review.comment && <p className="whitespace-pre-wrap">{review.comment}</p>}
+          <div className="flex justify-between items-center text-xs text-[#66756B]">
+            <span>
+              {dateText(review.createdAt)}
+              {review.isHidden ? ' · Đã ẩn' : ''}
+            </span>
+            <button className={actionClass} disabled={busy !== null} onClick={() => void toggle(review)}>
+              {review.isHidden ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+              {review.isHidden ? 'Hiện lại' : 'Ẩn'}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -113,6 +209,7 @@ export const VenuesPage: React.FC = () => {
   const [sort, setSort] = useState('name');
   const [status, setStatus] = useState('all');
   const [locating, setLocating] = useState(false);
+  const [promotions, setPromotions] = useState<PromotionOption[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
   const uploadCache = useRef(new Map<File, string>());
@@ -136,6 +233,12 @@ export const VenuesPage: React.FC = () => {
     void load(controller.signal);
     return () => controller.abort();
   }, [load]);
+  useEffect(() => {
+    // The offer picker is optional; a failed load just leaves "Không có ưu đãi".
+    void request<PromotionOption[]>('/admin/marketplace/promotions')
+      .then(setPromotions)
+      .catch(() => undefined);
+  }, []);
   useEffect(() => {
     const urls = files.map((file) => URL.createObjectURL(file));
     setPreviews(urls);
@@ -169,6 +272,9 @@ export const VenuesPage: React.FC = () => {
       longitude: String(venue.longitude),
       images: venue.images.join('\n'),
       isActive: venue.isActive,
+      phone: venue.phone || '',
+      isVerified: venue.isVerified,
+      promotionId: venue.promotionId || '',
       services: venue.services.map(({ name, durationMinutes, price, catalogServiceId }) => ({
         name,
         durationMinutes,
@@ -186,7 +292,7 @@ export const VenuesPage: React.FC = () => {
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   const textField = (
-    key: 'name' | 'description' | 'address' | 'city' | 'district' | 'latitude' | 'longitude' | 'images',
+    key: 'name' | 'description' | 'address' | 'city' | 'district' | 'latitude' | 'longitude' | 'images' | 'phone',
   ) => ({
     value: form[key],
     onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -251,6 +357,8 @@ export const VenuesPage: React.FC = () => {
             address: form.address.trim(),
             city: form.city.trim(),
             district: form.district.trim(),
+            phone: form.phone.trim() || null,
+            promotionId: form.promotionId || null,
             latitude: Number(form.latitude),
             longitude: Number(form.longitude),
             images: [...imageUrls, ...uploaded],
@@ -429,6 +537,39 @@ export const VenuesPage: React.FC = () => {
                   <input maxLength={100} className={inputClass} {...textField('district')} />
                 </Field>
               </div>
+              <Field label='Số điện thoại (nút "Gọi" trên app)'>
+                <input
+                  type="tel"
+                  maxLength={20}
+                  placeholder="VD: 0901 234 567"
+                  pattern="\+?[0-9 .\-]{6,20}"
+                  className={inputClass}
+                  {...textField('phone')}
+                />
+              </Field>
+              <Field label="Ưu đãi hiển thị (mã khuyến mãi)">
+                <select
+                  className={inputClass}
+                  value={form.promotionId}
+                  onChange={(event) => setForm((current) => ({ ...current, promotionId: event.target.value }))}
+                >
+                  <option value="">Không có ưu đãi</option>
+                  {promotions.map((promotion) => (
+                    <option key={promotion.id} value={promotion.id}>
+                      {promotion.code} · {promotion.name}
+                      {!promotion.isActive || new Date(promotion.endsAt) <= new Date() ? ' (đã tắt/hết hạn)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.isVerified}
+                  onChange={(event) => setForm((current) => ({ ...current, isVerified: event.target.checked }))}
+                />
+                Địa điểm đã xác minh (hiện dấu tích xanh)
+              </label>
               <button type="button" onClick={locate} className={`${actionClass} w-full`}>
                 <Navigation className="w-4 h-4" />
                 {locating ? 'Đang lấy vị trí...' : 'Lấy vị trí hiện tại'}
@@ -698,7 +839,15 @@ export const VenuesPage: React.FC = () => {
                     )}
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-bold text-sm truncate">{venue.name}</h3>
+                    <h3 className="font-bold text-sm truncate flex items-center gap-1">
+                      {venue.name}
+                      {venue.isVerified && <BadgeCheck className="w-4 h-4 text-[#2E7D4A] shrink-0" />}
+                      {venue.offer && (
+                        <span className="ml-1 px-1.5 py-0.5 rounded bg-red-600 text-white text-[10px]">
+                          {venue.offer.discountLabel}
+                        </span>
+                      )}
+                    </h3>
                     <p className="text-xs text-[#66756B] mt-1">
                       {venue.address} · {venue.city}
                     </p>
@@ -772,6 +921,20 @@ export const VenuesPage: React.FC = () => {
             <p className="text-sm">
               {selected.address} · {selected.district} · {selected.city}
             </p>
+            <p className="text-sm inline-flex items-center gap-2">
+              <Phone className="w-4 h-4" />
+              {selected.phone || 'Chưa có số điện thoại — nút "Gọi" trên app sẽ ẩn'}
+            </p>
+            {selected.offer ? (
+              <p className="text-sm inline-flex items-center gap-2">
+                <Ticket className="w-4 h-4" />
+                {selected.offer.title} ({selected.offer.code}) · hiệu lực đến {dateText(selected.offer.endsAt)}
+              </p>
+            ) : (
+              selected.promotionId && (
+                <p className="text-xs text-amber-700">Mã ưu đãi đã gắn nhưng đang tắt hoặc hết hạn nên app không hiện.</p>
+              )
+            )}
             <a
               href={`https://www.google.com/maps/search/?api=1&query=${selected.latitude},${selected.longitude}`}
               target="_blank"
@@ -807,11 +970,10 @@ export const VenuesPage: React.FC = () => {
                 );
               })}
             </div>
-            <p className="text-xs text-[#66756B]">
-              {selected.reviewCount
-                ? `${selected.rating.toFixed(1)} / 5 · ${selected.reviewCount} đánh giá`
-                : 'Chưa có đánh giá.'}
-            </p>
+            <div>
+              <h3 className="font-bold text-sm mb-2">Đánh giá của khách</h3>
+              <VenueReviews venueId={selected.id} onRatingChange={() => void load()} />
+            </div>
             <button className={actionClass} disabled={submitting} onClick={() => edit(selected)}>
               <Pencil className="w-4 h-4" />
               Chỉnh sửa địa điểm

@@ -16,8 +16,30 @@ Danh sách trống hoặc lỗi API không được thay bằng địa điểm m
 - `GET /api/venues` và `GET /api/venues/{id}` chỉ trả địa điểm đang hiển thị,
   chưa bị xóa. Query `category` lọc theo danh mục.
 
-Danh mục: `MASSAGE_SPA`, `CONSULTATION`, `TRAINING`. Địa điểm cũ mặc định
-`MASSAGE_SPA`. Dữ liệu public vẫn giữ các field cũ, thêm `category`.
+Danh mục: `MASSAGE_SPA`, `CONSULTATION`. Địa điểm cũ mặc định `MASSAGE_SPA`.
+Danh mục `TRAINING` (Địa điểm đào tạo) đã bỏ: không tạo hay lọc được nữa, và migration
+`20261102120000_venue_reviews_offers` ẩn các địa điểm đào tạo cũ (không xóa dữ liệu).
+Khóa học trên app dùng mục Khóa học đào tạo, không phải địa điểm.
+
+Thông tin thêm cho app (API mobile: [venues.md](../mobile/venues.md)):
+
+- `phone`: số cho nút **Gọi**. Để trống thì app ẩn nút.
+- `isVerified`: hiện dấu tích xanh cạnh tên.
+- `promotionId`: gắn một mã khuyến mãi làm ưu đãi của địa điểm. App chỉ hiện ưu đãi khi
+  mã đang bật và còn hạn; nhãn "-40%" lấy từ loại/giá trị mã. Các mục Thông tin,
+  Điều khoản, Lưu ý trên màn ưu đãi nhập trong form tạo mã khuyến mãi.
+
+## Đánh giá
+
+Khách viết đánh giá 1–5 sao trên app, mỗi khách một đánh giá cho mỗi địa điểm.
+`rating` và `reviewCount` của địa điểm được tính lại tự động mỗi khi có đánh giá mới
+hoặc admin ẩn/hiện, không nhập tay.
+
+- `GET /api/admin/venues/{id}/reviews`: tất cả đánh giá, kể cả đã ẩn, kèm tên thật.
+- `PATCH /api/admin/venues/reviews/{reviewId}` với `{"isHidden": true}`: ẩn đánh giá
+  spam/không phù hợp khỏi app và khỏi điểm trung bình. `false` để hiện lại.
+
+Trên web: mở chi tiết địa điểm, mục **Đánh giá của khách**, bấm **Ẩn** / **Hiện lại**.
 
 `services`: tên, thời lượng 1–1440 phút, giá nguyên VND >= 0.
 `hours`: tối đa 7 ngày, không trùng `dayOfWeek`; 0 là Chủ nhật, 1–6 là Thứ Hai–Bảy.
@@ -65,8 +87,10 @@ pm2 restart TEN_BACKEND
 pm2 logs TEN_BACKEND --lines 50
 ```
 
-Thay `TEN_BACKEND` bằng tên trong `pm2 list`. Migration mới
-`20261029140000_venue_management` thêm danh mục và `deleted_at`. Không chạy seed
+Thay `TEN_BACKEND` bằng tên trong `pm2 list`. Migration
+`20261029140000_venue_management` thêm danh mục và `deleted_at`;
+`20261102120000_venue_reviews_offers` thêm số điện thoại, xác minh, ưu đãi, bảng đánh giá
+và các mục chữ của mã khuyến mãi. Không chạy seed
 demo trên production. Tải lại `/admin/` bằng Ctrl+F5 sau khi triển khai.
 
 ## Kiểm tra

@@ -94,6 +94,15 @@ describe('support conversations', () => {
     expect(prisma.message.findFirst).not.toHaveBeenCalled();
   });
 
+  it('builds the "Nhắn để đặt" line from a visible venue only', async () => {
+    const { service, prisma } = setup('CUSTOMER', null, 'customer');
+    prisma.venue = { findFirst: jest.fn().mockResolvedValue({ name: 'Mạc Thị - Spa cho Nam', address: '123 Nguyễn Trãi' }) };
+    await expect(service.venueInquiryText('venue')).resolves.toBe('Mình muốn đặt lịch tại Mạc Thị - Spa cho Nam (123 Nguyễn Trãi).');
+    expect(prisma.venue.findFirst.mock.calls[0][0].where).toEqual({ id: 'venue', isActive: true, deletedAt: null });
+    prisma.venue.findFirst.mockResolvedValue(null);
+    await expect(service.venueInquiryText('hidden')).rejects.toThrow('Khong tim thay dia diem');
+  });
+
   it('exposes support system events with display text in history', async () => {
     const { service, prisma } = setup('CUSTOMER', { userId: 'customer' }, 'customer');
     prisma.message.findMany.mockResolvedValue([{ id: 'w', type: 'SYSTEM', text: 'SUPPORT_WELCOME', mediaKey: null }]);

@@ -51,11 +51,19 @@ export class ChatController {
 
   @Post('support')
   @ApiOperation({
-    summary: 'Mo hoac tao chat CSKH: khach mo hoi thoai cua chinh minh (khong can body); admin truyen customerId',
+    summary:
+      'Mo hoac tao chat CSKH: khach mo hoi thoai cua chinh minh (khong can body); admin truyen customerId. ' +
+      'Khach truyen venueId (nut "Nhan de dat") thi backend gui them tin hoi dat lich tai dia diem do.',
   })
   @ApiCreatedResponse({ type: ConversationModel })
-  createSupport(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateSupportConversationDto) {
-    return this.chat.createSupportConversation(auth.sub, dto.customerId);
+  async createSupport(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: CreateSupportConversationDto) {
+    // Check the venue first so a bad venueId does not leave a half-done request behind.
+    const inquiry = dto.venueId ? await this.chat.venueInquiryText(dto.venueId) : null;
+    const conversation = await this.chat.createSupportConversation(auth.sub, dto.customerId);
+    if (!inquiry || conversation.supportCustomerId !== auth.sub) return conversation;
+    const message = await this.chat.sendMessage(auth.sub, conversation.id, { type: 'TEXT', text: inquiry });
+    await this.gateway.publishRestMessage(message);
+    return { ...conversation, inquiryMessage: message };
   }
 
   @Post()

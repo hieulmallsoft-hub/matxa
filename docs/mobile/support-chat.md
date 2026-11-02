@@ -26,6 +26,8 @@ tạo mới, các lần sau trả lại đúng hội thoại cũ kèm lịch s�
 ```
 
 Dùng `id` cho các API tin nhắn, đã đọc và socket bên dưới. KTV gọi API này nhận `403`.
+Nút "Nhắn để đặt" ở địa điểm gọi cùng API với `{"venueId":"..."}`: backend gửi thêm tin
+hỏi đặt lịch tại địa điểm đó, trả về trong `inquiryMessage` (xem [venues.md](venues.md)).
 Admin gọi kèm `{"customerId":"UUID khách"}`.
 
 ## Tin hệ thống: lời chào và CSKH tham gia

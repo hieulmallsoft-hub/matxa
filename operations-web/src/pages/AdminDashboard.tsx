@@ -835,6 +835,9 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                       startsAt: new Date(String(f.get('startsAt'))).toISOString(),
                       endsAt: new Date(String(f.get('endsAt'))).toISOString(),
                       customerIds: String(f.get('customerIds') || '').split(',').map((id) => id.trim()).filter(Boolean),
+                      description: String(f.get('description') || '').trim() || undefined,
+                      terms: String(f.get('terms') || '').trim() || undefined,
+                      note: String(f.get('note') || '').trim() || undefined,
                     });
                   }}
                   className="space-y-3 text-xs"
@@ -904,6 +907,24 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                       />
                     </div>
                   </div>
+                  <p className="text-[11px] text-[#66756B]">
+                    3 mục dưới hiển thị ở màn ưu đãi khi mã được gắn vào một địa điểm.
+                  </p>
+                  {[
+                    { name: 'description', label: 'Thông tin', max: 5000 },
+                    { name: 'terms', label: 'Điều khoản và điều kiện', max: 5000 },
+                    { name: 'note', label: 'Lưu ý', max: 2000 },
+                  ].map((field) => (
+                    <div key={field.name}>
+                      <label className="font-semibold block mb-1">{field.label}</label>
+                      <textarea
+                        name={field.name}
+                        rows={2}
+                        maxLength={field.max}
+                        className="w-full px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] focus:outline-none focus:border-[#2E7D4A]"
+                      />
+                    </div>
+                  ))}
                   <button
                     type="submit"
                     className="w-full mt-2 py-2.5 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white font-semibold transition-colors"

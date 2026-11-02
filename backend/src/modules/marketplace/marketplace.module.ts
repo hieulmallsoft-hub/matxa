@@ -25,6 +25,7 @@ import {
 } from './controllers/technician-contract.controller';
 import { AdminVenueController, VenueController } from './controllers/venue.controller';
 import { VenueService } from './services/venue.service';
+import { VenueReviewService } from './services/venue-review.service';
 import { VenueStorageService } from './services/venue-storage.service';
 
 @Module({
@@ -54,6 +55,7 @@ import { VenueStorageService } from './services/venue-storage.service';
     MarketplaceRealtimeService,
     TechnicianContractService,
     VenueService,
+    VenueReviewService,
     VenueStorageService,
   ],
   exports: [MarketplaceService, MarketplaceRealtimeService],

@@ -211,6 +211,7 @@ model User {
   promotionUsages PromotionUsage[]
   promotionRecipients PromotionRecipient[]
   reviews Review[]
+  venueReviews VenueReview[]
   complaints Complaint[]
   technicianApplication TechnicianApplication?
   wallets               Wallet[]
@@ -581,10 +582,15 @@ model Promotion {
   startsAt       DateTime         @map("starts_at")
   endsAt         DateTime         @map("ends_at")
   isActive       Boolean          @default(true) @map("is_active")
+  // Display copy for the app's offer detail screen (Thông tin / Điều khoản / Lưu ý).
+  description    String?
+  terms          String?
+  note           String?
   createdAt      DateTime         @default(now()) @map("created_at")
   usages         PromotionUsage[]
   recipients     PromotionRecipient[]
   bookings       Booking[]
+  venues         Venue[]
 
   @@index([isActive, startsAt, endsAt])
   @@map("promotions")
@@ -908,6 +914,10 @@ model Venue {
   district    String?
   latitude    Decimal       @db.Decimal(10, 7)
   longitude   Decimal       @db.Decimal(10, 7)
+  phone       String?
+  isVerified  Boolean       @default(false) @map("is_verified")
+  promotionId String?       @map("promotion_id") @db.Uuid
+  // Cached from visible VenueReview rows; recomputed on every review write.
   rating      Decimal       @default(0) @db.Decimal(3, 2)
   reviewCount Int           @default(0) @map("review_count")
   images      String[]
@@ -917,9 +927,29 @@ model Venue {
   updatedAt   DateTime      @updatedAt @map("updated_at")
   services    VenueService[]
   hours       VenueOpeningHour[]
+  reviews     VenueReview[]
+  promotion   Promotion?    @relation(fields: [promotionId], references: [id], onDelete: SetNull)
 
   @@index([isActive, city, district])
+  @@index([promotionId])
   @@map("venues")
+}
+
+model VenueReview {
+  id        String   @id @default(uuid()) @db.Uuid
+  venueId   String   @map("venue_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  rating    Int
+  comment   String?
+  isHidden  Boolean  @default(false) @map("is_hidden")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([venueId, userId])
+  @@index([venueId, isHidden, createdAt(sort: Desc)])
+  @@map("venue_reviews")
 }
 
 model VenueService {

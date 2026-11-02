@@ -21,6 +21,8 @@ export class CreateConversationDto {
 export class CreateSupportConversationDto {
   @ApiPropertyOptional({ description: 'Chỉ admin: ID user CUSTOMER cần hỗ trợ. Khách hàng bỏ trống, backend lấy từ token.' })
   @IsOptional() @IsUUID() customerId?: string;
+  @ApiPropertyOptional({ description: 'Chỉ khách: địa điểm bấm "Nhắn để đặt"; backend gửi kèm tin hỏi đặt lịch' })
+  @IsOptional() @IsUUID() venueId?: string;
 }
 
 export class ListConversationsDto {

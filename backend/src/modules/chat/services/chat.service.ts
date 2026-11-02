@@ -71,6 +71,16 @@ export class ChatService {
       lastMessageAt: conversation.lastMessageAt };
   }
 
+  /** First line of a "Nhắn để đặt" request, so CSKH knows which venue the customer means. */
+  async venueInquiryText(venueId: string) {
+    const venue = await this.prisma.venue.findFirst({
+      where: { id: venueId, isActive: true, deletedAt: null },
+      select: { name: true, address: true },
+    });
+    if (!venue) throw new NotFoundException('Khong tim thay dia diem');
+    return `Mình muốn đặt lịch tại ${venue.name} (${venue.address}).`;
+  }
+
   /** Opens the only permitted chat for a booking. Participants are always
    * derived from Booking; the client never supplies a technician/customer id. */
   async createBookingConversation(userId: string, bookingId: string) {

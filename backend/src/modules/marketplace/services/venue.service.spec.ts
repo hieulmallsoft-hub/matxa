@@ -88,19 +88,67 @@ describe('venue management', () => {
 
   it('keeps deleted venues out of admin lists and inactive venues out of public lists', async () => {
     const { service, prisma } = setup();
-    await service.list({ category: 'TRAINING', city: 'HN' }, true);
+    await service.list({ category: 'CONSULTATION', city: 'HN' }, true);
     expect(prisma.venue.findMany).toHaveBeenLastCalledWith(
-      expect.objectContaining({ where: { deletedAt: null, category: 'TRAINING', city: 'HN' } }),
+      expect.objectContaining({ where: { deletedAt: null, category: 'CONSULTATION', city: 'HN' } }),
     );
     await service.list({});
     expect(prisma.venue.findMany).toHaveBeenLastCalledWith(
-      expect.objectContaining({ where: { deletedAt: null, isActive: true } }),
+      expect.objectContaining({
+        where: { deletedAt: null, isActive: true, category: { in: ['MASSAGE_SPA', 'CONSULTATION'] } },
+      }),
     );
     await service.remove('venue');
     expect(prisma.venue.update).toHaveBeenLastCalledWith({
       where: { id: 'venue' },
       data: { isActive: false, deletedAt: expect.any(Date) },
     });
+  });
+
+  it('adds distance from the user and can sort by it', async () => {
+    const { service, prisma } = setup();
+    const far = { ...venue, id: 'far', latitude: '21.2', longitude: '105.1', rating: '5' };
+    prisma.venue.findMany.mockResolvedValue([far, venue]);
+    const items = await service.list({ latitude: 21.1, longitude: 105.1, sort: 'distance' });
+    expect(items.map((item) => item.id)).toEqual(['venue', 'far']);
+    expect(items[0].distanceKm).toBe(0);
+    expect(items[1].distanceKm).toBeCloseTo(11.1, 1);
+    expect((await service.list({}))[0].distanceKm).toBeNull();
+  });
+
+  it('filters by minimum rating in the query', async () => {
+    const { service, prisma } = setup();
+    await service.list({ minRating: 4 });
+    expect(prisma.venue.findMany.mock.calls[0][0].where.rating).toEqual({ gte: 4 });
+  });
+
+  it('shows only a running, active promotion as the venue offer', async () => {
+    const { service, prisma } = setup();
+    const promotion = {
+      id: 'p', code: 'SPA40', name: 'Giảm 40% dịch vụ massage', type: 'PERCENT', value: '40', minOrderAmount: '0',
+      maxDiscount: null, isActive: true, startsAt: new Date(Date.now() - 1000), endsAt: new Date(Date.now() + 86_400_000),
+      description: 'Thông tin', terms: 'Điều khoản', note: 'Lưu ý',
+    };
+    prisma.venue.findFirst.mockResolvedValue({ ...venue, promotionId: 'p', promotion });
+    const detail: any = await service.detail('venue');
+    expect(detail.offer).toMatchObject({ code: 'SPA40', discountLabel: '-40%', terms: 'Điều khoản', note: 'Lưu ý' });
+    expect(detail).not.toHaveProperty('promotion');
+    prisma.venue.findFirst.mockResolvedValue({ ...venue, promotion: { ...promotion, endsAt: new Date(Date.now() - 1) } });
+    expect(((await service.detail('venue')) as any).offer).toBeNull();
+  });
+
+  it('rejects an unknown promotion and allows clearing it with null', async () => {
+    const { service, prisma } = setup();
+    prisma.promotion = { findUnique: jest.fn().mockResolvedValue(null) };
+    await expect(service.update('venue', { promotionId: '6b2ff86e-1e4c-4e0b-8b69-33b288a50efe' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    await service.update('venue', { promotionId: null });
+    expect(prisma.venue.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: { promotionId: null } }));
+  });
+
+  it('no longer accepts the training category', async () => {
+    await expect(validate({ ...dto, category: 'TRAINING' })).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('does not edit or delete an unavailable venue', async () => {

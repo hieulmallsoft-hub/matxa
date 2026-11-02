@@ -20,6 +20,10 @@ import {
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
+// TRAINING is kept in the database enum for old rows but can no longer be created or listed.
+export const VENUE_CATEGORIES = ['MASSAGE_SPA', 'CONSULTATION'] as const;
+type VenueCategoryValue = (typeof VENUE_CATEGORIES)[number];
+
 export class VenueServiceDto {
   @ApiProperty()
   @IsString()
@@ -59,11 +63,23 @@ export class CreateVenueDto {
   @MaxLength(200)
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   name!: string;
-  @ApiPropertyOptional({ enum: ['MASSAGE_SPA', 'CONSULTATION', 'TRAINING'] })
+  @ApiPropertyOptional({ enum: VENUE_CATEGORIES })
   @IsOptional()
-  @IsIn(['MASSAGE_SPA', 'CONSULTATION', 'TRAINING'])
-  category?: 'MASSAGE_SPA' | 'CONSULTATION' | 'TRAINING';
+  @IsIn(VENUE_CATEGORIES)
+  category?: VenueCategoryValue;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(5000) description?: string;
+  @ApiPropertyOptional({ nullable: true, description: 'Số gọi từ nút "Gọi" trên app' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @Matches(/^\+?[0-9 .-]{6,20}$/)
+  phone?: string | null;
+  @ApiPropertyOptional({ description: 'Hiện huy hiệu đã xác minh' }) @IsOptional() @IsBoolean() isVerified?: boolean;
+  @ApiPropertyOptional({ nullable: true, description: 'Mã khuyến mãi hiển thị làm ưu đãi; null để gỡ' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  promotionId?: string | null;
   @ApiProperty()
   @IsString()
   @MinLength(1)
@@ -108,10 +124,36 @@ export class VenueQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() search?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() city?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() district?: string;
-  @ApiPropertyOptional({ enum: ['MASSAGE_SPA', 'CONSULTATION', 'TRAINING'] })
+  @ApiPropertyOptional({ enum: VENUE_CATEGORIES })
   @IsOptional()
-  @IsIn(['MASSAGE_SPA', 'CONSULTATION', 'TRAINING'])
-  category?: 'MASSAGE_SPA' | 'CONSULTATION' | 'TRAINING';
-  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsNumber() @Min(-90) @Max(90) latitude?: number;
+  @IsIn(VENUE_CATEGORIES)
+  category?: VenueCategoryValue;
+  @ApiPropertyOptional({ description: 'Vị trí người dùng; có cả hai thì trả distanceKm' })
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(-90) @Max(90) latitude?: number;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsNumber() @Min(-180) @Max(180) longitude?: number;
+  @ApiPropertyOptional({ description: 'Lọc đánh giá từ mức này trở lên (1–5)' })
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(1) @Max(5) minRating?: number;
+  @ApiPropertyOptional({ enum: ['rating', 'distance'], default: 'rating', description: 'distance cần latitude/longitude' })
+  @IsOptional() @IsIn(['rating', 'distance']) sort?: 'rating' | 'distance';
+}
+
+export class VenueReviewQueryDto {
+  @ApiPropertyOptional({ default: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
+  @ApiPropertyOptional({ default: 20, maximum: 50 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50) limit = 20;
+  @ApiPropertyOptional({ description: 'Chỉ lấy đánh giá đúng số sao này' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5) rating?: number;
+}
+
+export class UpsertVenueReviewDto {
+  @ApiProperty({ minimum: 1, maximum: 5 }) @Type(() => Number) @IsInt() @Min(1) @Max(5) rating!: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  comment?: string;
+}
+
+export class ModerateVenueReviewDto {
+  @ApiProperty({ description: 'true ẩn đánh giá khỏi app và khỏi điểm trung bình' }) @IsBoolean() isHidden!: boolean;
 }
