@@ -11,7 +11,10 @@ describe('booking request recipient', () => {
 
   function setup(profileId = 'preferred-profile') {
     const prisma: any = {
-      booking: { findMany: jest.fn().mockResolvedValue([booking]), count: jest.fn().mockResolvedValue(1) },
+      booking: {
+        findMany: jest.fn().mockResolvedValue([booking]), count: jest.fn().mockResolvedValue(1),
+        findUnique: jest.fn().mockResolvedValue(booking),
+      },
       technicianProfile: { findFirst: jest.fn().mockResolvedValue({ id: profileId }) },
       bookingTechnicianApplication: { findUnique: jest.fn().mockResolvedValue(null) },
       serviceCatalogPriceOption: { findMany: jest.fn().mockResolvedValue([{ id: 'option', durationMinutes: 60 }]) },
@@ -92,6 +95,26 @@ describe('booking request recipient', () => {
       requestType: 'CUSTOMER_REQUEST', isRequestedTechnician: true,
       isSelected: false, isApplicant: true, canApply: false, canDecline: false, canWithdraw: true,
     });
+  });
+
+  it('checks open job eligibility against catalog-backed items when opening detail', async () => {
+    const { service, prisma } = setup();
+    const withCatalog = { ...booking, items: [{ catalogServiceId: 'catalog', catalogService: { id: 'catalog' } }] };
+    prisma.booking.findUnique = jest.fn().mockResolvedValue(withCatalog);
+    const response = await service.technicianJobDetail('tech-user', booking.id);
+    expect(prisma.booking.findUnique).toHaveBeenCalledWith(expect.objectContaining({
+      include: { items: { include: { catalogService: true } } },
+    }));
+    expect((service as any).assertOpenEligibility).toHaveBeenCalledWith(prisma, withCatalog, 'preferred-profile');
+    expect(response).toMatchObject({ canApply: true, canDecline: true });
+  });
+
+  it('lets a marketplace technician decline an open job they are not assigned to', async () => {
+    const { service } = setup();
+    const decline = jest.spyOn(service, 'declineOpenJob').mockResolvedValue({ status: 'DECLINED' } as any);
+    await service.declineTechnicianJob('tech-user', booking.id, {} as any);
+    expect(service.detail).toHaveBeenCalledWith('tech-user', booking.id, true, true);
+    expect(decline).toHaveBeenCalledWith('tech-user', booking.id);
   });
 
   it('marks a finalized alternative separately from the initial request', () => {

@@ -69,6 +69,22 @@ describe('AdminMarketplaceService', () => {
     expect(result.items[0]).not.toHaveProperty('passwordHash');
   });
 
+  it('matches users by exact id only when the search term is a UUID', async () => {
+    db.user.findMany.mockResolvedValue([]);
+    db.user.count.mockResolvedValue(0);
+    const id = '3F2504E0-4F89-11D3-9A0C-0305E82C3301';
+    await service.users({ page: 1, limit: 10, search: ` ${id} ` });
+    const uuidWhere = db.user.findMany.mock.calls[0][0].where;
+    expect(uuidWhere.OR[0]).toEqual({ id });
+    expect(uuidWhere.OR).toHaveLength(4);
+    expect(db.user.count).toHaveBeenCalledWith({ where: uuidWhere });
+
+    await service.users({ page: 1, limit: 10, search: '3f2504e0' });
+    const textWhere = db.user.findMany.mock.calls[1][0].where;
+    expect(textWhere.OR).toHaveLength(3);
+    expect(textWhere.OR).not.toContainEqual(expect.objectContaining({ id: expect.anything() }));
+  });
+
   it('does not allow the current admin to lock themselves', async () => {
     await expect(service.updateUserStatus('admin', 'admin', { status: 'BLOCKED' })).rejects.toBeInstanceOf(
       BadRequestException,

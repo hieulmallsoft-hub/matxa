@@ -894,7 +894,8 @@ export class BookingsService {
       });
       if (booking.status === 'EXPIRED' && !application)
         return this.openBookingResponse(booking, 'EXPIRED', false, true, profile.id);
-      if (booking.status === 'OPEN' && !application) await this.assertOpenEligibility(this.prisma, booking, profile.id);
+      // detail() loads items without catalogService; reload them so eligibility sees catalog data.
+      if (booking.status === 'OPEN' && !application) await this.openJobForTechnician(id, profile.id, true);
       else if (!application) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
       return this.openBookingResponse(booking, application?.status ?? null, application?.status === 'SELECTED', true, profile.id);
     }
@@ -966,7 +967,7 @@ export class BookingsService {
   }
 
   async declineTechnicianJob(userId: string, id: string, dto: CancelBookingDto) {
-    const booking = await this.detail(userId, id, true);
+    const booking = await this.detail(userId, id, true, true);
     if (booking.assignmentMode === 'OPEN_MARKETPLACE') return this.declineOpenJob(userId, id);
     if (booking.technician.userId !== userId) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
     if (booking.status !== 'PENDING') throw new BadRequestException('Chi co the tu choi don moi');
