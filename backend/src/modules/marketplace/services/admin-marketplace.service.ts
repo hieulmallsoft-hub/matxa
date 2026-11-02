@@ -279,13 +279,15 @@ export class AdminMarketplaceService {
 
   createPromotion(_adminId: string, dto: CreatePromotionDto) {
     this.validatePromotion(dto);
+    // customerIds is not a Promotion column; it maps to the recipients relation.
+    const { customerIds, ...promotion } = dto;
     return this.prisma.promotion.create({
       data: {
-        ...dto,
+        ...promotion,
         code: dto.code.trim().toUpperCase(),
         startsAt: new Date(dto.startsAt),
         endsAt: new Date(dto.endsAt),
-        ...(dto.customerIds?.length ? { recipients: { create: dto.customerIds.map((userId) => ({ userId })) } } : {}),
+        ...(customerIds?.length ? { recipients: { create: customerIds.map((userId) => ({ userId })) } } : {}),
       },
     });
   }
@@ -302,10 +304,15 @@ export class AdminMarketplaceService {
       endsAt: dto.endsAt ? new Date(dto.endsAt) : current.endsAt,
       value: dto.value ?? number(current.value),
     });
+    const { customerIds, ...promotion } = dto;
     return this.prisma.promotion.update({
       where: { id },
       data: {
-        ...dto,
+        ...promotion,
+        // An explicit list replaces recipients; an empty list makes the voucher public again.
+        ...(customerIds
+          ? { recipients: { deleteMany: {}, create: customerIds.map((userId) => ({ userId })) } }
+          : {}),
         ...(dto.code ? { code: dto.code.trim().toUpperCase() } : {}),
         ...(dto.startsAt ? { startsAt: new Date(dto.startsAt) } : {}),
         ...(dto.endsAt ? { endsAt: new Date(dto.endsAt) } : {}),

@@ -138,4 +138,21 @@ describe('AdminMarketplaceService', () => {
     });
     expect(db.promotion.create.mock.calls[0][0].data).toMatchObject({ code: 'WELCOME', value: 50000 });
   });
+
+  it('keeps customerIds out of promotion columns for public and assigned vouchers', async () => {
+    db.promotion.create.mockResolvedValue({ id: 'p1' });
+    const base = {
+      code: 'all', name: 'All', type: 'PERCENT' as const, value: 5,
+      startsAt: '2026-11-01', endsAt: '2026-11-03',
+    };
+    await service.createPromotion('admin', { ...base, customerIds: [] });
+    const publicData = db.promotion.create.mock.calls[0][0].data;
+    expect(publicData).not.toHaveProperty('customerIds');
+    expect(publicData).not.toHaveProperty('recipients');
+
+    await service.createPromotion('admin', { ...base, customerIds: ['u1'] });
+    const assignedData = db.promotion.create.mock.calls[1][0].data;
+    expect(assignedData).not.toHaveProperty('customerIds');
+    expect(assignedData.recipients).toEqual({ create: [{ userId: 'u1' }] });
+  });
 });
