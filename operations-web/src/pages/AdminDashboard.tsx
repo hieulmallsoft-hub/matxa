@@ -254,9 +254,11 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
 
   async function save(event: FormEvent<HTMLFormElement>, path: string, body: unknown) {
     event.preventDefault();
+    // React clears currentTarget once the handler yields, so keep the form before awaiting.
+    const formElement = event.currentTarget;
     try {
       await request(path, { method: 'POST', body: JSON.stringify(body) });
-      event.currentTarget.reset();
+      formElement.reset();
       notify('Đã lưu dữ liệu thành công.');
       await load();
       await refreshCategories();

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import {
   AdminBookingsQueryDto,
@@ -17,6 +17,12 @@ import {
 } from '../dto/marketplace.dto';
 
 const number = (value: unknown) => Number(value ?? 0);
+
+/** Promotion.code is unique; surface a readable 409 instead of a Prisma 500. */
+const duplicatePromotionCode = (error: unknown): never => {
+  if ((error as { code?: string })?.code === 'P2002') throw new ConflictException('Ma khuyen mai da ton tai');
+  throw error;
+};
 
 @Injectable()
 export class AdminMarketplaceService {
@@ -289,7 +295,7 @@ export class AdminMarketplaceService {
         endsAt: new Date(dto.endsAt),
         ...(customerIds?.length ? { recipients: { create: customerIds.map((userId) => ({ userId })) } } : {}),
       },
-    });
+    }).catch(duplicatePromotionCode);
   }
   promotions() {
     return this.prisma.promotion.findMany({ orderBy: { createdAt: 'desc' } });
@@ -317,7 +323,7 @@ export class AdminMarketplaceService {
         ...(dto.startsAt ? { startsAt: new Date(dto.startsAt) } : {}),
         ...(dto.endsAt ? { endsAt: new Date(dto.endsAt) } : {}),
       },
-    });
+    }).catch(duplicatePromotionCode);
   }
 
   async createTechnician(_adminId: string, dto: CreateTechnicianByAdminDto) {

@@ -151,7 +151,8 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
   async function addLesson(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!selected) return;
-    const f = new FormData(e.currentTarget);
+    const formElement = e.currentTarget;
+    const f = new FormData(formElement);
     try {
       await request(`/admin/courses/${selected.id}/lessons`, {
         method: 'POST',
@@ -161,7 +162,7 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
       await load();
       const fresh = await request<Course>(`/admin/courses/${selected.id}`);
       setSelected(fresh);
-      e.currentTarget.reset();
+      formElement.reset();
       setShowCreateLesson(false);
     } catch (err) { notify(err instanceof Error ? err.message : 'Không thêm được bài học', true); }
   }

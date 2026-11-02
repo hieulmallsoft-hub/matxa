@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { AdminMarketplaceService } from './admin-marketplace.service';
 
 describe('AdminMarketplaceService', () => {
@@ -154,5 +154,14 @@ describe('AdminMarketplaceService', () => {
     const assignedData = db.promotion.create.mock.calls[1][0].data;
     expect(assignedData).not.toHaveProperty('customerIds');
     expect(assignedData.recipients).toEqual({ create: [{ userId: 'u1' }] });
+  });
+
+  it('reports a duplicate promotion code as a conflict', async () => {
+    db.promotion.create.mockRejectedValue({ code: 'P2002' });
+    await expect(
+      service.createPromotion('admin', {
+        code: '292257', name: 'Dup', type: 'FIXED', value: 5, startsAt: '2026-11-01', endsAt: '2026-11-18',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });
