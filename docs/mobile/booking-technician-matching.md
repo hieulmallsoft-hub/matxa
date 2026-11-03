@@ -137,7 +137,26 @@ KTV ứng tuyển (không có body):
 POST /api/technician/jobs/{bookingId}/apply
 ```
 
-Customer lấy `GET /api/bookings/{bookingId}`, đọc `applications` rồi chốt bằng `POST /api/bookings/{bookingId}/select-technician` với body `{"applicationId":"ID ứng tuyển"}`. Backend gán `technicianId` cuối cùng, chuyển booking thành `CONFIRMED`; KTV thắng có `isSelected = true`, các ứng viên còn lại thành `NOT_SELECTED`.
+Customer lấy `GET /api/bookings/{bookingId}`, đọc `applications` (danh sách “KTV đang muốn phục vụ bạn”) rồi chốt bằng `POST /api/bookings/{bookingId}/select-technician` với body `{"applicationId":"ID ứng tuyển"}`. Backend gán `technicianId` cuối cùng, chuyển booking thành `CONFIRMED`; KTV thắng có `isSelected = true`, các ứng viên còn lại thành `NOT_SELECTED`.
+
+Mỗi phần tử `applications`:
+
+```json
+{
+  "applicationId": "uuid",
+  "technicianId": "technician-profile-id",
+  "displayName": "Nguyễn Thị Mai",
+  "avatarUrl": "https://...",
+  "averageRating": 4.8,
+  "reviewCount": 15,
+  "status": "APPLIED",
+  "isSelected": false,
+  "isApplicant": true,
+  "appliedAt": "2026-11-03T08:00:00.000Z"
+}
+```
+
+Chỉ hiện các phần tử `isApplicant = true` trong màn chờ (`WITHDRAWN`, `DECLINED`, `EXPIRED` là KTV đã rút hoặc từ chối). Khi có KTV ứng tuyển, khách nhận thông báo `TECHNICIAN_APPLIED` (trong app + push); khi nhận, gọi lại `GET /api/bookings/{bookingId}` để cập nhật danh sách. Trong lúc đang mở màn chờ, nên tải lại định kỳ (vd 10 giây) vì push có thể đến chậm.
 
 ## 4. Hủy booking
 

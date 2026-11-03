@@ -783,6 +783,10 @@ export class BookingsService {
           select: { id: true, displayName: true, avatarUrl: true, gender: true, nationality: true, role: true },
         },
         technician: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } },
+        applications: {
+          include: { technicianProfile: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } } },
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
     if (!booking) throw new NotFoundException('Lich dat khong ton tai');
@@ -1612,6 +1616,8 @@ export class BookingsService {
               technicianId: application.technicianProfileId,
               displayName: application.technicianProfile?.user?.displayName ?? null,
               avatarUrl: application.technicianProfile?.user?.avatarUrl ?? null,
+              averageRating: Number(application.technicianProfile?.averageRating ?? 0),
+              reviewCount: application.technicianProfile?.reviewCount ?? 0,
               status: application.status,
               isSelected: application.status === 'SELECTED',
               isApplicant: application.status === 'APPLIED',
