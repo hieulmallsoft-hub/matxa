@@ -752,7 +752,8 @@ export function ServiceCatalogPanel({
                           <div className="relative">
                             <input
                               type="number"
-                              min="0"
+                              min="400000"
+                              max="1000000"
                               step="10000"
                               required
                               value={prices[duration] ?? ''}

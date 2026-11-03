@@ -21,6 +21,7 @@ import {
   MinLength,
   Matches,
 } from 'class-validator';
+import { ServicePriceRange } from './service-price';
 
 export class SearchTechniciansDto {
   @ApiPropertyOptional({
@@ -233,11 +234,11 @@ export class CreateTechnicianServicePriceOptionDto {
 
 /** KTV may change the price and activation state of an existing catalog option. */
 export class UpdateTechnicianServicePriceOptionDto {
-  @ApiPropertyOptional({ example: 450000, description: 'Giá mới, đơn vị VND' })
+  @ApiPropertyOptional({ example: 450000, description: 'Giá mới, đơn vị VND (400.000 – 1.000.000)' })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(0)
+  @ServicePriceRange()
   price?: number;
 
   @ApiPropertyOptional({ description: 'Hiển thị gói này cho khách đặt lịch' })
@@ -368,10 +369,10 @@ export class UpdateAdminTechnicianDto extends PartialType(UpsertTechnicianProfil
 
 /** Admin may change a selling price, but cannot alter the duration/template selected by the technician. */
 export class UpdateAdminTechnicianPriceOptionDto {
-  @ApiProperty({ example: 500000, description: 'Giá bán bằng VND cho gói thời lượng hiện có.' })
+  @ApiProperty({ example: 500000, description: 'Giá bán bằng VND cho gói thời lượng hiện có (400.000 – 1.000.000).' })
   @Type(() => Number)
   @IsNumber()
-  @Min(0)
+  @ServicePriceRange()
   price!: number;
 }
 

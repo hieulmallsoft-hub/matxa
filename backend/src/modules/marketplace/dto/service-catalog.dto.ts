@@ -15,11 +15,12 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { ServicePriceRange } from './service-price';
 
 export class CatalogPriceOptionDto {
   @ApiProperty() @IsString() @MaxLength(50) code!: string;
   @ApiProperty() @Type(() => Number) @IsInt() @Min(15) @Max(720) durationMinutes!: number;
-  @ApiProperty() @Type(() => Number) @IsNumber() @Min(0) price!: number;
+  @ApiProperty() @Type(() => Number) @IsNumber() @ServicePriceRange() price!: number;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(0) sortOrder?: number;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
 }

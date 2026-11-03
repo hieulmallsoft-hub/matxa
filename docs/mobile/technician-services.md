@@ -185,6 +185,8 @@ Ví dụ chỉ cung cấp 60 và 90 phút:
 
 Ba request trên lần lượt áp dụng cho gói 60, 90 và 120 phút. Backend không cho tắt toàn bộ gói; luôn phải còn ít nhất một gói hoạt động.
 
+Giá mỗi gói phải từ **400.000đ đến 1.000.000đ**. Ngoài khoảng này API trả `400` với message `Gia dich vu phai tu 400.000d den 1.000.000d`; mobile nên chặn ngay ở ô nhập và hiển thị thông báo này.
+
 Khi khách đặt lịch, chỉ các `priceOptions` có `isActive: true` mới được dùng. Giá của gói không tự lấy từ catalog sau khi KTV đã chỉnh.
 
 ## 6. Cập nhật Profile nơi phục vụ

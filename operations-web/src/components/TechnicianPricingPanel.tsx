@@ -101,7 +101,7 @@ export function TechnicianPricingPanel({
                       </span>
                       <label>
                         Giá (VND)
-                        <input name="price" type="number" min="0" step="1000" defaultValue={option.price} required />
+                        <input name="price" type="number" min="400000" max="1000000" step="1000" defaultValue={option.price} required />
                       </label>
                       <button type="submit" disabled={savingId === option.id}>
                         {savingId === option.id ? 'Đang lưu…' : 'Lưu giá'}
