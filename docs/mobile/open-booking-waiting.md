@@ -31,7 +31,19 @@ POST /api/bookings
 ```
 
 Body như hiện tại, có `technicianId` là KTV khách chọn ở bước matching. Response có `bookingId`,
-`bookingStatus: "OPEN"` và `expiresInSeconds` (số giây còn lại để chờ, mặc định 900 = 15 phút).
+`bookingStatus: "OPEN"` và `expiresInSeconds` (số giây còn lại để chờ; server hiện đặt 5 phút).
+
+Backend kiểm tra KTV khách chọn **trước khi** tạo đơn. Nếu KTV đó không còn nhận được đơn, API trả lỗi và
+**không tạo đơn**; app báo lý do và đưa khách về màn chọn KTV (gọi lại `POST /api/bookings/matching-technicians`):
+
+| Lỗi | `message` |
+|---|---|
+| `409` | `KTV khong ranh trong khung gio nay` |
+| `409` | `KTV da co lich trung thoi gian` |
+| `409` | `KTV phai hoan thanh don hien tai truoc khi nhan don moi` |
+| `403` | `KTV khong phu hop khu vuc cua don` / `KTV chua co dich vu phu hop voi don nay` / `KTV khong ho tro hinh thuc dich vu nay` |
+
+Response tạo đơn có `canCancel` nhưng đó là cờ của KTV; cờ hủy của khách lấy từ `GET /api/bookings/{bookingId}` (mục 1.2).
 
 ## 1.2 Màn chờ
 
@@ -129,7 +141,7 @@ PATCH /api/bookings/{bookingId}/cancel
 | `TECHNICIAN_APPLIED` | Có KTV ứng tuyển | Tải lại danh sách ứng viên |
 | `REQUESTED_TECHNICIAN_DECLINED` | KTV khách chọn ban đầu từ chối. Nội dung: "<tên> đã từ chối đơn. Bạn có thể chọn KTV khác đang ứng tuyển." | Tải lại đơn; đổi dòng "Đang chờ <tên> xác nhận" thành mời chọn KTV khác |
 | `BOOKING_EXPIRED` | Hết 15 phút chưa chọn KTV | Hiện "Đơn đã hết hạn" |
-| `BOOKING_CANCELLED` | KTV đã được chọn hủy đơn | Hiện đơn đã hủy |
+| `BOOKING_CANCELLED` | KTV đã được chọn hủy đơn | Hiện đơn đã hủy (nội dung chữ theo mẫu admin cấu hình, chỉ dựa vào `type`) |
 
 ## 1.6 Trạng thái đơn (`status`)
 
