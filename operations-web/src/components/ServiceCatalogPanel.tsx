@@ -201,20 +201,27 @@ export function ServiceCatalogPanel({
 
   const durations = templates[template];
   const editItem = editor ?? undefined;
+  const activeCount = items.filter((i) => i.isActive).length;
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const item of items) counts[item.categoryId] = (counts[item.categoryId] ?? 0) + 1;
+    return counts;
+  }, [items]);
+  const stats = [
+    { label: 'Tổng dịch vụ', value: items.length, icon: Layers, tone: 'text-[#1C2B20] bg-[#F1F5EF]' },
+    { label: 'Đang dùng', value: activeCount, icon: Eye, tone: 'text-[#2E7D4A] bg-[#EAF5EC]' },
+    { label: 'Đang ẩn', value: items.length - activeCount, icon: EyeOff, tone: 'text-[#D97706] bg-[#FFF8E7]' },
+    { label: 'Danh mục', value: categories.length, icon: Tag, tone: 'text-[#4A574E] bg-[#F6F8F4]' },
+  ];
 
   return (
     <div className="space-y-6">
       {dialog}
       {/* 1. Main Header Card */}
       <div className="bg-white rounded-3xl border border-[#E5EBE5] p-6 sm:p-7 shadow-[0_2px_16px_rgba(28,43,32,0.04)]">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#E5EBE5]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-xl font-bold text-[#1C2B20] tracking-tight">Catalog Dịch Vụ Chuẩn</h2>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#EAF5EC] text-[#2E7D4A] border border-[#D0E7D5]">
-                {items.filter((i) => i.isActive).length}/{items.length} đang dùng
-              </span>
-            </div>
+            <h2 className="text-xl font-bold text-[#1C2B20] tracking-tight">Catalog Dịch Vụ Chuẩn</h2>
             <p className="text-xs text-[#66756B] mt-1">
               Danh mục gói dịch vụ spa & trị liệu gốc dùng chung cho toàn hệ thống MATXXA
             </p>
@@ -236,43 +243,47 @@ export function ServiceCatalogPanel({
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white text-xs font-semibold shadow-sm shadow-[#2E7D4A]/25 transition-all cursor-pointer hover:shadow-md active:scale-[0.98]"
             >
               <Plus className="w-4 h-4" />
-              <span>+ Thêm dịch vụ mới</span>
+              <span>Thêm dịch vụ mới</span>
             </button>
           </div>
         </div>
 
-        {/* 2. Filter Bar */}
-        <div className="pt-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Search Box */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-[#94A399] absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm theo tên dịch vụ, mã định danh..."
-              className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs text-[#1C2B20] placeholder-[#94A399] focus:outline-none focus:border-[#2E7D4A] focus:bg-white transition-all"
-            />
-          </div>
-
-          {/* Filter options */}
-          <div className="flex items-center gap-3 overflow-x-auto pb-1">
-            {/* Category Select */}
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-3 py-1.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs text-[#1C2B20] font-semibold focus:outline-none focus:border-[#2E7D4A] cursor-pointer"
+        {/* 2. Stats */}
+        <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {stats.map((stat, index) => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: index * 0.05 }}
+              className="flex items-center gap-3 p-4 rounded-2xl border border-[#E5EBE5] bg-white"
             >
-              <option value="ALL">Tất cả danh mục ({items.length})</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${stat.tone}`}>
+                <stat.icon className="w-[18px] h-[18px]" />
+              </span>
+              <div>
+                <p className="text-xl font-bold text-[#1C2B20] leading-none">{loading ? '–' : stat.value}</p>
+                <p className="text-[11px] font-semibold text-[#66756B] mt-1">{stat.label}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
 
-            {/* Active Only Toggle */}
-            <label className="inline-flex items-center gap-2 text-xs font-semibold text-[#66756B] select-none cursor-pointer px-3 py-1.5 rounded-xl border border-[#E5EBE5] bg-white hover:bg-[#F6F8F4] transition-colors whitespace-nowrap">
+        {/* 3. Filter Bar */}
+        <div className="mt-6 pt-5 border-t border-[#E5EBE5] space-y-3">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-[#94A399] absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Tìm theo tên dịch vụ, mã định danh..."
+                className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs text-[#1C2B20] placeholder-[#94A399] focus:outline-none focus:border-[#2E7D4A] focus:bg-white transition-all"
+              />
+            </div>
+
+            <label className="inline-flex items-center gap-2 text-xs font-semibold text-[#66756B] select-none cursor-pointer px-3 py-1.5 rounded-xl border border-[#E5EBE5] bg-white hover:bg-[#F6F8F4] transition-colors whitespace-nowrap self-start md:self-auto">
               <input
                 type="checkbox"
                 checked={activeOnly}
@@ -282,17 +293,60 @@ export function ServiceCatalogPanel({
               <span>Chỉ hiện đang dùng</span>
             </label>
           </div>
+
+          {/* Category Tabs */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            {[{ id: 'ALL', name: 'Tất cả' }, ...categories].map((c) => {
+              const selected = selectedCategory === c.id;
+              const count = c.id === 'ALL' ? items.length : categoryCounts[c.id] ?? 0;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setSelectedCategory(c.id)}
+                  className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                    selected ? 'text-white' : 'text-[#66756B] hover:bg-[#F6F8F4]'
+                  }`}
+                >
+                  {selected && (
+                    <motion.span
+                      layoutId="catalog-category-tab"
+                      className="absolute inset-0 rounded-xl bg-[#2E7D4A]"
+                      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                    />
+                  )}
+                  <span className="relative">{c.name}</span>
+                  <span
+                    className={`relative px-1.5 rounded-md text-[10px] font-bold ${
+                      selected ? 'bg-white/20 text-white' : 'bg-[#F1F5EF] text-[#94A399]'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* 3. Items List */}
-        <div className="mt-5 space-y-3">
+        {/* 4. Items Table */}
+        <div className="mt-4 rounded-2xl border border-[#E5EBE5] overflow-hidden">
+          <div className="hidden lg:grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,2fr)_minmax(0,1.2fr)_110px_120px] gap-4 px-4 py-2.5 bg-[#F6F8F4] border-b border-[#E5EBE5] text-[11px] font-bold uppercase tracking-wide text-[#94A399]">
+            <span>Dịch vụ</span>
+            <span>Danh mục</span>
+            <span>Bảng giá</span>
+            <span>Hình thức</span>
+            <span>Trạng thái</span>
+            <span className="text-right">Thao tác</span>
+          </div>
+
           {loading ? (
             <div className="py-12 flex flex-col items-center justify-center space-y-2 text-xs text-[#94A399]">
               <div className="w-6 h-6 border-2 border-[#2E7D4A]/30 border-t-[#2E7D4A] rounded-full animate-spin" />
               <span>Đang tải danh mục dịch vụ...</span>
             </div>
           ) : visibleItems.length === 0 ? (
-            <div className="py-12 text-center rounded-2xl border border-dashed border-[#E5EBE5] bg-[#F6F8F4]/50 space-y-2">
+            <div className="py-12 text-center bg-[#F6F8F4]/50 space-y-2">
               <Layers className="w-8 h-8 text-[#94A399] mx-auto" />
               <p className="text-xs font-bold text-[#66756B]">Không tìm thấy dịch vụ nào</p>
               <p className="text-[11px] text-[#94A399]">
@@ -300,19 +354,77 @@ export function ServiceCatalogPanel({
               </p>
             </div>
           ) : (
-            visibleItems.map((item) => (
-              <div
-                key={item.id}
-                className="group p-4 rounded-2xl border border-[#E5EBE5] bg-white hover:bg-[#F9FAF8] hover:border-[#D0E7D5] hover:shadow-sm transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-              >
-                {/* Left: Info */}
-                <div className="space-y-2 min-w-0 flex-1">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <h3 className="font-bold text-sm text-[#1C2B20] tracking-tight group-hover:text-[#2E7D4A] transition-colors">
+            <AnimatePresence initial={false} mode="popLayout">
+              {visibleItems.map((item, index) => (
+                <motion.div
+                  key={item.id}
+                  layout
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -12 }}
+                  transition={{ duration: 0.2, delay: Math.min(index, 10) * 0.02 }}
+                  className={`group grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,2fr)_minmax(0,1.2fr)_110px_120px] gap-2 lg:gap-4 lg:items-center px-4 py-3 border-b border-[#E5EBE5] last:border-b-0 bg-white hover:bg-[#F9FAF8] transition-colors ${
+                    item.isActive ? '' : 'opacity-70'
+                  }`}
+                >
+                  {/* Name */}
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm text-[#1C2B20] tracking-tight truncate group-hover:text-[#2E7D4A] transition-colors">
                       {item.name}
-                    </h3>
+                    </p>
+                    <p className="text-[11px] font-mono text-[#94A399] truncate">#{item.slug}</p>
+                  </div>
 
-                    {/* Status Pill */}
+                  {/* Category */}
+                  <div className="min-w-0">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-[#F1F5EF] text-[#4A574E] max-w-full">
+                      <Tag className="w-3 h-3 text-[#2E7D4A] flex-shrink-0" />
+                      <span className="truncate">{item.category?.name || 'Chưa phân loại'}</span>
+                    </span>
+                  </div>
+
+                  {/* Prices */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {item.priceOptions.map((p) => {
+                      const durationLabel =
+                        p.durationMinutes >= 120 && item.pricingTemplate === 'DATE_2_4_6_HOURS'
+                          ? `${p.durationMinutes / 60} tiếng`
+                          : `${p.durationMinutes} phút`;
+                      return (
+                        <span
+                          key={p.id}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#F6F8F4] border border-[#E5EBE5] text-[11px] font-semibold text-[#66756B]"
+                        >
+                          <Clock className="w-3 h-3 text-[#2E7D4A]" />
+                          <span>{durationLabel}</span>
+                          <strong className="text-[#2E7D4A] font-bold">
+                            {new Intl.NumberFormat('vi-VN').format(p.price)} đ
+                          </strong>
+                        </span>
+                      );
+                    })}
+                  </div>
+
+                  {/* Modes */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {item.modes.map((mode) => {
+                      const option = modeOptions.find((m) => m.value === mode);
+                      if (!option) return null;
+                      return (
+                        <span
+                          key={mode}
+                          title={option.label}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold text-[#4A574E] bg-[#F6F8F4]"
+                        >
+                          <option.icon className="w-3 h-3 text-[#2E7D4A]" />
+                          {mode === 'HOME' ? 'Tận nơi' : mode === 'ONSITE' ? 'Cơ sở' : 'Online'}
+                        </span>
+                      );
+                    })}
+                  </div>
+
+                  {/* Status */}
+                  <div>
                     <span
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${
                         item.isActive
@@ -323,85 +435,42 @@ export function ServiceCatalogPanel({
                       <span className={`w-1.5 h-1.5 rounded-full ${item.isActive ? 'bg-[#2E7D4A]' : 'bg-[#D97706]'}`} />
                       {item.isActive ? 'Đang dùng' : 'Đang ẩn'}
                     </span>
-
-                    {/* Category Tag */}
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold bg-[#F1F5EF] text-[#4A574E] border border-[#E5EBE5]">
-                      <Tag className="w-3 h-3 text-[#2E7D4A]" />
-                      {item.category?.name || 'Chưa phân loại'}
-                    </span>
-
-                    {/* Slug */}
-                    <span className="text-[11px] font-mono text-[#94A399]">#{item.slug}</span>
                   </div>
 
-                  {/* Price Options Chips */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {item.priceOptions.map((p) => {
-                      const durationLabel =
-                        p.durationMinutes >= 120 && item.pricingTemplate === 'DATE_2_4_6_HOURS'
-                          ? `${p.durationMinutes / 60} tiếng`
-                          : `${p.durationMinutes} phút`;
-                      return (
-                        <span
-                          key={p.id}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20]"
-                        >
-                          <Clock className="w-3 h-3 text-[#2E7D4A]" />
-                          <span>{durationLabel}:</span>
-                          <strong className="text-[#2E7D4A] font-bold">
-                            {new Intl.NumberFormat('vi-VN').format(p.price)} đ
-                          </strong>
-                        </span>
-                      );
-                    })}
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 lg:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(item)}
+                      title="Sửa dịch vụ"
+                      className="p-2 rounded-xl border border-transparent hover:border-[#D0E7D5] hover:bg-[#EAF5EC] text-[#66756B] hover:text-[#2E7D4A] transition-all cursor-pointer"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void toggle(item)}
+                      title={item.isActive ? 'Ẩn dịch vụ' : 'Hiện dịch vụ'}
+                      className={`p-2 rounded-xl border border-transparent transition-all cursor-pointer ${
+                        item.isActive
+                          ? 'text-[#66756B] hover:bg-[#FFF8E7] hover:text-[#D97706] hover:border-[#FDE68A]'
+                          : 'text-[#2E7D4A] hover:bg-[#EAF5EC] hover:border-[#D0E7D5]'
+                      }`}
+                    >
+                      {item.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void remove(item)}
+                      title="Xóa dịch vụ"
+                      className="p-2 rounded-xl border border-transparent hover:border-[#F8D2D0] hover:bg-[#FDF0EF] text-[#94A399] hover:text-[#D04A44] transition-all cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-
-                  {/* Modes */}
-                  <div className="flex items-center gap-2 text-[11px] text-[#66756B]">
-                    <span>Khu vực hỗ trợ:</span>
-                    {item.modes.map((mode) => (
-                      <span key={mode} className="font-semibold text-[#1C2B20]">
-                        {mode === 'HOME' ? '🏠 Tận nơi' : mode === 'ONSITE' ? '🏢 Cơ sở' : '🌐 Online'}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Right: Actions */}
-                <div className="flex items-center gap-1.5 flex-shrink-0 self-end sm:self-center">
-                  <button
-                    type="button"
-                    onClick={() => openEdit(item)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[#E5EBE5] bg-white hover:bg-[#EAF5EC] hover:text-[#2E7D4A] hover:border-[#D0E7D5] text-xs font-bold text-[#66756B] transition-all shadow-2xs cursor-pointer"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                    <span>Sửa</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => void toggle(item)}
-                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-2xs cursor-pointer ${
-                      item.isActive
-                        ? 'border-[#E5EBE5] bg-white hover:bg-[#FFF8E7] hover:text-[#D97706] hover:border-[#FDE68A] text-[#66756B]'
-                        : 'border-[#D0E7D5] bg-[#EAF5EC] text-[#2E7D4A] hover:bg-[#DDF0E1]'
-                    }`}
-                  >
-                    {item.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    <span>{item.isActive ? 'Ẩn' : 'Hiện'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => void remove(item)}
-                    className="inline-flex items-center gap-1 p-2 rounded-xl border border-transparent hover:border-[#F8D2D0] hover:bg-[#FDF0EF] text-[#94A399] hover:text-[#D04A44] transition-all cursor-pointer"
-                    title="Xóa dịch vụ"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))
+                </motion.div>
+              ))}
+            </AnimatePresence>
           )}
         </div>
       </div>
