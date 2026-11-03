@@ -14,6 +14,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { ServicePriceRange } from './service-price';
 
@@ -42,6 +43,8 @@ export class CreateServiceCatalogDto {
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => CatalogPriceOptionDto)
   priceOptions!: CatalogPriceOptionDto[];
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(0) sortOrder?: number;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
