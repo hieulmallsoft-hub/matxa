@@ -61,9 +61,10 @@ describe('customer cancels a waiting open booking', () => {
       },
       user: { findUnique: jest.fn().mockResolvedValue({ role: 'CUSTOMER' }) },
       bookingTechnicianApplication: {
-        findMany: jest.fn().mockResolvedValue([{ technicianProfile: { userId: 'tech-user-1' } }]),
+        findMany: jest.fn().mockResolvedValue([{ status: 'APPLIED', technicianProfile: { userId: 'tech-user-1' } }]),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      notification: { findMany: jest.fn().mockResolvedValue([]) },
       walletLedgerEntry: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     prisma.$transaction = jest.fn((callback: any) => callback(prisma));

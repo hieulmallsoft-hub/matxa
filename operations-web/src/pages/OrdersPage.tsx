@@ -94,7 +94,7 @@ export const OrdersPage: React.FC = () => {
             customer: {
               name: customerName,
               email: b.customer?.phoneNumber || '',
-              avatar: b.customer?.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80',
+              avatar: b.customer?.avatarUrl || '',
               initials: customerName.slice(0, 2).toUpperCase(),
             },
             product: {
@@ -300,11 +300,17 @@ export const OrdersPage: React.FC = () => {
                 Thông tin khách hàng
               </span>
               <div className="flex items-center gap-3">
-                <img
-                  src={selectedOrder.customer.avatar}
-                  alt={selectedOrder.customer.name}
-                  className="w-12 h-12 rounded-full object-cover ring-2 ring-[#EAF5EC]"
-                />
+                {selectedOrder.customer.avatar ? (
+                  <img
+                    src={selectedOrder.customer.avatar}
+                    alt={selectedOrder.customer.name}
+                    className="w-12 h-12 rounded-full object-cover ring-2 ring-[#EAF5EC]"
+                  />
+                ) : (
+                  <span className="w-12 h-12 rounded-full bg-[#EAF5EC] text-[#2E7D4A] font-bold text-base flex items-center justify-center ring-2 ring-[#EAF5EC]">
+                    {selectedOrder.customer.name.charAt(0).toUpperCase()}
+                  </span>
+                )}
                 <div>
                   <h4 className="font-bold text-sm text-[#1C2B20]">
                     {selectedOrder.customer.name}

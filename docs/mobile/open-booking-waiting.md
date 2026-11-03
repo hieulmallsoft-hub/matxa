@@ -215,7 +215,7 @@ chọn sẽ nhận `403`.
 |---|---|---|
 | `TECHNICIAN_SELECTED` | Khách chọn KTV này | Đơn chuyển sang "Đã nhận", hiện thông tin liên hệ |
 | `TECHNICIAN_NOT_SELECTED` | Khách chọn KTV khác | Đơn chuyển sang "Không được chọn" |
-| `BOOKING_CANCELLED` | Khách hủy đơn | Hiện đơn đã hủy |
+| `BOOKING_CANCELLED` | Khách hủy đơn. Gửi cho **mọi KTV đã nhận "Yêu cầu mới"/"Khách đặt bạn"** của đơn và KTV đang ứng tuyển (trừ KTV đã từ chối/rút) | Mở `GET /api/technician/jobs/{bookingId}` → `bookingStatus: "CANCELLED"`, hiện thẻ "Đã hủy" |
 | `BOOKING_EXPIRED` | Hết hạn, khách chưa chọn | Nhãn "Hết hạn" |
 
 ## Thử nhanh

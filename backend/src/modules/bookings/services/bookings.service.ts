@@ -841,12 +841,19 @@ export class BookingsService {
           select: { id: true },
         })
       : null;
+    const marketplaceTechnician =
+      allowMarketplaceTechnician && actor?.role === 'TECHNICIAN' && booking.assignmentMode === 'OPEN_MARKETPLACE';
+    // Requested or applied (any application status): the job stays visible after it leaves OPEN.
+    const involvedInMarketplaceJob =
+      marketplaceTechnician &&
+      (booking.applications.some((application) => application.technicianProfile.user.id === userId) ||
+        (booking.requestedTechnicianId !== null &&
+          (await this.prisma.technicianProfile.findUnique({ where: { userId }, select: { id: true } }))?.id ===
+            booking.requestedTechnicianId));
     const canViewMarketplaceJob =
-      allowMarketplaceTechnician &&
-      actor?.role === 'TECHNICIAN' &&
-      booking.assignmentMode === 'OPEN_MARKETPLACE' &&
-      ['OPEN', 'EXPIRED'].includes(booking.status) &&
-      Boolean(marketplaceNotification);
+      marketplaceTechnician &&
+      ((['OPEN', 'EXPIRED', 'CANCELLED'].includes(booking.status) && Boolean(marketplaceNotification)) ||
+        involvedInMarketplaceJob);
     if (booking.customerId !== userId && booking.technician?.userId !== userId && actor?.role !== 'ADMIN' && !canViewMarketplaceJob)
       throw new ForbiddenException('Ban khong co quyen xem lich dat');
     const historical = this.withHistoricalAddress(booking);
@@ -875,6 +882,8 @@ export class BookingsService {
         // when this technician never created an application record.
         { status: 'EXPIRED' },
         { applications: { some: { technicianProfileId: profile.id } } },
+        // The technician the customer picked keeps the job even if it is cancelled before they apply.
+        { requestedTechnicianId: profile.id },
       ],
       ...(query.serviceId ? { items: { some: { catalogServiceId: query.serviceId } } } : {}),
     };
@@ -940,7 +949,9 @@ export class BookingsService {
         return this.openBookingResponse(booking, 'EXPIRED', false, true, profile.id);
       // detail() loads items without catalogService; reload them so eligibility sees catalog data.
       if (booking.status === 'OPEN' && !application) await this.openJobForTechnician(id, profile.id, true);
-      else if (!application) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
+      // A cancelled job reached detail() through an involvement or notification check; just show it.
+      else if (!application && booking.requestedTechnicianId !== profile.id && booking.status !== 'CANCELLED')
+        throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
       return this.openBookingResponse(booking, application?.status ?? null, application?.status === 'SELECTED', true, profile.id);
     }
     if (booking.technician?.userId !== userId) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
@@ -1055,21 +1066,33 @@ export class BookingsService {
       return cancelled;
     });
     if (booking.assignmentMode === 'OPEN_MARKETPLACE' && booking.status === 'OPEN') {
-      const applied = await this.prisma.bookingTechnicianApplication.findMany({
-        where: { bookingId: id, status: 'APPLIED' },
-        include: { technicianProfile: { select: { userId: true } } },
-      });
+      const [applications, announced] = await Promise.all([
+        this.prisma.bookingTechnicianApplication.findMany({
+          where: { bookingId: id },
+          include: { technicianProfile: { select: { userId: true } } },
+        }),
+        this.prisma.notification.findMany({
+          where: { actionUrl: `matxa://bookings/${id}`, type: { in: ['OPEN_BOOKING_AVAILABLE', 'OPEN_BOOKING_REQUESTED'] } },
+          select: { userId: true },
+        }),
+      ]);
       await this.prisma.bookingTechnicianApplication.updateMany({
         where: { bookingId: id, status: 'APPLIED' },
         data: { status: 'EXPIRED', expiredAt: new Date() },
       });
-      for (const application of applied)
+      // Everyone the job was announced to or who applied, except those who already said no.
+      const usersWith = (statuses: string[]) =>
+        new Set(applications.filter((a) => statuses.includes(a.status)).map((a) => a.technicianProfile.userId));
+      const applied = usersWith(['APPLIED']);
+      const optedOut = usersWith(['DECLINED', 'WITHDRAWN']);
+      const recipients = new Set([...applied, ...announced.map((n) => n.userId)].filter((u) => !optedOut.has(u)));
+      for (const recipient of recipients)
         void this.notifyStatus(
-          application.technicianProfile.userId,
+          recipient,
           id,
           'BOOKING_CANCELLED',
           'Đơn đã bị hủy',
-          'Khách hàng đã hủy đơn mà bạn đang ứng tuyển.',
+          applied.has(recipient) ? 'Khách hàng đã hủy đơn mà bạn đang ứng tuyển.' : 'Khách hàng đã hủy đơn này.',
         );
     }
     const technicianUserId = booking.technician?.userId;
