@@ -622,6 +622,15 @@ export class BookingsService {
     });
     if (existing?.status === 'APPLIED') return { ...existing, idempotent: true };
     if (existing) throw new ConflictException('Trang thai ung tuyen hien tai khong cho phep apply lai');
+    // Selection charges the commission, so a technician who could not pay it must not be selectable.
+    const fee = await this.commissionFor(booking.grossServiceAmount);
+    if (fee > 0) {
+      const wallet = await this.prisma.wallet.findUnique({
+        where: { userId_type: { userId, type: 'ADVERTISING_CREDIT' } },
+        select: { balanceVnd: true },
+      });
+      if ((wallet?.balanceVnd ?? 0) < fee) throw new ConflictException('So du vi khong du de nhan don');
+    }
     try {
       const application = await this.prisma.bookingTechnicianApplication.create({
         data: { bookingId, technicianProfileId: profile.id, status: 'APPLIED', appliedAt: new Date() },
@@ -976,16 +985,26 @@ export class BookingsService {
     return this.updateStatus(userId, id, { status: 'CONFIRMED' });
   }
 
+  private async commissionRate() {
+    const rate = this.settings ? await this.settings.platformFeePercent() : Number(this.config.get('TECHNICIAN_COMMISSION_RATE_PERCENT', 25));
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new BadRequestException('Ty le chiet khau KTV khong hop le');
+    return rate;
+  }
+
+  /** Commission the technician's wallet is charged when the booking is confirmed for them. */
+  private async commissionFor(grossServiceAmount: unknown) {
+    return Math.round((Number(grossServiceAmount ?? 0) * (await this.commissionRate())) / 100);
+  }
+
   private async chargeTechnicianCommission(
     userId: string,
     bookingId: string,
     db: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
-    const rate = this.settings ? await this.settings.platformFeePercent() : Number(this.config.get('TECHNICIAN_COMMISSION_RATE_PERCENT', 25));
-    if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new BadRequestException('Ty le chiet khau KTV khong hop le');
     const booking = await db.booking.findFirst({ where: { id: bookingId, technician: { userId } }, select: { grossServiceAmount: true } });
     if (!booking) throw new ForbiddenException('Don khong thuoc KTV nay');
-    const fee = Math.round(Number(booking.grossServiceAmount ?? 0) * rate / 100);
+    const rate = await this.commissionRate();
+    const fee = await this.commissionFor(booking.grossServiceAmount);
     if (fee <= 0) return;
     const debit = async (tx: Prisma.TransactionClient) => {
       const wallet = await tx.wallet.upsert({ where: { userId_type: { userId, type: 'ADVERTISING_CREDIT' } }, create: { userId, type: 'ADVERTISING_CREDIT' }, update: {} });

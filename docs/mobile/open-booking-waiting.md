@@ -196,6 +196,11 @@ POST /api/technician/jobs/{bookingId}/withdraw   (không body)
 ```
 
 - **Ứng tuyển:** tạo lượt `APPLIED`; khách nhận `TECHNICIAN_APPLIED`. Gọi lại nhiều lần không sao.
+  Ứng tuyển **chưa trừ tiền**; ví KTV chỉ bị trừ hoa hồng khi khách chọn KTV này (`COMMISSION_DEBIT`),
+  và được hoàn lại nếu đơn bị hủy sau đó (`COMMISSION_REFUND`).
+  Nhưng ví phải **đủ tiền hoa hồng** của đơn ngay lúc ứng tuyển (hoa hồng = tiền dịch vụ × % phí nền tảng),
+  nếu không API trả `409 "So du vi khong du de nhan don"` → hiện "Số dư ví không đủ để nhận đơn này"
+  kèm nút **Nạp ví**. Lỗi này cũng có thể xảy ra ở `POST /api/technician/jobs/{id}/accept` (đơn đặt thẳng).
 - **Từ chối** (KTV "Khách đặt bạn"): đơn **không bị hủy**, chỉ bị ẩn khỏi danh sách của KTV này.
   Đơn vẫn mở cho KTV khác; khách nhận `REQUESTED_TECHNICIAN_DECLINED`.
 - **Rút ứng tuyển:** chỉ khi đơn còn `OPEN` và đang `APPLIED`.
