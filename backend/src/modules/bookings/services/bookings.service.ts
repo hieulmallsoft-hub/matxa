@@ -792,7 +792,7 @@ export class BookingsService {
           where: {
             userId,
             actionUrl: `matxa://bookings/${id}`,
-            type: { in: ['OPEN_BOOKING_AVAILABLE', 'BOOKING_EXPIRED', 'BOOKING_CANCELLED', 'BOOKING_FALLBACK_OPEN'] },
+            type: { in: ['OPEN_BOOKING_AVAILABLE', 'OPEN_BOOKING_REQUESTED', 'BOOKING_EXPIRED', 'BOOKING_CANCELLED', 'BOOKING_FALLBACK_OPEN'] },
           },
           select: { id: true },
         })
@@ -1735,12 +1735,20 @@ export class BookingsService {
           await this.assertOpenEligibility(this.prisma, booking, candidate.id);
           // Broadcast to every eligible technician at once. An application
           // is created only when that technician explicitly taps Apply.
+          // The technician the customer picked gets "Khách đặt bạn"; the rest get "Yêu cầu mới".
+          const requested = Boolean(booking.requestedTechnicianId) && booking.requestedTechnicianId === candidate.id;
           await this.notifyStatus(
             candidate.userId,
             booking.id,
-            'OPEN_BOOKING_AVAILABLE',
-            'Có đơn mới phù hợp',
-            'Có đơn dịch vụ mới phù hợp. Hãy mở tab Nhận việc để xem và ứng tuyển.',
+            requested ? 'OPEN_BOOKING_REQUESTED' : 'OPEN_BOOKING_AVAILABLE',
+            requested ? 'Khách đặt bạn' : 'Yêu cầu mới',
+            requested
+              ? 'Khách hàng đã chọn bạn cho đơn dịch vụ mới. Hãy mở đơn để ứng tuyển hoặc từ chối.'
+              : 'Có đơn dịch vụ mới phù hợp. Hãy mở tab Nhận việc để xem và ứng tuyển.',
+            {
+              requestType: requested ? 'CUSTOMER_REQUEST' : 'MARKETPLACE',
+              requestLabel: requested ? 'Khách đặt bạn' : 'Yêu cầu mới',
+            },
           );
         } catch (error) {
           // One ineligible technician must not block other notifications, but
@@ -1758,7 +1766,14 @@ export class BookingsService {
     }
   }
 
-  private async notifyStatus(userId: string, bookingId: string, type: string, title: string, body: string) {
+  private async notifyStatus(
+    userId: string,
+    bookingId: string,
+    type: string,
+    title: string,
+    body: string,
+    pushData: Record<string, string> = {},
+  ) {
     let effectiveTitle = title;
     let effectiveBody = body;
     try {
@@ -1776,7 +1791,7 @@ export class BookingsService {
       this.logger.warn(`Khong tao duoc thong bao trong app ${type}: ${error instanceof Error ? error.message : 'khong ro ly do'}`);
     }
     try {
-      await this.notifications.sendPush(userId, effectiveTitle, effectiveBody, { type, bookingId });
+      await this.notifications.sendPush(userId, effectiveTitle, effectiveBody, { ...pushData, type, bookingId });
     } catch (error) {
       // FCM failure must not remove the in-app notification or fail booking creation.
       this.logger.warn(`Khong gui duoc push ${type}: ${error instanceof Error ? error.message : 'khong ro ly do'}`);

@@ -27,8 +27,31 @@ Trạng thái `SELECTED` vẫn có nghĩa khách đã chọn ứng viên để t
 Nút ứng tuyển tiếp tục dựa vào `canApply`; từ chối dựa vào `canDecline`.
 Trong luồng OPEN, chỉ KTV khách yêu cầu ban đầu có `canDecline = true` khi còn được ứng tuyển.
 Metadata này không cấp thêm quyền nhận đơn, xem liên hệ hay bỏ qua bước khách chọn.
-Notification vẫn dùng `OPEN_BOOKING_AVAILABLE`; khi mở thông báo, mobile tải chi
-tiết đơn để lấy nhãn theo KTV đang xem.
+## Thông báo
+
+Khi đơn mở được tạo, mỗi KTV phù hợp nhận một thông báo trong app và một push.
+Loại thông báo khác nhau theo người nhận:
+
+| Người nhận | `type` | Tiêu đề mặc định | Nội dung mặc định |
+| --- | --- | --- | --- |
+| KTV khách chọn | `OPEN_BOOKING_REQUESTED` | Khách đặt bạn | Khách hàng đã chọn bạn cho đơn dịch vụ mới. Hãy mở đơn để ứng tuyển hoặc từ chối. |
+| KTV phù hợp khác | `OPEN_BOOKING_AVAILABLE` | Yêu cầu mới | Có đơn dịch vụ mới phù hợp. Hãy mở tab Nhận việc để xem và ứng tuyển. |
+
+Push data có thêm `requestType` và `requestLabel` (cùng giá trị như bảng trên):
+
+```json
+{ "type": "OPEN_BOOKING_REQUESTED", "bookingId": "booking-id",
+  "requestType": "CUSTOMER_REQUEST", "requestLabel": "Khách đặt bạn" }
+```
+
+Trong danh sách `GET /api/notifications`, phân biệt bằng `type` (thông báo trong app
+không có trường data). Cả hai loại có `actionUrl = matxa://bookings/{bookingId}`;
+chạm vào thì mở chi tiết đơn `GET /api/technician/jobs/{bookingId}`.
+Mobile phải xử lý `OPEN_BOOKING_REQUESTED` giống `OPEN_BOOKING_AVAILABLE`
+(mở chi tiết đơn), chỉ khác kiểu hiển thị.
+
+Tiêu đề và nội dung có thể bị admin đổi trong Cấu hình → mẫu thông báo, nên
+mobile không so khớp theo chữ mà dùng `type` hoặc `requestType`.
 
 Đơn mở tạo không có KTV yêu cầu trả `requestedTechnicianId: null`, nhãn
 “Yêu cầu mới”. Dữ liệu đơn mở cũ đã mất lựa chọn ban đầu không được suy đoán

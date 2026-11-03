@@ -53,9 +53,16 @@ sends eligible active technicians an in-app notification and an FCM push:
 ```json
 {
   "type": "OPEN_BOOKING_AVAILABLE",
-  "bookingId": "booking-id"
+  "bookingId": "booking-id",
+  "requestType": "MARKETPLACE",
+  "requestLabel": "Yêu cầu mới"
 }
 ```
+
+The technician the customer picked receives `type: "OPEN_BOOKING_REQUESTED"`
+with `requestType: "CUSTOMER_REQUEST"` and `requestLabel: "Khách đặt bạn"`
+instead. Handle both types the same way. See
+[booking-request-recipient.md](booking-request-recipient.md).
 
 Mobile should open or refresh the Jobs screen after tapping it. The app must
 still call `GET /technician/jobs` because push delivery can be delayed or

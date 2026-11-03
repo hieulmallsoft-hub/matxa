@@ -13,7 +13,8 @@ export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private readonly defaultTemplates: Record<string, { title: string; body: string }> = {
     BOOKING_CREATED: { title: '[Thông báo Psyocore]', body: 'Khách mới đã đặt lịch. KTV vui lòng thu tiền trước khi làm.' },
-    OPEN_BOOKING_AVAILABLE: { title: '[Thông báo Psyocore]', body: 'Có đơn dịch vụ mới phù hợp. Hãy mở tab Nhận việc để xem và ứng tuyển.' },
+    OPEN_BOOKING_AVAILABLE: { title: 'Yêu cầu mới', body: 'Có đơn dịch vụ mới phù hợp. Hãy mở tab Nhận việc để xem và ứng tuyển.' },
+    OPEN_BOOKING_REQUESTED: { title: 'Khách đặt bạn', body: 'Khách hàng đã chọn bạn cho đơn dịch vụ mới. Hãy mở đơn để ứng tuyển hoặc từ chối.' },
     TECHNICIAN_SELECTED: { title: '[Thông báo Psyocore]', body: 'Khách hàng đã chọn KTV cho đơn dịch vụ.' },
     BOOKING_CANCELLED: { title: '[Thông báo Psyocore]', body: 'Lịch hẹn đã được hủy.' },
     BOOKING_FALLBACK_OPEN: { title: '[Thông báo Psyocore]', body: 'KTV được chỉ định chưa phản hồi. Đơn đã mở cho KTV phù hợp khác.' },
@@ -111,6 +112,7 @@ export class NotificationsService {
     const translations: Record<string, { title: string; body: string }> = {
       BOOKING_CREATED: { title: 'New booking', body: 'A new booking is waiting for confirmation.' },
       OPEN_BOOKING_AVAILABLE: { title: 'New job available', body: 'A new job matching your services is available. Open Jobs to apply.' },
+      OPEN_BOOKING_REQUESTED: { title: 'A customer booked you', body: 'A customer chose you for a new job. Open it to apply or decline.' },
       BOOKING_FALLBACK_OPEN: { title: '[Thông báo Psyocore]', body: 'KTV được chỉ định chưa phản hồi. Đơn đã mở cho KTV phù hợp khác.' },
     BOOKING_EXPIRED: { title: 'Booking expired', body: 'No technician was selected before the application deadline.' },
       BOOKING_AUTO_COMPLETED: { title: 'Booking completed', body: 'The booking was automatically completed after 24 hours.' },

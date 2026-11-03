@@ -117,6 +117,59 @@ describe('booking request recipient', () => {
     expect(decline).toHaveBeenCalledWith('tech-user', booking.id);
   });
 
+  it('notifies the requested technician as "Khách đặt bạn" and others as "Yêu cầu mới"', async () => {
+    const prisma: any = {
+      technicianProfile: { findMany: jest.fn().mockResolvedValue([
+        { id: 'preferred-profile', userId: 'preferred-user' },
+        { id: 'other-profile', userId: 'other-user' },
+      ]) },
+    };
+    const notifications = {
+      getTemplate: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({}),
+      sendPush: jest.fn().mockResolvedValue({}),
+    };
+    const service = new BookingsService(prisma, { get: (_key: string, fallback: unknown) => fallback } as any,
+      notifications as any, {} as any);
+    jest.spyOn(service as any, 'assertOpenEligibility').mockResolvedValue(undefined);
+    await (service as any).notifyEligibleTechniciansForOpenBooking(booking);
+    expect(notifications.create).toHaveBeenCalledWith(
+      'preferred-user', 'OPEN_BOOKING_REQUESTED', 'Khách đặt bạn', expect.any(String), 'matxa://bookings/booking-1');
+    expect(notifications.create).toHaveBeenCalledWith(
+      'other-user', 'OPEN_BOOKING_AVAILABLE', 'Yêu cầu mới', expect.any(String), 'matxa://bookings/booking-1');
+    expect(notifications.sendPush).toHaveBeenCalledWith('preferred-user', 'Khách đặt bạn', expect.any(String), {
+      type: 'OPEN_BOOKING_REQUESTED', bookingId: 'booking-1', requestType: 'CUSTOMER_REQUEST', requestLabel: 'Khách đặt bạn',
+    });
+    expect(notifications.sendPush).toHaveBeenCalledWith('other-user', 'Yêu cầu mới', expect.any(String), {
+      type: 'OPEN_BOOKING_AVAILABLE', bookingId: 'booking-1', requestType: 'MARKETPLACE', requestLabel: 'Yêu cầu mới',
+    });
+  });
+
+  it('notifies everyone as "Yêu cầu mới" when the customer picked no technician', async () => {
+    const prisma: any = {
+      technicianProfile: { findMany: jest.fn().mockResolvedValue([{ id: 'preferred-profile', userId: 'preferred-user' }]) },
+    };
+    const notifications = { getTemplate: jest.fn().mockResolvedValue(null), create: jest.fn(), sendPush: jest.fn() };
+    const service = new BookingsService(prisma, { get: (_key: string, fallback: unknown) => fallback } as any,
+      notifications as any, {} as any);
+    jest.spyOn(service as any, 'assertOpenEligibility').mockResolvedValue(undefined);
+    await (service as any).notifyEligibleTechniciansForOpenBooking({ ...booking, requestedTechnicianId: null });
+    expect(notifications.create).toHaveBeenCalledWith(
+      'preferred-user', 'OPEN_BOOKING_AVAILABLE', 'Yêu cầu mới', expect.any(String), expect.any(String));
+  });
+
+  it('lets the requested technician open the job from an OPEN_BOOKING_REQUESTED notification', async () => {
+    const prisma: any = {
+      booking: { findUnique: jest.fn().mockResolvedValue({ ...booking, technician: null }) },
+      user: { findUnique: jest.fn().mockResolvedValue({ role: 'TECHNICIAN' }) },
+      notification: { findFirst: jest.fn().mockResolvedValue({ id: 'n1' }) },
+    };
+    const service = new BookingsService(prisma, { get: (_key: string, fallback: unknown) => fallback } as any,
+      {} as any, {} as any);
+    await service.detail('preferred-user', booking.id, true, true).catch(() => undefined);
+    expect(prisma.notification.findFirst.mock.calls[0][0].where.type.in).toContain('OPEN_BOOKING_REQUESTED');
+  });
+
   it('marks a finalized alternative separately from the initial request', () => {
     const { service } = setup();
     const response = (service as any).openBookingResponse(

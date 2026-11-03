@@ -24,7 +24,8 @@ type NotificationTemplate = { type: string; title: string; body: string; isActiv
 
 const defaultNotificationTemplates: NotificationTemplate[] = [
   { type: 'BOOKING_CREATED', title: '[Thông báo MATXXA]', body: 'Khách mới đã đặt lịch. KTV vui lòng thu tiền trước khi làm.', isActive: true },
-  { type: 'OPEN_BOOKING_AVAILABLE', title: '[Thông báo MATXXA]', body: 'Có đơn dịch vụ mới phù hợp. Hãy mở tab Nhận việc để xem và ứng tuyển.', isActive: true },
+  { type: 'OPEN_BOOKING_AVAILABLE', title: 'Yêu cầu mới', body: 'Có đơn dịch vụ mới phù hợp. Hãy mở tab Nhận việc để xem và ứng tuyển.', isActive: true },
+  { type: 'OPEN_BOOKING_REQUESTED', title: 'Khách đặt bạn', body: 'Khách hàng đã chọn bạn cho đơn dịch vụ mới. Hãy mở đơn để ứng tuyển hoặc từ chối.', isActive: true },
   { type: 'TECHNICIAN_SELECTED', title: '[Thông báo MATXXA]', body: 'Khách hàng đã chọn bạn cho đơn dịch vụ.', isActive: true },
   { type: 'BOOKING_CANCELLED', title: '[Thông báo MATXXA]', body: 'Lịch hẹn đã được hủy.', isActive: true },
   { type: 'BOOKING_EXPIRED', title: '[Thông báo MATXXA]', body: 'Đơn đã hết hạn.', isActive: true },

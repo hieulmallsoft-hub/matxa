@@ -117,7 +117,7 @@ Không gửi `assignmentMode` hoặc `serviceIds`.
 
 ## 3. Thông báo cho KTV
 
-Khi tạo booking mở thành công, backend lưu `OPEN_BOOKING_AVAILABLE` cho các KTV đủ điều kiện đồng thời và gửi push FCM nếu có device token. KTV khách chọn ban đầu thấy `requestType = CUSTOMER_REQUEST`, nhãn “Khách đặt bạn”; KTV phù hợp khác thấy `requestType = MARKETPLACE`, nhãn “Yêu cầu mới”. Thông báo trong hệ thống vẫn được lưu khi KTV không mở app, mất mạng hoặc tắt máy.
+Khi tạo booking mở thành công, backend lưu `OPEN_BOOKING_REQUESTED` cho KTV khách chọn và `OPEN_BOOKING_AVAILABLE` cho các KTV đủ điều kiện khác đồng thời và gửi push FCM nếu có device token. KTV khách chọn ban đầu thấy `requestType = CUSTOMER_REQUEST`, nhãn “Khách đặt bạn”; KTV phù hợp khác thấy `requestType = MARKETPLACE`, nhãn “Yêu cầu mới”. Thông báo trong hệ thống vẫn được lưu khi KTV không mở app, mất mạng hoặc tắt máy.
 
 Khi app mở lại, mobile KTV đồng bộ:
 
