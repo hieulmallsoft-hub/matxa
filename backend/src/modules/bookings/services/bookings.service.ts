@@ -977,11 +977,7 @@ export class BookingsService {
     return { bookingId: id, displayName: booking.customer.displayName, phoneNumber: phone.phoneNumber };
   }
 
-  async acceptTechnicianJob(userId: string, id: string) {
-    await this.detail(userId, id, true);
-    const expired = await this.expireDirectBookingIfDue(id);
-    if (expired) throw new ConflictException('BOOKING_EXPIRED');
-    await this.chargeTechnicianCommission(userId, id);
+  acceptTechnicianJob(userId: string, id: string) {
     return this.updateStatus(userId, id, { status: 'CONFIRMED' });
   }
 
@@ -1235,7 +1231,17 @@ export class BookingsService {
     if (dto.status === 'COMPLETED' && booking.scheduledEnd > new Date()) {
       throw new BadRequestException('Chua den gio ket thuc dich vu');
     }
-    const updated = await this.transition(id, booking.status, { status: dto.status });
+    if (dto.status === 'CONFIRMED' && (await this.expireDirectBookingIfDue(id)))
+      throw new ConflictException('BOOKING_EXPIRED');
+    // Confirming charges the commission; both commit together or not at all.
+    const updated =
+      dto.status === 'CONFIRMED'
+        ? await this.prisma.$transaction(async (tx) => {
+            const confirmed = await this.transition(id, booking.status, { status: 'CONFIRMED' }, tx);
+            await this.chargeTechnicianCommission(userId, id, tx);
+            return confirmed;
+          })
+        : await this.transition(id, booking.status, { status: dto.status });
     const title = dto.status === 'CONFIRMED' ? 'Đặt lịch thành công' : 'Dịch vụ đã hoàn thành';
     void this.notifyStatus(booking.customerId, id, `BOOKING_${dto.status}`, title, title);
     return updated;
