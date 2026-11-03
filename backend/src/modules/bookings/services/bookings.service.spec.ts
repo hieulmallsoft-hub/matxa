@@ -12,7 +12,9 @@ describe('BookingsService', () => {
   const address = { findFirst: jest.fn() };
   const promotion = { findFirst: jest.fn() };
   const promotionUsage = { count: jest.fn() };
+  const walletLedgerEntry = { findUnique: jest.fn() };
   const tx = {
+    walletLedgerEntry,
     booking,
     technicianProfile,
     review,

@@ -20,6 +20,8 @@ function createSubject(booking = assignedBooking()) {
     },
     technicianProfile: { findFirst: jest.fn().mockResolvedValue({ id: 'tech-profile-1' }) },
     bookingCancellation: { create: jest.fn().mockResolvedValue({ id: 'cancellation-1' }) },
+    walletLedgerEntry: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn() },
+    wallet: { update: jest.fn() },
   };
   const prisma: any = {
     booking: { findUnique: jest.fn().mockResolvedValue(booking) },
@@ -39,6 +41,23 @@ function createSubject(booking = assignedBooking()) {
 
 describe('TechnicianBookingCancellationService', () => {
   const otherReason = { reasonCode: 'OTHER' as const, reasonText: 'Khong the phuc vu', evidenceStorageKeys: [] };
+
+  it('refunds the commission charged when the technician took the booking', async () => {
+    const { service, tx } = createSubject();
+    tx.walletLedgerEntry.findUnique
+      .mockResolvedValueOnce({ walletId: 'wallet-1', amountVnd: -75000 })
+      .mockResolvedValueOnce(null);
+    tx.wallet.update.mockResolvedValue({ balanceVnd: 175000 });
+    await service.cancel('tech-user-1', 'booking-1', otherReason);
+    expect(tx.wallet.update).toHaveBeenCalledWith({
+      where: { id: 'wallet-1' },
+      data: { balanceVnd: { increment: 75000 } },
+      select: { balanceVnd: true },
+    });
+    expect(tx.walletLedgerEntry.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ type: 'COMMISSION_REFUND', amountVnd: 75000, balanceBeforeVnd: 100000, balanceAfterVnd: 175000 }),
+    });
+  });
 
   it('lets the assigned DIRECT technician cancel and writes the legacy fields plus audit', async () => {
     const { service, tx, storage } = createSubject();

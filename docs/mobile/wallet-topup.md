@@ -125,7 +125,15 @@ GET /api/wallet/transactions/{transactionId}
 
 Mỗi item có `amountVnd` có dấu: số dương là tiền vào, số âm là tiền ra. `balanceBeforeVnd` và `balanceAfterVnd` là số dư trước/sau giao dịch. Với giao dịch nạp tiền, response có thêm `status`, `paymentMethod`, `referenceCode` và `failureMessage`.
 
-Hiện ledger phát sinh giao dịch `TOP_UP` khi nạp ví thành công. Các loại chi tiền dịch vụ chỉ hiển thị sau khi backend có luồng sử dụng ví tương ứng.
+Các loại giao dịch (`type`):
+
+| type | Khi nào | amountVnd |
+|---|---|---|
+| `TOP_UP` | Nạp ví thành công | dương |
+| `COMMISSION_DEBIT` | KTV nhận đơn (hoặc được khách chọn): trừ hoa hồng nền tảng | âm |
+| `COMMISSION_REFUND` | Đơn đã nhận bị hủy (khách, KTV hoặc admin hủy): hoàn lại đúng số hoa hồng đã trừ, mỗi đơn một lần | dương |
+
+Gợi ý nhãn hiển thị: `TOP_UP` "Nạp ví", `COMMISSION_DEBIT` "Phí nhận đơn", `COMMISSION_REFUND` "Hoàn phí đơn bị hủy".
 
 ## 6. Các bước test trên Swagger
 

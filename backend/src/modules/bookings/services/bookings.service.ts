@@ -9,6 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../database/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
+import { refundBookingCommission } from './booking-commission-refund';
 import { applyPriceOptions, loadBookableServices } from '../../marketplace/services/technician-selection';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { MarketplaceRealtimeService } from '../../marketplace/services/marketplace-realtime.service';
@@ -1019,14 +1020,24 @@ export class BookingsService {
     if (dto.reasonCode === 'OTHER' && !dto.reasonText?.trim())
       throw new BadRequestException('Vui long nhap ly do khac');
     const actor = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
-    const updated = await this.transition(id, booking.status, {
-      status: 'CANCELLED',
-      cancelledAt: new Date(),
-      cancellationReason: dto.reasonText ?? dto.reason,
-      cancellationReasonCode: dto.reasonCode,
-      cancellationReasonText: dto.reasonText,
-      cancelledByUserId: userId,
-      cancelledByRole: actor?.role,
+    // The technician gets back the commission charged when they took the booking.
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const cancelled = await this.transition(
+        id,
+        booking.status,
+        {
+          status: 'CANCELLED',
+          cancelledAt: new Date(),
+          cancellationReason: dto.reasonText ?? dto.reason,
+          cancellationReasonCode: dto.reasonCode,
+          cancellationReasonText: dto.reasonText,
+          cancelledByUserId: userId,
+          cancelledByRole: actor?.role,
+        },
+        tx,
+      );
+      await refundBookingCommission(tx, id);
+      return cancelled;
     });
     if (booking.assignmentMode === 'OPEN_MARKETPLACE' && booking.status === 'OPEN') {
       const applied = await this.prisma.bookingTechnicianApplication.findMany({
@@ -1334,9 +1345,10 @@ export class BookingsService {
       cancelledByUserId?: string;
       cancelledByRole?: 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN';
     },
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
     try {
-      return await this.prisma.booking.update({ where: { id, status: expectedStatus }, data });
+      return await db.booking.update({ where: { id, status: expectedStatus }, data });
     } catch (error) {
       if ((error as { code?: string })?.code === 'P2025') {
         throw new ConflictException('Trang thai lich dat da thay doi, vui long tai lai');

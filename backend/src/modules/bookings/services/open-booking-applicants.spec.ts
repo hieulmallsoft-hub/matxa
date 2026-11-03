@@ -64,7 +64,9 @@ describe('customer cancels a waiting open booking', () => {
         findMany: jest.fn().mockResolvedValue([{ technicianProfile: { userId: 'tech-user-1' } }]),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      walletLedgerEntry: { findUnique: jest.fn().mockResolvedValue(null) },
     };
+    prisma.$transaction = jest.fn((callback: any) => callback(prisma));
     const notifications = { getTemplate: jest.fn().mockResolvedValue(null), create: jest.fn(), sendPush: jest.fn() };
     const service = new BookingsService(prisma, { get: (_key: string, fallback: unknown) => fallback } as any, notifications as any, {} as any);
     const result: any = await service.cancel('customer-1', 'booking-1', { reasonCode: 'NO_LONGER_NEEDED' });
