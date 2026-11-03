@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   LineChart as LineChartIcon,
-  TrendingUp,
   Download,
   Calendar,
   Sparkles,
@@ -29,143 +28,103 @@ import {
   Cell,
 } from 'recharts';
 import { PageHeader } from '../components/common/PageHeader';
-import { DemoDataNotice } from '../components/ui/kit';
 import { StatCard } from '../components/common/StatCard';
 import { SectionCard } from '../components/common/SectionCard';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { useToast } from '../components/ui/ToastContainer';
+import { request } from '../api/client';
 
 // Vietnamese currency formatter
 const formatVND = (val: number) => `${new Intl.NumberFormat('vi-VN').format(val)} đ`;
 
-// Trend data over time with comparison to previous period
-const REVENUE_TIMELINE = {
-  day: [
-    { label: '08:00', current: 2400000, previous: 1800000 },
-    { label: '10:00', current: 5800000, previous: 4200000 },
-    { label: '12:00', current: 8200000, previous: 7100000 },
-    { label: '14:00', current: 12500000, previous: 10400000 },
-    { label: '16:00', current: 18900000, previous: 15200000 },
-    { label: '18:00', current: 26400000, previous: 22100000 },
-    { label: '20:00', current: 34200000, previous: 28500000 },
-    { label: '22:00', current: 38600000, previous: 31800000 },
-  ],
-  week: [
-    { label: 'Thứ 2', current: 28500000, previous: 24100000 },
-    { label: 'Thứ 3', current: 32400000, previous: 27800000 },
-    { label: 'Thứ 4', current: 31200000, previous: 29500000 },
-    { label: 'Thứ 5', current: 36800000, previous: 32000000 },
-    { label: 'Thứ 6', current: 45200000, previous: 38400000 },
-    { label: 'Thứ 7', current: 52600000, previous: 44200000 },
-    { label: 'Chủ nhật', current: 48900000, previous: 41000000 },
-  ],
-  month: [
-    { label: 'Tháng 1', current: 165000000, previous: 142000000 },
-    { label: 'Tháng 2', current: 182000000, previous: 155000000 },
-    { label: 'Tháng 3', current: 194000000, previous: 168000000 },
-    { label: 'Tháng 4', current: 208000000, previous: 179000000 },
-    { label: 'Tháng 5', current: 221000000, previous: 188000000 },
-    { label: 'Tháng 6', current: 234000000, previous: 198000000 },
-    { label: 'Tháng 7', current: 228000000, previous: 202000000 },
-    { label: 'Tháng 8', current: 236000000, previous: 210000000 },
-    { label: 'Tháng 9', current: 242000000, previous: 218000000 },
-    { label: 'Tháng 10', current: 248560000, previous: 224000000 },
-  ],
+type Period = 'day' | 'week' | 'month';
+type RevenueReport = {
+  kpis: {
+    totalRevenue: number;
+    revenueThisMonth: number;
+    revenueLastMonth: number;
+    averageOrderValue: number;
+    averageOrderValueLastMonth: number;
+    completedThisMonth: number;
+    completionRate: number;
+    completionRateLastMonth: number;
+  };
+  timeline: { label: string; current: number; previous: number }[];
+  periodRevenue: number;
+  byCategory: { name: string; revenue: number; bookings: number; share: number }[];
+  byRegion: { region: string; revenue: number; bookings: number; share: number }[];
+  topServices: { name: string; duration: number; revenue: number; bookings: number; share: number }[];
+  topTechnicians: { name: string; avatarUrl: string | null; area: string; rating: number; revenue: number; completedOrders: number }[];
 };
 
-const REVENUE_STRUCTURE = [
-  { name: 'Massage tại nhà', value: 58, revenue: 144164800, color: '#2E7D4A' },
-  { name: 'Spa & Trị liệu Studio', value: 24, revenue: 59654400, color: '#41955F' },
-  { name: 'Gói Combo VIP', value: 12, revenue: 29827200, color: '#AEE4BB' },
-  { name: 'Dịch vụ khác & Mẹ bé', value: 6, revenue: 14913600, color: '#F2A93B' },
-];
+const PERIOD_LABELS: Record<Period, string> = { day: 'Hôm nay', week: 'Tuần này', month: 'Năm nay' };
+const COMPARE_LABELS: Record<Period, string> = { day: 'hôm qua', week: 'tuần trước', month: 'cùng kỳ năm trước' };
+const CATEGORY_COLORS = ['#2E7D4A', '#41955F', '#AEE4BB', '#F2A93B', '#5B8DEF', '#B47AE0', '#94A399'];
 
-const TOP_SERVICES = [
-  {
-    name: 'Massage Trị Liệu Cổ Vai Gáy Chuyên Sâu',
-    duration: '60 - 90 phút',
-    bookings: 642,
-    revenue: 417300000,
-    growth: '+26.4%',
-  },
-  {
-    name: 'Massage Đá Nóng Himalaya Phục Hồi',
-    duration: '90 phút',
-    bookings: 480,
-    revenue: 360000000,
-    growth: '+18.2%',
-  },
-  {
-    name: 'Combo Thư Giãn Toàn Diện 120 Phút',
-    duration: '120 phút',
-    bookings: 310,
-    revenue: 387500000,
-    growth: '+32.5%',
-  },
-  {
-    name: 'Massage Shiatsu Nhật Bản & Bấm Huyệt',
-    duration: '60 phút',
-    bookings: 285,
-    revenue: 156750000,
-    growth: '+12.8%',
-  },
-];
+/** Percent change vs. a previous value; undefined when there is nothing to compare with. */
+function change(current: number, previous: number) {
+  if (!previous) return undefined;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
+}
 
-const TOP_TECHNICIANS = [
-  {
-    name: 'Lê Thu Hương',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80',
-    area: 'TP. Hồ Chí Minh - Quận 1',
-    completedOrders: 142,
-    revenue: 92300000,
-    rating: 4.98,
-  },
-  {
-    name: 'Nguyễn Thị Mai',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-    area: 'TP. Hồ Chí Minh - Quận 3',
-    completedOrders: 128,
-    revenue: 83200000,
-    rating: 4.95,
-  },
-  {
-    name: 'Vũ Thị Ngọc',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-    area: 'Hà Nội - Cầu Giấy',
-    completedOrders: 115,
-    revenue: 74750000,
-    rating: 4.92,
-  },
-  {
-    name: 'Trần Văn Hoàng',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-    area: 'Đà Nẵng - Hải Châu',
-    completedOrders: 98,
-    revenue: 63700000,
-    rating: 4.91,
-  },
-];
-
-const REGIONAL_REVENUE = [
-  { region: 'TP. Hồ Chí Minh (Quận 1, 3, Bình Thạnh)', revenue: 142800000, share: 57.5 },
-  { region: 'Hà Nội (Cầu Giấy, Hoàn Kiếm, Ba Đình)', revenue: 76200000, share: 30.6 },
-  { region: 'Đà Nẵng (Hải Châu, Sơn Trà)', revenue: 29560000, share: 11.9 },
-];
+function EmptyRows({ text }: { text: string }) {
+  return <div className="py-10 text-center text-xs text-[#94A399]">{text}</div>;
+}
 
 export const AnalyticsPage: React.FC = () => {
   const { addToast } = useToast();
-  const [timeTab, setTimeTab] = useState<'day' | 'week' | 'month'>('month');
+  const [timeTab, setTimeTab] = useState<Period>('month');
   const [showComparison, setShowComparison] = useState(true);
+  const [report, setReport] = useState<RevenueReport | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    request<RevenueReport>(`/admin/marketplace/reports/revenue?period=${timeTab}`)
+      .then((data) => !cancelled && setReport(data))
+      .catch((e) =>
+        addToast({ title: 'Không tải được báo cáo', message: e instanceof Error ? e.message : '', type: 'error' }),
+      )
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeTab]);
 
   const handleExportReport = () => {
-    addToast({
-      title: 'Chưa xuất được',
-      message: 'Trang này đang dùng dữ liệu minh họa nên chưa có file để tải.',
-      type: 'warning',
-    });
+    if (!report) return;
+    const csv = (rows: (string | number)[][]) => rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const content = [
+      csv([[`Doanh thu - ${PERIOD_LABELS[timeTab]}`], ['Mốc', 'Kỳ hiện tại', `Kỳ so sánh (${COMPARE_LABELS[timeTab]})`]]),
+      csv(report.timeline.map((r) => [r.label, r.current, r.previous])),
+      csv([[], ['Nhóm dịch vụ', 'Doanh thu', 'Lượt', 'Tỷ trọng %']]),
+      csv(report.byCategory.map((r) => [r.name, r.revenue, r.bookings, r.share])),
+      csv([[], ['Khu vực', 'Doanh thu', 'Đơn', 'Tỷ trọng %']]),
+      csv(report.byRegion.map((r) => [r.region, r.revenue, r.bookings, r.share])),
+      csv([[], ['Dịch vụ', 'Doanh thu', 'Lượt', 'Tỷ trọng %']]),
+      csv(report.topServices.map((r) => [r.name, r.revenue, r.bookings, r.share])),
+      csv([[], ['Kỹ thuật viên', 'Khu vực', 'Doanh thu', 'Số ca', 'Đánh giá']]),
+      csv(report.topTechnicians.map((r) => [r.name, r.area, r.revenue, r.completedOrders, r.rating])),
+    ].join('\n');
+    // BOM so Excel opens the Vietnamese text as UTF-8.
+    const url = URL.createObjectURL(new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `bao-cao-doanh-thu-${timeTab}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
-  const chartData = REVENUE_TIMELINE[timeTab];
+  const kpis = report?.kpis;
+  const chartData = report?.timeline ?? [];
+  const topCategory = report?.byCategory[0];
+  const lastMonthLabel = `tháng ${((new Date().getMonth() + 11) % 12) + 1}`;
+  const kpiChange = (current: number, previous: number) => {
+    const value = change(current, previous);
+    return value === undefined ? {} : { change: Math.abs(value), isPositive: value >= 0 };
+  };
 
   return (
     <motion.div
@@ -179,7 +138,7 @@ export const AnalyticsPage: React.FC = () => {
       <PageHeader
         title="Doanh thu & Báo cáo"
         subtitle="Theo dõi hiệu quả kinh doanh, xu hướng tăng trưởng và đóng góp của kỹ thuật viên"
-        badge="Dữ liệu thời gian thực"
+        badge="Từ đơn đã hoàn thành"
         badgeTone="green"
         breadcrumbs={[
           { label: 'MATXXA' },
@@ -188,69 +147,59 @@ export const AnalyticsPage: React.FC = () => {
         actions={
           <button
             onClick={handleExportReport}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white text-xs font-semibold shadow-sm shadow-[#2E7D4A]/25 transition-all cursor-pointer"
+            disabled={!report}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white text-xs font-semibold shadow-sm shadow-[#2E7D4A]/25 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download className="w-4 h-4" />
             <span>Xuất báo cáo Excel</span>
           </button>
         }
       />
-      <DemoDataNotice />
 
       {/* 2. KPI Cards Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           label="Tổng doanh thu tích lũy"
-          value="0 đ"
-          change={18.2}
-          isPositive={true}
-          caption="so với kỳ trước"
+          value={kpis ? formatVND(kpis.totalRevenue) : '–'}
+          caption="tất cả đơn đã hoàn thành"
           icon={<CircleDollarSign className="w-5 h-5" />}
           tone="primary"
-          sparkline={[140, 155, 170, 185, 205, 220, 235, 248]}
         />
         <StatCard
           label="Doanh thu tháng này"
-          value="0 đ"
-          change={14.8}
-          isPositive={true}
-          caption="so với tháng 9"
+          value={kpis ? formatVND(kpis.revenueThisMonth) : '–'}
+          {...(kpis ? kpiChange(kpis.revenueThisMonth, kpis.revenueLastMonth) : {})}
+          caption={`so với ${lastMonthLabel}`}
           icon={<Receipt className="w-5 h-5" />}
           tone="success"
-          sparkline={[82, 88, 92, 104, 115, 122, 130, 142]}
         />
         <StatCard
           label="Giá trị đơn trung bình"
-          value="0 đ"
-          change={6.4}
-          isPositive={true}
-          caption="so với tháng trước"
+          value={kpis ? formatVND(kpis.averageOrderValue) : '–'}
+          {...(kpis ? kpiChange(kpis.averageOrderValue, kpis.averageOrderValueLastMonth) : {})}
+          caption="tháng này so với tháng trước"
           icon={<Sparkles className="w-5 h-5" />}
           tone="warning"
-          sparkline={[620, 630, 640, 650, 665, 672, 680]}
         />
         <StatCard
           label="Tỷ lệ hoàn thành đơn"
-          value="0%"
-          change={1.4}
-          isPositive={true}
-          caption="0 ca thành công"
+          value={kpis ? `${kpis.completionRate}%` : '–'}
+          {...(kpis ? kpiChange(kpis.completionRate, kpis.completionRateLastMonth) : {})}
+          caption={kpis ? `${kpis.completedThisMonth} ca thành công tháng này` : undefined}
           icon={<CheckCircle2 className="w-5 h-5" />}
           tone="info"
-          sparkline={[96.2, 96.8, 97.4, 97.9, 98.2, 98.6]}
         />
       </div>
 
       {/* 3. Main Revenue Trend Chart */}
       <SectionCard
         title="Doanh thu theo thời gian"
-        subtitle="Biểu đồ so sánh doanh thu thực tế và chu kỳ liền kề"
+        subtitle={`${PERIOD_LABELS[timeTab]}: ${formatVND(report?.periodRevenue ?? 0)} · đường nét đứt là ${COMPARE_LABELS[timeTab]}`}
         action={
           <div className="flex items-center gap-2 flex-wrap">
             {/* Period tabs */}
             <div className="flex items-center p-1 bg-[#F1F5EF] rounded-xl border border-[#E5EBE5]">
               {(['day', 'week', 'month'] as const).map((tab) => {
-                const label = tab === 'day' ? 'Hôm nay' : tab === 'week' ? 'Tuần này' : 'Tháng này';
                 const isActive = timeTab === tab;
                 return (
                   <button
@@ -262,7 +211,7 @@ export const AnalyticsPage: React.FC = () => {
                         : 'text-[#66756B] hover:text-[#1C2B20]'
                     }`}
                   >
-                    {label}
+                    {PERIOD_LABELS[tab]}
                   </button>
                 );
               })}
@@ -283,7 +232,7 @@ export const AnalyticsPage: React.FC = () => {
           </div>
         }
       >
-        <div className="w-full h-80 sm:h-96 pt-2">
+        <div className={`w-full h-80 sm:h-96 pt-2 transition-opacity ${loading ? 'opacity-40' : ''}`}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <defs>
@@ -370,93 +319,95 @@ export const AnalyticsPage: React.FC = () => {
         {/* Left: Revenue Structure (Donut) */}
         <SectionCard
           title="Cơ cấu doanh thu"
-          subtitle="Tỷ trọng đóng góp theo nhóm dịch vụ"
+          subtitle={`Tỷ trọng theo nhóm dịch vụ · ${PERIOD_LABELS[timeTab].toLowerCase()}`}
           className="lg:col-span-1"
         >
-          <div className="flex flex-col items-center">
-            <div className="w-48 h-48 relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={REVENUE_STRUCTURE}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={80}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {REVENUE_STRUCTURE.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-[11px] text-[#66756B]">Massage tại nhà</span>
-                <span className="text-xl font-bold text-[#1C2B20]">58%</span>
+          {!report?.byCategory.length ? (
+            <EmptyRows text="Chưa có đơn hoàn thành trong kỳ này" />
+          ) : (
+            <div className="flex flex-col items-center">
+              <div className="w-48 h-48 relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={report.byCategory}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={80}
+                      paddingAngle={3}
+                      dataKey="revenue"
+                    >
+                      {report.byCategory.map((entry, index) => (
+                        <Cell key={entry.name} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-8 text-center">
+                  <span className="text-[11px] text-[#66756B] truncate max-w-full">{topCategory?.name}</span>
+                  <span className="text-xl font-bold text-[#1C2B20]">{topCategory?.share}%</span>
+                </div>
+              </div>
+
+              <div className="w-full space-y-2.5 mt-4 pt-4 border-t border-[#F1F5EF]">
+                {report.byCategory.map((item, idx) => (
+                  <div key={item.name} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: CATEGORY_COLORS[idx % CATEGORY_COLORS.length] }}
+                      />
+                      <span className="text-[#1C2B20] font-medium truncate">{item.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="font-semibold text-[#1C2B20]">{item.share}%</span>
+                      <span className="text-[#94A399]">({formatVND(item.revenue)})</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-
-            <div className="w-full space-y-2.5 mt-4 pt-4 border-t border-[#F1F5EF]">
-              {REVENUE_STRUCTURE.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="text-[#1C2B20] font-medium">{item.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-[#1C2B20]">{item.value}%</span>
-                    <span className="text-[#94A399]">({(item.revenue / 1000000).toFixed(1)}Tr)</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
         </SectionCard>
 
         {/* Right: Regional Revenue Breakdown */}
         <SectionCard
           title="Doanh thu theo khu vực"
-          subtitle="Tình hình phân bổ doanh thu tại các thành phố lớn"
+          subtitle="Theo tỉnh/thành của địa chỉ phục vụ"
           className="lg:col-span-2"
         >
-          <div className="space-y-5">
-            {REGIONAL_REVENUE.map((reg, idx) => (
-              <div key={idx} className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-[#2E7D4A]" />
-                    <span className="font-bold text-[#1C2B20]">{reg.region}</span>
+          {!report?.byRegion.length ? (
+            <EmptyRows text="Chưa có đơn hoàn thành trong kỳ này" />
+          ) : (
+            <div className="space-y-5">
+              {report.byRegion.map((reg) => (
+                <div key={reg.region} className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-[#2E7D4A]" />
+                      <span className="font-bold text-[#1C2B20]">{reg.region}</span>
+                      <span className="text-[#94A399]">{reg.bookings} đơn</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-bold text-[#2E7D4A]">{formatVND(reg.revenue)}</span>
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#EAF5EC] text-[#2E7D4A]">
+                        {reg.share}%
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-[#2E7D4A]">{formatVND(reg.revenue)}</span>
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#EAF5EC] text-[#2E7D4A]">
-                      {reg.share}%
-                    </span>
+                  <div className="w-full h-2 rounded-full bg-[#F1F5EF] overflow-hidden">
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-[#2E7D4A] to-[#41955F] rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${reg.share}%` }}
+                      transition={{ duration: 0.6, ease: 'easeOut' }}
+                    />
                   </div>
                 </div>
-                <div className="w-full h-2 rounded-full bg-[#F1F5EF] overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-[#2E7D4A] to-[#41955F] rounded-full transition-all duration-500"
-                    style={{ width: `${reg.share}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-
-            <div className="p-4 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] flex items-center justify-between text-xs mt-4">
-              <span className="text-[#66756B]">
-                💡 Khu vực TP. Hồ Chí Minh tiếp tục dẫn đầu với tốc độ tăng trưởng +22% so với tháng trước.
-              </span>
-              <span className="font-semibold text-[#2E7D4A] flex items-center gap-1 cursor-pointer hover:underline">
-                Xem bản đồ nhiệt →
-              </span>
+              ))}
             </div>
-          </div>
+          )}
         </SectionCard>
       </div>
 
@@ -465,74 +416,80 @@ export const AnalyticsPage: React.FC = () => {
         {/* Top Services */}
         <SectionCard
           title="Dịch vụ được đặt nhiều nhất"
-          subtitle="Xếp hạng theo số lượt hoàn thành và tổng doanh thu"
-          action={
-            <span className="text-xs text-[#2E7D4A] font-semibold cursor-pointer hover:underline">
-              Xem tất cả dịch vụ
-            </span>
-          }
+          subtitle={`Xếp hạng theo doanh thu · ${PERIOD_LABELS[timeTab].toLowerCase()}`}
         >
-          <div className="divide-y divide-[#F1F5EF]">
-            {TOP_SERVICES.map((srv, idx) => (
-              <div key={idx} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-6 h-6 rounded-lg bg-[#EAF5EC] text-[#2E7D4A] font-bold text-xs flex items-center justify-center flex-shrink-0">
-                    {idx + 1}
-                  </span>
-                  <div className="truncate">
-                    <div className="font-bold text-xs text-[#1C2B20] truncate">{srv.name}</div>
-                    <div className="text-[11px] text-[#94A399] mt-0.5">{srv.duration} • {srv.bookings} lượt đặt</div>
+          {!report?.topServices.length ? (
+            <EmptyRows text="Chưa có đơn hoàn thành trong kỳ này" />
+          ) : (
+            <div className="divide-y divide-[#F1F5EF]">
+              {report.topServices.map((srv, idx) => (
+                <div key={srv.name} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-6 h-6 rounded-lg bg-[#EAF5EC] text-[#2E7D4A] font-bold text-xs flex items-center justify-center flex-shrink-0">
+                      {idx + 1}
+                    </span>
+                    <div className="truncate">
+                      <div className="font-bold text-xs text-[#1C2B20] truncate">{srv.name}</div>
+                      <div className="text-[11px] text-[#94A399] mt-0.5">{srv.duration} phút • {srv.bookings} lượt đặt</div>
+                    </div>
                   </div>
-                </div>
 
-                <div className="text-right flex-shrink-0">
-                  <div className="font-bold text-xs text-[#1C2B20]">{formatVND(srv.revenue)}</div>
-                  <div className="text-[11px] text-[#2E9B62] font-semibold flex items-center justify-end gap-0.5 mt-0.5">
-                    <TrendingUp className="w-3 h-3" /> {srv.growth}
+                  <div className="text-right flex-shrink-0">
+                    <div className="font-bold text-xs text-[#1C2B20]">{formatVND(srv.revenue)}</div>
+                    <div className="text-[11px] text-[#66756B] mt-0.5">{srv.share}% doanh thu</div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </SectionCard>
 
         {/* Top Technicians by Revenue */}
         <SectionCard
           title="Top Kỹ thuật viên theo doanh thu"
-          subtitle="Những KTV có doanh thu và tỷ lệ hài lòng cao nhất"
-          action={
-            <span className="text-xs text-[#2E7D4A] font-semibold cursor-pointer hover:underline">
-              Bảng xếp hạng KTV
-            </span>
-          }
+          subtitle={`Doanh thu các đơn KTV đã hoàn thành · ${PERIOD_LABELS[timeTab].toLowerCase()}`}
         >
-          <div className="divide-y divide-[#F1F5EF]">
-            {TOP_TECHNICIANS.map((tech, idx) => (
-              <div key={idx} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <img
-                    src={tech.avatar}
-                    alt={tech.name}
-                    className="w-10 h-10 rounded-full object-cover ring-2 ring-[#EAF5EC]"
-                  />
-                  <div className="truncate">
-                    <div className="font-bold text-xs text-[#1C2B20] flex items-center gap-1.5">
-                      <span>{tech.name}</span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] bg-[#FEF6E9] text-[#B87A14] font-semibold">
-                        ★ {tech.rating}
+          {!report?.topTechnicians.length ? (
+            <EmptyRows text="Chưa có đơn hoàn thành trong kỳ này" />
+          ) : (
+            <div className="divide-y divide-[#F1F5EF]">
+              {report.topTechnicians.map((tech) => (
+                <div key={tech.name + tech.area} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {tech.avatarUrl ? (
+                      <img
+                        src={tech.avatarUrl}
+                        alt={tech.name}
+                        className="w-10 h-10 rounded-full object-cover ring-2 ring-[#EAF5EC]"
+                      />
+                    ) : (
+                      <span className="w-10 h-10 rounded-full bg-[#EAF5EC] text-[#2E7D4A] font-bold text-sm flex items-center justify-center ring-2 ring-[#EAF5EC]">
+                        {tech.name.charAt(0).toUpperCase()}
                       </span>
+                    )}
+                    <div className="truncate">
+                      <div className="font-bold text-xs text-[#1C2B20] flex items-center gap-1.5">
+                        <span>{tech.name}</span>
+                        {tech.rating > 0 && (
+                          <span className="px-1.5 py-0.2 rounded text-[10px] bg-[#FEF6E9] text-[#B87A14] font-semibold">
+                            ★ {tech.rating}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-[#94A399] mt-0.5 truncate">
+                        {tech.area ? `${tech.area} • ` : ''}{tech.completedOrders} ca
+                      </div>
                     </div>
-                    <div className="text-[11px] text-[#94A399] mt-0.5 truncate">{tech.area} • {tech.completedOrders} ca</div>
+                  </div>
+
+                  <div className="text-right flex-shrink-0">
+                    <div className="font-bold text-xs text-[#2E7D4A]">{formatVND(tech.revenue)}</div>
+                    <div className="text-[11px] text-[#66756B] mt-0.5">Doanh thu hoàn tất</div>
                   </div>
                 </div>
-
-                <div className="text-right flex-shrink-0">
-                  <div className="font-bold text-xs text-[#2E7D4A]">{formatVND(tech.revenue)}</div>
-                  <div className="text-[11px] text-[#66756B] mt-0.5">Hoa hồng hoàn tất</div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </SectionCard>
       </div>
     </motion.div>

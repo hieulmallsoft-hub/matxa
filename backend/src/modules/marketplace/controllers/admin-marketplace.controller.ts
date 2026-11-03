@@ -41,6 +41,7 @@ import {
   AdminBookingsQueryDto,
   AdminPageDto,
   AdminUsersQueryDto,
+  RevenueReportQueryDto,
   CreateBannerDto,
   CreateCategoryDto,
   CreatePromotionDto,
@@ -127,6 +128,11 @@ export class AdminMarketplaceController {
   @ApiOkResponse({ type: AdminDashboardResponseDto })
   dashboard() {
     return this.admin.dashboard();
+  }
+  @Get('reports/revenue')
+  @ApiOperation({ summary: 'Bao cao doanh thu tu cac don COMPLETED (gio Viet Nam)' })
+  revenueReport(@Query() query: RevenueReportQueryDto) {
+    return this.admin.revenueReport(query.period);
   }
   @Get('users')
   @ApiOperation({ summary: 'Danh sach user de tim va quan ly trang thai' })

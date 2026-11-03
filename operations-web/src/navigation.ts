@@ -80,21 +80,11 @@ export const NAV_GROUPS: NavGroup[] = [
 
 export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
 
-// Mock-data pages with no backend yet: reachable by URL, kept out of the menu.
-const UNLISTED: Record<string, Pick<NavItem, 'label' | 'description'>> = {
-  payments: { label: 'Cổng thanh toán', description: 'Dữ liệu mô phỏng, chưa nối API' },
-  transactions: { label: 'Sổ cái đối soát', description: 'Dữ liệu mô phỏng, chưa nối API' },
-  products: { label: 'Vật tư & Sản phẩm', description: 'Dữ liệu mô phỏng, chưa nối API' },
-};
+// Mock-data pages (payments, transactions, products) have no backend yet, so they are not routable;
+// their URLs fall back to the dashboard.
+export const ALL_PAGE_IDS = NAV_ITEMS.map((item) => item.id);
 
-export const ALL_PAGE_IDS = [...NAV_ITEMS.map((item) => item.id), ...(Object.keys(UNLISTED) as PageId[])];
-
-export const navItem = (id: PageId): NavItem => {
-  const listed = NAV_ITEMS.find((item) => item.id === id);
-  if (listed) return listed;
-  const unlisted = UNLISTED[id];
-  return unlisted ? { id, icon: NAV_ITEMS[0].icon, ...unlisted } : NAV_ITEMS[0];
-};
+export const navItem = (id: PageId): NavItem => NAV_ITEMS.find((item) => item.id === id) ?? NAV_ITEMS[0];
 
 /** Accent-insensitive match so "khuyen mai" finds "Khuyến mãi". */
 export const normalizeSearch = (value: string) =>

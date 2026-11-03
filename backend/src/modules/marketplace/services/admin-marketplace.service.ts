@@ -15,6 +15,7 @@ import {
   UpdatePromotionDto,
   UpdateUserStatusDto,
 } from '../dto/marketplace.dto';
+import { buildRevenueReport, monthRanges, periodRanges, RevenuePeriod } from './revenue-report';
 
 const number = (value: unknown) => Number(value ?? 0);
 
@@ -27,6 +28,47 @@ const duplicatePromotionCode = (error: unknown): never => {
 @Injectable()
 export class AdminMarketplaceService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async revenueReport(period: RevenuePeriod = 'month', now = new Date()) {
+    const months = monthRanges(now);
+    const ranges = periodRanges(period, now);
+    const from = new Date(Math.min(months.previous.start.getTime(), ranges.previous.start.getTime()));
+    const to = new Date(Math.max(months.current.end.getTime(), ranges.current.end.getTime()));
+    const finished = (range: { start: Date; end: Date }) =>
+      this.prisma.booking.groupBy({
+        by: ['status'],
+        where: { status: { in: ['COMPLETED', 'CANCELLED', 'EXPIRED'] }, scheduledStart: { gte: range.start, lt: range.end } },
+        _count: { _all: true },
+      });
+    const [total, completed, thisMonth, lastMonth] = await Promise.all([
+      this.prisma.booking.aggregate({ where: { status: 'COMPLETED' }, _sum: { totalAmount: true } }),
+      this.prisma.booking.findMany({
+        where: { status: 'COMPLETED', scheduledStart: { gte: from, lt: to } },
+        select: {
+          scheduledStart: true,
+          totalAmount: true,
+          addressSnapshot: true,
+          technicianId: true,
+          technician: {
+            select: { city: true, district: true, averageRating: true, user: { select: { displayName: true, avatarUrl: true } } },
+          },
+          items: { select: { serviceName: true, categoryName: true, durationMinutes: true } },
+        },
+      }),
+      finished(months.current),
+      finished(months.previous),
+    ]);
+    const byStatus = (rows: { status: string; _count: { _all: number } }[]) =>
+      Object.fromEntries(rows.map((row) => [row.status, row._count._all]));
+    return buildRevenueReport({
+      period,
+      now,
+      totalRevenue: number(total._sum.totalAmount),
+      completed,
+      finishedThisMonth: byStatus(thisMonth),
+      finishedLastMonth: byStatus(lastMonth),
+    });
+  }
 
   async dashboard() {
     const now = new Date();

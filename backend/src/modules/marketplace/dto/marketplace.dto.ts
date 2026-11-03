@@ -350,6 +350,13 @@ export class AdminBookingsQueryDto extends AdminPageDto {
   status?: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
 }
 
+export class RevenueReportQueryDto {
+  @ApiPropertyOptional({ enum: ['day', 'week', 'month'], default: 'month', description: 'day = hom nay theo gio, week = tuan nay, month = cac thang trong nam' })
+  @IsOptional()
+  @IsIn(['day', 'week', 'month'])
+  period?: 'day' | 'week' | 'month';
+}
+
 export class UpdateUserStatusDto {
   @ApiProperty({ enum: ['ACTIVE', 'BLOCKED'] }) @IsIn(['ACTIVE', 'BLOCKED']) status!: 'ACTIVE' | 'BLOCKED';
 }

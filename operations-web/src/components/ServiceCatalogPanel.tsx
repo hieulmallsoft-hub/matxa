@@ -1,6 +1,7 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
-import { motion, AnimatePresence, animate } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useConfirm } from './ui/useConfirm';
+import { AnimatedNumber } from './ui/kit';
 import {
   Sparkles,
   Plus,
@@ -65,15 +66,6 @@ const CATEGORY_TONES = [
   { soft: 'bg-[#FCEEF3]', text: 'text-[#BE3A6A]', solid: 'bg-[#BE3A6A] text-white' },
   { soft: 'bg-[#E8F6F6]', text: 'text-[#0F7C7C]', solid: 'bg-[#0F7C7C] text-white' },
 ];
-
-function CountUp({ value }: { value: number }) {
-  const [shown, setShown] = useState(0);
-  useEffect(() => {
-    const controls = animate(0, value, { duration: 0.6, ease: 'easeOut', onUpdate: (v) => setShown(Math.round(v)) });
-    return () => controls.stop();
-  }, [value]);
-  return <>{shown}</>;
-}
 
 export function ServiceCatalogPanel({
   categories,
@@ -308,7 +300,7 @@ export function ServiceCatalogPanel({
                 <stat.icon className="w-[18px] h-[18px]" />
               </span>
               <div>
-                <p className="text-xl font-bold text-[#1C2B20] leading-none">{loading ? '–' : <CountUp value={stat.value} />}</p>
+                <p className="text-xl font-bold text-[#1C2B20] leading-none">{loading ? '–' : <AnimatedNumber value={stat.value} />}</p>
                 <p className="text-[11px] font-semibold text-[#66756B] mt-1">{stat.label}</p>
               </div>
             </motion.div>
