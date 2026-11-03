@@ -41,8 +41,8 @@ export function TechnicianPricingPanel({
   async function save(event: FormEvent<HTMLFormElement>, serviceId: string, optionId: string) {
     event.preventDefault();
     const price = Number(new FormData(event.currentTarget).get('price'));
-    if (!Number.isFinite(price) || price < 0) {
-      notify('Giá phải là số tiền không âm.', true);
+    if (!Number.isFinite(price) || price < 400_000 || price > 1_000_000) {
+      notify('Giá mỗi gói phải từ 400.000đ đến 1.000.000đ.', true);
       return;
     }
     setSavingId(optionId);
@@ -94,13 +94,14 @@ export function TechnicianPricingPanel({
                     <form
                       key={option.id}
                       className="pricing-option"
+                      noValidate
                       onSubmit={(event) => void save(event, service.id, option.id)}
                     >
                       <span>
                         {option.durationMinutes} phút{!option.isActive ? ' · Đang ẩn' : ''}
                       </span>
                       <label>
-                        Giá (VND)
+                        Giá (400.000 – 1.000.000đ)
                         <input name="price" type="number" min="400000" max="1000000" step="1000" defaultValue={option.price} required />
                       </label>
                       <button type="submit" disabled={savingId === option.id}>

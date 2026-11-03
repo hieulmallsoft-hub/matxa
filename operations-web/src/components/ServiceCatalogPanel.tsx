@@ -25,6 +25,19 @@ import {
 } from 'lucide-react';
 import { request } from '../api/client';
 
+const PRICE_MIN = 400_000;
+const PRICE_MAX = 1_000_000;
+const formatVnd = (value: number) => new Intl.NumberFormat('vi-VN').format(value);
+
+/** Vietnamese message for a price outside the allowed range, or null when it is fine. */
+function priceError(raw: string | undefined) {
+  if (!raw) return null;
+  const price = Number(raw);
+  if (price < PRICE_MIN) return `Tối thiểu ${formatVnd(PRICE_MIN)}đ`;
+  if (price > PRICE_MAX) return `Tối đa ${formatVnd(PRICE_MAX)}đ`;
+  return null;
+}
+
 type Category = { id: string; name: string };
 type PriceOption = { id: string; code: string; durationMinutes: number; price: number; isActive: boolean };
 type CatalogItem = {
@@ -130,9 +143,14 @@ export function ServiceCatalogPanel({
       return;
     }
 
+    const durations = templates[template];
+    if (durations.some((duration) => !prices[duration] || priceError(prices[duration]))) {
+      notify(`Giá mỗi gói phải từ ${formatVnd(PRICE_MIN)}đ đến ${formatVnd(PRICE_MAX)}đ`, true);
+      return;
+    }
+
     setIsSubmitting(true);
     const form = new FormData(event.currentTarget);
-    const durations = templates[template];
     const body = {
       categoryId: form.get('categoryId'),
       slug: form.get('slug'),
@@ -735,15 +753,19 @@ export function ServiceCatalogPanel({
 
                 {/* Pricing Inputs */}
                 <div className="p-4 rounded-2xl bg-[#F6F8F4] border border-[#E5EBE5] space-y-3">
-                  <span className="block text-xs font-bold text-[#1C2B20]">
-                    Mức giá tiêu chuẩn (VNĐ)
-                  </span>
+                  <div className="flex flex-wrap items-baseline justify-between gap-1">
+                    <span className="text-xs font-bold text-[#1C2B20]">Mức giá tiêu chuẩn (VNĐ)</span>
+                    <span className="text-[11px] font-semibold text-[#66756B]">
+                      Mỗi gói từ {formatVnd(PRICE_MIN)}đ đến {formatVnd(PRICE_MAX)}đ
+                    </span>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {durations.map((duration) => {
                       const durationLabel =
                         template === 'DATE_2_4_6_HOURS'
                           ? `${duration / 60} tiếng`
                           : `${duration} phút`;
+                      const error = priceError(prices[duration]);
                       return (
                         <div key={duration}>
                           <label className="block text-[11px] font-semibold text-[#66756B] mb-1">
@@ -751,20 +773,27 @@ export function ServiceCatalogPanel({
                           </label>
                           <div className="relative">
                             <input
-                              type="number"
-                              min="400000"
-                              max="1000000"
-                              step="10000"
+                              type="text"
+                              inputMode="numeric"
                               required
-                              value={prices[duration] ?? ''}
-                              onChange={(e) => setPrices({ ...prices, [duration]: e.target.value })}
-                              placeholder="vd: 500000"
-                              className="w-full pl-3 pr-8 py-2 rounded-xl bg-white border border-[#E5EBE5] text-xs font-bold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
+                              value={prices[duration] ? formatVnd(Number(prices[duration])) : ''}
+                              onChange={(e) =>
+                                setPrices({
+                                  ...prices,
+                                  [duration]: e.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 8),
+                                })
+                              }
+                              placeholder="vd: 500.000"
+                              aria-invalid={Boolean(error)}
+                              className={`w-full pl-3 pr-8 py-2 rounded-xl bg-white border text-xs font-bold text-[#1C2B20] focus:outline-none ${
+                                error ? 'border-red-400 focus:border-red-500' : 'border-[#E5EBE5] focus:border-[#2E7D4A]'
+                              }`}
                             />
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#94A399]">
                               đ
                             </span>
                           </div>
+                          {error && <p className="mt-1 text-[11px] font-semibold text-red-500">{error}</p>}
                         </div>
                       );
                     })}
