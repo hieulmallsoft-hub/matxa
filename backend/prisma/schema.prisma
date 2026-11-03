@@ -76,6 +76,7 @@ enum ServiceCatalogPricingTemplate {
 }
 
 enum CancellationReasonCode {
+  WAIT_TOO_LONG
   NO_LONGER_NEEDED
   SERVICE_ISSUE
   PAYMENT_REFUND_ISSUE

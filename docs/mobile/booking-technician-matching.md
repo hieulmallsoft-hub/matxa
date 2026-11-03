@@ -164,9 +164,23 @@ User hủy đơn:
 
 ```http
 PATCH /api/bookings/{bookingId}/cancel
+
+{ "reasonCode": "WAIT_TOO_LONG" }
 ```
 
-KTV nhận thông báo `BOOKING_CANCELLED` qua bản lưu trong app và push FCM nếu có device token.
+| Lựa chọn trên màn "Bạn muốn hủy đơn?" | `reasonCode` |
+|---|---|
+| Thời gian chờ quá lâu | `WAIT_TOO_LONG` |
+| Không muốn sử dụng dịch vụ nữa | `NO_LONGER_NEEDED` |
+| Vấn đề về dịch vụ | `SERVICE_ISSUE` |
+| Vấn đề thanh toán / hoàn tiền | `PAYMENT_REFUND_ISSUE` |
+| Lý do khác | `OTHER` + `reasonText` bắt buộc |
+
+Mã khác danh sách trên trả `400`. Hủy được khi đơn `OPEN`, `PENDING` hoặc `CONFIRMED`. KTV đã ứng tuyển nhận thông báo `BOOKING_CANCELLED` qua bản lưu trong app và push FCM nếu có device token.
+
+### KTV "Khách đặt bạn" từ chối
+
+KTV gọi `POST /api/technician/jobs/{bookingId}/decline`. Đơn **không bị hủy**: vẫn `OPEN` để khách chọn KTV khác đang ứng tuyển. Khách nhận thông báo `REQUESTED_TECHNICIAN_DECLINED` ("<tên KTV> đã từ chối đơn. Bạn có thể chọn KTV khác đang ứng tuyển."), `actionUrl = matxa://bookings/{bookingId}`. Khi nhận, app khách tải lại `GET /api/bookings/{bookingId}` và đổi dòng "Đang chờ <tên KTV> xác nhận".
 
 ## 5. Catalog dịch vụ
 

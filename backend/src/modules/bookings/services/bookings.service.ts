@@ -627,14 +627,27 @@ export class BookingsService {
 
   async declineOpenJob(userId: string, bookingId: string) {
     const profile = await this.requireActiveTechnician(userId);
-    await this.openJobForTechnician(bookingId, profile.id, true);
+    const booking = await this.openJobForTechnician(bookingId, profile.id, true);
     const existing = await this.prisma.bookingTechnicianApplication.findUnique({
       where: { bookingId_technicianProfileId: { bookingId, technicianProfileId: profile.id } },
     });
     if (existing) return existing;
-    return this.prisma.bookingTechnicianApplication.create({
+    const declined = await this.prisma.bookingTechnicianApplication.create({
       data: { bookingId, technicianProfileId: profile.id, status: 'DECLINED', declinedAt: new Date() },
     });
+    // The booking stays open for other applicants; the customer only needs to know their pick said no.
+    if (booking.requestedTechnicianId === profile.id) {
+      const technician = await this.prisma.user.findUnique({ where: { id: userId }, select: { displayName: true } });
+      const name = technician?.displayName || 'KTV bạn chọn';
+      void this.notifyStatus(
+        booking.customerId,
+        bookingId,
+        'REQUESTED_TECHNICIAN_DECLINED',
+        'KTV đã từ chối',
+        `${name} đã từ chối đơn. Bạn có thể chọn KTV khác đang ứng tuyển.`,
+      );
+    }
+    return declined;
   }
 
   async withdrawOpenJobApplication(userId: string, bookingId: string) {
@@ -1299,7 +1312,7 @@ export class BookingsService {
       status: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
       cancelledAt?: Date;
       cancellationReason?: string;
-      cancellationReasonCode?: 'NO_LONGER_NEEDED' | 'SERVICE_ISSUE' | 'PAYMENT_REFUND_ISSUE' | 'OTHER';
+      cancellationReasonCode?: 'WAIT_TOO_LONG' | 'NO_LONGER_NEEDED' | 'SERVICE_ISSUE' | 'PAYMENT_REFUND_ISSUE' | 'OTHER';
       cancellationReasonText?: string;
       cancelledByUserId?: string;
       cancelledByRole?: 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN';

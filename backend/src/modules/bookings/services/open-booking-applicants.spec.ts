@@ -77,3 +77,41 @@ describe('customer cancels a waiting open booking', () => {
     expect(notifications.create).toHaveBeenCalledWith('tech-user-1', 'BOOKING_CANCELLED', expect.any(String), expect.any(String), 'matxa://bookings/booking-1');
   });
 });
+
+describe('requested technician declines a waiting open booking', () => {
+  function setup(profileId: string) {
+    const booking: any = {
+      id: 'booking-1', customerId: 'customer-1', assignmentMode: 'OPEN_MARKETPLACE', status: 'OPEN',
+      technicianId: null, requestedTechnicianId: 'requested-profile', items: [],
+    };
+    const prisma: any = {
+      technicianProfile: { findFirst: jest.fn().mockResolvedValue({ id: profileId }) },
+      user: { findUnique: jest.fn().mockResolvedValue({ displayName: 'Kim Nguyễn' }) },
+      bookingTechnicianApplication: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn(async ({ data }: any) => ({ id: 'application-1', ...data })),
+      },
+    };
+    const notifications = { getTemplate: jest.fn().mockResolvedValue(null), create: jest.fn(), sendPush: jest.fn() };
+    const service = new BookingsService(prisma, { get: (_key: string, fallback: unknown) => fallback } as any, notifications as any, {} as any);
+    jest.spyOn(service as any, 'openJobForTechnician').mockResolvedValue(booking);
+    return { service, notifications };
+  }
+
+  it('keeps the booking open and tells the customer they can pick another applicant', async () => {
+    const { service, notifications } = setup('requested-profile');
+    const result: any = await service.declineOpenJob('tech-user', 'booking-1');
+    expect(result.status).toBe('DECLINED');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(notifications.create).toHaveBeenCalledWith(
+      'customer-1', 'REQUESTED_TECHNICIAN_DECLINED', expect.any(String),
+      expect.stringContaining('Kim Nguyễn'), 'matxa://bookings/booking-1');
+  });
+
+  it('does not notify the customer when another technician hides the job', async () => {
+    const { service, notifications } = setup('other-profile');
+    await service.declineOpenJob('tech-user', 'booking-1');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(notifications.create).not.toHaveBeenCalled();
+  });
+});

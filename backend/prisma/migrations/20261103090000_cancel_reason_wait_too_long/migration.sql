@@ -1,0 +1,1 @@
+ALTER TYPE "CancellationReasonCode" ADD VALUE IF NOT EXISTS 'WAIT_TOO_LONG';

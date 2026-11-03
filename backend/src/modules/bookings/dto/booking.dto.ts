@@ -134,10 +134,10 @@ export class SelectTechnicianDto {
 }
 
 export class CancelBookingDto {
-  @ApiPropertyOptional({ enum: ['NO_LONGER_NEEDED', 'SERVICE_ISSUE', 'PAYMENT_REFUND_ISSUE', 'OTHER'] })
+  @ApiPropertyOptional({ enum: ['WAIT_TOO_LONG', 'NO_LONGER_NEEDED', 'SERVICE_ISSUE', 'PAYMENT_REFUND_ISSUE', 'OTHER'] })
   @IsOptional()
-  @IsIn(['NO_LONGER_NEEDED', 'SERVICE_ISSUE', 'PAYMENT_REFUND_ISSUE', 'OTHER'])
-  reasonCode?: 'NO_LONGER_NEEDED' | 'SERVICE_ISSUE' | 'PAYMENT_REFUND_ISSUE' | 'OTHER';
+  @IsIn(['WAIT_TOO_LONG', 'NO_LONGER_NEEDED', 'SERVICE_ISSUE', 'PAYMENT_REFUND_ISSUE', 'OTHER'])
+  reasonCode?: 'WAIT_TOO_LONG' | 'NO_LONGER_NEEDED' | 'SERVICE_ISSUE' | 'PAYMENT_REFUND_ISSUE' | 'OTHER';
   @ApiPropertyOptional({ description: 'Bắt buộc khi reasonCode=OTHER' })
   @IsOptional()
   @IsString()
