@@ -548,6 +548,23 @@ export class BookingsService {
       calculatedAt: new Date(),
     });
     const customerPayableAmount = new Prisma.Decimal(subtotal).plus(serviceFee);
+    const scheduledEnd = new Date(start.getTime() + durationMinutes * 60_000);
+    // A chosen technician who cannot take this booking would never be notified and the customer
+    // would wait for nothing; refuse it now so the app can ask for another technician.
+    if (requestedTechnicianId)
+      await this.assertOpenEligibility(
+        this.prisma,
+        {
+          assignmentMode: 'OPEN_MARKETPLACE',
+          status: 'OPEN',
+          mode: dto.mode,
+          addressSnapshot: addressSnapshot ?? { city: dto.city, district: dto.district ?? null },
+          scheduledStart: start,
+          scheduledEnd,
+          items: ordered.map(({ service }) => ({ catalogService: service })),
+        },
+        requestedTechnicianId,
+      );
     const created = await this.prisma.booking.create({
       data: {
         customerId: userId,
@@ -559,7 +576,7 @@ export class BookingsService {
         addressSnapshot: addressSnapshot ?? { city: dto.city, district: dto.district ?? null },
         applicationDeadlineAt: deadline,
         scheduledStart: start,
-        scheduledEnd: new Date(start.getTime() + durationMinutes * 60_000),
+        scheduledEnd,
         subtotal,
         serviceFee,
         discountAmount: 0,

@@ -129,3 +129,42 @@ describe('cancel button on the waiting screen', () => {
     expect(response.canCancel).toBe(expected);
   });
 });
+
+describe('creating a booking for a chosen technician', () => {
+  function setup() {
+    const prisma: any = {
+      serviceCatalogItem: { findMany: jest.fn().mockResolvedValue([
+        { id: 'catalog', name: 'Massage', categoryId: 'category', category: { name: 'Massage' }, modes: ['HOME'],
+          priceOptions: [{ id: 'option', durationMinutes: 60, price: 100000 }] },
+      ]) },
+      address: { findFirst: jest.fn().mockResolvedValue({ id: 'address', city: 'HN', district: null }) },
+      booking: { create: jest.fn().mockResolvedValue({ id: 'booking-1', items: [] }) },
+    };
+    const service = new BookingsService(prisma, { get: (_key: string, fallback: unknown) => fallback } as any, {} as any, {} as any);
+    jest.spyOn(service as any, 'notifyEligibleTechniciansForOpenBooking').mockResolvedValue(undefined);
+    const dto: any = {
+      items: [{ catalogServiceId: 'catalog', priceOptionId: 'option' }],
+      scheduledStart: new Date(Date.now() + 86_400_000).toISOString(),
+      mode: 'HOME', city: 'HN', addressId: 'address', paymentMethod: 'CASH',
+    };
+    return { service, prisma, dto };
+  }
+
+  it('rejects the booking when the chosen technician cannot take it, so the customer is not left waiting', async () => {
+    const { service, prisma, dto } = setup();
+    jest.spyOn(service as any, 'assertOpenEligibility').mockRejectedValue(new Error('KTV khong ranh trong khung gio nay'));
+    await expect(service.createOpen('customer-1', dto, 'busy-profile')).rejects.toThrow('KTV khong ranh trong khung gio nay');
+    expect(prisma.booking.create).not.toHaveBeenCalled();
+  });
+
+  it('checks the chosen technician against the booking time and services before saving', async () => {
+    const { service, prisma, dto } = setup();
+    const check = jest.spyOn(service as any, 'assertOpenEligibility').mockResolvedValue(undefined);
+    await service.createOpen('customer-1', dto, 'free-profile');
+    expect(check).toHaveBeenCalledWith(prisma, expect.objectContaining({
+      assignmentMode: 'OPEN_MARKETPLACE', status: 'OPEN', mode: 'HOME',
+      items: [{ catalogService: expect.objectContaining({ id: 'catalog', categoryId: 'category' }) }],
+    }), 'free-profile');
+    expect(prisma.booking.create).toHaveBeenCalled();
+  });
+});
