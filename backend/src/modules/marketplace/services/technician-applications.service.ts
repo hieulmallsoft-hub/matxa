@@ -4,6 +4,26 @@ import { UpdateTechnicianApplicationDto } from '../dto/technician-application.dt
 import { TechnicianApplicationStorageService } from './technician-application-storage.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 
+const ADMIN_USER_SELECT = {
+  id: true,
+  displayName: true,
+  avatarUrl: true,
+  identities: { select: { phoneNumber: true, email: true } },
+} as const;
+
+/** Admin review needs a way to reach the applicant; flatten login identities to phone/email. */
+function withContact<T extends { user: { identities: Array<{ phoneNumber: string | null; email: string | null }> } }>(app: T) {
+  const { identities, ...user } = app.user;
+  return {
+    ...app,
+    user: {
+      ...user,
+      phoneNumber: identities.find((identity) => identity.phoneNumber)?.phoneNumber ?? null,
+      email: identities.find((identity) => identity.email)?.email ?? null,
+    },
+  };
+}
+
 @Injectable()
 export class TechnicianApplicationsService {
   constructor(
@@ -140,33 +160,38 @@ export class TechnicianApplicationsService {
         take: query.limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          user: { select: { id: true, displayName: true, avatarUrl: true } },
+          user: { select: { ...ADMIN_USER_SELECT } },
           kyc: { select: { status: true } },
+          _count: { select: { gallery: true } },
         },
       }),
       this.prisma.technicianApplication.count({ where }),
-    ]).then(([items, total]) => ({ items, total, page: query.page, limit: query.limit }));
+    ]).then(([items, total]) => ({ items: items.map(withContact), total, page: query.page, limit: query.limit }));
   }
   async detail(id: string) {
     const app = await this.prisma.technicianApplication.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, displayName: true, avatarUrl: true, role: true } },
+        user: { select: { ...ADMIN_USER_SELECT, role: true } },
         gallery: { orderBy: { sortOrder: 'asc' } },
         kyc: { include: { documents: true } },
       },
     });
     if (!app) throw new NotFoundException('Ho so khong ton tai');
-    const legacy = [app.idCardFrontKey, app.idCardBackKey, app.faceImageKey].filter((key): key is string =>
-      Boolean(key),
-    );
+    // Older apps stored KYC keys on the application, newer ones as KYC documents; sign both.
+    const keys = [
+      app.idCardFrontKey,
+      app.idCardBackKey,
+      app.faceImageKey,
+      ...(app.kyc?.documents ?? []).map((document) => document.storageKey),
+    ].filter((key): key is string => Boolean(key));
     const signedKyc = await Promise.all(
-      legacy.map(async (storageKey) => ({ storageKey, ...(await this.storage.createPrivateViewUrl(storageKey)) })),
+      [...new Set(keys)].map(async (storageKey) => ({ storageKey, ...(await this.storage.createPrivateViewUrl(storageKey)) })),
     );
     const signedGallery = await Promise.all(
       app.gallery.map(async (image) => ({ ...image, ...(await this.storage.createPrivateViewUrl(image.storageKey)) })),
     );
-    return { ...app, signedKyc, signedGallery };
+    return { ...withContact(app), signedKyc, signedGallery };
   }
   async reviewKyc(adminId: string, id: string, status: 'VERIFIED' | 'REJECTED', reason?: string) {
     if (status === 'REJECTED' && !reason?.trim()) throw new BadRequestException('Can nhap ly do tu choi KYC');

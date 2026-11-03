@@ -7,6 +7,7 @@ import { request } from '../api/client';
 import { TechnicianPricingPanel } from '../components/TechnicianPricingPanel';
 import { CourseManagementPanel } from '../components/CourseManagementPanel';
 import { ServiceCatalogPanel } from '../components/ServiceCatalogPanel';
+import { TechnicianApplicationsPanel, type TechnicianApplication } from '../components/TechnicianApplicationsPanel';
 import {
   CalendarCheck,
   ClipboardCheck,
@@ -21,10 +22,7 @@ import {
   Search,
   X,
   FileText,
-  AlertTriangle,
   Clock,
-  ShieldCheck,
-  ExternalLink,
   UsersRound,
   Tag,
   Image as ImageIcon,
@@ -120,36 +118,6 @@ type Promotion = {
   startsAt: string;
   endsAt: string;
 };
-type TechnicianApplication = {
-  id: string;
-  status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
-  displayName: string | null;
-  city: string | null;
-  district: string | null;
-  supportedModes: string[];
-  rejectionReason: string | null;
-  user: { id: string; displayName: string | null; phoneNumber?: string | null };
-  kyc?: { status: string } | null;
-  idCardFrontKey?: string | null;
-  idCardBackKey?: string | null;
-  faceImageKey?: string | null;
-  experienceYears?: number;
-  services?: any[];
-};
-
-const serviceModeLabels: Record<string, string> = {
-  HOME: 'Tận nơi',
-  HOME_VISIT: 'Tận nơi',
-  ONSITE: 'Tại cơ sở',
-  STUDIO: 'Tại cơ sở',
-  ONLINE: 'Online',
-};
-
-function formatServiceModes(modes?: string[] | null) {
-  if (!modes?.length) return 'Chưa chọn';
-  return modes.map((mode) => serviceModeLabels[mode] || mode).join(', ');
-}
-
 const NAV_DESCRIPTIONS: Record<string, string> = {
   ...Object.fromEntries(NAV_ITEMS.map((item) => [item.id, item.description])),
   pricing: 'Giá từng dịch vụ theo kỹ thuật viên',
@@ -175,9 +143,8 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [applications, setApplications] = useState<Page<TechnicianApplication> | null>(null);
   const [applicationAction, setApplicationAction] = useState<string | null>(null);
-  const [applicationDetail, setApplicationDetail] = useState<any | null>(null);
+  const [applicationDetail, setApplicationDetail] = useState<TechnicianApplication | null>(null);
   const [technicianDetail, setTechnicianDetail] = useState<any | null>(null);
-  const [appFilterTab, setAppFilterTab] = useState<'ALL' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED'>('ALL');
   const [promoTab, setPromoTab] = useState<'promos' | 'banners'>('promos');
   const [loading, setLoading] = useState(false);
   const [technicianQuery, setTechnicianQuery] = useState('');
@@ -305,12 +272,13 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
 
   async function openApplicationDetail(id: string) {
     try {
-      const detail = await request(`/admin/marketplace/technician-applications/${id}`);
+      const detail = await request<TechnicianApplication>(`/admin/marketplace/technician-applications/${id}`);
       setApplicationDetail(detail);
     } catch {
-      // Fallback
+      // Without signed photo links (e.g. storage unavailable) still show what the list knows.
       const fallbackItem = applications?.items.find((a) => a.id === id);
-      setApplicationDetail(fallbackItem || { id, displayName: 'Ứng viên KTV', status: 'SUBMITTED' });
+      if (fallbackItem) setApplicationDetail(fallbackItem);
+      notify('Không tải được ảnh hồ sơ, đang hiện thông tin cơ bản.', true);
     }
   }
 
@@ -348,11 +316,6 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
   const visibleTechnicians = technicianItems.filter((tech) =>
     normalizeSearch(`${tech.user.displayName ?? ''} ${tech.user.phoneNumber ?? ''} ${tech.city ?? ''}`).includes(normalizeSearch(technicianQuery)),
   );
-
-  const filteredApplications = applications?.items.filter((app) => {
-    if (appFilterTab === 'ALL') return true;
-    return app.status === appFilterTab;
-  }) || [];
 
   return (
     <div className="space-y-6">
@@ -499,279 +462,15 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
 
       {/* ── 2. DUYỆT HỒ SƠ KTV (APPLICATIONS) ── */}
       {tab === 'applications' && (
-        <div className="space-y-6">
-          {/* Filter Tabs */}
-          <div className="flex items-center gap-1.5 p-1 bg-[#F1F5EF] rounded-xl border border-[#E5EBE5] max-w-fit">
-            {[
-              { key: 'ALL', label: 'Tất cả hồ sơ' },
-              { key: 'SUBMITTED', label: 'Chờ duyệt' },
-              { key: 'UNDER_REVIEW', label: 'Cần bổ sung' },
-              { key: 'APPROVED', label: 'Đã duyệt' },
-              { key: 'REJECTED', label: 'Từ chối' },
-            ].map((tabItem) => (
-              <button
-                key={tabItem.key}
-                onClick={() => setAppFilterTab(tabItem.key as any)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  appFilterTab === tabItem.key
-                    ? 'bg-white text-[#2E7D4A] shadow-xs'
-                    : 'text-[#66756B] hover:text-[#1C2B20]'
-                }`}
-              >
-                {tabItem.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Applications Table */}
-          <SectionCard
-            title="Danh sách đơn đăng ký KTV"
-            subtitle={`${filteredApplications.length} hồ sơ theo bộ lọc — Admin xét duyệt thông tin pháp lý & chứng chỉ`}
-            noPadding
-          >
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#F6F8F4] text-[#66756B] uppercase font-semibold border-b border-[#E5EBE5]">
-                  <tr>
-                    <th className="py-3 px-4">Ứng viên KTV</th>
-                    <th className="py-3 px-4">Số điện thoại</th>
-                    <th className="py-3 px-4">Khu vực đăng ký</th>
-                    <th className="py-3 px-4">Hình thức phục vụ</th>
-                    <th className="py-3 px-4">KYC / CCCD</th>
-                    <th className="py-3 px-4">Trạng thái</th>
-                    <th className="py-3 px-4 text-right">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#F1F5EF] text-sm text-[#1C2B20]">
-                  {filteredApplications.map((app) => (
-                    <tr key={app.id} className="hover:bg-[#F6F8F4] transition-colors h-16">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-[#EAF5EC] text-[#2E7D4A] font-bold text-xs flex items-center justify-center">
-                            {app.displayName ? app.displayName.substring(0, 2).toUpperCase() : 'KT'}
-                          </div>
-                          <div>
-                            <div className="font-bold text-xs text-[#1C2B20]">
-                              {app.displayName ?? app.user.displayName ?? 'Chưa đặt tên'}
-                            </div>
-                            <div className="text-[11px] text-[#94A399]">Mã: {app.id}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-xs text-[#66756B]">
-                        {app.user.phoneNumber || '0912 *** 888'}
-                      </td>
-                      <td className="py-3 px-4 text-xs">
-                        {app.district ? `${app.district}, ` : ''}{app.city || 'Chưa cập nhật'}
-                      </td>
-                      <td className="py-3 px-4 text-xs font-medium text-[#2E7D4A]">
-                        {formatServiceModes(app.supportedModes)}
-                      </td>
-                      <td className="py-3 px-4 text-xs">
-                        <span className="inline-flex items-center gap-1 font-semibold text-[#2E9B62]">
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                          <span>{app.kyc?.status === 'VERIFIED' ? 'Đã tải CCCD' : 'Chờ kiểm tra'}</span>
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <StatusBadge status={app.status} />
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => void openApplicationDetail(app.id)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#EAF5EC] hover:bg-[#DDF0E1] text-[#2E7D4A] transition-colors"
-                          >
-                            Mở hồ sơ
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </SectionCard>
-        </div>
-      )}
-
-      {/* ── 2.1 MODAL CHI TIẾT HỒ SƠ KTV (Layout 2 cột + Footer Sticky) ── */}
-      {applicationDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1C2B20]/45 backdrop-blur-sm">
-          <div className="relative w-full max-w-4xl bg-white border border-[#E5EBE5] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-[#E5EBE5] flex items-center justify-between bg-white">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#EAF5EC] text-[#2E7D4A] font-bold text-sm flex items-center justify-center">
-                  {applicationDetail.displayName?.slice(0, 2).toUpperCase() || 'KT'}
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-[#1C2B20]">
-                    Hồ sơ ứng viên: {applicationDetail.displayName ?? applicationDetail.user?.displayName ?? 'Chưa đặt tên'}
-                  </h3>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <StatusBadge status={applicationDetail.status} size="sm" />
-                    <span className="text-xs text-[#66756B]">
-                      Khu vực: {applicationDetail.district ? `${applicationDetail.district}, ` : ''}{applicationDetail.city ?? 'Việt Nam'}
-                    </span>
-                  </div>
-                </div>
-
-              </div>
-
-              <button
-                onClick={() => setApplicationDetail(null)}
-                className="p-1.5 text-[#66756B] hover:text-[#1C2B20] hover:bg-[#F6F8F4] rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Body - 2 Columns Layout */}
-            <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-[#1C2B20]">
-              {/* Cột trái: Thông tin applicant */}
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] space-y-3">
-                  <h4 className="font-bold text-xs text-[#2E7D4A] uppercase tracking-wider">Ảnh cá nhân và ảnh dịch vụ</h4>
-                  <div className="grid grid-cols-3 gap-3">
-                    {(() => {
-                      const personal = applicationDetail.signedKyc?.find(
-                        (item: any) => item.storageKey === applicationDetail.faceImageKey,
-                      )?.viewUrl || applicationDetail.user?.avatarUrl;
-                      return personal ? (
-                        <img src={personal} alt="Ảnh cá nhân" className="h-28 w-full rounded-lg object-cover border border-[#E5EBE5]" />
-                      ) : (
-                        <div className="h-28 rounded-lg border border-dashed border-[#CBD8CC] flex items-center justify-center text-[11px] text-[#94A399]">Chưa có ảnh cá nhân</div>
-                      );
-                    })()}
-                    {(applicationDetail.signedGallery ?? []).map((image: any) => image.viewUrl && (
-                      <img key={image.id} src={image.viewUrl} alt="Ảnh dịch vụ" className="h-28 w-full rounded-lg object-cover border border-[#E5EBE5]" />
-                    ))}
-                  </div>
-                </div>
-                <div className="p-4 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] space-y-3">
-                  <h4 className="font-bold text-xs text-[#2E7D4A] uppercase tracking-wider">
-                    Thông tin cá nhân & Liên hệ
-                  </h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-[#66756B]">Họ và tên:</span>
-                      <strong className="text-[#1C2B20]">{applicationDetail.displayName || 'Nguyễn Thị Thảo'}</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#66756B]">Số điện thoại:</span>
-                      <strong className="text-[#1C2B20]">{applicationDetail.user?.phoneNumber || '0912 888 999'}</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#66756B]">Khu vực hoạt động:</span>
-                      <span>{applicationDetail.district || 'Cầu Giấy'}, {applicationDetail.city || 'Hà Nội'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#66756B]">Hình thức nhận lịch:</span>
-                      <span className="font-semibold text-[#2E7D4A]">
-                        {formatServiceModes(applicationDetail.supportedModes)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#66756B]">Kinh nghiệm:</span>
-                      <span>3 năm spa trị liệu cổ truyền</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] space-y-2">
-                  <h4 className="font-bold text-xs text-[#2E7D4A] uppercase tracking-wider">
-                    Giới thiệu bản thân (Bio)
-                  </h4>
-                  <p className="text-xs text-[#66756B] leading-relaxed">
-                    {applicationDetail.bio ||
-                      'Tốt nghiệp khóa đào tạo Y học Cổ truyền chứng chỉ xoa bóp bấm huyệt. Từng có 3 năm kinh nghiệm làm việc tại chuỗi spa cao cấp, chuyên sâu trị liệu đau mỏi vai gáy và dưỡng sinh.'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Cột phải: Tài liệu xác minh (KYC, CCCD, Chứng chỉ) */}
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] space-y-3">
-                  <h4 className="font-bold text-xs text-[#2E7D4A] uppercase tracking-wider">
-                    Tài liệu pháp lý & KYC
-                  </h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <span className="text-[11px] text-[#66756B] block">CCCD mặt trước</span>
-                      <div className="h-28 rounded-lg bg-white border border-[#E5EBE5] overflow-hidden flex items-center justify-center relative group">
-                        {(() => {
-                          const url = applicationDetail.signedKyc?.find((item: any) => item.storageKey === applicationDetail.idCardFrontKey)?.viewUrl;
-                          return url ? <img src={url} alt="CCCD trước" className="w-full h-full object-cover" /> : <span className="text-[11px] text-[#94A399]">Chưa có ảnh</span>;
-                        })()}
-                        <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-black/60 text-white">
-                          Đã chụp
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[11px] text-[#66756B] block">CCCD mặt sau</span>
-                      <div className="h-28 rounded-lg bg-white border border-[#E5EBE5] overflow-hidden flex items-center justify-center relative group">
-                        {(() => {
-                          const url = applicationDetail.signedKyc?.find((item: any) => item.storageKey === applicationDetail.idCardBackKey)?.viewUrl;
-                          return url ? <img src={url} alt="CCCD sau" className="w-full h-full object-cover" /> : <span className="text-[11px] text-[#94A399]">Chưa có ảnh</span>;
-                        })()}
-                        <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-black/60 text-white">
-                          Đã chụp
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-[#E5EBE5] space-y-1">
-                    <span className="text-[11px] text-[#66756B] block">Chứng chỉ đào tạo nghề</span>
-                    <div className="p-2.5 rounded-lg bg-white border border-[#E5EBE5] flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-[#2E7D4A]" />
-                        <span className="font-semibold text-xs">Chung_chi_cham_cuu_bam_huyet.pdf</span>
-                      </div>
-                      <span className="text-[#2E7D4A] font-semibold hover:underline cursor-pointer">Xem file</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer Sticky */}
-            <div className="px-6 py-4 border-t border-[#E5EBE5] bg-[#F6F8F4] flex items-center justify-between">
-              <span className="text-xs text-[#66756B]">
-                Mã hồ sơ: <strong>{applicationDetail.id}</strong>
-              </span>
-
-              <div className="flex items-center gap-2.5">
-                <button
-                  disabled={applicationAction === applicationDetail.id}
-                  onClick={() => void reviewApplication(applicationDetail, 'reject')}
-                  className="px-4 py-2 rounded-xl border border-[#F8D2D0] bg-[#FDF0EF] hover:bg-[#FCE3E1] text-[#D04A44] text-xs font-semibold transition-colors"
-                >
-                  Từ chối hồ sơ
-                </button>
-
-                <button
-                  disabled={applicationAction === applicationDetail.id}
-                  onClick={() => void reviewApplication(applicationDetail, 'review')}
-                  className="px-4 py-2 rounded-xl border border-[#FBE3B8] bg-[#FEF6E9] hover:bg-[#FDECD0] text-[#B87A14] text-xs font-semibold transition-colors"
-                >
-                  Yêu cầu bổ sung
-                </button>
-
-                <button
-                  disabled={applicationAction === applicationDetail.id}
-                  onClick={() => void reviewApplication(applicationDetail, 'approve')}
-                  className="px-5 py-2 rounded-xl bg-[#2E7D4A] hover:bg-[#256A3E] text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
-                >
-                  Duyệt hồ sơ KTV
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <TechnicianApplicationsPanel
+          applications={applications?.items ?? null}
+          loading={loading}
+          detail={applicationDetail}
+          busyId={applicationAction}
+          onOpen={(id) => void openApplicationDetail(id)}
+          onCloseDetail={() => setApplicationDetail(null)}
+          onAction={(app, action) => void reviewApplication(app, action)}
+        />
       )}
 
       {/* ── 3. KHUYẾN MÃI & BANNER ── */}
