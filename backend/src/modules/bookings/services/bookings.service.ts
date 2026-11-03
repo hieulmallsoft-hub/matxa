@@ -1561,7 +1561,7 @@ export class BookingsService {
 
   private historyResponse(booking: any, userId: string) {
     const isCustomer = booking.customerId === userId;
-    const canCancel = isCustomer && ['PENDING', 'CONFIRMED'].includes(booking.status);
+    const canCancel = isCustomer && ['OPEN', 'PENDING', 'CONFIRMED'].includes(booking.status);
     const canReview = isCustomer && booking.status === 'COMPLETED' && !booking.review;
     // Financial accounting belongs to KTV/admin responses, never customer history.
     const {

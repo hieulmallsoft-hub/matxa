@@ -115,3 +115,17 @@ describe('requested technician declines a waiting open booking', () => {
     expect(notifications.create).not.toHaveBeenCalled();
   });
 });
+
+describe('cancel button on the waiting screen', () => {
+  it.each([
+    ['OPEN', true],
+    ['PENDING', true],
+    ['CONFIRMED', true],
+    ['COMPLETED', false],
+    ['EXPIRED', false],
+  ])('customer canCancel for %s is %s', (status, expected) => {
+    const service = new BookingsService({} as any, { get: (_key: string, fallback: unknown) => fallback } as any, {} as any, {} as any);
+    const response = (service as any).historyResponse({ id: 'b1', customerId: 'customer-1', status, items: [] }, 'customer-1');
+    expect(response.canCancel).toBe(expected);
+  });
+});
