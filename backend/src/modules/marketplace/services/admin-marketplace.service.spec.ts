@@ -48,12 +48,13 @@ describe('AdminMarketplaceService', () => {
     });
   });
 
-  it('builds the revenue report from completed bookings only', async () => {
-    db.booking.aggregate.mockResolvedValue({ _sum: { totalAmount: 900000 } });
+  it('reports commission from completed bookings as revenue', async () => {
+    db.booking.aggregate.mockResolvedValue({ _sum: { platformFee: 225000, totalAmount: 900000 } });
     db.booking.findMany.mockResolvedValue([
       {
         scheduledStart: new Date('2026-11-02T09:00:00+07:00'),
         totalAmount: 500000,
+        platformFee: 125000,
         addressSnapshot: { city: 'Hà Nội' },
         technicianId: null,
         technician: null,
@@ -64,8 +65,14 @@ describe('AdminMarketplaceService', () => {
       .mockResolvedValueOnce([{ status: 'COMPLETED', _count: { _all: 1 } }, { status: 'CANCELLED', _count: { _all: 1 } }])
       .mockResolvedValueOnce([]);
     const report = await service.revenueReport('month', new Date('2026-11-03T10:00:00+07:00'));
-    expect(report.kpis).toMatchObject({ totalRevenue: 900000, revenueThisMonth: 500000, completionRate: 50 });
-    expect(db.booking.aggregate).toHaveBeenCalledWith({ where: { status: 'COMPLETED' }, _sum: { totalAmount: true } });
+    expect(report.kpis).toMatchObject({
+      totalRevenue: 225000,
+      totalOrderValue: 900000,
+      revenueThisMonth: 125000,
+      orderValueThisMonth: 500000,
+      completionRate: 50,
+    });
+    expect(db.booking.aggregate).toHaveBeenCalledWith({ where: { status: 'COMPLETED' }, _sum: { platformFee: true, totalAmount: true } });
     expect(db.booking.findMany.mock.calls[0][0].where.status).toBe('COMPLETED');
   });
 

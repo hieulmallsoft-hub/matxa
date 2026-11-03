@@ -1,10 +1,15 @@
-/** Admin revenue report: completed bookings (by scheduledStart, Asia/Ho_Chi_Minh) aggregated in memory. */
+/**
+ * Admin revenue report over completed bookings (by scheduledStart, Asia/Ho_Chi_Minh).
+ * The customer pays the technician, so the platform's revenue is the commission (platformFee)
+ * taken from the technician's wallet; totalAmount is reported separately as order value (GMV).
+ */
 
 export type RevenuePeriod = 'day' | 'week' | 'month';
 
 export type CompletedBooking = {
   scheduledStart: Date;
   totalAmount: unknown;
+  platformFee: unknown;
   addressSnapshot: unknown;
   technicianId: string | null;
   technician: {
@@ -72,7 +77,9 @@ function bucketIndex(period: RevenuePeriod, date: Date) {
 
 const amount = (value: unknown) => Number(value ?? 0);
 const inRange = (date: Date, range: Range) => date >= range.start && date < range.end;
-const sum = (bookings: CompletedBooking[]) => bookings.reduce((total, booking) => total + amount(booking.totalAmount), 0);
+const fee = (booking: CompletedBooking) => amount(booking.platformFee);
+const sum = (bookings: CompletedBooking[]) => bookings.reduce((total, booking) => total + fee(booking), 0);
+const gmv = (bookings: CompletedBooking[]) => bookings.reduce((total, booking) => total + amount(booking.totalAmount), 0);
 
 function rank<T extends { revenue: number }>(map: Map<string, T>, limit?: number) {
   const rows = [...map.values()].sort((a, b) => b.revenue - a.revenue);
@@ -83,6 +90,7 @@ export function buildRevenueReport(input: {
   period: RevenuePeriod;
   now: Date;
   totalRevenue: number;
+  totalOrderValue: number;
   completed: CompletedBooking[];
   /** Bookings scheduled this month / last month that reached a final state, by status. */
   finishedThisMonth: Record<string, number>;
@@ -99,7 +107,7 @@ export function buildRevenueReport(input: {
     const total = done + (counts.CANCELLED ?? 0) + (counts.EXPIRED ?? 0);
     return total ? Math.round((done / total) * 1000) / 10 : 0;
   };
-  const average = (bookings: CompletedBooking[]) => (bookings.length ? Math.round(sum(bookings) / bookings.length) : 0);
+  const average = (bookings: CompletedBooking[]) => (bookings.length ? Math.round(gmv(bookings) / bookings.length) : 0);
 
   const labels = bucketLabels(period, now);
   const timeline = labels.map((label) => ({ label, current: 0, previous: 0 }));
@@ -110,20 +118,20 @@ export function buildRevenueReport(input: {
     const bucket = timeline[bucketIndex(period, booking.scheduledStart)];
     if (!bucket) continue;
     if (isCurrent) {
-      bucket.current += amount(booking.totalAmount);
+      bucket.current += fee(booking);
       current.push(booking);
     } else {
-      bucket.previous += amount(booking.totalAmount);
+      bucket.previous += fee(booking);
     }
   }
 
   const categories = new Map<string, { name: string; revenue: number; bookings: number }>();
   const regions = new Map<string, { region: string; revenue: number; bookings: number }>();
   const services = new Map<string, { name: string; duration: number; revenue: number; bookings: number }>();
-  const technicians = new Map<string, { name: string; avatarUrl: string | null; area: string; rating: number; revenue: number; completedOrders: number }>();
+  const technicians = new Map<string, { name: string; avatarUrl: string | null; area: string; rating: number; revenue: number; orderValue: number; completedOrders: number }>();
   for (const booking of current) {
-    const revenue = amount(booking.totalAmount);
-    // A multi-item booking's total is split evenly so category/service sums still add up to revenue.
+    const revenue = fee(booking);
+    // A multi-item booking's commission is split evenly so category/service sums still add up to revenue.
     const share = booking.items.length ? revenue / booking.items.length : 0;
     for (const item of booking.items) {
       const category = item.categoryName || 'Chưa phân loại';
@@ -148,9 +156,11 @@ export function buildRevenueReport(input: {
         area: [booking.technician.city, booking.technician.district].filter(Boolean).join(' - '),
         rating: amount(booking.technician.averageRating),
         revenue: 0,
+        orderValue: 0,
         completedOrders: 0,
       };
       t.revenue += revenue;
+      t.orderValue += amount(booking.totalAmount);
       t.completedOrders += 1;
       technicians.set(booking.technicianId, t);
     }
@@ -163,7 +173,9 @@ export function buildRevenueReport(input: {
     period,
     kpis: {
       totalRevenue: input.totalRevenue,
+      totalOrderValue: input.totalOrderValue,
       revenueThisMonth: sum(thisMonth),
+      orderValueThisMonth: gmv(thisMonth),
       revenueLastMonth: sum(lastMonth),
       averageOrderValue: average(thisMonth),
       averageOrderValueLastMonth: average(lastMonth),
@@ -173,6 +185,7 @@ export function buildRevenueReport(input: {
     },
     timeline,
     periodRevenue: currentRevenue,
+    periodOrderValue: gmv(current),
     byCategory: withShare(rank(categories)),
     byRegion: withShare(rank(regions)),
     topServices: withShare(rank(services, 5)),

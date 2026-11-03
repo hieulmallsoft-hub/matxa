@@ -41,12 +41,13 @@ export class AdminMarketplaceService {
         _count: { _all: true },
       });
     const [total, completed, thisMonth, lastMonth] = await Promise.all([
-      this.prisma.booking.aggregate({ where: { status: 'COMPLETED' }, _sum: { totalAmount: true } }),
+      this.prisma.booking.aggregate({ where: { status: 'COMPLETED' }, _sum: { platformFee: true, totalAmount: true } }),
       this.prisma.booking.findMany({
         where: { status: 'COMPLETED', scheduledStart: { gte: from, lt: to } },
         select: {
           scheduledStart: true,
           totalAmount: true,
+          platformFee: true,
           addressSnapshot: true,
           technicianId: true,
           technician: {
@@ -63,7 +64,8 @@ export class AdminMarketplaceService {
     return buildRevenueReport({
       period,
       now,
-      totalRevenue: number(total._sum.totalAmount),
+      totalRevenue: number(total._sum.platformFee),
+      totalOrderValue: number(total._sum.totalAmount),
       completed,
       finishedThisMonth: byStatus(thisMonth),
       finishedLastMonth: byStatus(lastMonth),

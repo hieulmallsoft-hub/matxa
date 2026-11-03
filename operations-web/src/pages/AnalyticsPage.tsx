@@ -41,7 +41,9 @@ type Period = 'day' | 'week' | 'month';
 type RevenueReport = {
   kpis: {
     totalRevenue: number;
+    totalOrderValue: number;
     revenueThisMonth: number;
+    orderValueThisMonth: number;
     revenueLastMonth: number;
     averageOrderValue: number;
     averageOrderValueLastMonth: number;
@@ -51,10 +53,11 @@ type RevenueReport = {
   };
   timeline: { label: string; current: number; previous: number }[];
   periodRevenue: number;
+  periodOrderValue: number;
   byCategory: { name: string; revenue: number; bookings: number; share: number }[];
   byRegion: { region: string; revenue: number; bookings: number; share: number }[];
   topServices: { name: string; duration: number; revenue: number; bookings: number; share: number }[];
-  topTechnicians: { name: string; avatarUrl: string | null; area: string; rating: number; revenue: number; completedOrders: number }[];
+  topTechnicians: { name: string; avatarUrl: string | null; area: string; rating: number; revenue: number; orderValue: number; completedOrders: number }[];
 };
 
 const PERIOD_LABELS: Record<Period, string> = { day: 'Hôm nay', week: 'Tuần này', month: 'Năm nay' };
@@ -97,16 +100,16 @@ export const AnalyticsPage: React.FC = () => {
     if (!report) return;
     const csv = (rows: (string | number)[][]) => rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
     const content = [
-      csv([[`Doanh thu - ${PERIOD_LABELS[timeTab]}`], ['Mốc', 'Kỳ hiện tại', `Kỳ so sánh (${COMPARE_LABELS[timeTab]})`]]),
+      csv([[`Hoa hồng nền tảng - ${PERIOD_LABELS[timeTab]}`], ['Mốc', 'Kỳ hiện tại', `Kỳ so sánh (${COMPARE_LABELS[timeTab]})`]]),
       csv(report.timeline.map((r) => [r.label, r.current, r.previous])),
-      csv([[], ['Nhóm dịch vụ', 'Doanh thu', 'Lượt', 'Tỷ trọng %']]),
+      csv([[], ['Nhóm dịch vụ', 'Hoa hồng', 'Lượt', 'Tỷ trọng %']]),
       csv(report.byCategory.map((r) => [r.name, r.revenue, r.bookings, r.share])),
-      csv([[], ['Khu vực', 'Doanh thu', 'Đơn', 'Tỷ trọng %']]),
+      csv([[], ['Khu vực', 'Hoa hồng', 'Đơn', 'Tỷ trọng %']]),
       csv(report.byRegion.map((r) => [r.region, r.revenue, r.bookings, r.share])),
-      csv([[], ['Dịch vụ', 'Doanh thu', 'Lượt', 'Tỷ trọng %']]),
+      csv([[], ['Dịch vụ', 'Hoa hồng', 'Lượt', 'Tỷ trọng %']]),
       csv(report.topServices.map((r) => [r.name, r.revenue, r.bookings, r.share])),
-      csv([[], ['Kỹ thuật viên', 'Khu vực', 'Doanh thu', 'Số ca', 'Đánh giá']]),
-      csv(report.topTechnicians.map((r) => [r.name, r.area, r.revenue, r.completedOrders, r.rating])),
+      csv([[], ['Kỹ thuật viên', 'Khu vực', 'Hoa hồng', 'Giá trị đơn', 'Số ca', 'Đánh giá']]),
+      csv(report.topTechnicians.map((r) => [r.name, r.area, r.revenue, r.orderValue, r.completedOrders, r.rating])),
     ].join('\n');
     // BOM so Excel opens the Vietnamese text as UTF-8.
     const url = URL.createObjectURL(new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8' }));
@@ -137,7 +140,7 @@ export const AnalyticsPage: React.FC = () => {
       {/* 1. Header */}
       <PageHeader
         title="Doanh thu & Báo cáo"
-        subtitle="Theo dõi hiệu quả kinh doanh, xu hướng tăng trưởng và đóng góp của kỹ thuật viên"
+        subtitle="Doanh thu nền tảng là hoa hồng thu từ KTV trên các đơn đã hoàn thành; tiền dịch vụ khách trả trực tiếp cho KTV"
         badge="Từ đơn đã hoàn thành"
         badgeTone="green"
         breadcrumbs={[
@@ -159,14 +162,14 @@ export const AnalyticsPage: React.FC = () => {
       {/* 2. KPI Cards Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
-          label="Tổng doanh thu tích lũy"
+          label="Tổng hoa hồng tích lũy"
           value={kpis ? formatVND(kpis.totalRevenue) : '–'}
-          caption="tất cả đơn đã hoàn thành"
+          caption={kpis ? `trên ${formatVND(kpis.totalOrderValue)} giá trị đơn` : undefined}
           icon={<CircleDollarSign className="w-5 h-5" />}
           tone="primary"
         />
         <StatCard
-          label="Doanh thu tháng này"
+          label="Hoa hồng tháng này"
           value={kpis ? formatVND(kpis.revenueThisMonth) : '–'}
           {...(kpis ? kpiChange(kpis.revenueThisMonth, kpis.revenueLastMonth) : {})}
           caption={`so với ${lastMonthLabel}`}
@@ -193,8 +196,8 @@ export const AnalyticsPage: React.FC = () => {
 
       {/* 3. Main Revenue Trend Chart */}
       <SectionCard
-        title="Doanh thu theo thời gian"
-        subtitle={`${PERIOD_LABELS[timeTab]}: ${formatVND(report?.periodRevenue ?? 0)} · đường nét đứt là ${COMPARE_LABELS[timeTab]}`}
+        title="Hoa hồng theo thời gian"
+        subtitle={`${PERIOD_LABELS[timeTab]}: ${formatVND(report?.periodRevenue ?? 0)} hoa hồng trên ${formatVND(report?.periodOrderValue ?? 0)} giá trị đơn · nét đứt là ${COMPARE_LABELS[timeTab]}`}
         action={
           <div className="flex items-center gap-2 flex-wrap">
             {/* Period tabs */}
@@ -272,7 +275,7 @@ export const AnalyticsPage: React.FC = () => {
                         </div>
                         <div className="flex items-center justify-between gap-4 text-[#2E7D4A] font-semibold">
                           <span className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-[#2E7D4A]" /> Kỳ hiện tại:
+                            <span className="w-2 h-2 rounded-full bg-[#2E7D4A]" /> Hoa hồng kỳ này:
                           </span>
                           <span>{formatVND(cur)}</span>
                         </div>
@@ -318,7 +321,7 @@ export const AnalyticsPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Revenue Structure (Donut) */}
         <SectionCard
-          title="Cơ cấu doanh thu"
+          title="Cơ cấu hoa hồng"
           subtitle={`Tỷ trọng theo nhóm dịch vụ · ${PERIOD_LABELS[timeTab].toLowerCase()}`}
           className="lg:col-span-1"
         >
@@ -373,7 +376,7 @@ export const AnalyticsPage: React.FC = () => {
 
         {/* Right: Regional Revenue Breakdown */}
         <SectionCard
-          title="Doanh thu theo khu vực"
+          title="Hoa hồng theo khu vực"
           subtitle="Theo tỉnh/thành của địa chỉ phục vụ"
           className="lg:col-span-2"
         >
@@ -416,7 +419,7 @@ export const AnalyticsPage: React.FC = () => {
         {/* Top Services */}
         <SectionCard
           title="Dịch vụ được đặt nhiều nhất"
-          subtitle={`Xếp hạng theo doanh thu · ${PERIOD_LABELS[timeTab].toLowerCase()}`}
+          subtitle={`Xếp hạng theo hoa hồng · ${PERIOD_LABELS[timeTab].toLowerCase()}`}
         >
           {!report?.topServices.length ? (
             <EmptyRows text="Chưa có đơn hoàn thành trong kỳ này" />
@@ -436,7 +439,7 @@ export const AnalyticsPage: React.FC = () => {
 
                   <div className="text-right flex-shrink-0">
                     <div className="font-bold text-xs text-[#1C2B20]">{formatVND(srv.revenue)}</div>
-                    <div className="text-[11px] text-[#66756B] mt-0.5">{srv.share}% doanh thu</div>
+                    <div className="text-[11px] text-[#66756B] mt-0.5">{srv.share}% hoa hồng</div>
                   </div>
                 </div>
               ))}
@@ -446,8 +449,8 @@ export const AnalyticsPage: React.FC = () => {
 
         {/* Top Technicians by Revenue */}
         <SectionCard
-          title="Top Kỹ thuật viên theo doanh thu"
-          subtitle={`Doanh thu các đơn KTV đã hoàn thành · ${PERIOD_LABELS[timeTab].toLowerCase()}`}
+          title="Top Kỹ thuật viên"
+          subtitle={`Theo hoa hồng đóng góp cho nền tảng · ${PERIOD_LABELS[timeTab].toLowerCase()}`}
         >
           {!report?.topTechnicians.length ? (
             <EmptyRows text="Chưa có đơn hoàn thành trong kỳ này" />
@@ -484,7 +487,7 @@ export const AnalyticsPage: React.FC = () => {
 
                   <div className="text-right flex-shrink-0">
                     <div className="font-bold text-xs text-[#2E7D4A]">{formatVND(tech.revenue)}</div>
-                    <div className="text-[11px] text-[#66756B] mt-0.5">Doanh thu hoàn tất</div>
+                    <div className="text-[11px] text-[#66756B] mt-0.5">hoa hồng · {formatVND(tech.orderValue)} giá trị đơn</div>
                   </div>
                 </div>
               ))}
