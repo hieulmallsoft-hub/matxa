@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Search, RefreshCw, MessageSquare, Check, Plus, ImagePlus } from 'lucide-react';
+import { Send, Search, RefreshCw, MessageSquare, Check, Plus, ImagePlus, CircleStop } from 'lucide-react';
 import { SupportCustomerPicker } from '../components/SupportCustomerPicker';
 import { useToast } from '../components/ui/ToastContainer';
+import { useConfirm } from '../components/ui/useConfirm';
 import { PageHeader } from '../components/common/PageHeader';
 import { request } from '../api/client';
 
@@ -65,6 +66,8 @@ function Avatar({ participant }: { participant?: Participant | null }) {
 
 export const MessagesPage: React.FC = () => {
   const { addToast } = useToast();
+  const { confirm, dialog } = useConfirm();
+  const [ending, setEnding] = useState(false);
   const [threads, setThreads] = useState<Conversation[]>([]);
   const [activeThreadId, setActiveThreadId] = useState('');
   const [currentUserId, setCurrentUserId] = useState('');
@@ -239,6 +242,31 @@ export const MessagesPage: React.FC = () => {
       setRefreshKey((key) => key + 1);
     } catch (error) { addToast({ title: 'Không mở được chat hỗ trợ', message: errorText(error), type: 'error' }); }
     finally { setCreating(false); }
+  };
+
+  // Ending deletes the thread for good; the customer's next "Chat ngay" starts a new one.
+  const handleEndSupport = async () => {
+    const thread = activeThread;
+    if (!thread || ending) return;
+    const ok = await confirm({
+      title: 'Kết thúc hỗ trợ?',
+      message: `Toàn bộ tin nhắn và ảnh với ${thread.participant?.displayName || 'khách hàng'} sẽ bị xóa vĩnh viễn, không xem lại được. Lần sau khách nhắn sẽ bắt đầu cuộc trò chuyện mới.`,
+      confirmText: 'Kết thúc & xóa',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setEnding(true);
+    try {
+      await request(`/conversations/${thread.id}/end`, { method: 'POST' });
+      setThreads((rows) => rows.filter((row) => row.id !== thread.id));
+      setActiveThreadId((current) => (current === thread.id ? '' : current));
+      addToast({ title: 'Đã kết thúc hỗ trợ', message: 'Cuộc trò chuyện đã được xóa.', type: 'success' });
+      setRefreshKey((key) => key + 1);
+    } catch (error) {
+      addToast({ title: 'Không kết thúc được', message: errorText(error), type: 'error' });
+    } finally {
+      setEnding(false);
+    }
   };
 
   const loadOlder = async () => {
@@ -468,10 +496,22 @@ export const MessagesPage: React.FC = () => {
             <p className="break-all">{activeThread?.supportCustomerId || activeThread?.participant?.id || 'Chưa chọn khách'}</p>
           </div>
           <p className="text-[#66756B] leading-relaxed">
-            Lịch sử hỗ trợ được lưu trên server. Các admin có thể tiếp tục xử lý cùng một hội thoại; mỗi tin nhắn lưu rõ người gửi.
+            Mỗi cuộc trò chuyện là một lần hỗ trợ. Khi xong, bấm Kết thúc để xóa hẳn; nếu 24 giờ không ai nhắn, hệ thống tự kết thúc và xóa.
           </p>
+          {activeThread && (
+            <button
+              type="button"
+              onClick={() => void handleEndSupport()}
+              disabled={ending}
+              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-[#F8D2D0] bg-white text-[#B9403A] text-xs font-semibold hover:bg-[#FDF0EF] disabled:opacity-50 transition-colors"
+            >
+              <CircleStop className="w-4 h-4" />
+              {ending ? 'Đang kết thúc...' : 'Kết thúc hỗ trợ'}
+            </button>
+          )}
         </aside>
       </div>
+      {dialog}
       {pickerOpen && <SupportCustomerPicker onClose={() => setPickerOpen(false)} onSelect={handleCreateSupport} busy={creating} />}
     </motion.div>
   );

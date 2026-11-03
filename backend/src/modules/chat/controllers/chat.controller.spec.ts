@@ -9,7 +9,7 @@ describe('ChatController support entry', () => {
       sendMessage: jest.fn().mockResolvedValue({ id: 'm1', conversationId: 'support-1', senderId: 'customer' }),
     };
     const gateway: any = { publishRestMessage: jest.fn() };
-    return { chat, gateway, controller: new ChatController(chat, {} as any, gateway) };
+    return { chat, gateway, controller: new ChatController(chat, {} as any, gateway, {} as any) };
   }
 
   it('sends the venue inquiry as the customer and publishes it to CSKH', async () => {

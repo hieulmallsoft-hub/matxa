@@ -17,26 +17,35 @@ gửi tin/ảnh, nhận tin realtime.
 | Gửi ảnh | `POST /api/conversations/{id}/image-upload-url` → `PUT` lên S3 → `POST .../messages` |
 | Đánh dấu đã đọc | `PATCH /api/conversations/{id}/read` |
 | Realtime | Socket.IO namespace `/chat`, sự kiện `message.created` |
+| Biết chat đã kết thúc | Socket `conversation.ended`, hoặc API trả `404` |
 
 Mọi request dùng `Authorization: Bearer <accessToken của khách>`. App **không bao giờ**
 gửi ID admin, ID KTV hay `senderId`: backend lấy người gửi từ token.
 
 **2. Có tách thành nhiều cuộc trò chuyện nhỏ không?**
 
-**Không.** Mỗi khách có **đúng một** cuộc trò chuyện hỗ trợ, dùng chung với toàn bộ CSKH.
-Mọi lần hỏi đáp nối tiếp trong cùng cuộc đó. Gọi "Chat ngay" bao nhiêu lần cũng trả về
+**Có, theo từng lần hỗ trợ.** Mỗi lần hỗ trợ là một cuộc trò chuyện. Tại một thời điểm, mỗi
+khách chỉ có **tối đa một** cuộc đang mở: gọi "Chat ngay" nhiều lần trong lúc đang mở vẫn trả về
 cùng một `id`. Vì vậy mục **"Cuộc trò chuyện gần đây"** trong Figma chỉ có tối đa **một dòng**.
+
+Cuộc trò chuyện **kết thúc** khi:
+- nhân viên CSKH bấm **Kết thúc hỗ trợ** trên web admin, hoặc
+- **24 giờ** không ai nhắn tin.
+
+Kết thúc là **xóa hẳn**: tin nhắn, ảnh và thông báo của cuộc đó đều bị xóa. Lần sau khách bấm
+"Chat ngay", backend tạo cuộc mới với `id` mới và lời chào mới.
 
 Chat hỗ trợ tách biệt với chat theo đơn (khách ↔ KTV, `type: BOOKING`). Màn Hỗ trợ
 không dùng endpoint chat booking.
 
 **3. Lịch sử lưu ở đâu, có mất không?**
 
-- Lưu trên **database server**, ảnh trên S3. Đóng app, đăng xuất, đổi máy **không mất**.
-- **Tự xoá sau 90 ngày không có tin mới** (cả phía khách lẫn admin). Khách nhắn lại sau đó
-  sẽ bắt đầu cuộc trò chuyện mới, có lời chào mới.
-- Khách bấm xoá cuộc trò chuyện (`DELETE /api/conversations/{id}`) chỉ **ẩn** ở phía khách.
-  Mở lại chat hoặc có tin mới thì hiện lại đầy đủ lịch sử.
+- **Trong lúc cuộc trò chuyện còn mở**, lịch sử lưu trên server: đóng app, đăng xuất, đổi máy
+  **không mất**.
+- **Khi cuộc trò chuyện kết thúc**, lịch sử bị xóa vĩnh viễn ở cả phía khách và admin.
+  App phải xóa tin đã lưu tạm (cache) của cuộc đó.
+- Khách bấm xoá cuộc trò chuyện (`DELETE /api/conversations/{id}`) chỉ **ẩn** ở phía khách,
+  không kết thúc cuộc trò chuyện. Mở lại chat hoặc có tin mới thì hiện lại đầy đủ lịch sử.
 
 ## Luồng màn hình (theo Figma)
 
@@ -114,7 +123,7 @@ Response là **mảng** (không có `items`), tối đa 1 phần tử:
 ]
 ```
 
-Mảng rỗng: khách chưa mở chat lần nào, hoặc chat cũ đã tự xoá sau 90 ngày.
+Mảng rỗng: khách chưa mở chat, hoặc cuộc trước đã kết thúc.
 
 ## 3. Lịch sử tin nhắn
 
@@ -245,6 +254,24 @@ socket.emit('conversation.close', { conversationId });  // khi rời màn chat
 - Socket **không** giữ tin khi máy offline. Khi app resume hoặc reconnect, gọi lại API lịch sử
   (mục 3) để bù tin bị lỡ.
 
+### Chat kết thúc
+
+```js
+socket.on('conversation.ended', ({ conversationId, reason }) => {
+  // reason: "AGENT_ENDED" (CSKH bấm Kết thúc) | "IDLE" (24 giờ không ai nhắn)
+});
+```
+
+Khi nhận sự kiện này cho cuộc đang mở:
+1. Xóa tin đã lưu tạm của `conversationId` và bỏ dòng đó khỏi "Cuộc trò chuyện gần đây".
+2. Nếu khách đang ở màn chat: hiện "Cuộc trò chuyện đã kết thúc" và khóa ô nhập. Khi khách muốn
+   nhắn tiếp, gọi lại `POST /api/conversations/support` để lấy cuộc **mới** rồi mở bằng `id` mới.
+
+Nếu app offline lúc kết thúc thì sẽ không nhận được sự kiện. Khi đó mọi API với `id` cũ trả
+`404` ("Cuoc tro chuyen khong ton tai"); app xử lý giống như nhận `conversation.ended`.
+**Không giữ `id` cũ lâu dài**: mỗi lần vào màn Hỗ trợ, gọi `POST /api/conversations/support`
+để lấy `id` hiện tại.
+
 ## 9. Push notification
 
 Khi app chạy nền, khách nhận push loại `CHAT_MESSAGE_RECEIVED`, data gồm:
@@ -253,7 +280,8 @@ Khi app chạy nền, khách nhận push loại `CHAT_MESSAGE_RECEIVED`, data g�
 { "conversationId": "conversation-uuid", "messageId": "message-uuid", "conversationType": "SUPPORT" }
 ```
 
-Không có `bookingId`. Chạm push → mở màn chat Hỗ trợ theo `conversationId`.
+Không có `bookingId`. Chạm push → mở màn chat Hỗ trợ theo `conversationId`. Nếu cuộc đó
+đã kết thúc (API trả `404`), mở màn Hỗ trợ bình thường.
 Push cần device token đã đăng ký và FCM cấu hình đúng; tin vẫn được lưu khi máy offline.
 
 ## 10. Quyền truy cập và lỗi thường gặp
@@ -263,6 +291,7 @@ Push cần device token đã đăng ký và FCM cấu hình đúng; tin vẫn đ
 | Khách xem/gửi vào cuộc trò chuyện của khách khác | `403` |
 | Tài khoản KTV gọi các API hỗ trợ | `403` |
 | `venueId` không tồn tại hoặc địa điểm đã ẩn | `404`, không tạo/gửi gì |
+| Gọi API với `id` của cuộc đã kết thúc | `404` "Cuoc tro chuyen khong ton tai": mở cuộc mới bằng `POST /api/conversations/support` |
 | Gửi tin `type: "SYSTEM"` từ app | `400` (app không được gửi tin hệ thống) |
 | `mediaKey` không phải key backend cấp cho đúng cuộc trò chuyện này | `400` |
 | Tin chữ rỗng | `400` |

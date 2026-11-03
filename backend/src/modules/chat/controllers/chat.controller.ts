@@ -27,6 +27,7 @@ import { ChatGateway } from '../gateways/chat.gateway';
 import { AccessTokenPayload } from '../../auth/entities/access-token-payload.entity';
 import { ChatStorageService } from '../services/chat-storage.service';
 import { ChatService } from '../services/chat.service';
+import { SupportChatRetentionService } from '../services/support-chat-retention.service';
 import {
   CreateConversationDto,
   CreateSupportConversationDto,
@@ -47,6 +48,7 @@ export class ChatController {
     private readonly chat: ChatService,
     private readonly storage: ChatStorageService,
     private readonly gateway: ChatGateway,
+    private readonly supportSessions: SupportChatRetentionService,
   ) {}
 
   @Post('support')
@@ -124,6 +126,15 @@ export class ChatController {
   @ApiOkResponse({ type: ChatReadResponseDto })
   markRead(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.chat.markRead(auth.sub, id);
+  }
+
+  @Post(':id/end')
+  @ApiOperation({
+    summary: 'Admin ket thuc chat CSKH: xoa han cuoc tro chuyen, tin nhan va anh; lan sau khach mo chat moi',
+  })
+  @ApiOkResponse({ schema: { example: { conversationId: 'uuid', ended: true } } })
+  end(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
+    return this.supportSessions.endByAdmin(auth.sub, id);
   }
 
   @Delete(':id')

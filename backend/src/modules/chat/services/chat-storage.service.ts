@@ -1,12 +1,14 @@
 import { randomUUID } from 'crypto';
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectsCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { CreateUploadUrlDto } from '../dto/chat.dto';
 
 @Injectable()
 export class ChatStorageService {
+  private readonly logger = new Logger(ChatStorageService.name);
+
   constructor(private readonly config: ConfigService) {}
 
   async createUploadUrl(conversationId: string, userId: string, dto: CreateUploadUrlDto) {
@@ -65,5 +67,31 @@ export class ChatStorageService {
       credentials: { accessKeyId, secretAccessKey },
     });
     return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: mediaKey }), { expiresIn: 300 });
+  }
+
+  /** Best effort: a failed S3 delete is logged, never blocks ending a chat. */
+  async deleteObjects(mediaKeys: string[]) {
+    const keys = [...new Set(mediaKeys.filter((key) => key.startsWith('chat/')))];
+    if (!keys.length) return;
+    const bucket = this.config.get<string>('S3_BUCKET');
+    const region = this.config.get<string>('S3_REGION');
+    const accessKeyId = this.config.get<string>('S3_ACCESS_KEY_ID');
+    const secretAccessKey = this.config.get<string>('S3_SECRET_ACCESS_KEY');
+    if (!bucket || !region || !accessKeyId || !secretAccessKey) return;
+    const endpoint = this.config.get<string>('S3_ENDPOINT') || undefined;
+    const client = new S3Client({
+      region,
+      endpoint,
+      forcePathStyle: Boolean(endpoint),
+      credentials: { accessKeyId, secretAccessKey },
+    });
+    for (let index = 0; index < keys.length; index += 1000) {
+      const batch = keys.slice(index, index + 1000);
+      try {
+        await client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true } }));
+      } catch (error) {
+        this.logger.warn(`Khong xoa duoc ${batch.length} anh chat tren S3: ${error instanceof Error ? error.message : 'unknown'}`);
+      }
+    }
   }
 }

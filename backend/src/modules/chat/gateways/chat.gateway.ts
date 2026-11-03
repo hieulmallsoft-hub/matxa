@@ -77,6 +77,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /** Tells both sides a support chat ended; the thread no longer exists, so its room is emptied too. */
+  publishConversationEnded(conversationId: string, memberIds: string[], reason: 'AGENT_ENDED' | 'IDLE') {
+    if (!this.server) return;
+    const rooms = [`conversation:${conversationId}`, ...memberIds.map((id) => `user:${id}`)];
+    this.server.to(rooms).emit('conversation.ended', { conversationId, reason });
+    this.server.in(`conversation:${conversationId}`).socketsLeave(`conversation:${conversationId}`);
+  }
+
   @SubscribeMessage('conversation.open')
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   async open(@ConnectedSocket() client: AuthSocket, @MessageBody() dto: SocketConversationDto) {
