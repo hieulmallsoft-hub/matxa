@@ -44,6 +44,7 @@ describe('open booking display fields', () => {
     expect(response).toMatchObject({
       distanceKm: 5,
       address: null,
+      addressText: '52 Ngõ 15, Tổ 2A+Tổ 2B+Tổ 2C, Bạch Mai, Hà Nội',
       addressPreview: '… Tổ 2A+Tổ 2B+Tổ 2C, Bạch Mai, Hà Nội',
       city: 'Ha Noi',
       district: 'Hai Ba Trung',

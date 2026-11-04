@@ -194,9 +194,12 @@ GET /api/technician/jobs/{bookingId}
 | `canWithdraw` | Hiện nút **Rút ứng tuyển** sau khi đã ứng tuyển |
 | `applicationStatus` | `APPLIED` = "Đã ứng tuyển", chờ khách chọn |
 | `bookingStatus` | `EXPIRED` → nhãn "Hết hạn" |
+| `customerSelectedAnotherTechnician` | `true` = **đơn đã có KTV khác nhận** → thẻ hiện "Đã có KTV nhận", ẩn mọi nút. Đúng cho cả KTV đã ứng tuyển lẫn KTV chưa bấm gì (kể cả KTV "Khách đặt bạn") |
 | `customer.gender`, `customer.nationality` | "Khách nữ, Việt Nam" |
-| `addressPreview` | Địa chỉ rút gọn trên thẻ, chi tiết và sheet "Bạn muốn ứng tuyển đơn?": "… Tổ 2A+Tổ 2B+Tổ 2C, Bạch Mai, Hà Nội" (bỏ số nhà/ngõ). Địa chỉ đầy đủ `address` chỉ có sau khi KTV được nhận đơn |
-| `district`, `city` | Dùng khi `addressPreview` là `null` (đơn tại cơ sở/online, hoặc địa chỉ không tách được): hiện "Hai Bà Trưng, Hà Nội". Cả ba đều `null` thì ẩn dòng địa chỉ |
+| `addressText` | **Địa chỉ chi tiết** (số nhà, ngõ, phường, quận, TP) trên thẻ, chi tiết và sheet "Bạn muốn ứng tuyển đơn?". Có ngay từ khi KTV thấy đơn tại nhà |
+| `addressPreview` | Bản rút gọn bỏ số nhà/ngõ ("… Tổ 2A, Bạch Mai, Hà Nội") nếu muốn hiện gọn |
+| `district`, `city` | Dùng khi `addressText` là `null` (đơn tại cơ sở/online): "Hai Bà Trưng, Hà Nội". Tất cả `null` thì ẩn dòng địa chỉ |
+| `address` | Object có toạ độ để mở bản đồ/chỉ đường; chỉ có sau khi KTV được nhận đơn |
 | `distanceKm` | "Khoảng cách: 5km" trong sheet ứng tuyển. `null` khi KTV chưa cập nhật vị trí hoặc đơn không tại nhà → ẩn |
 Dựa vào các cờ `can...` để hiện nút; không tự suy ra từ trạng thái.
 
@@ -235,7 +238,7 @@ chọn sẽ nhận `403`.
 | `type` | Khi nào | App làm gì |
 |---|---|---|
 | `TECHNICIAN_SELECTED` | Khách chọn KTV này | Đơn chuyển sang "Đã nhận", hiện thông tin liên hệ |
-| `TECHNICIAN_NOT_SELECTED` | Khách chọn KTV khác | Đơn chuyển sang "Không được chọn" |
+| `TECHNICIAN_NOT_SELECTED` | Đơn đã có KTV khác nhận. Gửi cho **mọi KTV đơn đã tới** (đã ứng tuyển, đã nhận "Yêu cầu mới"/"Khách đặt bạn" mà chưa bấm gì), trừ KTV đã từ chối/rút. Nội dung: "Đơn này đã có KTV khác nhận." | Tải lại đơn → `customerSelectedAnotherTechnician: true` → thẻ "Đã có KTV nhận", không cho ứng tuyển. Chạm thông báo mở được chi tiết (không còn 403) |
 | `BOOKING_CANCELLED` | Khách hủy đơn. Gửi cho **mọi KTV đã nhận "Yêu cầu mới"/"Khách đặt bạn"** của đơn và KTV đang ứng tuyển (trừ KTV đã từ chối/rút) | Mở `GET /api/technician/jobs/{bookingId}` → `bookingStatus: "CANCELLED"`, hiện thẻ "Đã hủy" |
 | `BOOKING_EXPIRED` | Hết hạn, khách chưa chọn | Nhãn "Hết hạn" |
 

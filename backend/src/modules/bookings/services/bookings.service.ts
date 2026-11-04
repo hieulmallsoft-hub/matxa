@@ -668,7 +668,7 @@ export class BookingsService {
       'KTV đã nhận đơn',
       `${technician?.displayName || 'KTV bạn chọn'} đã nhận đơn của bạn.`,
     );
-    this.afterOpenBookingAssigned(booking.id, result);
+    void this.afterOpenBookingAssigned(booking.id, result);
     return { id: applicationId, bookingId: booking.id, status: 'SELECTED', bookingStatus: result.booking.status };
   }
 
@@ -723,7 +723,7 @@ export class BookingsService {
       'Bạn đã được chọn',
       'Khách hàng đã chọn bạn cho đơn dịch vụ.',
     );
-    this.afterOpenBookingAssigned(bookingId, result);
+    void this.afterOpenBookingAssigned(bookingId, result);
     return this.openBookingResponse(result.booking, 'SELECTED', true);
   }
 
@@ -792,15 +792,40 @@ export class BookingsService {
     return result;
   }
 
-  private afterOpenBookingAssigned(bookingId: string, result: { booking: any; loserUserIds: string[] }) {
+  /** Everyone the booking reached (announced or applied) learns it is taken, except the winner and those who said no. */
+  private async afterOpenBookingAssigned(
+    bookingId: string,
+    result: { booking: any; winnerUserId: string; loserUserIds: string[] },
+  ) {
     this.realtime?.broadcastAvailabilityChanged(result.booking.technicianId);
-    for (const userId of result.loserUserIds)
+    const applicants = new Set(result.loserUserIds);
+    let recipients = new Set(applicants);
+    try {
+      const [optedOut, announced] = await Promise.all([
+        this.prisma.bookingTechnicianApplication.findMany({
+          where: { bookingId, status: { in: ['DECLINED', 'WITHDRAWN'] } },
+          include: { technicianProfile: { select: { userId: true } } },
+        }),
+        this.prisma.notification.findMany({
+          where: { actionUrl: `matxa://bookings/${bookingId}`, type: { in: ['OPEN_BOOKING_AVAILABLE', 'OPEN_BOOKING_REQUESTED'] } },
+          select: { userId: true },
+        }),
+      ]);
+      const skip = new Set(optedOut.map((item) => item.technicianProfile.userId));
+      recipients = new Set([...applicants, ...announced.map((item) => item.userId)].filter((userId) => !skip.has(userId)));
+    } catch (error) {
+      this.logger.warn(
+        `Khong tai duoc KTV da nhan thong bao don ${bookingId}: ${error instanceof Error ? error.message : 'khong ro ly do'}`,
+      );
+    }
+    recipients.delete(result.winnerUserId);
+    for (const userId of recipients)
       void this.notifyStatus(
         userId,
         bookingId,
         'TECHNICIAN_NOT_SELECTED',
-        'Khách đã chọn KTV khác',
-        'Đơn này đã được gán cho một KTV khác.',
+        'Đơn đã có KTV nhận',
+        applicants.has(userId) ? 'Khách đã chọn KTV khác cho đơn bạn ứng tuyển.' : 'Đơn này đã có KTV khác nhận.',
       );
   }
 
@@ -884,7 +909,7 @@ export class BookingsService {
             booking.requestedTechnicianId));
     const canViewMarketplaceJob =
       marketplaceTechnician &&
-      ((['OPEN', 'EXPIRED', 'CANCELLED'].includes(booking.status) && Boolean(marketplaceNotification)) ||
+      ((['OPEN', 'EXPIRED', 'CANCELLED', 'CONFIRMED', 'COMPLETED'].includes(booking.status) && Boolean(marketplaceNotification)) ||
         involvedInMarketplaceJob);
     if (booking.customerId !== userId && booking.technician?.userId !== userId && actor?.role !== 'ADMIN' && !canViewMarketplaceJob)
       throw new ForbiddenException('Ban khong co quyen xem lich dat');
@@ -981,8 +1006,8 @@ export class BookingsService {
         return this.openBookingResponse(booking, 'EXPIRED', false, true, profile.id, profile);
       // detail() loads items without catalogService; reload them so eligibility sees catalog data.
       if (booking.status === 'OPEN' && !application) await this.openJobForTechnician(id, profile.id, true);
-      // A cancelled job reached detail() through an involvement or notification check; just show it.
-      else if (!application && booking.requestedTechnicianId !== profile.id && booking.status !== 'CANCELLED')
+      // A cancelled or already-taken job reached detail() through an involvement or notification check; just show it.
+      else if (!application && booking.requestedTechnicianId !== profile.id && !['CANCELLED', 'CONFIRMED', 'COMPLETED'].includes(booking.status))
         throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
       return this.openBookingResponse(booking, application?.status ?? null, application?.status === 'SELECTED', true, profile.id, profile);
     }
@@ -1601,6 +1626,8 @@ export class BookingsService {
           }
         : null,
       address: selected || booking.status === 'EXPIRED' ? (booking.addressSnapshot ?? null) : null,
+      // Full street address as text so the technician can judge the trip; coordinates (`address`) stay hidden until selected.
+      addressText: booking.mode === 'HOME' ? (booking.addressSnapshot?.address ?? booking.addressSnapshot?.addressText ?? null) : null,
       addressPreview: booking.mode === 'HOME' ? addressPreview(booking.addressSnapshot) : null,
       city: booking.addressSnapshot?.city ?? null,
       district: booking.addressSnapshot?.district ?? null,
@@ -1611,7 +1638,11 @@ export class BookingsService {
       canContact: selected && ['CONFIRMED', 'COMPLETED'].includes(booking.status),
       canCancel: selected && booking.status === 'CONFIRMED',
       canComplete: selected && booking.status === 'CONFIRMED' && new Date(booking.scheduledEnd) <= new Date(),
-      customerSelectedAnotherTechnician: effectiveApplicationStatus === 'NOT_SELECTED',
+      // Also true for a technician who never applied (e.g. the requested one) once someone else got the job.
+      customerSelectedAnotherTechnician:
+        effectiveApplicationStatus === 'NOT_SELECTED' ||
+        (Boolean(viewerTechnicianId) && Boolean(booking.technicianId) && booking.technicianId !== viewerTechnicianId &&
+          ['CONFIRMED', 'COMPLETED'].includes(booking.status)),
       applicationDeadlineAt: booking.applicationDeadlineAt ?? null,
       expiredAt: booking.expiredAt ?? null,
       ...(includeTechnicianPricing ? { pricing: this.technicianPricing(booking) } : {}),
