@@ -19,7 +19,7 @@ import { PayosService } from './payos.service';
 import { Optional } from '@nestjs/common';
 import { SettingsService } from '../../settings/settings.service';
 import { ComplaintStorageService } from './complaint-storage.service';
-import { kmBetween } from './distance';
+import { addressPreview, kmBetween, technicianBadge } from './distance';
 import {
   BookingHistoryQueryDto,
   CancelBookingDto,
@@ -953,7 +953,7 @@ export class BookingsService {
         continue;
       visible.push(
         booking.assignmentMode === 'OPEN_MARKETPLACE'
-          ? this.openBookingResponse(booking, app?.status ?? null, Boolean(app?.status === 'SELECTED'), true, profile.id)
+          ? this.openBookingResponse(booking, app?.status ?? null, Boolean(app?.status === 'SELECTED'), true, profile.id, profile)
           : this.technicianJobResponse(this.withHistoricalAddress(booking), userId),
       );
     }
@@ -970,19 +970,19 @@ export class BookingsService {
         const application = await this.prisma.bookingTechnicianApplication.findUnique({
           where: { bookingId_technicianProfileId: { bookingId: id, technicianProfileId: profile.id } },
         });
-        return this.openBookingResponse(expired, application?.status ?? null, false, true, profile.id);
+        return this.openBookingResponse(expired, application?.status ?? null, false, true, profile.id, profile);
       }
       const application = await this.prisma.bookingTechnicianApplication.findUnique({
         where: { bookingId_technicianProfileId: { bookingId: id, technicianProfileId: profile.id } },
       });
       if (booking.status === 'EXPIRED' && !application)
-        return this.openBookingResponse(booking, 'EXPIRED', false, true, profile.id);
+        return this.openBookingResponse(booking, 'EXPIRED', false, true, profile.id, profile);
       // detail() loads items without catalogService; reload them so eligibility sees catalog data.
       if (booking.status === 'OPEN' && !application) await this.openJobForTechnician(id, profile.id, true);
       // A cancelled job reached detail() through an involvement or notification check; just show it.
       else if (!application && booking.requestedTechnicianId !== profile.id && booking.status !== 'CANCELLED')
         throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
-      return this.openBookingResponse(booking, application?.status ?? null, application?.status === 'SELECTED', true, profile.id);
+      return this.openBookingResponse(booking, application?.status ?? null, application?.status === 'SELECTED', true, profile.id, profile);
     }
     if (booking.technician?.userId !== userId) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
     return this.technicianJobResponse(booking, userId);
@@ -1449,7 +1449,7 @@ export class BookingsService {
   private async requireActiveTechnician(userId: string) {
     const profile = await this.prisma.technicianProfile.findFirst({
       where: { userId, isActive: true, isVerified: true, user: { status: 'ACTIVE' } },
-      select: { id: true },
+      select: { id: true, latitude: true, longitude: true },
     });
     if (!profile) throw new ForbiddenException('Tai khoan KTV chua du dieu kien nhan don');
     return profile;
@@ -1555,6 +1555,7 @@ export class BookingsService {
     selected: boolean,
     includeTechnicianPricing = false,
     viewerTechnicianId?: string,
+    viewerLocation?: { latitude?: unknown; longitude?: unknown },
   ) {
     const effectiveApplicationStatus =
       applicationStatus ??
@@ -1598,6 +1599,8 @@ export class BookingsService {
           }
         : null,
       address: selected || booking.status === 'EXPIRED' ? (booking.addressSnapshot ?? null) : null,
+      addressPreview: booking.mode === 'HOME' ? addressPreview(booking.addressSnapshot) : null,
+      distanceKm: kmBetween(booking.addressSnapshot, viewerLocation),
       canApply,
       canDecline: canApply && booking.requestedTechnicianId === viewerTechnicianId,
       canWithdraw: booking.status === 'OPEN' && effectiveApplicationStatus === 'APPLIED',
@@ -1754,6 +1757,9 @@ export class BookingsService {
               avatarUrl: application.technicianProfile?.user?.avatarUrl ?? null,
               averageRating: Number(application.technicianProfile?.averageRating ?? 0),
               reviewCount: application.technicianProfile?.reviewCount ?? 0,
+              distanceKm: kmBetween(booking.address, application.technicianProfile),
+              isAvailable: Boolean(application.technicianProfile?.isAvailable),
+              badge: technicianBadge(application.technicianProfile),
               status: application.status,
               isSelected: application.status === 'SELECTED',
               isApplicant: application.status === 'APPLIED',

@@ -12,3 +12,25 @@ export function kmBetween(from: Point, to: Point) {
     Math.cos(rad(lat1!)) * Math.cos(rad(lat2!)) * Math.sin(rad(lng2! - lng1!) / 2) ** 2;
   return Math.round(6371 * 2 * Math.asin(Math.sqrt(Math.min(1, Math.max(0, a)))) * 10) / 10;
 }
+
+/**
+ * Address shown to technicians before they get the booking: the first part (house number and
+ * street) is dropped, e.g. "52 Ngõ 15, Tổ 2A, Bạch Mai, Hà Nội" -> "… Tổ 2A, Bạch Mai, Hà Nội".
+ */
+export function addressPreview(snapshot: any) {
+  if (!snapshot || typeof snapshot !== 'object') return null;
+  const parts = String(snapshot.address ?? snapshot.addressText ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length > 1) return `… ${parts.slice(1).join(', ')}`;
+  return [snapshot.district, snapshot.city].filter(Boolean).join(', ') || null;
+}
+
+/** Tag on a fallback technician card: "Chất lượng" (well reviewed) wins over "Mới" (joined in the last 30 days). */
+export function technicianBadge(profile: any): 'QUALITY' | 'NEW' | null {
+  if (!profile) return null;
+  if (Number(profile.averageRating ?? 0) >= 4.5 && Number(profile.reviewCount ?? 0) >= 10) return 'QUALITY';
+  if (profile.createdAt && Date.now() - new Date(profile.createdAt).getTime() < 30 * 86_400_000) return 'NEW';
+  return null;
+}

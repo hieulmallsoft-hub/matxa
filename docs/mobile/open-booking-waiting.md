@@ -34,7 +34,7 @@ POST /api/bookings
 ```
 
 Body như hiện tại, có `technicianId` là KTV khách chọn ở bước matching. Response có `bookingId`,
-`bookingStatus: "OPEN"` và `expiresInSeconds` (số giây còn lại để chờ; server hiện đặt 5 phút).
+`bookingStatus: "OPEN"` và `expiresInSeconds` (số giây còn lại để chờ, theo `OPEN_BOOKING_APPLICATION_TTL_MINUTES`; Figma là 15 phút).
 
 Backend kiểm tra KTV khách chọn **trước khi** tạo đơn. Nếu KTV đó không còn nhận được đơn, API trả lỗi và
 **không tạo đơn**; app báo lý do và đưa khách về màn chọn KTV (gọi lại `POST /api/bookings/matching-technicians`):
@@ -74,6 +74,9 @@ Mỗi phần tử `applications`:
   "avatarUrl": "https://...",
   "averageRating": 4.8,
   "reviewCount": 15,
+  "distanceKm": 2,
+  "isAvailable": true,
+  "badge": "QUALITY",
   "status": "APPLIED",
   "isSelected": false,
   "isApplicant": true,
@@ -84,7 +87,10 @@ Mỗi phần tử `applications`:
 - **Chỉ hiện phần tử `isApplicant: true`.** `WITHDRAWN` là KTV đã rút ứng tuyển, `DECLINED` là
   KTV đã từ chối; không hiện các phần tử này.
 - `averageRating`, `reviewCount` → "★4.8 (15 đánh giá)".
-- Backend **chưa trả** khoảng cách ("2 km"), "Sẵn sàng", tag "Mới"/"Chất lượng". Ẩn các phần này.
+- `distanceKm` → "📍 2 km" (từ địa chỉ khách tới KTV). `null` khi đơn không tại nhà hoặc KTV chưa có vị trí → ẩn dòng này.
+- `isAvailable: true` → "🕒 Sẵn sàng" (KTV đang bật nhận việc). `false` thì ẩn.
+- `badge` → tag góc ảnh: `"QUALITY"` = **Chất lượng** (★ ≥ 4.5 và ≥ 10 đánh giá), `"NEW"` = **Mới**
+  (KTV tham gia dưới 30 ngày), `null` = không gắn tag.
 
 **Cập nhật danh sách:** khi nhận thông báo `TECHNICIAN_APPLIED` hoặc `REQUESTED_TECHNICIAN_DECLINED`
 (mục 1.5), gọi lại `GET /api/bookings/{bookingId}`. Trong lúc đang mở màn chờ, tải lại khoảng
@@ -188,7 +194,9 @@ GET /api/technician/jobs/{bookingId}
 | `canWithdraw` | Hiện nút **Rút ứng tuyển** sau khi đã ứng tuyển |
 | `applicationStatus` | `APPLIED` = "Đã ứng tuyển", chờ khách chọn |
 | `bookingStatus` | `EXPIRED` → nhãn "Hết hạn" |
-
+| `customer.gender`, `customer.nationality` | "Khách nữ, Việt Nam" |
+| `addressPreview` | Địa chỉ rút gọn trên thẻ, chi tiết và sheet "Bạn muốn ứng tuyển đơn?": "… Tổ 2A+Tổ 2B+Tổ 2C, Bạch Mai, Hà Nội" (bỏ số nhà/ngõ). Địa chỉ đầy đủ `address` chỉ có sau khi KTV được nhận đơn |
+| `distanceKm` | "Khoảng cách: 5km" trong sheet ứng tuyển. `null` khi KTV chưa cập nhật vị trí hoặc đơn không tại nhà → ẩn |
 Dựa vào các cờ `can...` để hiện nút; không tự suy ra từ trạng thái.
 
 ## 2.3 Ứng tuyển, từ chối, rút
@@ -204,6 +212,10 @@ POST /api/technician/jobs/{bookingId}/withdraw   (không body)
   hiện thông tin liên hệ khách. Nên đổi nhãn nút thành **"Nhận đơn"** thay cho "Ứng tuyển" ở thẻ này.
   Khách nhận `REQUESTED_TECHNICIAN_ACCEPTED`; các KTV thay thế đang ứng tuyển nhận `TECHNICIAN_NOT_SELECTED`.
 - **Ứng tuyển** (KTV "Yêu cầu mới"): tạo lượt `APPLIED`; khách nhận `TECHNICIAN_APPLIED`. Gọi lại nhiều lần không sao.
+- **Sheet sau khi bấm** (Figma "Nhận đơn thành công"): dựa vào response của `/apply`.
+  `bookingStatus: "CONFIRMED"` → hiện "Nhận đơn thành công — hãy gọi cho khách"; lúc này đã có
+  `address` và số khách. Còn `status: "APPLIED"` (KTV "Yêu cầu mới") thì khách **chưa chọn** nên
+  chưa có số để gọi → hiện "Đã ứng tuyển, chờ khách chọn"; khi nhận `TECHNICIAN_SELECTED` mới hiện sheet thành công.
   Ứng tuyển **chưa trừ tiền**; ví KTV thay thế chỉ bị trừ hoa hồng khi khách chọn KTV này (`COMMISSION_DEBIT`),
   và được hoàn lại nếu đơn bị hủy sau đó (`COMMISSION_REFUND`).
   Nhưng ví phải **đủ tiền hoa hồng** của đơn ngay lúc ứng tuyển (hoa hồng = tiền dịch vụ × % phí nền tảng),
