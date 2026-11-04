@@ -756,7 +756,6 @@ export class BookingsService {
             include: { items: { include: { catalogService: true } } },
           });
           await this.assertOpenEligibility(tx, booking, application.technicianProfileId);
-          await this.chargeTechnicianCommission(application.technicianProfile.user.id, bookingId, tx);
           await tx.bookingTechnicianApplication.update({
             where: { id: application.id },
             data: { status: 'SELECTED', selectedAt: now },
@@ -770,6 +769,9 @@ export class BookingsService {
             data: { technicianId: application.technicianProfileId, status: 'CONFIRMED' },
             include: { items: { include: { catalogService: true } }, payment: true },
           });
+          // Charged after the assignment: the charge only accepts a booking that belongs to the
+          // technician. Same transaction, so an insufficient wallet still rolls everything back.
+          await this.chargeTechnicianCommission(application.technicianProfile.user.id, bookingId, tx);
           const losers = await tx.bookingTechnicianApplication.findMany({
             where: { bookingId, status: 'NOT_SELECTED' },
             include: { technicianProfile: { select: { userId: true } } },
@@ -1600,6 +1602,8 @@ export class BookingsService {
         : null,
       address: selected || booking.status === 'EXPIRED' ? (booking.addressSnapshot ?? null) : null,
       addressPreview: booking.mode === 'HOME' ? addressPreview(booking.addressSnapshot) : null,
+      city: booking.addressSnapshot?.city ?? null,
+      district: booking.addressSnapshot?.district ?? null,
       distanceKm: kmBetween(booking.addressSnapshot, viewerLocation),
       canApply,
       canDecline: canApply && booking.requestedTechnicianId === viewerTechnicianId,

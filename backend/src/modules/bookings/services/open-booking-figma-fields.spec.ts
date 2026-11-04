@@ -45,6 +45,8 @@ describe('open booking display fields', () => {
       distanceKm: 5,
       address: null,
       addressPreview: '… Tổ 2A+Tổ 2B+Tổ 2C, Bạch Mai, Hà Nội',
+      city: 'Ha Noi',
+      district: 'Hai Ba Trung',
     });
   });
 

@@ -196,6 +196,7 @@ GET /api/technician/jobs/{bookingId}
 | `bookingStatus` | `EXPIRED` → nhãn "Hết hạn" |
 | `customer.gender`, `customer.nationality` | "Khách nữ, Việt Nam" |
 | `addressPreview` | Địa chỉ rút gọn trên thẻ, chi tiết và sheet "Bạn muốn ứng tuyển đơn?": "… Tổ 2A+Tổ 2B+Tổ 2C, Bạch Mai, Hà Nội" (bỏ số nhà/ngõ). Địa chỉ đầy đủ `address` chỉ có sau khi KTV được nhận đơn |
+| `district`, `city` | Dùng khi `addressPreview` là `null` (đơn tại cơ sở/online, hoặc địa chỉ không tách được): hiện "Hai Bà Trưng, Hà Nội". Cả ba đều `null` thì ẩn dòng địa chỉ |
 | `distanceKm` | "Khoảng cách: 5km" trong sheet ứng tuyển. `null` khi KTV chưa cập nhật vị trí hoặc đơn không tại nhà → ẩn |
 Dựa vào các cờ `can...` để hiện nút; không tự suy ra từ trạng thái.
 
