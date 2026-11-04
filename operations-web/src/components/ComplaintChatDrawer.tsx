@@ -87,7 +87,10 @@ export function ComplaintChatDrawer({ complaintId, onClose }: { complaintId: str
     return () => clearInterval(timer);
   }, [context, loadMessages]);
 
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: 'smooth' }), [messages.length]);
+  useEffect(() => {
+    // Braces matter: newer Chrome returns a Promise from scrollIntoView, which React would call as the cleanup.
+    bottom.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages.length]);
 
   const send = async (event: FormEvent) => {
     event.preventDefault();
