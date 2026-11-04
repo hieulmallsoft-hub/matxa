@@ -180,7 +180,7 @@ Mã khác danh sách trên trả `400`. Hủy được khi đơn `OPEN`, `PENDIN
 
 ### KTV "Khách đặt bạn" từ chối
 
-KTV gọi `POST /api/technician/jobs/{bookingId}/decline`. Đơn **không bị hủy**: vẫn `OPEN` để khách chọn KTV khác đang ứng tuyển. Khách nhận thông báo `REQUESTED_TECHNICIAN_DECLINED` ("<tên KTV> đã từ chối đơn. Bạn có thể chọn KTV khác đang ứng tuyển."), `actionUrl = matxa://bookings/{bookingId}`. Khi nhận, app khách tải lại `GET /api/bookings/{bookingId}` và đổi dòng "Đang chờ <tên KTV> xác nhận".
+KTV gọi `POST /api/technician/jobs/{bookingId}/decline`. Đơn **không bị hủy**: vẫn `OPEN` để khách chọn KTV khác đang ứng tuyển. Khách nhận thông báo `REQUESTED_TECHNICIAN_DECLINED` ("<tên KTV> đã từ chối đơn. Đơn vẫn mở để KTV khác nhận."), `actionUrl = matxa://bookings/{bookingId}`. Khi nhận, app khách tải lại `GET /api/bookings/{bookingId}` và đổi dòng "Đang chờ <tên KTV> xác nhận".
 
 ## 5. Catalog dịch vụ
 

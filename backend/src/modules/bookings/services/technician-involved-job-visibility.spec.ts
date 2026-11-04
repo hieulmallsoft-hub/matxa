@@ -35,7 +35,7 @@ describe('marketplace jobs a technician was involved in', () => {
         count: jest.fn().mockResolvedValue(1),
       },
       user: { findUnique: jest.fn().mockResolvedValue({ role: 'TECHNICIAN' }) },
-      notification: { findFirst: jest.fn().mockResolvedValue(null) },
+      notification: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
       technicianProfile: {
         findUnique: jest.fn(async ({ where }: any) => (profiles[where.userId] ? { id: profiles[where.userId] } : null)),
         findFirst: jest.fn(async ({ where }: any) => (profiles[where.userId] ? { id: profiles[where.userId] } : null)),

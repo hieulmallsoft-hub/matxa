@@ -59,4 +59,15 @@ describe('assigning an open booking charges the chosen technician', () => {
     expect(state.technicianId).toBe('fftools-profile');
     expect(state.ledger).toEqual([expect.objectContaining({ type: 'COMMISSION_DEBIT', amountVnd: -200000 })]);
   });
+
+  it('tells the customer to pick someone else, not about the technician wallet, when the charge fails', async () => {
+    const { service, state } = subject();
+    state.balance = 1000;
+    jest.spyOn(service, 'chargeTechnicianCommission').mockRejectedValue(
+      new (require('@nestjs/common').ConflictException)('So du vi khong du de nhan don'),
+    );
+    await expect(service.selectTechnician('customer-1', 'booking-1', 'fftools-application')).rejects.toThrow(
+      'KTV nay hien khong nhan duoc don, vui long chon KTV khac',
+    );
+  });
 });

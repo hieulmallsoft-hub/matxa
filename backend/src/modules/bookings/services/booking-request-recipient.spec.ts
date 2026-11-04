@@ -17,6 +17,7 @@ describe('booking request recipient', () => {
       },
       technicianProfile: { findFirst: jest.fn().mockResolvedValue({ id: profileId }) },
       bookingTechnicianApplication: { findUnique: jest.fn().mockResolvedValue(null) },
+      notification: { findMany: jest.fn().mockResolvedValue([]) },
       serviceCatalogPriceOption: { findMany: jest.fn().mockResolvedValue([{ id: 'option', durationMinutes: 60 }]) },
       technicianService: { findMany: jest.fn().mockResolvedValue([
         { catalogServiceId: 'catalog', priceOptions: [{ durationMinutes: 60 }] },

@@ -149,7 +149,7 @@ PATCH /api/bookings/{bookingId}/cancel
 |---|---|---|
 | `TECHNICIAN_APPLIED` | Có KTV thay thế ứng tuyển | Tải lại danh sách ứng viên |
 | `REQUESTED_TECHNICIAN_ACCEPTED` | KTV khách chọn ban đầu đã nhận đơn → đơn `CONFIRMED`. Nội dung: "<tên> đã nhận đơn của bạn." | Tải lại đơn, chuyển sang màn "Đã kết nối" (chi tiết đơn, nhắn tin với KTV) |
-| `REQUESTED_TECHNICIAN_DECLINED` | KTV khách chọn ban đầu từ chối. Nội dung: "<tên> đã từ chối đơn. Bạn có thể chọn KTV khác đang ứng tuyển." | Tải lại đơn; đổi dòng "Đang chờ <tên> xác nhận" thành mời chọn KTV khác |
+| `REQUESTED_TECHNICIAN_DECLINED` | KTV khách chọn ban đầu từ chối. Nội dung: "<tên> đã từ chối đơn. Đơn vẫn mở để KTV khác nhận." | Tải lại đơn; đổi dòng "Đang chờ <tên> xác nhận" thành mời chọn KTV khác |
 | `BOOKING_EXPIRED` | Hết 15 phút chưa chọn KTV | Hiện "Đơn đã hết hạn" |
 | `BOOKING_CANCELLED` | KTV đã được chọn hủy đơn | Hiện đơn đã hủy (nội dung chữ theo mẫu admin cấu hình, chỉ dựa vào `type`) |
 

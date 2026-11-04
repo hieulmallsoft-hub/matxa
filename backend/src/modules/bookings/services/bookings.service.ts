@@ -691,7 +691,7 @@ export class BookingsService {
         bookingId,
         'REQUESTED_TECHNICIAN_DECLINED',
         'KTV đã từ chối',
-        `${name} đã từ chối đơn. Bạn có thể chọn KTV khác đang ứng tuyển.`,
+        `${name} đã từ chối đơn. Đơn vẫn mở để KTV khác nhận.`,
       );
     }
     return declined;
@@ -715,7 +715,12 @@ export class BookingsService {
   }
 
   async selectTechnician(customerId: string, bookingId: string, applicationId: string) {
-    const result = await this.assignOpenBooking(bookingId, applicationId, customerId);
+    const result = await this.assignOpenBooking(bookingId, applicationId, customerId).catch((error) => {
+      // The technician's wallet dropped since they applied; that is their business, not the customer's.
+      if (error instanceof ConflictException && error.message === 'So du vi khong du de nhan don')
+        throw new ConflictException('KTV nay hien khong nhan duoc don, vui long chon KTV khac');
+      throw error;
+    });
     void this.notifyStatus(
       result.winnerUserId,
       bookingId,
@@ -920,6 +925,14 @@ export class BookingsService {
   async listTechnicianJobs(userId: string, query: TechnicianJobQueryDto) {
     const profile = await this.requireActiveTechnician(userId);
     const now = new Date();
+    // Expired jobs stay in the history of technicians they were announced to, not everyone's.
+    const announcements = await this.prisma.notification.findMany({
+      where: { userId, type: { in: ['OPEN_BOOKING_AVAILABLE', 'OPEN_BOOKING_REQUESTED'] } },
+      select: { actionUrl: true },
+    });
+    const announcedIds = announcements
+      .map((item) => item.actionUrl?.replace('matxa://bookings/', ''))
+      .filter((id): id is string => Boolean(id));
     const directWhere: Prisma.BookingWhereInput = {
       technician: { userId },
       assignmentMode: 'DIRECT',
@@ -937,7 +950,7 @@ export class BookingsService {
         { status: 'OPEN', OR: [{ applicationDeadlineAt: null }, { applicationDeadlineAt: { gt: now } }] },
         // Keep expired marketplace jobs visible in technician history even
         // when this technician never created an application record.
-        { status: 'EXPIRED' },
+        { status: 'EXPIRED', id: { in: announcedIds } },
         { applications: { some: { technicianProfileId: profile.id } } },
         // The technician the customer picked keeps the job even if it is cancelled before they apply.
         { requestedTechnicianId: profile.id },
@@ -1625,7 +1638,7 @@ export class BookingsService {
             nationality: booking.customer.nationality ?? null,
           }
         : null,
-      address: selected || booking.status === 'EXPIRED' ? (booking.addressSnapshot ?? null) : null,
+      address: selected ? (booking.addressSnapshot ?? null) : null,
       // Full street address as text so the technician can judge the trip; coordinates (`address`) stay hidden until selected.
       addressText: booking.mode === 'HOME' ? (booking.addressSnapshot?.address ?? booking.addressSnapshot?.addressText ?? null) : null,
       addressPreview: booking.mode === 'HOME' ? addressPreview(booking.addressSnapshot) : null,
