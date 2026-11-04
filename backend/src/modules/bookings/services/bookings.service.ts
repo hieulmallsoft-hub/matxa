@@ -19,6 +19,7 @@ import { PayosService } from './payos.service';
 import { Optional } from '@nestjs/common';
 import { SettingsService } from '../../settings/settings.service';
 import { ComplaintStorageService } from './complaint-storage.service';
+import { kmBetween } from './distance';
 import {
   BookingHistoryQueryDto,
   CancelBookingDto,
@@ -48,6 +49,7 @@ export class BookingsService {
   ) {}
 
   async quote(userId: string, dto: QuoteBookingDto, db: Prisma.TransactionClient = this.prisma) {
+    await this.assertLeadTime(new Date(dto.scheduledStart));
     const baseServices = await loadBookableServices(db, dto.technicianId, dto.serviceIds, dto.mode);
     const services = await applyPriceOptions(db, baseServices, dto.priceOptionIds);
     const durationMinutes = services.reduce((sum, item) => sum + item.durationMinutes, 0);
@@ -421,6 +423,8 @@ export class BookingsService {
   async matchingTechnicians(userId: string, dto: any) {
     const start = new Date(dto.scheduledStart);
     if (!Number.isFinite(start.getTime()) || start <= new Date()) throw new BadRequestException('Thoi gian dat lich khong hop le');
+    await this.assertLeadTime(start);
+    const { maxDispatchRadiusKm } = await this.bookingRules();
     const serviceIds: string[] = [...new Set((dto.items ?? []).map((item: any) => String(item.catalogServiceId)))] as string[];
     const optionIds: string[] = [...new Set((dto.items ?? []).map((item: any) => String(item.priceOptionId)))] as string[];
     if (!serviceIds.length || serviceIds.length !== (dto.items ?? []).length) throw new BadRequestException('Danh sach dich vu khong hop le');
@@ -448,12 +452,7 @@ export class BookingsService {
       : dto.mode === 'HOME' && dto.addressId
         ? await this.prisma.address.findFirst({ where: { id: dto.addressId, userId, deletedAt: null }, select: { latitude: true, longitude: true } }).then((a) => a && { latitude: Number(a.latitude), longitude: Number(a.longitude) })
         : null;
-    const distanceKm = (latitude: unknown, longitude: unknown) => {
-      if (!location || latitude === null || latitude === undefined || longitude === null || longitude === undefined) return null;
-      const rad = (v: number) => (v * Math.PI) / 180;
-      const a = Math.sin(rad(Number(latitude) - location.latitude) / 2) ** 2 + Math.cos(rad(location.latitude)) * Math.cos(rad(Number(latitude))) * Math.sin(rad(Number(longitude) - location.longitude) / 2) ** 2;
-      return Math.round(6371 * 2 * Math.asin(Math.sqrt(Math.min(1, Math.max(0, a)))) * 10) / 10;
-    };
+    const distanceKm = (latitude: unknown, longitude: unknown) => kmBetween(location, { latitude, longitude });
     const eligible = [] as any[];
     for (const candidate of candidates) {
       const [slot, conflict, matchingServices] = await Promise.all([
@@ -463,7 +462,9 @@ export class BookingsService {
       ]);
       const hasAllServices = services.every((service: any) => matchingServices.some((item: any) => item.catalogServiceId === service.id && item.categoryId === service.categoryId));
       if (!slot || conflict || !hasAllServices) continue;
-       eligible.push({ technicianId: candidate.id, displayName: candidate.user.displayName, avatarUrl: candidate.user.avatarUrl, city: candidate.city, district: candidate.district, distanceKm: distanceKm(candidate.latitude, candidate.longitude), rating: Number(candidate.averageRating), reviewCount: candidate.reviewCount });
+      const distance = distanceKm(candidate.latitude, candidate.longitude);
+      if (maxDispatchRadiusKm > 0 && distance !== null && distance > maxDispatchRadiusKm) continue;
+       eligible.push({ technicianId: candidate.id, displayName: candidate.user.displayName, avatarUrl: candidate.user.avatarUrl, city: candidate.city, district: candidate.district, distanceKm: distance, rating: Number(candidate.averageRating), reviewCount: candidate.reviewCount });
     }
     eligible.sort((a, b) => {
       if (dto.sort === 'rating') return b.rating - a.rating;
@@ -497,6 +498,7 @@ export class BookingsService {
     const start = new Date(dto.scheduledStart);
     if (!Number.isFinite(start.getTime()) || start <= new Date())
       throw new BadRequestException('Thoi gian dat lich phai o tuong lai');
+    await this.assertLeadTime(start);
     if (dto.mode !== 'HOME' && dto.addressId) throw new BadRequestException('Chi gui addressId khi dat tai nha');
     const now = new Date();
     const defaultTtlMinutes = Number(this.config.get('OPEN_BOOKING_APPLICATION_TTL_MINUTES', 15));
@@ -992,6 +994,17 @@ export class BookingsService {
     return this.updateStatus(userId, id, { status: 'CONFIRMED' });
   }
 
+  /** Admin booking rules; 0 means no limit. Defaults apply when settings are not wired (tests). */
+  private async bookingRules() {
+    return (await this.settings?.getBookingRules()) ?? { minAdvanceHours: 0, maxDispatchRadiusKm: 0 };
+  }
+
+  private async assertLeadTime(start: Date) {
+    const { minAdvanceHours } = await this.bookingRules();
+    if (minAdvanceHours > 0 && start.getTime() < Date.now() + minAdvanceHours * 3_600_000)
+      throw new BadRequestException(`Vui long dat lich truoc it nhat ${minAdvanceHours} gio`);
+  }
+
   private async commissionRate() {
     const rate = this.settings ? await this.settings.platformFeePercent() : Number(this.config.get('TECHNICIAN_COMMISSION_RATE_PERCENT', 25));
     if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new BadRequestException('Ty le chiet khau KTV khong hop le');
@@ -1444,11 +1457,16 @@ export class BookingsService {
         isVerified: true,
         user: { status: 'ACTIVE', role: 'TECHNICIAN', technicianApplication: { is: { status: 'APPROVED' } } },
       },
-      select: { id: true, city: true, district: true, serviceModes: true },
+      select: { id: true, city: true, district: true, serviceModes: true, latitude: true, longitude: true },
     });
     if (!profile) throw new ForbiddenException('Tai khoan KTV chua du dieu kien nhan don');
     const snapshot =
       booking.addressSnapshot && typeof booking.addressSnapshot === 'object' ? (booking.addressSnapshot as any) : null;
+    // Only home bookings carry coordinates; technicians without a location are not filtered out.
+    const { maxDispatchRadiusKm } = await this.bookingRules();
+    const distance = kmBetween(snapshot, profile);
+    if (maxDispatchRadiusKm > 0 && distance !== null && distance > maxDispatchRadiusKm)
+      throw new ForbiddenException('KTV ngoai ban kinh phuc vu cua don');
     if (snapshot?.city && profile.city && snapshot.city !== profile.city)
       throw new ForbiddenException('KTV khong phu hop khu vuc cua don');
     if (snapshot?.district && profile.district && snapshot.district !== profile.district)

@@ -53,14 +53,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
   const [isSaving, setIsSaving] = useState(false);
 
   // Settings State
-  const [brandName, setBrandName] = useState('MATXXA');
-  const [brandHotline, setBrandHotline] = useState('1900 888 666');
-  const [supportEmail, setSupportEmail] = useState('hotro@matxa.vn');
-  const [minAdvanceHours, setMinAdvanceHours] = useState('1');
-  const [autoCancelMinutes, setAutoCancelMinutes] = useState('15');
-  const [maxTravelDistanceKm, setMaxTravelDistanceKm] = useState('15');
+  const [brandName, setBrandName] = useState('');
+  const [brandHotline, setBrandHotline] = useState('');
+  const [supportEmail, setSupportEmail] = useState('');
+  const [minAdvanceHours, setMinAdvanceHours] = useState('0');
+  const [maxTravelDistanceKm, setMaxTravelDistanceKm] = useState('0');
   const [techCommissionRate, setTechCommissionRate] = useState('75');
-  const [nightSurcharge, setNightSurcharge] = useState('50000');
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
 
   React.useEffect(() => {
@@ -73,6 +71,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
   React.useEffect(() => {
     void request<{ technicianSharePercent: number }>('/admin/settings/commission')
       .then((value) => setTechCommissionRate(String(value.technicianSharePercent)))
+      .catch(() => undefined);
+    void request<{ brandName: string; hotline: string; supportEmail: string }>('/admin/settings/platform')
+      .then((value) => {
+        setBrandName(value.brandName);
+        setBrandHotline(value.hotline);
+        setSupportEmail(value.supportEmail);
+      })
+      .catch(() => undefined);
+    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number }>('/admin/settings/booking')
+      .then((value) => {
+        setMinAdvanceHours(String(value.minAdvanceHours));
+        setMaxTravelDistanceKm(String(value.maxDispatchRadiusKm));
+      })
       .catch(() => undefined);
   }, []);
 
@@ -103,9 +114,28 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         const share = Number(techCommissionRate);
         if (!Number.isFinite(share) || share < 0 || share > 100) throw new Error('Tỷ lệ KTV nhận phải từ 0 đến 100%');
         await request('/admin/settings/commission', { method: 'PATCH', body: JSON.stringify({ technicianSharePercent: share }) });
+        addToast({ title: 'Đã lưu chính sách KTV', message: `KTV nhận ${techCommissionRate}% giá trị dịch vụ.`, type: 'success' });
+      }
+      if (activeCategory === 'brand') {
+        if (!brandName.trim()) throw new Error('Tên thương hiệu không được để trống');
+        await request('/admin/settings/platform', {
+          method: 'PATCH',
+          body: JSON.stringify({ brandName: brandName.trim(), hotline: brandHotline.trim(), supportEmail: supportEmail.trim() }),
+        });
+        addToast({ title: 'Đã lưu thông tin hệ thống', type: 'success' });
+      }
+      if (activeCategory === 'booking') {
+        const hours = Number(minAdvanceHours);
+        const radius = Number(maxTravelDistanceKm);
+        if (!Number.isInteger(hours) || hours < 0 || hours > 72) throw new Error('Thời gian đặt trước phải là số nguyên từ 0 đến 72 giờ');
+        if (!Number.isInteger(radius) || radius < 0 || radius > 200) throw new Error('Bán kính phải là số nguyên từ 0 đến 200 km');
+        await request('/admin/settings/booking', {
+          method: 'PATCH',
+          body: JSON.stringify({ minAdvanceHours: hours, maxDispatchRadiusKm: radius }),
+        });
+        addToast({ title: 'Đã lưu quy định đặt lịch', message: 'Áp dụng cho các đơn đặt sau khi lưu.', type: 'success' });
       }
       setIsSaving(false);
-      addToast({ title: 'Đã lưu chính sách KTV', message: `KTV nhận ${techCommissionRate}% giá trị dịch vụ.`, type: 'success' });
     } catch (error) {
       setIsSaving(false);
       addToast({ title: 'Không thể lưu thay đổi', message: error instanceof Error ? error.message : 'Vui lòng thử lại', type: 'error' });
@@ -114,7 +144,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
 
   // Only these categories are stored on the server. The rest are layout only for now,
   // so they are read-only and never report a successful save.
-  const SAVED_ON_SERVER: SettingCategory[] = ['technician', 'notifications'];
+  const SAVED_ON_SERVER: SettingCategory[] = ['brand', 'booking', 'technician', 'notifications'];
+  const SAVE_BAR: Partial<Record<SettingCategory, { label: string; hint: string }>> = {
+    brand: { label: 'Lưu thông tin hệ thống', hint: 'Hiển thị trên ứng dụng khách hàng và KTV.' },
+    booking: { label: 'Lưu quy định đặt lịch', hint: 'Áp dụng cho các đơn đặt sau khi lưu.' },
+    technician: { label: 'Lưu chính sách KTV', hint: 'Tỷ lệ mới áp dụng cho các đơn được nhận sau khi lưu.' },
+  };
+  const saveBar = SAVE_BAR[activeCategory];
   const persisted = SAVED_ON_SERVER.includes(activeCategory);
 
   const categories = [
@@ -203,14 +239,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                     onChange={(e) => setBrandName(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
                   />
-                  <span className="text-[11px] text-[#66756B]">Tên hiển thị chính thức của hệ thống đặt massage & spa.</span>
+                  <span className="text-[11px] text-[#66756B]">Tên hiển thị chính thức của hệ thống đặt massage &amp; spa.</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-[#1C2B20]">Hotline tổng đài CSKH</label>
                     <input
-                      type="text"
+                      type="tel"
+                      maxLength={20}
+                      placeholder="vd: 0901 234 567"
                       value={brandHotline}
                       onChange={(e) => setBrandHotline(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
@@ -222,6 +260,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                     <label className="text-xs font-bold text-[#1C2B20]">Email tiếp nhận phản hồi</label>
                     <input
                       type="email"
+                      placeholder="vd: hotro@matxa.vn"
                       value={supportEmail}
                       onChange={(e) => setSupportEmail(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
@@ -246,36 +285,28 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                   <label className="text-xs font-bold text-[#1C2B20]">Thời gian đặt trước tối thiểu (tiếng)</label>
                   <input
                     type="number"
-                    min="1"
+                    min="0"
+                    max="72"
                     value={minAdvanceHours}
                     onChange={(e) => setMinAdvanceHours(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
                   />
-                  <span className="text-[11px] text-[#66756B]">Khách hàng cần đặt trước tối thiểu bao nhiêu giờ trước ca phục vụ.</span>
+                  <span className="text-[11px] text-[#66756B]">Khách phải đặt trước ca phục vụ ít nhất bao nhiêu giờ. Nhập 0 để không giới hạn.</span>
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-[#1C2B20]">Bán kính ghép lịch KTV tối đa (km)</label>
                   <input
                     type="number"
-                    min="5"
+                    min="0"
+                    max="200"
                     value={maxTravelDistanceKm}
                     onChange={(e) => setMaxTravelDistanceKm(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
                   />
-                  <span className="text-[11px] text-[#66756B]">Hệ thống chỉ gán các kỹ thuật viên trong bán kính này để đảm bảo đúng giờ.</span>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-[#1C2B20]">Phụ phí phục vụ ca đêm (22h00 - 06h00)</label>
-                  <input
-                    type="number"
-                    step="10000"
-                    value={nightSurcharge}
-                    onChange={(e) => setNightSurcharge(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
-                  />
-                  <span className="text-[11px] text-[#66756B]">Số tiền phụ thu (VNĐ) tự động cộng vào đơn ngoài giờ chuẩn.</span>
+                  <span className="text-[11px] text-[#66756B]">
+                    Đơn tại nhà chỉ gợi ý và gửi cho KTV trong bán kính này tính từ địa chỉ khách. KTV chưa cập nhật vị trí vẫn nhận được. Nhập 0 để không giới hạn.
+                  </span>
                 </div>
               </div>
             </div>
@@ -416,11 +447,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
       </div>
 
       {/* Sticky Bottom Save Bar */}
-      {activeCategory === 'technician' && (
+      {saveBar && (
         <div className="sticky bottom-4 z-20 flex items-center justify-between gap-3 rounded-2xl bg-white/95 backdrop-blur-md border border-[#E5EBE5] py-3 px-5 shadow-lg">
-          <span className="text-xs text-[#66756B] hidden sm:inline">Tỷ lệ mới áp dụng cho các đơn được nhận sau khi lưu.</span>
+          <span className="text-xs text-[#66756B] hidden sm:inline">{saveBar.hint}</span>
           <Button variant="primary" className="ml-auto" loading={isSaving} icon={<Save className="w-4 h-4" />} onClick={() => void handleSaveAll()}>
-            {isSaving ? 'Đang lưu...' : 'Lưu chính sách KTV'}
+            {isSaving ? 'Đang lưu...' : saveBar.label}
           </Button>
         </div>
       )}
