@@ -1851,6 +1851,8 @@ export class BookingsService {
       isSelected: ['CONFIRMED', 'COMPLETED'].includes(booking.status),
       isApplicant: false,
       jobState: booking.status === 'PENDING' ? 'NEW' : booking.status === 'CONFIRMED' ? 'ACCEPTED' : booking.status,
+      // A direct booking always names this technician, so a pending one is a 'Khách đặt bạn' card.
+      displayStatus: booking.status === 'PENDING' ? 'REQUESTED' : booking.status === 'CONFIRMED' ? 'ACCEPTED' : booking.status,
       canAccept: booking.status === 'PENDING',
       canDecline: booking.status === 'PENDING',
       canComplete: booking.status === 'CONFIRMED' && new Date(booking.scheduledEnd) <= new Date(),

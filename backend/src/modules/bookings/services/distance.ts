@@ -6,6 +6,8 @@ const coordinate = (value: unknown) => (value === null || value === undefined ||
 export function kmBetween(from: Point, to: Point) {
   const [lat1, lng1, lat2, lng2] = [from?.latitude, from?.longitude, to?.latitude, to?.longitude].map(coordinate);
   if ([lat1, lng1, lat2, lng2].some((value) => value === null || !Number.isFinite(value))) return null;
+  // Profiles without a location are stored as 0,0 (a point in the Atlantic), not as null.
+  if ((lat1 === 0 && lng1 === 0) || (lat2 === 0 && lng2 === 0)) return null;
   const rad = (v: number) => (v * Math.PI) / 180;
   const a =
     Math.sin(rad(lat2! - lat1!) / 2) ** 2 +

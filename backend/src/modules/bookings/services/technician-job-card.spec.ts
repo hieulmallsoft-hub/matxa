@@ -54,3 +54,18 @@ describe('technician job card', () => {
     expect(parsed.serviceIds).toEqual([a, b]);
   });
 });
+
+describe('direct booking job card', () => {
+  const service: any = new BookingsService({} as any, { get: (_k: string, f: unknown) => f } as any, {} as any, {} as any);
+  const direct = (status: string) => ({
+    id: 'booking-1', assignmentMode: 'DIRECT', status, technicianId: 'duc-profile', customerId: 'customer-1',
+    items: [], subtotal: 500000, serviceFee: 0, totalAmount: 500000, discountAmount: 0, grossServiceAmount: 500000,
+    platformFee: 0, technicianEarning: 500000, scheduledStart: new Date(), scheduledEnd: new Date(),
+  });
+  it.each([
+    ['PENDING', 'REQUESTED'], ['CONFIRMED', 'ACCEPTED'], ['COMPLETED', 'COMPLETED'],
+    ['CANCELLED', 'CANCELLED'], ['EXPIRED', 'EXPIRED'],
+  ])('labels a %s direct booking %s', (status, expected) => {
+    expect(service.technicianJobResponse(direct(status), 'duc-user').displayStatus).toBe(expected);
+  });
+});

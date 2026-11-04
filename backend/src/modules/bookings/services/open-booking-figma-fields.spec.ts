@@ -56,3 +56,11 @@ describe('open booking display fields', () => {
     expect(addressPreview(null)).toBeNull();
   });
 });
+
+describe('missing coordinates', () => {
+  it('treats 0,0 (an unset profile location) as unknown instead of a point in the ocean', () => {
+    const { kmBetween } = require('./distance');
+    expect(kmBetween({ latitude: 21.0245, longitude: 105.8575 }, { latitude: 0, longitude: 0 })).toBeNull();
+    expect(kmBetween({ latitude: 21.0245, longitude: 105.8575 }, { latitude: '0.0000000', longitude: '0.0000000' })).toBeNull();
+  });
+});
