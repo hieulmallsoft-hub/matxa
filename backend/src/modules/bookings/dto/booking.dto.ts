@@ -239,4 +239,11 @@ export class TechnicianJobQueryDto extends BookingHistoryQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) city?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) district?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() serviceId?: string;
+  @ApiPropertyOptional({ type: [String], description: 'Catalog service IDs (lọc nhiều dịch vụ), comma-separated or repeated' })
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').map((id) => id.trim()).filter(Boolean) : value))
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsUUID('all', { each: true })
+  serviceIds?: string[];
 }

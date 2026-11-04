@@ -182,9 +182,38 @@ Chạm thông báo → mở chi tiết đơn.
 ## 2.2 Danh sách và chi tiết
 
 ```http
-GET /api/technician/jobs
+GET /api/technician/jobs?city=Hà Nội&serviceIds=<id1>,<id2>,<id3>
+GET /api/technician/jobs?status=COMPLETED          (chip "Đã hoàn thành")
 GET /api/technician/jobs/{bookingId}
 ```
+
+**Bộ lọc (Figma):**
+- "Chọn thành phố" (chọn 1): danh sách lấy từ `GET /api/locations/cities` → gửi `city`.
+- "Chọn dịch vụ" (chọn nhiều): danh sách lấy từ `GET /api/service-catalog` → gửi `serviceIds` (cách nhau dấu phẩy
+  hoặc lặp lại `serviceIds=..&serviceIds=..`). Chip hiện "3 dịch vụ".
+- "Xóa lọc": gọi lại không có `city`/`serviceIds`/`status`.
+
+**`displayStatus`: nhãn của thẻ và màn chi tiết.** Mobile chỉ cần đọc trường này, không tự ghép các cờ:
+
+| `displayStatus` | Thẻ / chi tiết (Figma) | Nút |
+|---|---|---|
+| `REQUESTED` | 🔥 "Khách đặt bạn" + đếm ngược | **Từ chối** + **Nhận đơn** |
+| `NEW` | ☀️ "Yêu cầu mới" + đếm ngược | **Ứng tuyển** |
+| `APPLIED` | Không nhãn; chi tiết: ⏳ "Đang chờ khách xác nhận" | "Đã ứng tuyển" (xám) |
+| `NOT_SELECTED` | ⊗ "Không được chọn"; chi tiết: "Khách đã chọn KTV khác" | **Xem đơn khác** |
+| `CANCELLED` | ⊗ "Đã hủy"; chi tiết: "Đơn đã được hủy" | **Xem đơn khác** |
+| `EXPIRED` | "Hết hạn" (chữ đỏ) | — |
+| `DECLINED` / `WITHDRAWN` | Đã từ chối / Đã rút | — |
+| `ACCEPTED` | Đơn đã nhận: địa chỉ đầy đủ, quy định, "Gửi về Psyocore / Thực nhận / Tổng thu từ khách" | **Liên hệ khách**, **Đã hoàn thành** (khi `canComplete`) |
+| `COMPLETED` | "Đã hoàn thành", "Bạn đã nhận được" | — |
+
+Đếm ngược "12:05" = `applicationDeadlineAt` − giờ hiện tại (chỉ khi `REQUESTED`/`NEW`).
+
+**Tiền (`pricing`):**
+- "Bạn sẽ nhận được" = `pricing.technicianEarning`. Trước khi nhận đơn (`isEstimate: true`) đã **trừ sẵn hoa hồng**
+  theo tỷ lệ hiện tại, nên khớp với "Thực nhận" sau khi nhận.
+- Màn đơn đã nhận (`isEstimate: false`): "Gửi về Psyocore" = `platformFee`, "Thực nhận" = `technicianEarning`,
+  "Tổng thu từ khách" = `totalAmount` (đã gồm phí phục vụ tại nhà nếu có).
 
 | Trường | Dùng để |
 |---|---|

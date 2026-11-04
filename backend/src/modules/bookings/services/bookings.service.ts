@@ -924,6 +924,7 @@ export class BookingsService {
 
   async listTechnicianJobs(userId: string, query: TechnicianJobQueryDto) {
     const profile = await this.requireActiveTechnician(userId);
+    const commissionPercent = await this.commissionRate();
     const now = new Date();
     // Expired jobs stay in the history of technicians they were announced to, not everyone's.
     const announcements = await this.prisma.notification.findMany({
@@ -955,7 +956,9 @@ export class BookingsService {
         // The technician the customer picked keeps the job even if it is cancelled before they apply.
         { requestedTechnicianId: profile.id },
       ],
-      ...(query.serviceId ? { items: { some: { catalogServiceId: query.serviceId } } } : {}),
+      ...(query.serviceId || query.serviceIds?.length
+        ? { items: { some: { catalogServiceId: { in: [query.serviceId, ...(query.serviceIds ?? [])].filter(Boolean) as string[] } } } }
+        : {}),
     };
     const [bookings, total] = await Promise.all([
       this.prisma.booking.findMany({
@@ -993,8 +996,8 @@ export class BookingsService {
         continue;
       visible.push(
         booking.assignmentMode === 'OPEN_MARKETPLACE'
-          ? this.openBookingResponse(booking, app?.status ?? null, Boolean(app?.status === 'SELECTED'), true, profile.id, profile)
-          : this.technicianJobResponse(this.withHistoricalAddress(booking), userId),
+          ? this.openBookingResponse(booking, app?.status ?? null, Boolean(app?.status === 'SELECTED'), true, profile.id, profile, commissionPercent)
+          : this.technicianJobResponse(this.withHistoricalAddress(booking), userId, commissionPercent),
       );
     }
     return { items: visible, total, page: query.page, limit: query.limit };
@@ -1002,6 +1005,7 @@ export class BookingsService {
 
   async technicianJobDetail(userId: string, id: string) {
     const profile = await this.requireActiveTechnician(userId);
+    const commissionPercent = await this.commissionRate();
     const booking = await this.detail(userId, id, true, true);
     if (booking.assignmentMode === 'OPEN_MARKETPLACE') {
       if (booking.status === 'OPEN' && booking.applicationDeadlineAt && booking.applicationDeadlineAt <= new Date()) {
@@ -1010,22 +1014,22 @@ export class BookingsService {
         const application = await this.prisma.bookingTechnicianApplication.findUnique({
           where: { bookingId_technicianProfileId: { bookingId: id, technicianProfileId: profile.id } },
         });
-        return this.openBookingResponse(expired, application?.status ?? null, false, true, profile.id, profile);
+        return this.openBookingResponse(expired, application?.status ?? null, false, true, profile.id, profile, commissionPercent);
       }
       const application = await this.prisma.bookingTechnicianApplication.findUnique({
         where: { bookingId_technicianProfileId: { bookingId: id, technicianProfileId: profile.id } },
       });
       if (booking.status === 'EXPIRED' && !application)
-        return this.openBookingResponse(booking, 'EXPIRED', false, true, profile.id, profile);
+        return this.openBookingResponse(booking, 'EXPIRED', false, true, profile.id, profile, commissionPercent);
       // detail() loads items without catalogService; reload them so eligibility sees catalog data.
       if (booking.status === 'OPEN' && !application) await this.openJobForTechnician(id, profile.id, true);
       // A cancelled or already-taken job reached detail() through an involvement or notification check; just show it.
       else if (!application && booking.requestedTechnicianId !== profile.id && !['CANCELLED', 'CONFIRMED', 'COMPLETED'].includes(booking.status))
         throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
-      return this.openBookingResponse(booking, application?.status ?? null, application?.status === 'SELECTED', true, profile.id, profile);
+      return this.openBookingResponse(booking, application?.status ?? null, application?.status === 'SELECTED', true, profile.id, profile, commissionPercent);
     }
     if (booking.technician?.userId !== userId) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
-    return this.technicianJobResponse(booking, userId);
+    return this.technicianJobResponse(booking, userId, commissionPercent);
   }
 
   async technicianJobContact(userId: string, id: string) {
@@ -1596,7 +1600,13 @@ export class BookingsService {
     includeTechnicianPricing = false,
     viewerTechnicianId?: string,
     viewerLocation?: { latitude?: unknown; longitude?: unknown },
+    commissionPercent?: number,
   ) {
+    // Also true for a technician who never applied (e.g. the requested one) once someone else got the job.
+    const takenByAnother =
+      applicationStatus === 'NOT_SELECTED' ||
+      (Boolean(viewerTechnicianId) && Boolean(booking.technicianId) && booking.technicianId !== viewerTechnicianId &&
+        ['CONFIRMED', 'COMPLETED'].includes(booking.status));
     const effectiveApplicationStatus =
       applicationStatus ??
       (booking.assignmentMode === 'OPEN_MARKETPLACE' && booking.status === 'EXPIRED' ? 'EXPIRED' : null);
@@ -1651,15 +1661,30 @@ export class BookingsService {
       canContact: selected && ['CONFIRMED', 'COMPLETED'].includes(booking.status),
       canCancel: selected && booking.status === 'CONFIRMED',
       canComplete: selected && booking.status === 'CONFIRMED' && new Date(booking.scheduledEnd) <= new Date(),
-      // Also true for a technician who never applied (e.g. the requested one) once someone else got the job.
-      customerSelectedAnotherTechnician:
-        effectiveApplicationStatus === 'NOT_SELECTED' ||
-        (Boolean(viewerTechnicianId) && Boolean(booking.technicianId) && booking.technicianId !== viewerTechnicianId &&
-          ['CONFIRMED', 'COMPLETED'].includes(booking.status)),
+      customerSelectedAnotherTechnician: takenByAnother,
+      displayStatus: this.jobDisplayStatus(booking, effectiveApplicationStatus, selected, takenByAnother, viewerTechnicianId),
       applicationDeadlineAt: booking.applicationDeadlineAt ?? null,
       expiredAt: booking.expiredAt ?? null,
-      ...(includeTechnicianPricing ? { pricing: this.technicianPricing(booking) } : {}),
+      ...(includeTechnicianPricing ? { pricing: this.technicianPricing(booking, selected ? undefined : commissionPercent) } : {}),
     };
+  }
+
+  /** One label per technician card, matching the Figma states, so the app does not combine flags itself. */
+  private jobDisplayStatus(
+    booking: any,
+    applicationStatus: string | null,
+    selected: boolean,
+    takenByAnother: boolean,
+    viewerTechnicianId?: string,
+  ) {
+    if (booking.status === 'CANCELLED') return 'CANCELLED';
+    if (selected && booking.status === 'COMPLETED') return 'COMPLETED';
+    if (selected && booking.status === 'CONFIRMED') return 'ACCEPTED';
+    if (takenByAnother) return 'NOT_SELECTED';
+    if (booking.status === 'EXPIRED' || applicationStatus === 'EXPIRED') return 'EXPIRED';
+    if (applicationStatus === 'APPLIED') return 'APPLIED';
+    if (applicationStatus === 'DECLINED' || applicationStatus === 'WITHDRAWN') return applicationStatus;
+    return booking.requestedTechnicianId && booking.requestedTechnicianId === viewerTechnicianId ? 'REQUESTED' : 'NEW';
   }
 
   private withHistoricalAddress<
@@ -1818,7 +1843,7 @@ export class BookingsService {
     };
   }
 
-  private technicianJobResponse(booking: any, userId: string) {
+  private technicianJobResponse(booking: any, userId: string, commissionPercent?: number) {
     const base = this.historyResponse(booking, userId);
     return {
       ...base,
@@ -1838,7 +1863,8 @@ export class BookingsService {
             nationality: booking.customer.nationality ?? null,
           }
         : null,
-      pricing: this.technicianPricing(booking),
+      // A pending direct booking is not charged yet: show the earning after today's commission.
+      pricing: this.technicianPricing(booking, booking.status === 'PENDING' ? commissionPercent : undefined),
     };
   }
 
@@ -1854,8 +1880,18 @@ export class BookingsService {
     };
   }
 
-  private technicianPricing(booking: any) {
+  /**
+   * With `estimatePercent` (jobs not yet theirs) the fee is what the technician would be charged at today's
+   * rate, so "Bạn sẽ nhận được" already has the commission taken off; otherwise it is what was charged.
+   */
+  private technicianPricing(booking: any, estimatePercent?: number) {
+    const gross = booking.grossServiceAmount === null || booking.grossServiceAmount === undefined ? null : Number(booking.grossServiceAmount);
+    if (estimatePercent !== undefined && gross !== null) {
+      const platformFee = Math.round((gross * estimatePercent) / 100);
+      return { grossServiceAmount: gross, platformFee, technicianEarning: gross - platformFee, isEstimate: true, currency: 'VND' };
+    }
     return {
+      isEstimate: false,
       grossServiceAmount:
         booking.grossServiceAmount === null || booking.grossServiceAmount === undefined
           ? null
