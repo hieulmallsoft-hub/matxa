@@ -457,7 +457,8 @@ export class BookingsService {
     for (const candidate of candidates) {
       const [slot, conflict, matchingServices] = await Promise.all([
         this.prisma.availabilitySlot.findFirst({ where: { technicianId: candidate.id, isAvailable: true, startAt: { lte: start }, endAt: { gte: end } } }),
-        this.prisma.booking.findFirst({ where: { technicianId: candidate.id, status: 'CONFIRMED', scheduledStart: { lt: end }, scheduledEnd: { gt: start } }, select: { id: true } }),
+        // One unfinished confirmed booking at a time (same rule as assertOpenEligibility), whatever its hour.
+        this.prisma.booking.findFirst({ where: { technicianId: candidate.id, status: 'CONFIRMED' }, select: { id: true } }),
         this.prisma.technicianService.findMany({ where: { technicianId: candidate.id, isActive: true, catalogServiceId: { in: serviceIds }, modes: { has: dto.mode } }, select: { catalogServiceId: true, categoryId: true } }),
       ]);
       const hasAllServices = services.every((service: any) => matchingServices.some((item: any) => item.catalogServiceId === service.id && item.categoryId === service.categoryId));
