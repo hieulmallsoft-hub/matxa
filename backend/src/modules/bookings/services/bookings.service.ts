@@ -32,6 +32,9 @@ import {
   UpdateBookingStatusDto,
 } from '../dto/booking.dto';
 
+/** A complaint needs a technician on the booking: in progress (e.g. "KTV không đến"), done, or cancelled. */
+const COMPLAINABLE_STATUSES: string[] = ['CONFIRMED', 'COMPLETED', 'CANCELLED'];
+
 @Injectable()
 export class BookingsService {
   private readonly logger = new Logger(BookingsService.name);
@@ -1495,8 +1498,8 @@ export class BookingsService {
       select: { id: true, status: true, complaint: { select: { id: true } } },
     });
     if (!booking) throw new NotFoundException('Lich dat khong ton tai');
-    if (!['COMPLETED', 'CANCELLED'].includes(booking.status))
-      throw new BadRequestException('Chi co the khieu nai sau khi don hoan thanh hoac bi huy');
+    if (!COMPLAINABLE_STATUSES.includes(booking.status))
+      throw new BadRequestException('Chi co the khieu nai don da co KTV nhan, da hoan thanh hoac da huy');
     if (booking.complaint) throw new ConflictException('Lich dat da duoc tao khieu nai');
     if (!dto.detail.trim()) throw new BadRequestException('Vui long nhap chi tiet khieu nai');
     const evidence = dto.evidenceStorageKeys ?? [];
@@ -1531,7 +1534,8 @@ export class BookingsService {
   async assertComplaintUploadAllowed(userId: string, id: string) {
     const booking = await this.prisma.booking.findUnique({ where: { id }, select: { customerId: true, status: true } });
     if (!booking || booking.customerId !== userId) throw new ForbiddenException('Ban khong co quyen tao minh chung cho lich dat nay');
-    if (booking.status !== 'COMPLETED' && booking.status !== 'CANCELLED') throw new BadRequestException('Chi co the gui minh chung sau khi lich dat hoan tat hoac bi huy');
+    if (!COMPLAINABLE_STATUSES.includes(booking.status))
+      throw new BadRequestException('Chi co the gui minh chung cho don da co KTV nhan, da hoan thanh hoac da huy');
   }
 
   listComplaints(status?: string) {

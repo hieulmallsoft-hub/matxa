@@ -1,6 +1,12 @@
 # Khiếu nại booking
 
-Khách chỉ gửi khiếu nại cho booking của chính mình sau khi booking `COMPLETED` hoặc `CANCELLED`. Mỗi booking chỉ được tạo một khiếu nại.
+Khách gửi khiếu nại cho booking của chính mình khi booking đã có KTV nhận: **`CONFIRMED` (đang diễn ra)**,
+`COMPLETED` hoặc `CANCELLED`. Mỗi booking chỉ được tạo một khiếu nại.
+
+- `CONFIRMED`: dùng cho các trường hợp xảy ra ngay trong lúc đơn diễn ra, ví dụ "KTV không liên hệ, không đến".
+  Hiện nút **Khiếu nại** ở màn chi tiết đơn đã kết nối (Figma).
+- Đơn chưa có KTV (`OPEN`, `PENDING`, `EXPIRED`) không khiếu nại được → `400`.
+- Đơn **đang có khiếu nại** sẽ **không tự hoàn thành** sau 24h; admin xử lý khiếu nại rồi mới đóng đơn.
 
 ## Upload ảnh minh chứng (tùy chọn)
 
