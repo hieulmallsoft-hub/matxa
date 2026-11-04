@@ -15,6 +15,77 @@ import {
 import { BookingsService } from '../services/bookings.service';
 import { TechnicianBookingCancellationService } from '../services/technician-booking-cancellation.service';
 
+/** One technician job card / detail, as returned by both the list and the detail endpoint. */
+const technicianJobSchema = {
+  type: 'object',
+  properties: {
+    bookingId: { type: 'string' },
+    bookingStatus: { type: 'string', enum: ['OPEN', 'PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'EXPIRED'] },
+    displayStatus: {
+      type: 'string',
+      enum: ['REQUESTED', 'NEW', 'APPLIED', 'NOT_SELECTED', 'CANCELLED', 'EXPIRED', 'DECLINED', 'WITHDRAWN', 'ACCEPTED', 'COMPLETED'],
+      example: 'NEW',
+      description: 'Nhãn thẻ theo Figma: REQUESTED=Khách đặt bạn, NEW=Yêu cầu mới, APPLIED=Đang chờ khách xác nhận, NOT_SELECTED=Không được chọn / đã có KTV khác nhận, ACCEPTED=Đã nhận, COMPLETED=Đã hoàn thành',
+    },
+    applicationStatus: { type: 'string', nullable: true, enum: ['APPLIED', 'SELECTED', 'NOT_SELECTED', 'WITHDRAWN', 'DECLINED', 'EXPIRED'] },
+    requestedTechnicianId: { type: 'string', nullable: true, description: 'ID profile KTV khách yêu cầu ban đầu; khác KTV được gán cuối cùng.' },
+    isRequestedTechnician: { type: 'boolean' },
+    isSelected: { type: 'boolean', description: 'KTV duoc chot cuoi cung' },
+    isApplicant: { type: 'boolean', description: 'KTV dang ung tuyen APPLIED' },
+    customerSelectedAnotherTechnician: { type: 'boolean', description: 'Đơn đã có KTV khác nhận' },
+    requestType: { type: 'string', enum: ['CUSTOMER_REQUEST', 'MARKETPLACE'] },
+    requestLabel: { type: 'string', example: 'Khách đặt bạn' },
+    customer: {
+      type: 'object',
+      properties: {
+        displayName: { type: 'string', nullable: true },
+        gender: { type: 'string', nullable: true, example: 'FEMALE' },
+        nationality: { type: 'string', nullable: true, example: 'Việt Nam' },
+        avatarUrl: { type: 'string', nullable: true },
+      },
+    },
+    mode: { type: 'string', enum: ['HOME', 'ONSITE', 'ONLINE'] },
+    addressText: {
+      type: 'string', nullable: true, example: '52 Ngõ 15, Tổ 2A, Bạch Mai, Hai Bà Trưng, Hà Nội',
+      description: 'Địa chỉ chi tiết (đơn tại nhà), có ngay khi KTV thấy đơn',
+    },
+    addressPreview: { type: 'string', nullable: true, example: '… Tổ 2A, Bạch Mai, Hai Bà Trưng, Hà Nội', description: 'Bản rút gọn bỏ số nhà' },
+    district: { type: 'string', nullable: true, example: 'Hai Bà Trưng' },
+    city: { type: 'string', nullable: true, example: 'Hà Nội' },
+    distanceKm: { type: 'number', nullable: true, example: 5, description: 'Khoảng cách từ KTV tới khách; null khi chưa có vị trí' },
+    address: {
+      type: 'object', nullable: true,
+      description: 'Có toạ độ để mở bản đồ; chỉ có sau khi KTV được nhận đơn',
+      properties: { address: { type: 'string' }, latitude: { type: 'number' }, longitude: { type: 'number' } },
+    },
+    scheduledStart: { type: 'string', format: 'date-time' },
+    scheduledEnd: { type: 'string', format: 'date-time' },
+    applicationDeadlineAt: { type: 'string', format: 'date-time', nullable: true, description: 'Đếm ngược "12:05"' },
+    paymentMethod: { type: 'string', example: 'CASH' },
+    items: {
+      type: 'array',
+      items: { type: 'object', properties: { name: { type: 'string' }, durationMinutes: { type: 'number' }, price: { type: 'number' } } },
+    },
+    totalAmount: { type: 'number', description: 'Tổng thu từ khách' },
+    pricing: {
+      type: 'object',
+      properties: {
+        grossServiceAmount: { type: 'number', example: 500000 },
+        platformFee: { type: 'number', example: 125000, description: 'Gửi về Psyocore' },
+        technicianEarning: { type: 'number', example: 375000, description: 'Bạn sẽ nhận được / Thực nhận' },
+        isEstimate: { type: 'boolean', description: 'true = ước tính theo tỷ lệ hoa hồng hiện tại (chưa nhận đơn)' },
+        currency: { type: 'string', example: 'VND' },
+      },
+    },
+    canApply: { type: 'boolean' },
+    canDecline: { type: 'boolean' },
+    canWithdraw: { type: 'boolean' },
+    canContact: { type: 'boolean' },
+    canCancel: { type: 'boolean' },
+    canComplete: { type: 'boolean' },
+  },
+};
+
 @ApiTags('Technician Jobs')
 @ApiBearerAuth('access-token')
 @UseGuards(AccessTokenGuard, RolesGuard)
@@ -32,36 +103,7 @@ export class TechnicianJobsController {
     schema: {
       type: 'object',
       properties: {
-        items: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              bookingId: { type: 'string' },
-              bookingStatus: { type: 'string' },
-              requestedTechnicianId: { type: 'string', nullable: true, description: 'ID profile KTV khách yêu cầu ban đầu; khác KTV được gán cuối cùng.' },
-              isRequestedTechnician: { type: 'boolean' },
-              isSelected: { type: 'boolean', description: 'KTV duoc chot cuoi cung' },
-              isApplicant: { type: 'boolean', description: 'KTV dang ung tuyen APPLIED' },
-              requestType: { type: 'string', enum: ['CUSTOMER_REQUEST', 'MARKETPLACE'] },
-              requestLabel: { type: 'string', example: 'Khách đặt bạn' },
-              customer: {
-                type: 'object',
-                properties: {
-                  displayName: { type: 'string', nullable: true },
-                  gender: { type: 'string', nullable: true },
-                  nationality: { type: 'string', nullable: true },
-                  avatarUrl: { type: 'string', nullable: true },
-                },
-              },
-              scheduledStart: { type: 'string', format: 'date-time' },
-              scheduledEnd: { type: 'string', format: 'date-time' },
-              items: { type: 'array', items: { type: 'object' } },
-              canApply: { type: 'boolean' },
-              canDecline: { type: 'boolean' },
-            },
-          },
-        },
+        items: { type: 'array', items: technicianJobSchema },
         total: { type: 'number' },
         page: { type: 'number' },
         limit: { type: 'number' },
@@ -73,27 +115,7 @@ export class TechnicianJobsController {
   }
   @Get(':id')
   @ApiOperation({ summary: 'KTV xem chi tiet don cua minh' })
-  @ApiOkResponse({
-    schema: {
-      type: 'object',
-      properties: {
-        bookingId: { type: 'string' },
-        bookingStatus: { type: 'string' },
-        requestedTechnicianId: { type: 'string', nullable: true },
-        isRequestedTechnician: { type: 'boolean' },
-        isSelected: { type: 'boolean' },
-        isApplicant: { type: 'boolean' },
-        requestType: { type: 'string', enum: ['CUSTOMER_REQUEST', 'MARKETPLACE'] },
-        requestLabel: { type: 'string', example: 'Khách đặt bạn' },
-        customer: { type: 'object' },
-        scheduledStart: { type: 'string', format: 'date-time' },
-        scheduledEnd: { type: 'string', format: 'date-time' },
-        items: { type: 'array', items: { type: 'object' } },
-        canApply: { type: 'boolean' },
-        canContact: { type: 'boolean' },
-      },
-    },
-  })
+  @ApiOkResponse({ schema: technicianJobSchema as any })
   detail(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.bookings.technicianJobDetail(auth.sub, id);
   }
