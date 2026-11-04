@@ -8,6 +8,7 @@ import {
   Grid2X2,
   ImageIcon,
   Mail,
+  MessageCircle,
   RefreshCw,
   RotateCcw,
   Search,
@@ -19,6 +20,7 @@ import { request } from '../api/client';
 import { PageHeader } from '../components/common/PageHeader';
 import { useToast } from '../components/ui/ToastContainer';
 import { AnimatedNumber, Badge, Button, Input, Select } from '../components/ui/kit';
+import { ComplaintChatDrawer } from '../components/ComplaintChatDrawer';
 
 type Status = 'SUBMITTED' | 'IN_REVIEW' | 'RESOLVED' | 'REJECTED';
 type Complaint = {
@@ -30,7 +32,13 @@ type Complaint = {
   status: Status;
   createdAt: string;
   customer?: { displayName?: string | null; avatarUrl?: string | null } | null;
-  booking?: { status: string; totalAmount: number | string; scheduledStart: string } | null;
+  booking?: {
+    status: string;
+    totalAmount: number | string;
+    scheduledStart: string;
+    technician?: { user?: { displayName?: string | null } | null } | null;
+  } | null;
+  conversation?: { id: string; lastMessageAt?: string | null } | null;
   evidence?: unknown[];
 };
 
@@ -93,6 +101,7 @@ export function ComplaintsPage() {
   const [reason, setReason] = useState('');
   const [search, setSearch] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [chatId, setChatId] = useState<string | null>(null);
 
   // Always load every complaint so the counters stay right whichever filter is active.
   const load = useCallback(async () => {
@@ -274,6 +283,9 @@ export function ComplaintsPage() {
                               <span className="inline-flex items-center gap-1.5">
                                 <Wallet className="w-3.5 h-3.5" /> {money(complaint.booking.totalAmount)}
                               </span>
+                              {complaint.booking.technician?.user?.displayName && (
+                                <span>KTV: <b className="text-content-primary">{complaint.booking.technician.user.displayName}</b></span>
+                              )}
                               {booking && <Badge tone={booking.tone}>Đơn: {booking.label}</Badge>}
                             </>
                           )}
@@ -287,6 +299,15 @@ export function ComplaintsPage() {
                       </div>
 
                       <div className="flex lg:flex-col gap-2 lg:w-44 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="soft"
+                          icon={<MessageCircle className="w-4 h-4" />}
+                          onClick={() => setChatId(complaint.id)}
+                          className="flex-1 lg:flex-none"
+                        >
+                          Chat với khách
+                        </Button>
                         {ACTIONS[complaint.status].map((action) => (
                           <Button
                             key={action.to}
@@ -309,6 +330,8 @@ export function ComplaintsPage() {
           </ul>
         )}
       </section>
+
+      <ComplaintChatDrawer complaintId={chatId} onClose={() => setChatId(null)} />
     </div>
   );
 }
