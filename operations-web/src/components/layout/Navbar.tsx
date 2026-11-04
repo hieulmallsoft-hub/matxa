@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bell, CalendarClock, CheckCircle2, ChevronDown, LogOut, Menu, MessageCircle, Search, UserCheck } from 'lucide-react';
+import { Bell, CalendarClock, CheckCircle2, ChevronDown, KeyRound, LogOut, Menu, MessageCircle, Search, UserCheck } from 'lucide-react';
 import { NAV_GROUPS, navItem, type CountKey } from '../../navigation';
+import ChangePasswordModal from '../ChangePasswordModal';
 import type { PageId } from '../../types/dashboard';
 
 interface NavbarProps {
@@ -51,6 +52,7 @@ const popover = {
 export const Navbar: React.FC<NavbarProps> = ({ currentPage, onOpenCommandPalette, onNavigate, onOpenMobileMenu, counts, user, onLogout }) => {
   const tasks = usePopover();
   const account = usePopover();
+  const [changingPassword, setChangingPassword] = useState(false);
   const page = navItem(currentPage);
   const group = NAV_GROUPS.find((candidate) => candidate.items.some((item) => item.id === currentPage));
   const totalTasks = TASKS.reduce((sum, task) => sum + (counts[task.key] ?? 0), 0);
@@ -166,6 +168,15 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onOpenCommandPalett
               <button
                 onClick={() => {
                   account.setOpen(false);
+                  setChangingPassword(true);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-content-primary hover:bg-surface-subtle"
+              >
+                <KeyRound className="w-4 h-4" /> Đổi mật khẩu
+              </button>
+              <button
+                onClick={() => {
+                  account.setOpen(false);
                   onLogout();
                 }}
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-status-danger hover:bg-status-dangerBg"
@@ -176,6 +187,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onOpenCommandPalett
           )}
         </AnimatePresence>
       </div>
+      <ChangePasswordModal isOpen={changingPassword} onClose={() => setChangingPassword(false)} />
     </header>
   );
 };

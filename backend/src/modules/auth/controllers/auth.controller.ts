@@ -19,6 +19,7 @@ import { EmailLoginDto } from '../dto/email-login.dto';
 import { CompleteRegistrationDto } from '../dto/complete-registration.dto';
 import { VerifyRegistrationOtpDto } from '../dto/verify-registration-otp.dto';
 import { CompletePasswordResetDto } from '../dto/complete-password-reset.dto';
+import { ChangePasswordDto } from '../dto/change-password.dto';
 import { VerifyPasswordResetOtpDto } from '../dto/verify-password-reset-otp.dto';
 import { SendEmailOtpDto } from '../dto/send-email-otp.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
@@ -106,6 +107,21 @@ export class AuthController {
   @ApiOkResponse({ type: CompletePasswordResetResponse })
   completePasswordReset(@Body() dto: CompletePasswordResetDto): Promise<CompletePasswordResetResponse> {
     return this.authService.completePasswordReset(dto.passwordResetSessionId, dto.newPassword, dto.deviceId);
+  }
+
+  @Post('password/change')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AccessTokenGuard)
+  @ApiBearerAuth('access-token')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Doi mat khau khi dang dang nhap',
+    description: 'Can mat khau hien tai. Thanh cong thi dang xuat moi thiet bi khac, giu phien hien tai.',
+  })
+  @ApiOkResponse({ schema: { type: 'object', properties: { changed: { type: 'boolean', example: true } } } })
+  @ApiBadRequestResponse({ description: 'Mat khau hien tai sai, mat khau moi trung mat khau cu hoac ngan hon 8 ky tu' })
+  changePassword(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(auth.sub, auth.sid, dto.currentPassword, dto.newPassword);
   }
 
   @HttpCode(HttpStatus.ACCEPTED)

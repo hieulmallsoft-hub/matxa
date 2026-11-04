@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { createHmac, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
@@ -155,6 +155,28 @@ export class AuthService {
       });
     });
     return { completed: true };
+  }
+
+  /** Changes the password of a signed-in user and signs out their other sessions. */
+  async changePassword(userId: string, sessionId: string, currentPassword: string, newPassword: string) {
+    const identity = await this.prisma.userIdentity.findFirst({
+      where: { userId, provider: DbAuthProvider.EMAIL },
+      select: { id: true, passwordHash: true },
+    });
+    if (!identity?.passwordHash) throw new BadRequestException('Tai khoan khong dang nhap bang mat khau');
+    // 400 rather than 401: a wrong current password must not look like an expired session.
+    if (!(await this.verifyPassword(currentPassword, identity.passwordHash)))
+      throw new BadRequestException('Mat khau hien tai khong dung');
+    if (currentPassword === newPassword) throw new BadRequestException('Mat khau moi phai khac mat khau hien tai');
+    const passwordHash = await this.hashPassword(newPassword);
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.userIdentity.update({ where: { id: identity.id }, data: { passwordHash } });
+      await transaction.session.updateMany({
+        where: { userId, revokedAt: null, id: { not: sessionId } },
+        data: { revokedAt: new Date() },
+      });
+    });
+    return { changed: true };
   }
 
   async loginWithFirebasePhone(idToken: string, metadata: ClientMetadata): Promise<AuthResponse> {
