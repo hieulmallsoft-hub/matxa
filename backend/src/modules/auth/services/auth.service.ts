@@ -413,7 +413,7 @@ export class AuthService {
       });
 
       // Google profile data is a first-login default only.  A user may have
-      // changed their profile in Matxa, so a subsequent Google login must not
+      // changed their profile in Psyocore, so a subsequent Google login must not
       // overwrite displayName or avatarUrl with Google's cached profile.
       return transaction.user.findUniqueOrThrow({
         where: { id: userId },

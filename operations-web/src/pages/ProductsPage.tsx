@@ -47,7 +47,7 @@ export const ProductsPage: React.FC = () => {
         title="Vật tư & Tinh dầu Spa"
         subtitle="Quản lý kho nguyên liệu tự nhiên, tinh dầu trị liệu và dụng cụ massage cấp phát cho kỹ thuật viên"
         breadcrumbs={[
-          { label: 'MATXXA', href: '#' },
+          { label: 'Psyocore', href: '#' },
           { label: 'Quản lý kho & Vật tư' },
         ]}
         actions={

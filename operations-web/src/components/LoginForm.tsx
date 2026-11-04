@@ -41,7 +41,7 @@ export function LoginForm({ onSuccess }: { onSuccess: (auth: AuthResponse) => Pr
             <Sparkles size={32} />
           </div>
           <p className="eyebrow" style={{ justifyContent: 'center' }}>
-            MATXA LUXURY OPERATIONS
+            PSYOCORE LUXURY OPERATIONS
           </p>
           <h1>Đăng nhập Quản trị</h1>
           <p>Hệ thống điều hành trung tâm dành cho Quản trị viên.</p>

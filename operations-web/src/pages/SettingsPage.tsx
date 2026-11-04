@@ -23,12 +23,12 @@ import { SectionCard } from '../components/common/SectionCard';
 type NotificationTemplate = { type: string; title: string; body: string; isActive: boolean };
 
 const defaultNotificationTemplates: NotificationTemplate[] = [
-  { type: 'BOOKING_CREATED', title: '[Thông báo MATXXA]', body: 'Khách mới đã đặt lịch. KTV vui lòng thu tiền trước khi làm.', isActive: true },
+  { type: 'BOOKING_CREATED', title: '[Thông báo Psyocore]', body: 'Khách mới đã đặt lịch. KTV vui lòng thu tiền trước khi làm.', isActive: true },
   { type: 'OPEN_BOOKING_AVAILABLE', title: 'Yêu cầu mới', body: 'Có đơn dịch vụ mới phù hợp. Hãy mở tab Nhận việc để xem và ứng tuyển.', isActive: true },
   { type: 'OPEN_BOOKING_REQUESTED', title: 'Khách đặt bạn', body: 'Khách hàng đã chọn bạn cho đơn dịch vụ mới. Hãy mở đơn để ứng tuyển hoặc từ chối.', isActive: true },
-  { type: 'TECHNICIAN_SELECTED', title: '[Thông báo MATXXA]', body: 'Khách hàng đã chọn bạn cho đơn dịch vụ.', isActive: true },
-  { type: 'BOOKING_CANCELLED', title: '[Thông báo MATXXA]', body: 'Lịch hẹn đã được hủy.', isActive: true },
-  { type: 'BOOKING_EXPIRED', title: '[Thông báo MATXXA]', body: 'Đơn đã hết hạn.', isActive: true },
+  { type: 'TECHNICIAN_SELECTED', title: '[Thông báo Psyocore]', body: 'Khách hàng đã chọn bạn cho đơn dịch vụ.', isActive: true },
+  { type: 'BOOKING_CANCELLED', title: '[Thông báo Psyocore]', body: 'Lịch hẹn đã được hủy.', isActive: true },
+  { type: 'BOOKING_EXPIRED', title: '[Thông báo Psyocore]', body: 'Đơn đã hết hạn.', isActive: true },
 ];
 
 interface SettingsPageProps {
@@ -260,7 +260,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                     <label className="text-xs font-bold text-[#1C2B20]">Email tiếp nhận phản hồi</label>
                     <input
                       type="email"
-                      placeholder="vd: hotro@matxa.vn"
+                      placeholder="vd: hello.psyocore@gmail.com"
                       value={supportEmail}
                       onChange={(e) => setSupportEmail(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
@@ -363,7 +363,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                     onChange={(e) => setTechCommissionRate(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
                   />
-                  <span className="text-[11px] text-[#66756B]">KTV hưởng {techCommissionRate}% tổng giá trị ca phục vụ, sàn MATXXA giữ lại {100 - Number(techCommissionRate)}%.</span>
+                  <span className="text-[11px] text-[#66756B]">KTV hưởng {techCommissionRate}% tổng giá trị ca phục vụ, sàn Psyocore giữ lại {100 - Number(techCommissionRate)}%.</span>
                 </div>
               </div>
             </div>

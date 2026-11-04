@@ -200,7 +200,7 @@ export const OrdersPage: React.FC = () => {
         badge={`${orders.filter((o) => o.status === 'Processing').length} ca đang phục vụ`}
         badgeTone="blue"
         breadcrumbs={[
-          { label: 'MATXXA' },
+          { label: 'Psyocore' },
           { label: 'Lịch đặt & Đơn hàng' },
         ]}
         actions={

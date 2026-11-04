@@ -31,7 +31,7 @@ const TRANSACTION_ROWS = [
     txId: 'TX-2026-10490',
     type: 'Phí vận hành & nền tảng',
     amount: '+225.000 đ',
-    method: 'Hệ thống MATXXA',
+    method: 'Hệ thống Psyocore',
     party: 'Khấu trừ tự động (30%)',
     time: '24 phút trước',
     status: 'Completed',
@@ -112,7 +112,7 @@ export const TransactionsPage: React.FC = () => {
         title="Sổ cái đối soát giao dịch"
         subtitle="Nhật ký chi tiết dòng tiền ra/vào, giải ngân hoa hồng KTV và đối soát booking thời gian thực"
         breadcrumbs={[
-          { label: 'MATXXA', href: '#' },
+          { label: 'Psyocore', href: '#' },
           { label: 'Tài chính & Thanh toán', href: '#' },
           { label: 'Sổ cái đối soát' },
         ]}

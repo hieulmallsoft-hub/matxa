@@ -279,7 +279,7 @@ export function ServiceCatalogPanel({
           <div>
             <h2 className="text-xl font-bold text-[#1C2B20] tracking-tight">Catalog Dịch Vụ Chuẩn</h2>
             <p className="text-xs text-[#66756B] mt-1">
-              Danh mục gói dịch vụ spa & trị liệu gốc dùng chung cho toàn hệ thống MATXXA
+              Danh mục gói dịch vụ spa & trị liệu gốc dùng chung cho toàn hệ thống Psyocore
             </p>
           </div>
 

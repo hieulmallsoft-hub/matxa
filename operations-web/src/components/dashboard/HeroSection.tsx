@@ -54,7 +54,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             }}
           >
             <span className="w-2 h-2 rounded-full bg-[#a8f0be] animate-pulse" />
-            <span className="tracking-wide">🌿 MATXA SPA OPERATIONS</span>
+            <span className="tracking-wide">🌿 PSYOCORE SPA OPERATIONS</span>
             <span className="opacity-50">|</span>
             <span className="opacity-80">Hệ thống vận hành</span>
           </motion.div>

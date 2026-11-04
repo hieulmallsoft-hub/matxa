@@ -144,7 +144,7 @@ export function ContractTemplatesPage() {
         badge="Pháp chế & Hợp đồng"
         badgeTone="green"
         breadcrumbs={[
-          { label: 'MATXXA' },
+          { label: 'Psyocore' },
           { label: 'Quản lý' },
           { label: 'Mẫu hợp đồng KTV' },
         ]}

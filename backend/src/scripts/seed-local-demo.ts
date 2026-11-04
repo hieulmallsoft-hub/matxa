@@ -49,7 +49,7 @@ async function main() {
 
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
   try {
-    await userWithEmail(prisma, 'admin@matxa.local', 'Matxa Admin', UserRole.ADMIN);
+    await userWithEmail(prisma, 'admin@matxa.local', 'Psyocore Admin', UserRole.ADMIN);
 
     const categories = await Promise.all([
       prisma.serviceCategory.upsert({

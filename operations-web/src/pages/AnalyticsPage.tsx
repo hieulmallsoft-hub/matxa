@@ -144,7 +144,7 @@ export const AnalyticsPage: React.FC = () => {
         badge="Từ đơn đã hoàn thành"
         badgeTone="green"
         breadcrumbs={[
-          { label: 'MATXXA' },
+          { label: 'Psyocore' },
           { label: 'Doanh thu & Báo cáo' },
         ]}
         actions={

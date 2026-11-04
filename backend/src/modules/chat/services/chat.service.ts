@@ -6,7 +6,7 @@ import { CreateConversationDto, EditMessageDto, ListMessagesDto, SendMessageDto 
 import { COMPLAINT_CREATED, COMPLAINT_STATUS_LABEL } from '../../bookings/services/complaint-conversation';
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000;
-const SUPPORT_PARTICIPANT = { id: 'support', displayName: 'MATXXA CSKH', avatarUrl: null, role: 'ADMIN' };
+const SUPPORT_PARTICIPANT = { id: 'support', displayName: 'Psyocore CSKH', avatarUrl: null, role: 'ADMIN' };
 // Support SYSTEM messages store a stable event code in `text`; responses expose it as
 // `systemEvent` and replace `text` with the display copy.
 const SUPPORT_WELCOME = 'SUPPORT_WELCOME';
@@ -28,8 +28,8 @@ const complaintSummary = (complaint: { id: string; bookingId: string; status: st
 /** A booking chat stays readable after these, but takes no new messages. */
 const CLOSED_BOOKING_STATUSES = ['CANCELLED', 'EXPIRED'];
 const SUPPORT_SYSTEM_TEXT: Record<string, string> = {
-  [SUPPORT_WELCOME]: 'MATXXA CSKH có thể giúp gì cho bạn?',
-  [SUPPORT_AGENT_JOINED]: 'MATXXA CSKH đã tham gia cuộc trò chuyện',
+  [SUPPORT_WELCOME]: 'Psyocore CSKH có thể giúp gì cho bạn?',
+  [SUPPORT_AGENT_JOINED]: 'Psyocore CSKH đã tham gia cuộc trò chuyện',
 };
 
 @Injectable()
@@ -584,7 +584,7 @@ export class ChatService {
       this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { bookingId: true, type: true, supportCustomerId: true, customerId: true } }),
     ]);
     const title = conversation && ADMIN_THREAD_TYPES.includes(conversation.type) && senderId !== threadOwner(conversation)
-      ? 'MATXXA CSKH' : sender?.displayName ?? 'Bạn có tin nhắn mới';
+      ? 'Psyocore CSKH' : sender?.displayName ?? 'Bạn có tin nhắn mới';
     const body =
       dto.type === 'TEXT'
         ? dto.text!.trim().slice(0, 200)

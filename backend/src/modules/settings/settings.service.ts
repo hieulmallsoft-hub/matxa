@@ -11,7 +11,7 @@ const PLATFORM_KEYS: Record<keyof PlatformInfo, string> = {
   hotline: 'PLATFORM_HOTLINE',
   supportEmail: 'PLATFORM_SUPPORT_EMAIL',
 };
-const PLATFORM_DEFAULTS: PlatformInfo = { brandName: 'MATXXA', hotline: '', supportEmail: '' };
+const PLATFORM_DEFAULTS: PlatformInfo = { brandName: 'Psyocore', hotline: '', supportEmail: '' };
 const BOOKING_KEYS: Record<keyof BookingRules, string> = {
   minAdvanceHours: 'BOOKING_MIN_ADVANCE_HOURS',
   maxDispatchRadiusKm: 'BOOKING_MAX_DISPATCH_RADIUS_KM',

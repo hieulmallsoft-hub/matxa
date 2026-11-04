@@ -17,14 +17,14 @@ describe('SettingsService platform info and booking rules', () => {
 
   it('falls back to defaults until the admin saves anything', async () => {
     const { service } = subject();
-    await expect(service.getPlatformInfo()).resolves.toEqual({ brandName: 'MATXXA', hotline: '', supportEmail: '' });
+    await expect(service.getPlatformInfo()).resolves.toEqual({ brandName: 'Psyocore', hotline: '', supportEmail: '' });
     await expect(service.getBookingRules()).resolves.toEqual({ minAdvanceHours: 0, maxDispatchRadiusKm: 0 });
   });
 
   it('saves only the fields that were sent and returns the stored values', async () => {
     const { service, rows } = subject();
     await expect(service.setPlatformInfo({ hotline: '0901 234 567' })).resolves.toEqual({
-      brandName: 'MATXXA',
+      brandName: 'Psyocore',
       hotline: '0901 234 567',
       supportEmail: '',
     });
@@ -39,7 +39,7 @@ describe('SettingsService platform info and booking rules', () => {
     const { service } = subject();
     await service.setBookingRules({ minAdvanceHours: 1 });
     await expect(service.publicSettings()).resolves.toEqual({
-      brandName: 'MATXXA',
+      brandName: 'Psyocore',
       hotline: '',
       supportEmail: '',
       minAdvanceHours: 1,

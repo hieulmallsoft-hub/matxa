@@ -101,7 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCol
           <AnimatePresence initial={false}>
             {!isCollapsed && (
               <motion.span initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -6 }} className="text-left min-w-0">
-                <span className="block font-extrabold tracking-wide text-content-primary leading-tight">MATXXA</span>
+                <span className="block font-extrabold tracking-wide text-content-primary leading-tight">Psyocore</span>
                 <span className="block text-[11px] text-content-secondary">Quản trị Massage & Spa</span>
               </motion.span>
             )}

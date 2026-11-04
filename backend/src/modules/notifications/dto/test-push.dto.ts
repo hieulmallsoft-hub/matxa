@@ -2,7 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class TestPushDto {
-  @ApiPropertyOptional({ default: 'Matxa test notification' })
+  @ApiPropertyOptional({ default: 'Psyocore test notification' })
   @IsOptional()
   @IsString()
   @MaxLength(100)

@@ -18,7 +18,7 @@ export class AuthUser {
   @ApiPropertyOptional({ example: 'user@example.com' })
   email?: string;
 
-  @ApiPropertyOptional({ example: 'Matxa User' })
+  @ApiPropertyOptional({ example: 'Psyocore User' })
   name?: string;
 
   @ApiPropertyOptional({ format: 'uri' })

@@ -37,7 +37,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose, currentPa
                 <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#3C9A5E] to-primary flex items-center justify-center">
                   <BrandLogo className="w-6 h-6 text-white" />
                 </span>
-                <span className="font-extrabold text-content-primary">MATXXA</span>
+                <span className="font-extrabold text-content-primary">Psyocore</span>
               </div>
               <button onClick={onClose} aria-label="Đóng menu" className="p-2 rounded-lg text-content-secondary hover:bg-surface-subtle">
                 <X className="w-5 h-5" />

@@ -412,7 +412,7 @@ export function BrandLogo({ className }: { className?: string }) {
   return (
     <span
       role="img"
-      aria-label="MATXXA"
+      aria-label="Psyocore"
       className={cx('inline-block bg-current shrink-0', className)}
       style={{ WebkitMaskImage: url, maskImage: url, WebkitMaskSize: 'contain', maskSize: 'contain', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat', WebkitMaskPosition: 'center', maskPosition: 'center' }}
     />

@@ -83,7 +83,7 @@ cuộc cũ.
   "type": "SUPPORT",
   "supportCustomerId": "customer-user-uuid",
   "bookingId": null,
-  "participant": { "id": "support", "displayName": "MATXXA CSKH", "avatarUrl": null, "role": "ADMIN" },
+  "participant": { "id": "support", "displayName": "Psyocore CSKH", "avatarUrl": null, "role": "ADMIN" },
   "lastMessageAt": "2026-11-02T08:00:00.000Z"
 }
 ```
@@ -115,7 +115,7 @@ Response là **mảng** (không có `items`), tối đa 1 phần tử:
   {
     "id": "conversation-uuid",
     "type": "SUPPORT",
-    "participant": { "id": "support", "displayName": "MATXXA CSKH", "avatarUrl": null, "role": "ADMIN" },
+    "participant": { "id": "support", "displayName": "Psyocore CSKH", "avatarUrl": null, "role": "ADMIN" },
     "lastMessage": { "id": "message-uuid", "type": "TEXT", "text": "Chào bạn!", "createdAt": "2026-11-02T08:00:00.000Z" },
     "lastMessageAt": "2026-11-02T08:00:00.000Z",
     "unreadCount": 1
@@ -162,7 +162,7 @@ GET /api/conversations/{id}/messages?page=1&limit=30
 |---|---|
 | `type = "SYSTEM"` | Theo `systemEvent` (xem mục 6). Kiểm tra trước tiên. |
 | `senderId` = ID khách đang đăng nhập | Bong bóng của khách (bên phải) |
-| `sender.role = "ADMIN"` | Bong bóng CSKH (bên trái), tên hiển thị "MATXXA CSKH" |
+| `sender.role = "ADMIN"` | Bong bóng CSKH (bên trái), tên hiển thị "Psyocore CSKH" |
 
 - `recalledAt` khác `null`: hiện "Tin nhắn đã thu hồi".
 - Tin ảnh có `mediaUrl` là link ký tạm thời. Ảnh không tải được (link hết hạn) thì gọi lại
@@ -218,8 +218,8 @@ Tin `type: "SYSTEM"` có thêm trường `systemEvent`; `text` đã là nội du
 
 | `systemEvent` | Khi nào xuất hiện | Hiển thị theo Figma |
 |---|---|---|
-| `SUPPORT_WELCOME` | Tự tạo khi cuộc trò chuyện được mở lần đầu | Bong bóng CSKH: "MATXXA CSKH có thể giúp gì cho bạn?" |
-| `SUPPORT_AGENT_JOINED` | Ngay trước tin trả lời đầu tiên của admin | Dòng nhỏ giữa màn hình: "MATXXA CSKH đã tham gia cuộc trò chuyện" |
+| `SUPPORT_WELCOME` | Tự tạo khi cuộc trò chuyện được mở lần đầu | Bong bóng CSKH: "Psyocore CSKH có thể giúp gì cho bạn?" |
+| `SUPPORT_AGENT_JOINED` | Ngay trước tin trả lời đầu tiên của admin | Dòng nhỏ giữa màn hình: "Psyocore CSKH đã tham gia cuộc trò chuyện" |
 
 Lưu ý: `SUPPORT_WELCOME` có `senderId` là ID khách nhưng **không phải** tin khách gửi.
 Luôn kiểm tra `type`/`systemEvent` trước khi xét `senderId`.

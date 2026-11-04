@@ -515,7 +515,7 @@ export const VenuesPage: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         title="Địa điểm & Spa"
-        subtitle="Quản lý spa, phòng tham vấn hiển thị trên ứng dụng MATXXA"
+        subtitle="Quản lý spa, phòng tham vấn hiển thị trên ứng dụng Psyocore"
         actions={
           <>
             <Button icon={<RefreshCw className="w-4 h-4" />} onClick={() => void load()} loading={loading}>

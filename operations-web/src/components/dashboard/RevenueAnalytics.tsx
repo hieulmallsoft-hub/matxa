@@ -235,7 +235,7 @@ export const RevenueAnalytics: React.FC = () => {
         </div>
 
         <div className="text-[11px] font-mono text-[#94AB71]/80">
-          MÔ HÌNH DỰ BÁO: MATXA BIO-PROJECTION V2
+          MÔ HÌNH DỰ BÁO: PSYOCORE BIO-PROJECTION V2
         </div>
       </div>
     </div>

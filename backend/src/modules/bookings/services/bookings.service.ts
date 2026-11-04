@@ -316,7 +316,7 @@ export class BookingsService {
       paymentUrl: this.vnpay.createPaymentUrl({
         txnRef,
         amountVnd: Number(payment.amount),
-        orderInfo: `MATXA ${bookingId}`,
+        orderInfo: `PSYOCORE ${bookingId}`,
         ipAddress,
         expiresAt,
       }),
@@ -338,7 +338,7 @@ export class BookingsService {
     const data = await this.payos.createPaymentLink({
       orderCode,
       amount: Number(payment.amount),
-      description: `MATXA ${bookingId.slice(0, 8)}`,
+      description: `PSYOCORE ${bookingId.slice(0, 8)}`,
       reference: payment.id,
     });
     await this.prisma.payment.update({

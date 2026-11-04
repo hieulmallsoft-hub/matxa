@@ -97,13 +97,13 @@ function LoginScreen({ onLoggedIn, notice }: { onLoggedIn: (user: AuthUser) => v
           <span className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
             <BrandLogo className="w-7 h-7 text-white" />
           </span>
-          <span className="text-xl font-extrabold tracking-wide">MATXXA</span>
+          <span className="text-xl font-extrabold tracking-wide">Psyocore</span>
         </div>
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="relative space-y-3">
           <h1 className="text-4xl font-extrabold leading-tight">Quản trị Massage & Spa</h1>
           <p className="text-white/80 max-w-md">Theo dõi đơn đặt lịch, duyệt kỹ thuật viên, chăm sóc khách hàng — tất cả ở một nơi.</p>
         </motion.div>
-        <p className="relative text-xs text-white/60">© MATXXA</p>
+        <p className="relative text-xs text-white/60">© Psyocore</p>
       </div>
 
       <div className="flex items-center justify-center p-6">
@@ -118,7 +118,7 @@ function LoginScreen({ onLoggedIn, notice }: { onLoggedIn: (user: AuthUser) => v
             <span className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
               <BrandLogo className="w-6 h-6 text-white" />
             </span>
-            <span className="font-extrabold">MATXXA</span>
+            <span className="font-extrabold">Psyocore</span>
           </div>
           <div>
             <h2 className="text-2xl font-bold text-content-primary">Đăng nhập</h2>

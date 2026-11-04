@@ -75,7 +75,7 @@ export const PaymentsPage: React.FC = () => {
         title="Cổng thanh toán & Quỹ vận hành"
         subtitle="Quản lý dòng tiền đối soát, thanh toán trực tuyến qua VietQR, MoMo và tiền mặt thu hộ của kỹ thuật viên"
         breadcrumbs={[
-          { label: 'MATXXA', href: '#' },
+          { label: 'Psyocore', href: '#' },
           { label: 'Tài chính & Thanh toán' },
         ]}
         actions={

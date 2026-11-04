@@ -16,10 +16,10 @@ async function bootstrap(): Promise<void> {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('Matxa API · Mobile & Operations')
+    .setTitle('Psyocore API · Mobile & Operations')
     .setDescription(
       [
-        '# Matxa API Documentation',
+        '# Psyocore API Documentation',
         'Tài liệu tích hợp chính thức cho Mobile App và Operations Web.',
         '',
         '## Quy ước tích hợp',
@@ -57,7 +57,7 @@ async function bootstrap(): Promise<void> {
     });
   SwaggerModule.setup('docs', app, swaggerDocument, {
     useGlobalPrefix: true,
-    customSiteTitle: 'Matxa API Docs',
+    customSiteTitle: 'Psyocore API Docs',
     customfavIcon: 'https://swagger.io/favicon-32x32.png',
     customCss: `
       .swagger-ui .topbar { background: #123c2d; }

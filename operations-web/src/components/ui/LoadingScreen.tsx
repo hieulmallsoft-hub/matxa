@@ -7,11 +7,11 @@ interface LoadingScreenProps {
 }
 
 const BOOT_LOGS = [
-  'Đang khởi tạo hệ thống quản trị MATXXA...',
+  'Đang khởi tạo hệ thống quản trị Psyocore...',
   'Kết nối máy chủ điều phối ca massage...',
   'Đồng bộ dữ liệu kỹ thuật viên & khách hàng...',
   'Tải bảng điều khiển vận hành Spa...',
-  'Hệ thống MATXXA đã sẵn sàng.',
+  'Hệ thống Psyocore đã sẵn sàng.',
 ];
 
 export const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
@@ -64,7 +64,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
       >
         <div className="flex items-center justify-center gap-2 mb-1">
           <span className="text-2xl font-bold tracking-tight text-[#1C2B20]">
-            MATXXA
+            Psyocore
           </span>
           <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-[#EAF5EC] text-[#2E7D4A] border border-[#2E7D4A]/20">
             Admin Spa

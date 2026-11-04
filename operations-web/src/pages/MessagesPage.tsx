@@ -50,9 +50,9 @@ const mergeMessages = (previous: ApiMessage[], incoming: ApiMessage[]) =>
   [...new Map([...previous, ...incoming].map((message) => [message.id, message])).values()]
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 const QUICK_REPLIES = [
-  'Dạ MATXXA xin chào! Anh/chị cần hỗ trợ nội dung gì ạ?',
+  'Dạ Psyocore xin chào! Anh/chị cần hỗ trợ nội dung gì ạ?',
   'Dạ anh/chị vui lòng chờ để bên em kiểm tra thông tin ạ.',
-  'Dạ cảm ơn anh/chị đã liên hệ MATXXA!',
+  'Dạ cảm ơn anh/chị đã liên hệ Psyocore!',
 ];
 function Avatar({ participant }: { participant?: Participant | null }) {
   return participant?.avatarUrl ? (
@@ -325,7 +325,7 @@ export const MessagesPage: React.FC = () => {
         subtitle="Chọn khách hàng để tư vấn và lưu lịch sử hỗ trợ trực tiếp với CSKH"
         badge={unreadCount ? `${unreadCount} tin chưa đọc` : undefined}
         badgeTone="blue"
-        breadcrumbs={[{ label: 'MATXXA' }, { label: 'Tin nhắn CSKH' }]}
+        breadcrumbs={[{ label: 'Psyocore' }, { label: 'Tin nhắn CSKH' }]}
         actions={
           <div className="flex items-center gap-4">
           <button disabled={!currentUserId} onClick={() => setPickerOpen(true)} className="flex items-center gap-2 rounded-xl bg-[#2E7D4A] text-white px-4 py-2.5 text-sm font-semibold disabled:opacity-40"><Plus size={18} /> Tạo cuộc trò chuyện</button>

@@ -61,7 +61,7 @@ describe('support conversations', () => {
     const opened = await service.createSupportConversation('customer', 'someone-else');
     expect(prisma.conversation.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { supportCustomerId: 'customer' } }));
     expect(prisma.conversationMember.upsert).toHaveBeenCalledTimes(1);
-    expect(opened.participant).toMatchObject({ id: 'support', displayName: 'MATXXA CSKH' });
+    expect(opened.participant).toMatchObject({ id: 'support', displayName: 'Psyocore CSKH' });
   });
 
   it('rejects technicians, admins without a customer, and non-customer targets', async () => {
@@ -76,7 +76,7 @@ describe('support conversations', () => {
   it('adds a single "CSKH joined" event before the first admin reply', async () => {
     const { service, prisma } = setup();
     const sent: any = await service.sendMessage('admin', thread.id, { type: 'TEXT', text: 'Hello' }, false);
-    expect(sent.joinMessage).toMatchObject({ type: 'SYSTEM', systemEvent: 'SUPPORT_AGENT_JOINED', text: 'MATXXA CSKH đã tham gia cuộc trò chuyện' });
+    expect(sent.joinMessage).toMatchObject({ type: 'SYSTEM', systemEvent: 'SUPPORT_AGENT_JOINED', text: 'Psyocore CSKH đã tham gia cuộc trò chuyện' });
     const [joined, reply] = prisma.message.create.mock.calls.map((call: any) => call[0].data);
     expect(joined.createdAt.getTime()).toBeLessThan(reply.createdAt.getTime());
 
@@ -107,7 +107,7 @@ describe('support conversations', () => {
     const { service, prisma } = setup('CUSTOMER', { userId: 'customer' }, 'customer');
     prisma.message.findMany.mockResolvedValue([{ id: 'w', type: 'SYSTEM', text: 'SUPPORT_WELCOME', mediaKey: null }]);
     const page = await service.listMessages('customer', thread.id, { page: 1, limit: 30 });
-    expect(page.items[0]).toMatchObject({ systemEvent: 'SUPPORT_WELCOME', text: 'MATXXA CSKH có thể giúp gì cho bạn?' });
+    expect(page.items[0]).toMatchObject({ systemEvent: 'SUPPORT_WELCOME', text: 'Psyocore CSKH có thể giúp gì cho bạn?' });
   });
 
   it.each(['customer', 'admin', 'admin-2'])('allows the customer and CSKH to send (%s)', async (actor) => {
@@ -147,8 +147,8 @@ describe('support conversations', () => {
   it('sends support push metadata with the customer conversation id', async () => {
     const { service, notifications } = setup();
     await (service as any).notifyRecipients('admin', thread.id, 'message', { type: 'TEXT', text: 'Hello' }, true);
-    expect(notifications.create).toHaveBeenCalledWith('customer', 'CHAT_MESSAGE_RECEIVED', 'MATXXA CSKH', 'Hello', `matxa://chat/${thread.id}`);
-    expect(notifications.sendPush).toHaveBeenCalledWith('customer', 'MATXXA CSKH', 'Hello', expect.objectContaining({ conversationId: thread.id, conversationType: 'SUPPORT' }));
+    expect(notifications.create).toHaveBeenCalledWith('customer', 'CHAT_MESSAGE_RECEIVED', 'Psyocore CSKH', 'Hello', `matxa://chat/${thread.id}`);
+    expect(notifications.sendPush).toHaveBeenCalledWith('customer', 'Psyocore CSKH', 'Hello', expect.objectContaining({ conversationId: thread.id, conversationType: 'SUPPORT' }));
   });
 
   it('filters the admin inbox to support threads', async () => {

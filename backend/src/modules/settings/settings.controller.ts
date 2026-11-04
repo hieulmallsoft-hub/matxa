@@ -17,7 +17,7 @@ class UpdateCommissionDto {
 }
 
 class UpdatePlatformInfoDto {
-  @ApiPropertyOptional({ example: 'MATXXA' })
+  @ApiPropertyOptional({ example: 'Psyocore' })
   @IsOptional() @IsString() @MinLength(1) @MaxLength(100)
   brandName?: string;
 
@@ -25,7 +25,7 @@ class UpdatePlatformInfoDto {
   @IsOptional() @IsString() @MaxLength(20) @Matches(/^[0-9+ .()-]*$/, { message: 'Hotline chi gom so, dau cach va + . ( ) -' })
   hotline?: string;
 
-  @ApiPropertyOptional({ example: 'hotro@matxa.vn', description: 'Chuoi rong de xoa' })
+  @ApiPropertyOptional({ example: 'hello.psyocore@gmail.com', description: 'Chuoi rong de xoa' })
   @IsOptional() @IsString() @MaxLength(200) @ValidateIf((dto) => dto.supportEmail !== '') @IsEmail({}, { message: 'Email CSKH khong hop le' })
   supportEmail?: string;
 }

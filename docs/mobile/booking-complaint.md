@@ -123,7 +123,7 @@ Dùng các API chat có sẵn với `conversationId`:
 - `POST /api/conversations/{conversationId}/image-upload-url` (gửi thêm ảnh minh chứng)
 - `PATCH /api/conversations/{conversationId}/read`
 
-Trong `GET /api/conversations`, chat này có `type: "COMPLAINT"`, `participant` là **MATXXA CSKH** và thêm
+Trong `GET /api/conversations`, chat này có `type: "COMPLAINT"`, `participant` là **Psyocore CSKH** và thêm
 `complaint: { id, bookingId, bookingCode, status, statusLabel, reasonCode }` → hiện tiêu đề "Khiếu nại đơn #ECEE5154".
 Có thể lọc riêng bằng `GET /api/conversations?type=COMPLAINT`.
 
@@ -132,12 +132,12 @@ Tin `SYSTEM` trong chat này (đã có sẵn chữ ở `text`, dùng `systemEven
 | `systemEvent` | `text` | Hiển thị |
 |---|---|---|
 | `COMPLAINT_CREATED` | "Bạn đã gửi khiếu nại. CSKH sẽ phản hồi tại đây." | Dòng giữa màn hình (thẻ khiếu nại đã có ở đầu chat) |
-| `SUPPORT_AGENT_JOINED` | "MATXXA CSKH đã tham gia cuộc trò chuyện" | Dòng giữa màn hình |
+| `SUPPORT_AGENT_JOINED` | "Psyocore CSKH đã tham gia cuộc trò chuyện" | Dòng giữa màn hình |
 | `COMPLAINT_STATUS_CHANGED` | "Khiếu nại đã chuyển sang: Đã giải quyết" (+ `complaintStatus`) | Dòng giữa màn hình; cập nhật nhãn trạng thái ở đầu chat |
 
 ### 5. Thông báo
 
 | `type` | Khi nào | Bấm vào |
 |---|---|---|
-| `CHAT_MESSAGE_RECEIVED` (title "MATXXA CSKH", data `conversationType: "COMPLAINT"`) | CSKH trả lời | Mở chat `conversationId` |
+| `CHAT_MESSAGE_RECEIVED` (title "Psyocore CSKH", data `conversationType: "COMPLAINT"`) | CSKH trả lời | Mở chat `conversationId` |
 | `COMPLAINT_STATUS_CHANGED` | Admin đổi trạng thái khiếu nại. Nội dung "Khiếu nại đơn #ECEE5154: Đã giải quyết". Push data có `complaintId`, `conversationId`, `bookingId` | `actionUrl = matxa://chat/{conversationId}` |

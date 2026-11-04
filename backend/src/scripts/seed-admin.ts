@@ -16,7 +16,7 @@ async function main() {
   const databaseUrl = required('DATABASE_URL');
   const email = required('ADMIN_EMAIL').trim().toLowerCase();
   const password = required('ADMIN_PASSWORD');
-  const displayName = process.env.ADMIN_DISPLAY_NAME?.trim() || 'Matxa Administrator';
+  const displayName = process.env.ADMIN_DISPLAY_NAME?.trim() || 'Psyocore Administrator';
   const resetPassword = process.env.ADMIN_RESET_PASSWORD === 'true';
   if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error('ADMIN_EMAIL khong hop le');
   if (password.length < 8 || password.length > 72) throw new Error('ADMIN_PASSWORD phai dai tu 8 den 72 ky tu');

@@ -10,7 +10,7 @@ GET /api/settings/public
 
 ```json
 {
-  "brandName": "MATXXA",
+  "brandName": "Psyocore",
   "hotline": "0901 234 567",
   "supportEmail": "hotro@matxa.vn",
   "minAdvanceHours": 1,

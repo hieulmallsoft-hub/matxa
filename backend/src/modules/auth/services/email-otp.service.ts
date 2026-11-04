@@ -75,9 +75,9 @@ export class EmailOtpService {
         await this.transporter!.sendMail({
           from: this.from,
           to: email,
-          subject: 'Ma xac minh tai khoan Matxa',
-          text: `Ma xac minh Matxa cua ban la ${code}. Ma co hieu luc trong ${Math.ceil(this.ttl / 60)} phut. Khong chia se ma nay voi nguoi khac.`,
-          html: `<p>Ma xac minh Matxa cua ban la:</p><p style="font-size:28px;font-weight:bold;letter-spacing:6px">${code}</p><p>Ma co hieu luc trong ${Math.ceil(this.ttl / 60)} phut. Khong chia se ma nay voi nguoi khac.</p>`,
+          subject: 'Ma xac minh tai khoan Psyocore',
+          text: `Ma xac minh Psyocore cua ban la ${code}. Ma co hieu luc trong ${Math.ceil(this.ttl / 60)} phut. Khong chia se ma nay voi nguoi khac.`,
+          html: `<p>Ma xac minh Psyocore cua ban la:</p><p style="font-size:28px;font-weight:bold;letter-spacing:6px">${code}</p><p>Ma co hieu luc trong ${Math.ceil(this.ttl / 60)} phut. Khong chia se ma nay voi nguoi khac.</p>`,
         });
       } catch (error) {
         await this.redis.client.del(`email-otp:challenge:${challengeId}`);

@@ -65,7 +65,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onOpenCommandPalett
       </button>
 
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] text-content-tertiary font-medium truncate">{group?.title ?? 'MATXXA'}</p>
+        <p className="text-[11px] text-content-tertiary font-medium truncate">{group?.title ?? 'Psyocore'}</p>
         <AnimatePresence mode="wait" initial={false}>
           <motion.p
             key={currentPage}
