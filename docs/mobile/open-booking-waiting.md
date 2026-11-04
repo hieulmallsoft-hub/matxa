@@ -10,15 +10,18 @@ Mọi request dùng `Authorization: Bearer <accessToken>`; base URL `/api`.
 
 ```
 Khách đặt đơn (chọn KTV A)          → đơn OPEN, đếm ngược 15 phút
-  ├─ KTV A nhận "Khách đặt bạn"     → Ứng tuyển hoặc Từ chối
-  ├─ KTV phù hợp khác "Yêu cầu mới" → Ứng tuyển
+  ├─ KTV A nhận "Khách đặt bạn"     → Nhận đơn → đơn CONFIRMED NGAY cho KTV A
+  │                                  → hoặc Từ chối
+  ├─ KTV phù hợp khác "Yêu cầu mới" → Ứng tuyển (KTV thay thế)
   │
-Khách thấy danh sách KTV đã ứng tuyển → bấm "Chọn"   → đơn CONFIRMED
-                                     → bấm "Hủy đơn" → đơn CANCELLED
-Hết 15 phút mà chưa chọn ai          → đơn EXPIRED (tự động)
+KTV A từ chối / chưa phản hồi        → khách bấm "Chọn" một KTV thay thế → đơn CONFIRMED
+Khách bấm "Hủy đơn"                 → đơn CANCELLED
+Hết 15 phút mà chưa có ai nhận      → đơn EXPIRED (tự động)
 ```
 
-KTV A từ chối **không hủy đơn**: đơn vẫn mở để khách chọn KTV khác đang ứng tuyển.
+- **KTV A nhận đơn = đơn được xác nhận luôn**, khách không cần bấm "Chọn". KTV A **không bao giờ**
+  nằm trong danh sách "N KTV đang muốn phục vụ bạn"; danh sách đó chỉ là KTV thay thế.
+- KTV A từ chối **không hủy đơn**: đơn vẫn mở để khách chọn KTV khác đang ứng tuyển.
 
 ---
 
@@ -138,7 +141,8 @@ PATCH /api/bookings/{bookingId}/cancel
 
 | `type` | Khi nào | App làm gì |
 |---|---|---|
-| `TECHNICIAN_APPLIED` | Có KTV ứng tuyển | Tải lại danh sách ứng viên |
+| `TECHNICIAN_APPLIED` | Có KTV thay thế ứng tuyển | Tải lại danh sách ứng viên |
+| `REQUESTED_TECHNICIAN_ACCEPTED` | KTV khách chọn ban đầu đã nhận đơn → đơn `CONFIRMED`. Nội dung: "<tên> đã nhận đơn của bạn." | Tải lại đơn, chuyển sang màn "Đã kết nối" (chi tiết đơn, nhắn tin với KTV) |
 | `REQUESTED_TECHNICIAN_DECLINED` | KTV khách chọn ban đầu từ chối. Nội dung: "<tên> đã từ chối đơn. Bạn có thể chọn KTV khác đang ứng tuyển." | Tải lại đơn; đổi dòng "Đang chờ <tên> xác nhận" thành mời chọn KTV khác |
 | `BOOKING_EXPIRED` | Hết 15 phút chưa chọn KTV | Hiện "Đơn đã hết hạn" |
 | `BOOKING_CANCELLED` | KTV đã được chọn hủy đơn | Hiện đơn đã hủy (nội dung chữ theo mẫu admin cấu hình, chỉ dựa vào `type`) |
@@ -195,8 +199,12 @@ POST /api/technician/jobs/{bookingId}/decline    (không body)
 POST /api/technician/jobs/{bookingId}/withdraw   (không body)
 ```
 
-- **Ứng tuyển:** tạo lượt `APPLIED`; khách nhận `TECHNICIAN_APPLIED`. Gọi lại nhiều lần không sao.
-  Ứng tuyển **chưa trừ tiền**; ví KTV chỉ bị trừ hoa hồng khi khách chọn KTV này (`COMMISSION_DEBIT`),
+- **KTV "Khách đặt bạn" bấm nhận** (cùng API `/apply`): đơn **xác nhận ngay** cho KTV này và trừ hoa hồng luôn.
+  Response `{ "status": "SELECTED", "bookingStatus": "CONFIRMED", ... }` → chuyển thẻ sang "Đã nhận",
+  hiện thông tin liên hệ khách. Nên đổi nhãn nút thành **"Nhận đơn"** thay cho "Ứng tuyển" ở thẻ này.
+  Khách nhận `REQUESTED_TECHNICIAN_ACCEPTED`; các KTV thay thế đang ứng tuyển nhận `TECHNICIAN_NOT_SELECTED`.
+- **Ứng tuyển** (KTV "Yêu cầu mới"): tạo lượt `APPLIED`; khách nhận `TECHNICIAN_APPLIED`. Gọi lại nhiều lần không sao.
+  Ứng tuyển **chưa trừ tiền**; ví KTV thay thế chỉ bị trừ hoa hồng khi khách chọn KTV này (`COMMISSION_DEBIT`),
   và được hoàn lại nếu đơn bị hủy sau đó (`COMMISSION_REFUND`).
   Nhưng ví phải **đủ tiền hoa hồng** của đơn ngay lúc ứng tuyển (hoa hồng = tiền dịch vụ × % phí nền tảng),
   nếu không API trả `409 "So du vi khong du de nhan don"` → hiện "Số dư ví không đủ để nhận đơn này"

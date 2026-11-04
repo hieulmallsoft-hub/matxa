@@ -622,7 +622,9 @@ export class BookingsService {
     const existing = await this.prisma.bookingTechnicianApplication.findUnique({
       where: { bookingId_technicianProfileId: { bookingId, technicianProfileId: profile.id } },
     });
-    if (existing?.status === 'APPLIED') return { ...existing, idempotent: true };
+    const requested = booking.requestedTechnicianId === profile.id;
+    if (existing?.status === 'APPLIED')
+      return requested ? this.acceptAsRequestedTechnician(userId, booking, existing.id) : { ...existing, idempotent: true };
     if (existing) throw new ConflictException('Trang thai ung tuyen hien tai khong cho phep apply lai');
     // Selection charges the commission, so a technician who could not pay it must not be selectable.
     const fee = await this.commissionFor(booking.grossServiceAmount);
@@ -637,6 +639,7 @@ export class BookingsService {
       const application = await this.prisma.bookingTechnicianApplication.create({
         data: { bookingId, technicianProfileId: profile.id, status: 'APPLIED', appliedAt: new Date() },
       });
+      if (requested) return this.acceptAsRequestedTechnician(userId, booking, application.id);
       void this.notifyStatus(
         booking.customerId,
         bookingId,
@@ -652,6 +655,21 @@ export class BookingsService {
         });
       throw error;
     }
+  }
+
+  /** The technician the customer picked accepting is the confirmation; no customer selection is needed. */
+  private async acceptAsRequestedTechnician(userId: string, booking: any, applicationId: string) {
+    const result = await this.assignOpenBooking(booking.id, applicationId, booking.customerId);
+    const technician = await this.prisma.user.findUnique({ where: { id: userId }, select: { displayName: true } });
+    void this.notifyStatus(
+      booking.customerId,
+      booking.id,
+      'REQUESTED_TECHNICIAN_ACCEPTED',
+      'KTV đã nhận đơn',
+      `${technician?.displayName || 'KTV bạn chọn'} đã nhận đơn của bạn.`,
+    );
+    this.afterOpenBookingAssigned(booking.id, result);
+    return { id: applicationId, bookingId: booking.id, status: 'SELECTED', bookingStatus: result.booking.status };
   }
 
   async declineOpenJob(userId: string, bookingId: string) {
@@ -697,6 +715,20 @@ export class BookingsService {
   }
 
   async selectTechnician(customerId: string, bookingId: string, applicationId: string) {
+    const result = await this.assignOpenBooking(bookingId, applicationId, customerId);
+    void this.notifyStatus(
+      result.winnerUserId,
+      bookingId,
+      'TECHNICIAN_SELECTED',
+      'Bạn đã được chọn',
+      'Khách hàng đã chọn bạn cho đơn dịch vụ.',
+    );
+    this.afterOpenBookingAssigned(bookingId, result);
+    return this.openBookingResponse(result.booking, 'SELECTED', true);
+  }
+
+  /** Charges the commission and confirms an open booking for one applicant; the rest become NOT_SELECTED. */
+  private async assignOpenBooking(bookingId: string, applicationId: string, customerId: string) {
     let result: { booking: any; winnerUserId: string; loserUserIds: string[] };
     try {
       result = await this.prisma.$transaction(
@@ -755,13 +787,10 @@ export class BookingsService {
         throw new ConflictException('Don dang duoc chon KTV, vui long thu lai');
       throw error;
     }
-    void this.notifyStatus(
-      result.winnerUserId,
-      bookingId,
-      'TECHNICIAN_SELECTED',
-      'Bạn đã được chọn',
-      'Khách hàng đã chọn bạn cho đơn dịch vụ.',
-    );
+    return result;
+  }
+
+  private afterOpenBookingAssigned(bookingId: string, result: { booking: any; loserUserIds: string[] }) {
     this.realtime?.broadcastAvailabilityChanged(result.booking.technicianId);
     for (const userId of result.loserUserIds)
       void this.notifyStatus(
@@ -771,7 +800,6 @@ export class BookingsService {
         'Khách đã chọn KTV khác',
         'Đơn này đã được gán cho một KTV khác.',
       );
-    return this.openBookingResponse(result.booking, 'SELECTED', true);
   }
 
   async listMine(userId: string): Promise<any[]>;
