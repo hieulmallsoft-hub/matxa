@@ -117,7 +117,7 @@ export class ChatController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CreateUploadUrlDto,
   ) {
-    await this.chat.ensureMember(auth.sub, id);
+    await this.chat.ensureCanWrite(auth.sub, id);
     return this.storage.createUploadUrl(id, auth.sub, dto);
   }
 

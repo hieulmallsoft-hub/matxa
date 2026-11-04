@@ -10,6 +10,8 @@ const SUPPORT_PARTICIPANT = { id: 'support', displayName: 'MATXXA CSKH', avatarU
 // `systemEvent` and replace `text` with the display copy.
 const SUPPORT_WELCOME = 'SUPPORT_WELCOME';
 const SUPPORT_AGENT_JOINED = 'SUPPORT_AGENT_JOINED';
+/** A booking chat stays readable after these, but takes no new messages. */
+const CLOSED_BOOKING_STATUSES = ['CANCELLED', 'EXPIRED'];
 const SUPPORT_SYSTEM_TEXT: Record<string, string> = {
   [SUPPORT_WELCOME]: 'MATXXA CSKH có thể giúp gì cho bạn?',
   [SUPPORT_AGENT_JOINED]: 'MATXXA CSKH đã tham gia cuộc trò chuyện',
@@ -188,6 +190,7 @@ export class ChatService {
               include: { user: { select: { id: true, displayName: true, avatarUrl: true, role: true } } },
             },
             messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+            booking: { select: { status: true } },
           },
         },
       },
@@ -226,6 +229,9 @@ export class ChatService {
           lastMessage: conversation.messages[0] ? this.withSupportSystemText(conversation.messages[0]) : null,
           lastMessageAt: conversation.lastMessageAt,
           unreadCount: unreadByConversation.get(conversation.id) ?? 0,
+          bookingStatus: conversation.booking?.status ?? null,
+          // false once the booking is cancelled/expired: show the history, hide the message box.
+          canSendMessage: !conversation.booking || !CLOSED_BOOKING_STATUSES.includes(conversation.booking.status),
         });
       } catch (error) {
         if (!(error instanceof ForbiddenException)) throw error;
@@ -260,8 +266,16 @@ export class ChatService {
     };
   }
 
+  /** Membership plus: a booking chat only takes new messages while the booking is still on. */
+  async ensureCanWrite(userId: string, conversationId: string) {
+    const access = await this.ensureAccess(userId, conversationId);
+    if (access.bookingStatus && CLOSED_BOOKING_STATUSES.includes(access.bookingStatus))
+      throw new ForbiddenException('Don da ket thuc, cuoc tro chuyen chi con xem lai');
+    return access;
+  }
+
   async sendMessage(userId: string, conversationId: string, dto: SendMessageDto, notify = true) {
-    const { isAdmin } = await this.ensureAccess(userId, conversationId);
+    const { isAdmin } = await this.ensureCanWrite(userId, conversationId);
     this.validateMessage(conversationId, userId, dto);
     const conversation = await this.prisma.conversation.findUniqueOrThrow({
       where: { id: conversationId },
@@ -426,9 +440,11 @@ export class ChatService {
     if (!member && user?.role !== 'ADMIN') throw new ForbiddenException('Ban khong co quyen xem cuoc tro chuyen');
     if (conversation.type === 'SUPPORT' && user?.role !== 'ADMIN' && conversation.supportCustomerId !== userId)
       throw new ForbiddenException('Ban khong thuoc hoi thoai ho tro nay');
-    if (member && user?.role !== 'ADMIN' && conversation.bookingId)
-      await this.bookingChatContext(userId, conversation.bookingId);
-    return { member, isAdmin: user?.role === 'ADMIN', conversation };
+    const booking =
+      member && user?.role !== 'ADMIN' && conversation.bookingId
+        ? await this.bookingChatContext(userId, conversation.bookingId)
+        : null;
+    return { member, isAdmin: user?.role === 'ADMIN', conversation, bookingStatus: booking?.status ?? null };
   }
 
   private validateMessage(conversationId: string, userId: string, dto: SendMessageDto) {
@@ -482,6 +498,7 @@ export class ChatService {
         id: true,
         customerId: true,
         assignmentMode: true,
+        status: true,
         technicianId: true,
         technician: { select: { id: true, userId: true } },
         applications: { where: { status: 'SELECTED' }, select: { technicianProfileId: true } },

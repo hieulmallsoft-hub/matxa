@@ -19,6 +19,17 @@ Applicants in `APPLIED`, `NOT_SELECTED`, `WITHDRAWN`, `DECLINED`, and `EXPIRED`
 cannot create, read, send, or upload to a booking chat. They must not receive
 customer contact details.
 
+**Đơn đã kết thúc thì chat chỉ còn xem lại.** Khi đơn `CANCELLED` hoặc `EXPIRED`, cả khách và KTV
+vẫn đọc được lịch sử nhưng **không gửi tin, không gửi ảnh** (`403 "Don da ket thuc, cuoc tro chuyen chi con xem lai"`).
+Mỗi phần tử của `GET /api/conversations` có:
+
+| Trường | Dùng để |
+|---|---|
+| `bookingStatus` | Trạng thái đơn của cuộc trò chuyện (`null` với chat CSKH) |
+| `canSendMessage` | `false` → ẩn ô nhập tin, hiện "Đơn đã kết thúc" |
+
+Mỗi đơn có cuộc trò chuyện riêng: chat của đơn cũ đã hủy **không** phải là chat của đơn mới, dù cùng khách và KTV.
+
 ## Open/create booking chat
 
 ```http
