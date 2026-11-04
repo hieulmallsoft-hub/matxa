@@ -23,7 +23,7 @@ const technicianJobSchema = {
     bookingStatus: { type: 'string', enum: ['OPEN', 'PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'EXPIRED'] },
     displayStatus: {
       type: 'string',
-      enum: ['REQUESTED', 'NEW', 'APPLIED', 'NOT_SELECTED', 'CANCELLED', 'EXPIRED', 'DECLINED', 'WITHDRAWN', 'ACCEPTED', 'COMPLETED'],
+      enum: ['REQUESTED', 'NEW', 'APPLIED', 'NOT_SELECTED', 'UNAVAILABLE', 'CANCELLED', 'EXPIRED', 'DECLINED', 'WITHDRAWN', 'ACCEPTED', 'COMPLETED'],
       example: 'NEW',
       description: 'Nhãn thẻ theo Figma: REQUESTED=Khách đặt bạn, NEW=Yêu cầu mới, APPLIED=Đang chờ khách xác nhận, NOT_SELECTED=Không được chọn / đã có KTV khác nhận, ACCEPTED=Đã nhận, COMPLETED=Đã hoàn thành',
     },

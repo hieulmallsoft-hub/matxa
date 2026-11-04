@@ -149,7 +149,7 @@ PATCH /api/bookings/{bookingId}/cancel
 |---|---|---|
 | `TECHNICIAN_APPLIED` | Có KTV thay thế ứng tuyển | Tải lại danh sách ứng viên |
 | `REQUESTED_TECHNICIAN_ACCEPTED` | KTV khách chọn ban đầu đã nhận đơn → đơn `CONFIRMED`. Nội dung: "<tên> đã nhận đơn của bạn." | Tải lại đơn, chuyển sang màn "Đã kết nối" (chi tiết đơn, nhắn tin với KTV) |
-| `REQUESTED_TECHNICIAN_DECLINED` | KTV khách chọn ban đầu từ chối. Nội dung: "<tên> đã từ chối đơn. Đơn vẫn mở để KTV khác nhận." | Tải lại đơn; đổi dòng "Đang chờ <tên> xác nhận" thành mời chọn KTV khác |
+| `REQUESTED_TECHNICIAN_DECLINED` | KTV khách chọn ban đầu từ chối: "<tên> đã từ chối đơn. Đơn vẫn mở để KTV khác nhận." **Hoặc** KTV đó vừa nhận đơn khác (mỗi KTV chỉ làm 1 đơn một lúc) nên backend tự từ chối thay: "<tên> đã nhận đơn khác nên không thể nhận đơn này. Đơn vẫn mở để KTV khác nhận." | Tải lại đơn; đổi dòng "Đang chờ <tên> xác nhận" thành mời chọn KTV khác |
 | `BOOKING_EXPIRED` | Hết 15 phút chưa chọn KTV | Hiện "Đơn đã hết hạn" |
 | `BOOKING_CANCELLED` | KTV đã được chọn hủy đơn | Hiện đơn đã hủy (nội dung chữ theo mẫu admin cấu hình, chỉ dựa vào `type`) |
 
@@ -206,6 +206,13 @@ GET /api/technician/jobs/{bookingId}
 | `DECLINED` / `WITHDRAWN` | Đã từ chối / Đã rút | — |
 | `ACCEPTED` | Đơn đã nhận: địa chỉ đầy đủ, quy định, "Gửi về Psyocore / Thực nhận / Tổng thu từ khách" | **Liên hệ khách**, **Đã hoàn thành** (khi `canComplete`) |
 | `COMPLETED` | "Đã hoàn thành", "Bạn đã nhận được" | — |
+| `UNAVAILABLE` | Đơn còn mở nhưng **KTV này không nhận được nữa** (đang có đơn khác chưa xong, hết khung giờ rảnh, ngoài bán kính…). Lý do ở `unavailableReason`. Hiện "Bạn không thể nhận đơn này" | Ẩn nút; **Xem đơn khác** |
+
+**Mỗi KTV chỉ làm 1 đơn một lúc.** Khi KTV được nhận 1 đơn, backend tự:
+- **rút** các ứng tuyển của KTV đó ở đơn khác → khách các đơn đó không còn thấy KTV này trong danh sách thay thế;
+- **từ chối thay** các đơn khác mà khách đặt riêng KTV này → khách nhận `REQUESTED_TECHNICIAN_DECLINED`;
+- các đơn "Yêu cầu mới" khác biến khỏi tab Nhận việc; mở từ thông báo cũ → `displayStatus: "UNAVAILABLE"` (không còn lỗi 409).
+Hoàn thành đơn đang làm thì KTV lại thấy và nhận đơn mới bình thường.
 
 Đếm ngược "12:05" = `applicationDeadlineAt` − giờ hiện tại (chỉ khi `REQUESTED`/`NEW`).
 

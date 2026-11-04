@@ -833,6 +833,51 @@ export class BookingsService {
         'Đơn đã có KTV nhận',
         applicants.has(userId) ? 'Khách đã chọn KTV khác cho đơn bạn ứng tuyển.' : 'Đơn này đã có KTV khác nhận.',
       );
+    await this.releaseOtherOpenRequests(result.booking.technicianId, result.winnerUserId, bookingId);
+  }
+
+  /**
+   * A technician takes one booking at a time, so once they get one their other open requests are
+   * released: applications are withdrawn and bookings that asked for them are declined on their
+   * behalf, so no customer keeps waiting for someone who can no longer come.
+   */
+  private async releaseOtherOpenRequests(technicianProfileId: string, technicianUserId: string, takenBookingId: string) {
+    try {
+      const now = new Date();
+      await this.prisma.bookingTechnicianApplication.updateMany({
+        where: {
+          technicianProfileId, status: 'APPLIED', bookingId: { not: takenBookingId },
+          booking: { assignmentMode: 'OPEN_MARKETPLACE', status: 'OPEN' },
+        },
+        data: { status: 'WITHDRAWN', withdrawnAt: now },
+      });
+      const waiting = await this.prisma.booking.findMany({
+        where: {
+          id: { not: takenBookingId }, assignmentMode: 'OPEN_MARKETPLACE', status: 'OPEN',
+          requestedTechnicianId: technicianProfileId, applications: { none: { technicianProfileId } },
+        },
+        select: { id: true, customerId: true },
+      });
+      if (!waiting.length) return;
+      await this.prisma.bookingTechnicianApplication.createMany({
+        data: waiting.map((item) => ({ bookingId: item.id, technicianProfileId, status: 'DECLINED' as const, declinedAt: now })),
+        skipDuplicates: true,
+      });
+      const technician = await this.prisma.user.findUnique({ where: { id: technicianUserId }, select: { displayName: true } });
+      const name = technician?.displayName || 'KTV bạn chọn';
+      for (const item of waiting)
+        void this.notifyStatus(
+          item.customerId,
+          item.id,
+          'REQUESTED_TECHNICIAN_DECLINED',
+          'KTV đã từ chối',
+          `${name} đã nhận đơn khác nên không thể nhận đơn này. Đơn vẫn mở để KTV khác nhận.`,
+        );
+    } catch (error) {
+      this.logger.warn(
+        `Khong giai phong duoc don mo khac cua KTV ${technicianProfileId}: ${error instanceof Error ? error.message : 'khong ro ly do'}`,
+      );
+    }
   }
 
   async listMine(userId: string): Promise<any[]>;
@@ -1023,7 +1068,21 @@ export class BookingsService {
       if (booking.status === 'EXPIRED' && !application)
         return this.openBookingResponse(booking, 'EXPIRED', false, true, profile.id, profile, commissionPercent);
       // detail() loads items without catalogService; reload them so eligibility sees catalog data.
-      if (booking.status === 'OPEN' && !application) await this.openJobForTechnician(id, profile.id, true);
+      if (booking.status === 'OPEN' && !application) {
+        const unavailableReason = await this.openJobForTechnician(id, profile.id, true).then(
+          () => null,
+          // An open job they were told about but can no longer take (busy, out of range…): show it, don't error.
+          (error) => (error instanceof ConflictException || error instanceof ForbiddenException ? error.message : Promise.reject(error)),
+        );
+        if (unavailableReason)
+          return {
+            ...this.openBookingResponse(booking, null, false, true, profile.id, profile, commissionPercent),
+            displayStatus: 'UNAVAILABLE',
+            unavailableReason,
+            canApply: false,
+            canDecline: false,
+          };
+      }
       // A cancelled or already-taken job reached detail() through an involvement or notification check; just show it.
       else if (!application && booking.requestedTechnicianId !== profile.id && !['CANCELLED', 'CONFIRMED', 'COMPLETED'].includes(booking.status))
         throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
@@ -1353,6 +1412,8 @@ export class BookingsService {
         : await this.transition(id, booking.status, { status: dto.status });
     const title = dto.status === 'CONFIRMED' ? 'Đặt lịch thành công' : 'Dịch vụ đã hoàn thành';
     void this.notifyStatus(booking.customerId, id, `BOOKING_${dto.status}`, title, title);
+    if (dto.status === 'CONFIRMED' && booking.technicianId)
+      void this.releaseOtherOpenRequests(booking.technicianId, userId, id);
     return updated;
   }
 
