@@ -637,8 +637,24 @@ export class BookingsService {
       if ((wallet?.balanceVnd ?? 0) < fee) throw new ConflictException('So du vi khong du de nhan don');
     }
     try {
-      const application = await this.prisma.bookingTechnicianApplication.create({
-        data: { bookingId, technicianProfileId: profile.id, status: 'APPLIED', appliedAt: new Date() },
+      const application = await this.prisma.$transaction(async (tx) => {
+        const now = new Date();
+        // Touching the row takes its lock: a concurrent assignment either finishes first (then this
+        // sees the booking is no longer OPEN) or waits for this application and marks it NOT_SELECTED.
+        const claimed = await tx.booking.updateMany({
+          where: {
+            id: bookingId,
+            assignmentMode: 'OPEN_MARKETPLACE',
+            status: 'OPEN',
+            technicianId: null,
+            OR: [{ applicationDeadlineAt: null }, { applicationDeadlineAt: { gt: now } }],
+          },
+          data: { status: 'OPEN' },
+        });
+        if (!claimed.count) throw new ConflictException('Don khong con mo de ung tuyen');
+        return tx.bookingTechnicianApplication.create({
+          data: { bookingId, technicianProfileId: profile.id, status: 'APPLIED', appliedAt: now },
+        });
       });
       if (requested) return this.acceptAsRequestedTechnician(userId, booking, application.id);
       void this.notifyStatus(

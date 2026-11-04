@@ -11,7 +11,9 @@ describe('technician applies to an open booking', () => {
         create: jest.fn(async ({ data }: any) => ({ id: 'application-1', ...data })),
       },
       wallet: { findUnique: jest.fn().mockResolvedValue(balanceVnd === null ? null : { balanceVnd }) },
+      booking: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     };
+    prisma.$transaction = jest.fn((callback: any) => callback(prisma));
     const notifications = { getTemplate: jest.fn().mockResolvedValue(null), create: jest.fn(), sendPush: jest.fn() };
     const service = new BookingsService(prisma, { get: (_key: string, fallback: unknown) => fallback } as any, notifications as any, {} as any);
     jest

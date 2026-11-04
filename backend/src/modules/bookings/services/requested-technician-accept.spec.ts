@@ -16,7 +16,9 @@ describe('requested technician accepts an open booking', () => {
       },
       wallet: { findUnique: jest.fn().mockResolvedValue({ balanceVnd: 1_000_000 }) },
       user: { findUnique: jest.fn().mockResolvedValue({ displayName: 'Duc Nguyen' }) },
+      booking: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     };
+    prisma.$transaction = jest.fn((callback: any) => callback(prisma));
     const service: any = new BookingsService(
       prisma, { get: (_key: string, fallback: unknown) => fallback } as any, {} as any, {} as any,
     );
