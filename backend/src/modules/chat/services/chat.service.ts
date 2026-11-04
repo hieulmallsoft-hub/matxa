@@ -3,6 +3,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { ChatStorageService } from './chat-storage.service';
 import { CreateConversationDto, EditMessageDto, ListMessagesDto, SendMessageDto } from '../dto/chat.dto';
+import { COMPLAINT_CREATED, COMPLAINT_STATUS_LABEL } from '../../bookings/services/complaint-conversation';
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000;
 const SUPPORT_PARTICIPANT = { id: 'support', displayName: 'MATXXA CSKH', avatarUrl: null, role: 'ADMIN' };
@@ -10,6 +11,20 @@ const SUPPORT_PARTICIPANT = { id: 'support', displayName: 'MATXXA CSKH', avatarU
 // `systemEvent` and replace `text` with the display copy.
 const SUPPORT_WELCOME = 'SUPPORT_WELCOME';
 const SUPPORT_AGENT_JOINED = 'SUPPORT_AGENT_JOINED';
+/** Customer <-> admin threads: the general CSKH one and the per-complaint one. */
+const ADMIN_THREAD_TYPES = ['SUPPORT', 'COMPLAINT'];
+/** The customer a CSKH or complaint thread belongs to. */
+const threadOwner = (conversation: { type?: string | null; supportCustomerId?: string | null; customerId?: string | null } | null) =>
+  conversation?.type === 'SUPPORT' ? conversation.supportCustomerId : conversation?.type === 'COMPLAINT' ? conversation.customerId : null;
+const COMPLAINT_SUMMARY_SELECT = { id: true, bookingId: true, status: true, reasonCode: true } as const;
+const complaintSummary = (complaint: { id: string; bookingId: string; status: string; reasonCode: string } | null | undefined) =>
+  complaint
+    ? {
+        ...complaint,
+        bookingCode: complaint.bookingId.slice(0, 8).toUpperCase(),
+        statusLabel: COMPLAINT_STATUS_LABEL[complaint.status] ?? complaint.status,
+      }
+    : null;
 /** A booking chat stays readable after these, but takes no new messages. */
 const CLOSED_BOOKING_STATUSES = ['CANCELLED', 'EXPIRED'];
 const SUPPORT_SYSTEM_TEXT: Record<string, string> = {
@@ -133,7 +148,7 @@ export class ChatService {
     return conversation;
   }
 
-  async listConversations(userId: string, type?: 'BOOKING' | 'SUPPORT' | 'LEGACY') {
+  async listConversations(userId: string, type?: 'BOOKING' | 'SUPPORT' | 'COMPLAINT' | 'LEGACY') {
     const currentUser = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     if (currentUser?.role === 'ADMIN') {
       const conversations = await this.prisma.conversation.findMany({
@@ -142,6 +157,7 @@ export class ChatService {
         include: {
           members: { include: { user: { select: { id: true, displayName: true, avatarUrl: true, role: true } } } },
           messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+          complaint: { select: COMPLAINT_SUMMARY_SELECT },
         },
       });
       const ids = conversations.map((conversation) => conversation.id);
@@ -173,6 +189,7 @@ export class ChatService {
           supportCustomerId: conversation.supportCustomerId ?? null,
           bookingId: conversation.bookingId,
           participant,
+          complaint: complaintSummary(conversation.complaint),
           lastMessage: conversation.messages[0] ? this.withSupportSystemText(conversation.messages[0]) : null,
           lastMessageAt: conversation.lastMessageAt,
           unreadCount: unreadByConversation.get(conversation.id) ?? 0,
@@ -191,6 +208,7 @@ export class ChatService {
             },
             messages: { orderBy: { createdAt: 'desc' }, take: 1 },
             booking: { select: { status: true } },
+            complaint: { select: COMPLAINT_SUMMARY_SELECT },
           },
         },
       },
@@ -223,13 +241,15 @@ export class ChatService {
           type: conversation.type ?? (conversation.bookingId ? 'BOOKING' : 'LEGACY'),
           supportCustomerId: conversation.supportCustomerId ?? null,
           bookingId: conversation.bookingId,
-          participant: conversation.type === 'SUPPORT'
+          participant: ADMIN_THREAD_TYPES.includes(conversation.type)
             ? SUPPORT_PARTICIPANT
             : conversation.members.find((member) => member.user.role !== 'ADMIN')?.user ?? conversation.members[0]?.user,
           lastMessage: conversation.messages[0] ? this.withSupportSystemText(conversation.messages[0]) : null,
           lastMessageAt: conversation.lastMessageAt,
           unreadCount: unreadByConversation.get(conversation.id) ?? 0,
           bookingStatus: conversation.booking?.status ?? null,
+          // "Hỗ trợ đơn #XXXX" threads carry the complaint they are about.
+          complaint: complaintSummary(conversation.complaint),
           // false once the booking is cancelled/expired: show the history, hide the message box.
           canSendMessage: !conversation.booking || !CLOSED_BOOKING_STATUSES.includes(conversation.booking.status),
         });
@@ -285,7 +305,7 @@ export class ChatService {
     let joinMessage: Awaited<ReturnType<typeof this.prisma.message.create>> | undefined;
     const message = await this.prisma.$transaction(async (tx) => {
       // The first admin reply in a support thread is preceded by a "CSKH joined" event.
-      if (conversation.type === 'SUPPORT' && isAdmin) {
+      if (ADMIN_THREAD_TYPES.includes(conversation.type) && isAdmin) {
         const joined = await tx.message.findFirst({
           where: { conversationId, type: 'SYSTEM', text: SUPPORT_AGENT_JOINED },
           select: { id: true },
@@ -393,10 +413,11 @@ export class ChatService {
 
   async recipientIds(userId: string, conversationId: string) {
     const conversation = await this.prisma.conversation.findUnique({
-      where: { id: conversationId }, select: { type: true, supportCustomerId: true },
+      where: { id: conversationId }, select: { type: true, supportCustomerId: true, customerId: true },
     });
-    if (conversation?.type === 'SUPPORT') {
-      if (userId !== conversation.supportCustomerId) return conversation.supportCustomerId ? [conversation.supportCustomerId] : [];
+    if (conversation && ADMIN_THREAD_TYPES.includes(conversation.type)) {
+      const owner = threadOwner(conversation);
+      if (userId !== owner) return owner ? [owner] : [];
       const admins = await this.prisma.user.findMany({ where: { role: 'ADMIN', status: 'ACTIVE' }, select: { id: true } });
       return admins.map((admin) => admin.id);
     }
@@ -410,9 +431,9 @@ export class ChatService {
   async ensureMember(userId: string, conversationId: string) {
     const [member, conversation] = await Promise.all([
       this.prisma.conversationMember.findUnique({ where: { conversationId_userId: { conversationId, userId } } }),
-      this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { bookingId: true, type: true, supportCustomerId: true } }),
+      this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { bookingId: true, type: true, supportCustomerId: true, customerId: true } }),
     ]);
-    if (conversation?.type === 'SUPPORT') {
+    if (conversation && ADMIN_THREAD_TYPES.includes(conversation.type)) {
       const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
       if (user?.role === 'ADMIN') {
         return this.prisma.conversationMember.upsert({
@@ -420,7 +441,7 @@ export class ChatService {
           create: { conversationId, userId }, update: {},
         });
       }
-      if (conversation.supportCustomerId !== userId) throw new ForbiddenException('Ban khong thuoc hoi thoai ho tro nay');
+      if (threadOwner(conversation) !== userId) throw new ForbiddenException('Ban khong thuoc hoi thoai ho tro nay');
     }
     if (!member) throw new ForbiddenException('Ban khong thuoc cuoc tro chuyen nay');
     if (conversation?.bookingId) {
@@ -434,11 +455,11 @@ export class ChatService {
     const [member, user, conversation] = await Promise.all([
       this.prisma.conversationMember.findUnique({ where: { conversationId_userId: { conversationId, userId } } }),
       this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } }),
-      this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { id: true, bookingId: true, type: true, supportCustomerId: true } }),
+      this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { id: true, bookingId: true, type: true, supportCustomerId: true, customerId: true } }),
     ]);
     if (!conversation) throw new NotFoundException('Cuoc tro chuyen khong ton tai');
     if (!member && user?.role !== 'ADMIN') throw new ForbiddenException('Ban khong co quyen xem cuoc tro chuyen');
-    if (conversation.type === 'SUPPORT' && user?.role !== 'ADMIN' && conversation.supportCustomerId !== userId)
+    if (ADMIN_THREAD_TYPES.includes(conversation.type) && user?.role !== 'ADMIN' && threadOwner(conversation) !== userId)
       throw new ForbiddenException('Ban khong thuoc hoi thoai ho tro nay');
     const booking =
       member && user?.role !== 'ADMIN' && conversation.bookingId
@@ -472,6 +493,17 @@ export class ChatService {
   }
 
   private async withSystemMessageText<T extends { type: string; text: string | null }>(message: T) {
+    if (message.type === 'SYSTEM' && message.text === COMPLAINT_CREATED)
+      return { ...message, systemEvent: COMPLAINT_CREATED, text: 'Bạn đã gửi khiếu nại. CSKH sẽ phản hồi tại đây.' };
+    if (message.type === 'SYSTEM' && message.text?.startsWith('COMPLAINT_STATUS:')) {
+      const complaintStatus = message.text.slice('COMPLAINT_STATUS:'.length);
+      return {
+        ...message,
+        systemEvent: 'COMPLAINT_STATUS_CHANGED',
+        complaintStatus,
+        text: `Khiếu nại đã chuyển sang: ${COMPLAINT_STATUS_LABEL[complaintStatus] ?? complaintStatus}`,
+      };
+    }
     if (message.type === 'SYSTEM' && message.text && message.text in SUPPORT_SYSTEM_TEXT)
       return this.withSupportSystemText(message);
     if (message.type !== 'SYSTEM' || message.text !== 'TECHNICIAN_SELECTED') return message;
@@ -549,9 +581,9 @@ export class ChatService {
     const [sender, recipients, conversation] = await Promise.all([
       this.prisma.user.findUnique({ where: { id: senderId }, select: { displayName: true } }),
       this.recipientIds(senderId, conversationId),
-      this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { bookingId: true, type: true, supportCustomerId: true } }),
+      this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { bookingId: true, type: true, supportCustomerId: true, customerId: true } }),
     ]);
-    const title = conversation?.type === 'SUPPORT' && senderId !== conversation.supportCustomerId
+    const title = conversation && ADMIN_THREAD_TYPES.includes(conversation.type) && senderId !== threadOwner(conversation)
       ? 'MATXXA CSKH' : sender?.displayName ?? 'Bạn có tin nhắn mới';
     const body =
       dto.type === 'TEXT'

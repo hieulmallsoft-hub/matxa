@@ -50,6 +50,7 @@ describe('admin notifications', () => {
       $transaction: jest.fn((callback: any) => callback(tx)),
       booking: { findFirst: jest.fn().mockResolvedValue({ id: 'booking-1', status: 'COMPLETED', complaint: null }) },
       complaint: { create: jest.fn().mockResolvedValue({ id: 'complaint-1' }) },
+      conversation: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 'conversation-1' }) },
     };
     const notifications: any = { create: jest.fn().mockResolvedValue({}), sendPush: jest.fn().mockResolvedValue({}), notifyAdmins: jest.fn() };
     const service = new BookingsService(prisma, { get: jest.fn() } as any, notifications, {} as any);

@@ -26,8 +26,8 @@ export class CreateSupportConversationDto {
 }
 
 export class ListConversationsDto {
-  @ApiPropertyOptional({ enum: ['BOOKING', 'SUPPORT', 'LEGACY'] })
-  @IsOptional() @IsIn(['BOOKING', 'SUPPORT', 'LEGACY']) type?: 'BOOKING' | 'SUPPORT' | 'LEGACY';
+  @ApiPropertyOptional({ enum: ['BOOKING', 'SUPPORT', 'COMPLAINT', 'LEGACY'] })
+  @IsOptional() @IsIn(['BOOKING', 'SUPPORT', 'COMPLAINT', 'LEGACY']) type?: 'BOOKING' | 'SUPPORT' | 'COMPLAINT' | 'LEGACY';
 }
 
 export class ListMessagesDto {

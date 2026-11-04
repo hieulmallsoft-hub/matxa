@@ -20,6 +20,7 @@ import { Optional } from '@nestjs/common';
 import { SettingsService } from '../../settings/settings.service';
 import { ComplaintStorageService } from './complaint-storage.service';
 import { addressPreview, kmBetween, technicianBadge } from './distance';
+import { COMPLAINT_STATUS_LABEL, complaintStatusEvent, ensureComplaintConversation } from './complaint-conversation';
 import {
   BookingHistoryQueryDto,
   CancelBookingDto,
@@ -34,6 +35,27 @@ import {
 
 /** A complaint needs a technician on the booking: in progress (e.g. "KTV không đến"), done, or cancelled. */
 const COMPLAINABLE_STATUSES: string[] = ['CONFIRMED', 'COMPLETED', 'CANCELLED'];
+const COMPLAINT_REASON_LABEL: Record<string, string> = {
+  SERVICE_ISSUE: 'Vấn đề về dịch vụ',
+  TECHNICIAN_NO_CONTACT: 'KTV không liên hệ, không đến',
+  TECHNICIAN_BEHAVIOR: 'Thái độ của KTV',
+  SAFETY_ISSUE: 'Vấn đề an toàn',
+  PAYMENT_ISSUE: 'Thanh toán',
+  OTHER: 'Lý do khác',
+};
+/** What the complaint chat header needs: the booking, its items and the booked technician. */
+const COMPLAINT_CONTEXT_INCLUDE = {
+  evidence: { select: { id: true } },
+  customer: { select: { id: true, displayName: true, avatarUrl: true } },
+  booking: {
+    select: {
+      id: true, status: true, mode: true, scheduledStart: true, scheduledEnd: true, totalAmount: true, addressSnapshot: true,
+      payment: { select: { method: true } },
+      items: { select: { serviceName: true, durationMinutes: true, unitPrice: true } },
+      technician: { select: { averageRating: true, reviewCount: true, user: { select: { displayName: true, avatarUrl: true } } } },
+    },
+  },
+} as const;
 
 @Injectable()
 export class BookingsService {
@@ -925,6 +947,7 @@ export class BookingsService {
           orderBy: { createdAt: 'asc' },
         },
         review: true,
+        complaint: { select: { id: true, status: true, reasonCode: true, createdAt: true, conversation: { select: { id: true } } } },
       },
       orderBy: { scheduledStart: 'desc' },
     });
@@ -946,6 +969,7 @@ export class BookingsService {
         address: true,
         promotion: true,
         review: true,
+        complaint: { select: { id: true, status: true, reasonCode: true, createdAt: true, conversation: { select: { id: true } } } },
         customer: {
           select: { id: true, displayName: true, avatarUrl: true, gender: true, nationality: true, role: true },
         },
@@ -1524,7 +1548,9 @@ export class BookingsService {
         `Đơn ${id.slice(0, 8)}: ${dto.detail.trim().slice(0, 120)}`,
         'admin://complaints',
       );
-      return complaint;
+      // The complaint opens its own support chat; the app jumps straight into it.
+      const conversationId = await ensureComplaintConversation(this.prisma, complaint);
+      return { ...complaint, conversationId };
     } catch (error) {
       if ((error as { code?: string })?.code === 'P2002') throw new ConflictException('Lich dat da duoc tao khieu nai');
       throw error;
@@ -1539,13 +1565,104 @@ export class BookingsService {
   }
 
   listComplaints(status?: string) {
-    return this.prisma.complaint.findMany({ where: status ? { status: status as any } : undefined, include: { booking: { select: { id: true, status: true, totalAmount: true, scheduledStart: true } }, customer: { select: { id: true, displayName: true, avatarUrl: true } }, evidence: true }, orderBy: { createdAt: 'desc' } });
+    return this.prisma.complaint.findMany({
+      where: status ? { status: status as any } : undefined,
+      include: {
+        booking: {
+          select: {
+            id: true, status: true, totalAmount: true, scheduledStart: true,
+            technician: { select: { user: { select: { displayName: true, avatarUrl: true } } } },
+          },
+        },
+        customer: { select: { id: true, displayName: true, avatarUrl: true } },
+        evidence: true,
+        conversation: { select: { id: true, lastMessageAt: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /** The customer's complaint on one of their bookings, with what the support chat header shows. */
+  async customerComplaint(customerId: string, bookingId: string) {
+    const complaint = await this.prisma.complaint.findFirst({
+      where: { bookingId, customerId },
+      include: COMPLAINT_CONTEXT_INCLUDE,
+    });
+    if (!complaint) throw new NotFoundException('Don nay chua co khieu nai');
+    return this.complaintContext(complaint);
+  }
+
+  /** Same view for the admin; opening it also creates the chat of an older complaint. */
+  async adminComplaint(complaintId: string) {
+    const complaint = await this.prisma.complaint.findUnique({ where: { id: complaintId }, include: COMPLAINT_CONTEXT_INCLUDE });
+    if (!complaint) throw new NotFoundException('Khieu nai khong ton tai');
+    return { ...(await this.complaintContext(complaint)), customer: complaint.customer };
+  }
+
+  private async complaintContext(complaint: any) {
+    const booking = complaint.booking;
+    const technician = booking.technician;
+    return {
+      id: complaint.id,
+      status: complaint.status,
+      statusLabel: COMPLAINT_STATUS_LABEL[complaint.status] ?? complaint.status,
+      reasonCode: complaint.reasonCode,
+      reasonLabel: COMPLAINT_REASON_LABEL[complaint.reasonCode] ?? complaint.reasonCode,
+      detail: complaint.detail,
+      contactEmail: complaint.contactEmail,
+      createdAt: complaint.createdAt,
+      evidenceCount: complaint.evidence?.length ?? 0,
+      conversationId: await ensureComplaintConversation(this.prisma, complaint),
+      booking: {
+        id: booking.id,
+        code: booking.id.slice(0, 8).toUpperCase(),
+        status: booking.status,
+        mode: booking.mode,
+        scheduledStart: booking.scheduledStart,
+        scheduledEnd: booking.scheduledEnd,
+        addressText: booking.mode === 'HOME' ? (booking.addressSnapshot?.address ?? booking.addressSnapshot?.addressText ?? null) : null,
+        paymentMethod: booking.payment?.method ?? 'CASH',
+        totalAmount: Number(booking.totalAmount),
+        items: (booking.items ?? []).map((item: any) => ({
+          name: item.serviceName,
+          durationMinutes: item.durationMinutes,
+          price: Number(item.unitPrice),
+        })),
+      },
+      technician: technician
+        ? {
+            displayName: technician.user?.displayName ?? null,
+            avatarUrl: technician.user?.avatarUrl ?? null,
+            averageRating: Number(technician.averageRating ?? 0),
+            reviewCount: technician.reviewCount ?? 0,
+          }
+        : null,
+    };
   }
 
   async updateComplaintStatus(adminId: string, id: string, status: 'IN_REVIEW' | 'RESOLVED' | 'REJECTED') {
-    const complaint = await this.prisma.complaint.findUnique({ where: { id }, select: { id: true } });
+    const complaint = await this.prisma.complaint.findUnique({
+      where: { id },
+      select: { id: true, bookingId: true, customerId: true },
+    });
     if (!complaint) throw new NotFoundException('Khieu nai khong ton tai');
-    return this.prisma.complaint.update({ where: { id }, data: { status } });
+    const updated = await this.prisma.complaint.update({ where: { id }, data: { status } });
+    // The customer follows the case in its chat: post the change there and tell them.
+    const conversationId = await ensureComplaintConversation(this.prisma, complaint);
+    const now = new Date();
+    await this.prisma.message.create({
+      data: { conversationId, senderId: adminId, type: 'SYSTEM', text: complaintStatusEvent(status), bookingId: complaint.bookingId, createdAt: now },
+    });
+    await this.prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: now } });
+    const body = `Khiếu nại đơn #${complaint.bookingId.slice(0, 8).toUpperCase()}: ${COMPLAINT_STATUS_LABEL[status]}`;
+    const actionUrl = `matxa://chat/${conversationId}`;
+    await this.notifications.create(complaint.customerId, 'COMPLAINT_STATUS_CHANGED', 'Cập nhật khiếu nại', body, actionUrl);
+    void this.notifications
+      .sendPush(complaint.customerId, 'Cập nhật khiếu nại', body, {
+        type: 'COMPLAINT_STATUS_CHANGED', complaintId: id, conversationId, bookingId: complaint.bookingId,
+      })
+      .catch(() => undefined);
+    return updated;
   }
 
   private async transition(
@@ -1885,6 +2002,19 @@ export class BookingsService {
       paymentMethod: booking.payment?.method ?? null,
       canCancel,
       canReview,
+      // Complaints are between the customer and the admins; the technician never sees them.
+      canComplain: isCustomer && !booking.complaint && COMPLAINABLE_STATUSES.includes(booking.status),
+      complaint:
+        isCustomer && booking.complaint
+          ? {
+              id: booking.complaint.id,
+              status: booking.complaint.status,
+              statusLabel: COMPLAINT_STATUS_LABEL[booking.complaint.status] ?? booking.complaint.status,
+              reasonCode: booking.complaint.reasonCode,
+              createdAt: booking.complaint.createdAt,
+              conversationId: booking.complaint.conversation?.id ?? null,
+            }
+          : null,
       review: booking.review
         ? {
             id: booking.review.id,

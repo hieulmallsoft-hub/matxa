@@ -23,5 +23,6 @@ class UpdateComplaintStatusDto {
 export class AdminComplaintsController {
   constructor(private readonly bookings: BookingsService) {}
   @Get() list(@Query('status') status?: string) { return this.bookings.listComplaints(status); }
+  @Get(':id') detail(@Param('id', ParseUUIDPipe) id: string) { return this.bookings.adminComplaint(id); }
   @Patch(':id/status') update(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateComplaintStatusDto) { return this.bookings.updateComplaintStatus(auth.sub, id, body.status); }
 }

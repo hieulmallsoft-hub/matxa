@@ -207,6 +207,15 @@ export class BookingsController {
     return this.bookings.createComplaint(auth.sub, id, dto);
   }
 
+  @Get(':id/complaint')
+  @ApiOperation({
+    summary: 'Khach xem khieu nai cua don + thong tin don va KTV cho dau khung chat ho tro',
+    description: 'conversationId la chat ho tro rieng cua khieu nai (khach <-> CSKH). 404 neu don chua co khieu nai.',
+  })
+  customerComplaint(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
+    return this.bookings.customerComplaint(auth.sub, id);
+  }
+
   @Post(':id/complaint-evidence-upload-url')
   @ApiOperation({ summary: 'Tao URL upload anh minh chung khieu nai' })
   async complaintEvidenceUploadUrl(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: { contentType: string; size: number }) {

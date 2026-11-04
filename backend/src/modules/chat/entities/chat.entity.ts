@@ -29,7 +29,7 @@ export class MessageModel {
 
 export class ConversationModel {
   @ApiProperty() id!: string;
-  @ApiProperty({ enum: ['BOOKING', 'SUPPORT', 'LEGACY'] }) type!: string;
+  @ApiProperty({ enum: ['BOOKING', 'SUPPORT', 'COMPLAINT', 'LEGACY'] }) type!: string;
   @ApiPropertyOptional({ nullable: true }) supportCustomerId?: string;
   @ApiPropertyOptional() bookingId?: string;
   @ApiProperty({ type: ChatUserModel }) participant!: ChatUserModel;

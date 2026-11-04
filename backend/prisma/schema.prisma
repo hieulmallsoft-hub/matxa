@@ -864,6 +864,7 @@ model Complaint {
   booking         Booking             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   customer        User                @relation(fields: [customerId], references: [id])
   evidence        ComplaintEvidence[]
+  conversation    Conversation?
 
   @@index([customerId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
@@ -984,12 +985,15 @@ enum ConversationType {
   LEGACY
   BOOKING
   SUPPORT
+  COMPLAINT
 }
 
 model Conversation {
   id            String               @id @default(uuid()) @db.Uuid
   type          ConversationType     @default(LEGACY)
   supportCustomerId String?          @unique @map("support_customer_id") @db.Uuid
+  // One customer <-> admin thread per complaint ("Hỗ trợ đơn hàng"); the booking itself stays in bookingId-less form.
+  complaintId   String?              @unique @map("complaint_id") @db.Uuid
   // Null values represent legacy direct conversations. New booking chats are
   // isolated by bookingId so the same customer/KTV can have separate threads.
   bookingId     String?              @unique @map("booking_id") @db.Uuid
@@ -1005,6 +1009,7 @@ model Conversation {
   customer      User?                @relation("BookingConversationCustomer", fields: [customerId], references: [id], onDelete: SetNull)
   technicianUser User?               @relation("BookingConversationTechnician", fields: [technicianUserId], references: [id], onDelete: SetNull)
   supportCustomer User?              @relation("SupportConversationCustomer", fields: [supportCustomerId], references: [id], onDelete: Cascade)
+  complaint     Complaint?           @relation(fields: [complaintId], references: [id], onDelete: Cascade)
 
   @@index([lastMessageAt(sort: Desc)])
   @@index([type, lastMessageAt(sort: Desc)])
