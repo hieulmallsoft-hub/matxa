@@ -248,7 +248,7 @@ export class ChatService {
           lastMessageAt: conversation.lastMessageAt,
           unreadCount: unreadByConversation.get(conversation.id) ?? 0,
           bookingStatus: conversation.booking?.status ?? null,
-          // "Hỗ trợ đơn #XXXX" threads carry the complaint they are about.
+          // "Khiếu nại đơn #XXXX" threads carry the complaint they are about.
           complaint: complaintSummary(conversation.complaint),
           // false once the booking is cancelled/expired: show the history, hide the message box.
           canSendMessage: !conversation.booking || !CLOSED_BOOKING_STATUSES.includes(conversation.booking.status),

@@ -61,7 +61,7 @@ PATCH /api/admin/complaints/{complaintId}/status
 
 Chỉ tài khoản có role `ADMIN` được gọi hai API này. Backend trả kèm booking, khách hàng và danh sách ảnh minh chứng để admin xử lý.
 
-## Chat hỗ trợ đơn hàng (giống "Hỗ trợ đơn hàng" của Shopee)
+## Chat khiếu nại với CSKH
 
 Mỗi khiếu nại có **một khung chat riêng giữa khách và CSKH**, gắn với đúng đơn đó. KTV **không** vào được
 khung chat này. Đầu khung chat hiện thông tin đơn, KTV đã đặt và nội dung khiếu nại.
@@ -74,14 +74,14 @@ khung chat này. Đầu khung chat hiện thông tin đơn, KTV đã đặt và 
 { "id": "complaint-id", "status": "SUBMITTED", "reasonCode": "TECHNICIAN_NO_CONTACT", "conversationId": "conversation-id" }
 ```
 
-### 2. Chi tiết đơn: nút "Khiếu nại" hay "Hỗ trợ đơn hàng"
+### 2. Chi tiết đơn: nút "Khiếu nại" hay "Xem khiếu nại"
 
 `GET /api/bookings/{bookingId}` có thêm:
 
 | Trường | Dùng để |
 |---|---|
 | `canComplain` | `true` → hiện nút **Khiếu nại** |
-| `complaint` | Khác `null` → đơn đã khiếu nại: hiện trạng thái (`complaint.statusLabel`) và nút **Hỗ trợ đơn hàng** |
+| `complaint` | Khác `null` → đơn đã khiếu nại: hiện trạng thái (`complaint.statusLabel`) và nút **Xem khiếu nại** (mở chat với CSKH) |
 
 ```json
 "complaint": { "id": "…", "status": "IN_REVIEW", "statusLabel": "Đang xử lý", "reasonCode": "TECHNICIAN_NO_CONTACT", "createdAt": "…", "conversationId": "…" }
@@ -124,7 +124,7 @@ Dùng các API chat có sẵn với `conversationId`:
 - `PATCH /api/conversations/{conversationId}/read`
 
 Trong `GET /api/conversations`, chat này có `type: "COMPLAINT"`, `participant` là **MATXXA CSKH** và thêm
-`complaint: { id, bookingId, bookingCode, status, statusLabel, reasonCode }` → hiện tiêu đề "Hỗ trợ đơn #ECEE5154".
+`complaint: { id, bookingId, bookingCode, status, statusLabel, reasonCode }` → hiện tiêu đề "Khiếu nại đơn #ECEE5154".
 Có thể lọc riêng bằng `GET /api/conversations?type=COMPLAINT`.
 
 Tin `SYSTEM` trong chat này (đã có sẵn chữ ở `text`, dùng `systemEvent` để chọn kiểu hiển thị):

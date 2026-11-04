@@ -14,7 +14,7 @@ export const COMPLAINT_STATUS_LABEL: Record<string, string> = {
 };
 
 /**
- * Returns the customer <-> admin thread of a complaint ("Hỗ trợ đơn hàng"), creating it on first use so
+ * Returns the customer <-> admin thread of a complaint, creating it on first use so
  * complaints filed before this feature also get one. The technician is never a member.
  */
 export async function ensureComplaintConversation(

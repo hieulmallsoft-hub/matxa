@@ -2,7 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { COMPLAINT_CREATED } from './complaint-conversation';
 
-// "Hỗ trợ đơn hàng": each complaint gets its own customer <-> admin chat with the booking and
+// Complaint chat: each complaint gets its own customer <-> admin chat with the booking and
 // technician shown on top, like Shopee's order support.
 describe('complaint support chat', () => {
   const booking = {

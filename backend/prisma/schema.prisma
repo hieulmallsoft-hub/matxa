@@ -992,7 +992,7 @@ model Conversation {
   id            String               @id @default(uuid()) @db.Uuid
   type          ConversationType     @default(LEGACY)
   supportCustomerId String?          @unique @map("support_customer_id") @db.Uuid
-  // One customer <-> admin thread per complaint ("Hỗ trợ đơn hàng"); the booking itself stays in bookingId-less form.
+  // One customer <-> admin thread per complaint; the booking itself stays in bookingId-less form.
   complaintId   String?              @unique @map("complaint_id") @db.Uuid
   // Null values represent legacy direct conversations. New booking chats are
   // isolated by bookingId so the same customer/KTV can have separate threads.

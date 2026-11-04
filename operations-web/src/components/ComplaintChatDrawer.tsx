@@ -48,7 +48,7 @@ const money = (value: number) => `${new Intl.NumberFormat('vi-VN').format(value)
 const time = (value: string) =>
   new Date(value).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
 
-/** "Hỗ trợ đơn hàng": the admin side of one complaint's chat, with the booking and technician on top. */
+/** Complaint chat: the admin side of one complaint's chat, with the booking and technician on top. */
 export function ComplaintChatDrawer({ complaintId, onClose }: { complaintId: string | null; onClose: () => void }) {
   const { addToast } = useToast();
   const [context, setContext] = useState<Context | null>(null);
@@ -113,7 +113,7 @@ export function ComplaintChatDrawer({ complaintId, onClose }: { complaintId: str
       isOpen={Boolean(complaintId)}
       onClose={onClose}
       width="xl"
-      title={context ? `Hỗ trợ đơn #${context.booking.code}` : 'Hỗ trợ đơn hàng'}
+      title={context ? `Khiếu nại đơn #${context.booking.code}` : 'Chat khiếu nại'}
       subtitle={context ? `${context.customer?.displayName || 'Khách hàng'} · ${context.contactEmail}` : undefined}
       badge={context && <Badge tone={STATUS_TONE[context.status] ?? 'gray'} dot>{context.statusLabel}</Badge>}
       footer={

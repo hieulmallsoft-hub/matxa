@@ -1,7 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import { ChatService } from './chat.service';
 
-// A complaint chat ("Hỗ trợ đơn hàng") belongs to the customer who complained and the admins.
+// A complaint chat belongs to the customer who complained and the admins.
 describe('complaint chat access', () => {
   const thread = { id: 'conversation-1', type: 'COMPLAINT', bookingId: null, supportCustomerId: null, customerId: 'customer-1' };
   const roles: Record<string, string> = { 'customer-1': 'CUSTOMER', 'other-customer': 'CUSTOMER', 'ktv-user': 'TECHNICIAN', 'admin-1': 'ADMIN' };
