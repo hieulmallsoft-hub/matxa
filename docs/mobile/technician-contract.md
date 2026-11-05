@@ -1,5 +1,7 @@
 # Hợp đồng KTV và ký điện tử
 
+> **Đã thay đổi (11/2026):** KTV ký hợp đồng **ngay khi gửi hồ sơ đăng ký** — xem mục "Ký hợp đồng khi đăng ký" trong [technician-registration.md](technician-registration.md). Backend ghép chữ ký vào mẫu PDF; admin duyệt hồ sơ là hợp đồng có hiệu lực. Luồng ký sau khi được duyệt bên dưới chỉ còn cho các KTV cũ, app mới **không cần** làm.
+
 Hợp đồng được tạo sau khi hồ sơ KTV đã `APPROVED`. Backend lấy số điện thoại đã xác thực và số CCCD trong hồ sơ, sau đó lưu một snapshot để nội dung hợp đồng không đổi theo Profile về sau.
 
 ## KTV

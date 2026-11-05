@@ -38,7 +38,7 @@ export function ContractTemplatesPage() {
   const fetchCurrentTemplate = async () => {
     setLoadingTemplate(true);
     try {
-      const res = await request<CurrentTemplate>('/technician/contract/template');
+      const res = await request<CurrentTemplate>('/admin/technician-contracts/template');
       setCurrentTemplate(res);
     } catch {
       setCurrentTemplate(null);

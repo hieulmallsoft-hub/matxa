@@ -19,6 +19,8 @@ import {
   UserCheck,
   X,
   XCircle,
+  Download,
+  FileSignature,
 } from 'lucide-react';
 import { AnimatedNumber, Badge, Button, Card, Empty, SearchBox, SkeletonRows, Tabs, EASE } from './ui/kit';
 import { DetailDrawer } from './common/DetailDrawer';
@@ -53,6 +55,22 @@ export type TechnicianApplication = {
   _count?: { gallery: number };
   signedKyc?: Array<{ storageKey: string; viewUrl?: string }>;
   signedGallery?: Array<{ id: string; viewUrl?: string }>;
+  contract?: {
+    contractNumber: string;
+    status: 'DRAFT' | 'SIGNED' | 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
+    signedAt: string | null;
+    consent?: { ip?: string | null; device?: string | null; userAgent?: string | null; templateFileName?: string | null } | null;
+    signatureUrl: string | null;
+    signedDocumentUrl: string | null;
+  } | null;
+};
+
+const CONTRACT_STATUS: Record<string, { label: string; tone: 'green' | 'amber' | 'red' | 'blue' | 'gray' }> = {
+  DRAFT: { label: 'Chưa ký', tone: 'gray' },
+  SIGNED: { label: 'Đã ký', tone: 'blue' },
+  PENDING_REVIEW: { label: 'Đã ký · chờ duyệt', tone: 'amber' },
+  APPROVED: { label: 'Có hiệu lực', tone: 'green' },
+  REJECTED: { label: 'Bị từ chối', tone: 'red' },
 };
 
 const STATUS: Record<ApplicationStatus, { label: string; tone: 'green' | 'amber' | 'red' | 'blue' | 'gray' }> = {
@@ -397,6 +415,7 @@ function ApplicationDrawer({ detail, busy, onClose, onAction }: {
         { label: 'Khu vực hoạt động', ok: Boolean(app.city) },
         { label: 'Hình thức phục vụ', ok: app.supportedModes.length > 0 },
         { label: 'Ảnh dịch vụ', ok: gallery.length > 0 },
+        { label: 'Đã ký hợp đồng', ok: Boolean(app.contract?.signedDocumentUrl) },
       ]
     : [];
   const passed = checks.filter((check) => check.ok).length;
@@ -487,6 +506,40 @@ function ApplicationDrawer({ detail, busy, onClose, onAction }: {
             </div>
             {app.kyc?.status === 'REJECTED' && app.kyc.rejectionReason && (
               <p className="text-xs text-[#B9403A]">KYC bị từ chối: {app.kyc.rejectionReason}</p>
+            )}
+          </Section>
+
+          <Section
+            title="Hợp đồng"
+            icon={<FileSignature className="w-4 h-4" />}
+            aside={app.contract ? <Badge tone={CONTRACT_STATUS[app.contract.status]?.tone ?? 'gray'} dot>{CONTRACT_STATUS[app.contract.status]?.label ?? app.contract.status}</Badge> : undefined}
+          >
+            {app.contract?.signedDocumentUrl ? (
+              <div className="grid grid-cols-[1fr_auto] gap-4 p-4 rounded-2xl border border-surface-border">
+                <dl className="space-y-2 text-xs">
+                  <Info label="Số hợp đồng" value={app.contract.contractNumber} />
+                  <Info label="Thời điểm ký" value={app.contract.signedAt ? fullDate(app.contract.signedAt) : null} />
+                  <Info label="Mẫu hợp đồng" value={app.contract.consent?.templateFileName ?? 'Không có mẫu PDF'} />
+                  <Info label="Thiết bị · IP" value={[app.contract.consent?.device, app.contract.consent?.ip].filter(Boolean).join(' · ') || null} />
+                </dl>
+                <div className="flex flex-col items-end gap-2">
+                  {app.contract.signatureUrl && (
+                    <img src={app.contract.signatureUrl} alt="Chữ ký" className="h-20 w-40 object-contain rounded-lg border border-surface-border bg-white" />
+                  )}
+                  <a
+                    href={app.contract.signedDocumentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover"
+                  >
+                    <Download className="w-4 h-4" /> Tải hợp đồng đã ký (PDF)
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <p className="p-3.5 rounded-xl bg-status-warningBg border border-[#FBE3B8] text-xs text-[#A86A0C]">
+                Ứng viên chưa ký hợp đồng khi gửi hồ sơ (app chưa gửi chữ ký).
+              </p>
             )}
           </Section>
 

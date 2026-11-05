@@ -1,8 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { UpdateTechnicianApplicationDto } from '../dto/technician-application.dto';
 import { TechnicianApplicationStorageService } from './technician-application-storage.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
+import { TechnicianContractService } from './technician-contract.service';
 
 const ADMIN_USER_SELECT = {
   id: true,
@@ -38,6 +39,7 @@ export class TechnicianApplicationsService {
     private readonly prisma: PrismaService,
     private readonly storage: TechnicianApplicationStorageService,
     private readonly notifications: NotificationsService,
+    @Optional() private readonly contracts?: TechnicianContractService,
   ) {}
   async getMine(userId: string) {
     const app = await this.prisma.technicianApplication.findUnique({
@@ -136,7 +138,11 @@ export class TechnicianApplicationsService {
     });
     if (!result.count) throw new NotFoundException('Anh gallery khong ton tai');
   }
-  async submit(userId: string) {
+  /** `signature`: the hand-drawn signature uploaded just before, merged into the contract on submit. */
+  async submit(
+    userId: string,
+    signature?: { signatureKey?: string; ip?: string | null; userAgent?: string | null; device?: string | null },
+  ) {
     const app = await this.prisma.technicianApplication.findUnique({ where: { userId } });
     if (!app) throw new NotFoundException('Chua co ho so dang ky');
     // Say exactly what is missing; a generic "incomplete" left technicians guessing.
@@ -149,6 +155,13 @@ export class TechnicianApplicationsService {
         missingFields: missingFields.map(([field]) => field),
       });
     if (app.status === 'APPROVED') throw new ConflictException('Ho so da duoc duyet');
+    // Sign before submitting: a broken signature must not leave a submitted application without its contract.
+    if (signature?.signatureKey && this.contracts)
+      await this.contracts.signApplication(userId, signature.signatureKey, {
+        ip: signature.ip ?? null,
+        userAgent: signature.userAgent ?? null,
+        device: signature.device ?? null,
+      });
     const result = await this.prisma.technicianApplication.update({
       where: { userId },
       data: { status: 'SUBMITTED', rejectionReason: null, submittedAt: new Date() },
@@ -206,7 +219,8 @@ export class TechnicianApplicationsService {
     const signedGallery = await Promise.all(
       app.gallery.map(async (image) => ({ ...image, ...(await this.storage.createPrivateViewUrl(image.storageKey)) })),
     );
-    return { ...withContact(app), signedKyc, signedGallery };
+    const contract = (await this.contracts?.contractForApplication(app.id).catch(() => null)) ?? null;
+    return { ...withContact(app), signedKyc, signedGallery, contract };
   }
   async reviewKyc(adminId: string, id: string, status: 'VERIFIED' | 'REJECTED', reason?: string) {
     if (status === 'REJECTED' && !reason?.trim()) throw new BadRequestException('Can nhap ly do tu choi KYC');
@@ -298,6 +312,7 @@ export class TechnicianApplicationsService {
         data: { status: 'APPROVED', reviewedBy: adminId, reviewedAt: now, approvedAt: now, rejectionReason: null },
       });
     });
+    await this.contracts?.reviewWithApplication(id, adminId, 'APPROVED');
     const type = 'TECHNICIAN_APPLICATION_APPROVED';
     const title = 'Hồ sơ KTV đã được duyệt';
     const body = 'Bạn đã có thể bắt đầu cấu hình dịch vụ và lịch làm việc.';
@@ -328,6 +343,7 @@ export class TechnicianApplicationsService {
         reviewedAt: now,
       },
     });
+    await this.contracts?.reviewWithApplication(id, adminId, 'REJECTED', reason);
     await this.prisma.technicianKyc.updateMany({
       where: { applicationId: id },
       data: { status: 'REJECTED', rejectionReason: reason.trim(), reviewedBy: adminId, reviewedAt: now },

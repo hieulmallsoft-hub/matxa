@@ -11,8 +11,11 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import { Request } from 'express';
+import { TechnicianContractService } from '../services/technician-contract.service';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -59,6 +62,8 @@ import {
   TechnicianDocumentUploadDto,
   TechnicianGalleryUploadDto,
   UpdateTechnicianApplicationDto,
+  ApplicationSignatureUploadDto,
+  SubmitTechnicianApplicationDto,
 } from '../dto/technician-application.dto';
 
 @ApiTags('Marketplace')
@@ -178,6 +183,7 @@ export class TechnicianController {
   constructor(
     private readonly marketplace: MarketplaceService,
     private readonly applications: TechnicianApplicationsService,
+    private readonly contracts: TechnicianContractService,
   ) {}
   @Get('application')
   @ApiTags('Technician Application')
@@ -250,8 +256,35 @@ export class TechnicianController {
       'Bước cuối: yêu cầu đủ thông tin và đủ 3 ảnh ID_CARD_FRONT, ID_CARD_BACK, FACE. Sau khi gửi, hồ sơ chuyển sang PENDING.',
   })
   @ApiOkResponse({ description: 'Hồ sơ đã chuyển sang PENDING' })
-  submitApplication(@CurrentAuth() auth: AccessTokenPayload) {
-    return this.applications.submit(auth.sub);
+  submitApplication(
+    @CurrentAuth() auth: AccessTokenPayload,
+    @Body() dto: SubmitTechnicianApplicationDto,
+    @Req() request: Request,
+  ) {
+    return this.applications.submit(auth.sub, {
+      signatureKey: dto.signatureKey,
+      device: dto.device ?? null,
+      ip: request.ip ?? request.socket?.remoteAddress ?? null,
+      userAgent: request.headers['user-agent'] ?? null,
+    });
+  }
+  @Get('application/contract-template')
+  @ApiTags('Technician Application')
+  @ApiOperation({
+    summary: 'Mau hop dong (PDF) de hien cho nguoi dang dang ky KTV doc truoc khi ky',
+    description: 'Tra downloadUrl tam thoi 600 giay. 404 neu admin chua tai mau.',
+  })
+  applicationContractTemplate(@CurrentAuth() auth: AccessTokenPayload) {
+    return this.contracts.applicantTemplate(auth.sub);
+  }
+  @Post('application/signature-upload-url')
+  @ApiTags('Technician Application')
+  @ApiOperation({
+    summary: 'URL upload anh chu ky tay khi ky hop dong luc dang ky',
+    description: 'PUT anh PNG/JPEG len uploadUrl, roi gui storageKey trong body cua application/submit (signatureKey).',
+  })
+  applicationSignatureUpload(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: ApplicationSignatureUploadDto) {
+    return this.contracts.applicantSignatureUploadUrl(auth.sub, dto.contentType, dto.size);
   }
   @Patch('profile')
   @ApiTags('Technician Management')

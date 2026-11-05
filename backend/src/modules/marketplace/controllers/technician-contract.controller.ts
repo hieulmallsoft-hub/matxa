@@ -29,6 +29,7 @@ export class TechnicianContractController {
 export class AdminTechnicianContractController {
   constructor(private readonly contracts: TechnicianContractService) {}
   @Get() list() { return this.contracts.listAdmin(); }
+  @Get('template') currentTemplate() { return this.contracts.templateUrl(); }
   @Post('template-upload-url') templateUpload(@Body() body: { fileName: string; contentType: string }) { return this.contracts.templateUploadUrl(body.fileName, body.contentType); }
   @Post('template-upload')
   @UseInterceptors(FileInterceptor('file'))

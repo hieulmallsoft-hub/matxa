@@ -62,3 +62,19 @@ export class ReviewTechnicianKycDto {
   @ApiProperty({ enum: ['VERIFIED', 'REJECTED'] }) @IsIn(['VERIFIED', 'REJECTED']) status!: 'VERIFIED' | 'REJECTED';
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) reason?: string;
 }
+
+export class ApplicationSignatureUploadDto {
+  @ApiProperty({ enum: ['image/png', 'image/jpeg'], example: 'image/png' }) @IsIn(['image/png', 'image/jpeg']) contentType!: string;
+  @ApiProperty({ example: 25000, description: 'Kich thuoc byte, toi da 2MB' }) @Type(() => Number) @IsInt() @Min(1) @Max(2_000_000) size!: number;
+}
+
+export class SubmitTechnicianApplicationDto {
+  @ApiPropertyOptional({
+    description: 'storageKey cua anh chu ky tay (tu application/signature-upload-url). Backend ghep chu ky vao mau hop dong thanh 1 PDF.',
+    example: 'technician-contracts/<userId>/signatures/<file>.png',
+  })
+  @IsOptional() @IsString() @MaxLength(1024) signatureKey?: string;
+
+  @ApiPropertyOptional({ description: 'Ten thiet bi de ghi vao bang chung ky', example: 'iPhone 16 Plus' })
+  @IsOptional() @IsString() @MaxLength(200) device?: string;
+}
