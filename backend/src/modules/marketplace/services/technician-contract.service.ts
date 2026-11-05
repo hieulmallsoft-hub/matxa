@@ -165,18 +165,27 @@ export class TechnicianContractService {
     const contract = await this.prisma.technicianContract.findUnique({ where: { applicationId } });
     if (!contract) return null;
     const { bucket, client } = this.storage();
-    const link = (key: string | null) =>
-      key ? getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: 600 }) : Promise.resolve(null);
     return {
       id: contract.id,
       contractNumber: contract.contractNumber,
       status: contract.status,
       signedAt: contract.signedAt,
       consent: (contract.contractData as Record<string, unknown>)?.consent ?? null,
-      signatureUrl: await link(contract.signatureKey),
-      signedDocumentUrl: await link(contract.signedDocumentKey),
+      signatureUrl: await this.signedLink(client, bucket, contract.signatureKey),
+      signedDocumentUrl: await this.signedLink(client, bucket, contract.signedDocumentKey),
       expiresIn: 600,
     };
+  }
+
+  /** The applicant's own signed contract, so the app shows the merged PDF instead of drawing its own copy. */
+  async applicantContract(userId: string) {
+    const app = await this.prisma.technicianApplication.findUnique({ where: { userId }, select: { id: true } });
+    if (!app) throw new NotFoundException('Chua co ho so dang ky');
+    return this.contractForApplication(app.id);
+  }
+
+  private signedLink(client: S3Client, bucket: string, key: string | null) {
+    return key ? getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: 600 }) : Promise.resolve(null);
   }
 
   /** Approving or rejecting the application decides the contract signed with it. */

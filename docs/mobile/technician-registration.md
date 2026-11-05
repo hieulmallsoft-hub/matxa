@@ -86,6 +86,12 @@ thiết bị/IP và hình chữ ký). Admin xem và tải PDF này khi duyệt h
 | 4. Upload ảnh chữ ký | `PUT {uploadUrl}` | Header `Content-Type` đúng như bước 3 |
 | 5. Gửi hồ sơ kèm chữ ký | `POST /api/technician/application/submit` | Body `{ "signatureKey": "<storageKey bước 3>", "device": "<tên máy>" }` |
 
+| 6. Xem lại hợp đồng đã ký | `GET /api/technician/application/contract` | Trả `contractNumber`, `status`, `signedAt`, **`signedDocumentUrl`** (PDF đã ghép chữ ký, hết hạn 600 giây), `signatureUrl`. `null` nếu chưa ký |
+
+**Màn "hợp đồng đã ký" phải mở `signedDocumentUrl`**, không tự vẽ lại hợp đồng trong app: bản PDF này mới có
+chữ ký tay thật và là bản admin lưu. Không hiển thị kiểu "Đại diện Bên A: <tên đánh máy> / Đã ký điện tử <ngày>"
+vì đó không phải chữ ký.
+
 Lỗi ở bước 5:
 
 | Lỗi | Ý nghĩa |

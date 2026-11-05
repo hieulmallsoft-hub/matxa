@@ -104,3 +104,35 @@ describe('signing the contract while applying', () => {
     });
   });
 });
+
+describe('applicant views their own signed contract', () => {
+  it('returns the signed PDF and signature links of the caller only', async () => {
+    const prisma: any = {
+      technicianApplication: { findUnique: jest.fn().mockResolvedValue({ id: 'application-1' }) },
+      technicianContract: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'contract-1', contractNumber: 'HD-2026-AB12CD34', status: 'PENDING_REVIEW', signedAt: new Date('2026-11-05T02:04:44Z'),
+          contractData: { consent: { device: 'iPhone' } }, signatureKey: 'technician-contracts/user-1/signatures/s.png',
+          signedDocumentKey: 'technician-contracts/user-1/signed/HD-2026-AB12CD34.pdf',
+        }),
+      },
+    };
+    const contracts = new TechnicianContractService(prisma, { get: () => undefined } as any);
+    jest.spyOn(contracts as any, 'storage').mockReturnValue({ bucket: 'bucket', client: { config: {} } });
+    jest.spyOn(contracts as any, 'signedLink').mockImplementation(async (_c: any, _b: any, key: any) => (key ? `https://signed/${key}` : null));
+    await expect(contracts.applicantContract('user-1')).resolves.toMatchObject({
+      contractNumber: 'HD-2026-AB12CD34', status: 'PENDING_REVIEW',
+      signedDocumentUrl: 'https://signed/technician-contracts/user-1/signed/HD-2026-AB12CD34.pdf',
+    });
+    expect(prisma.technicianApplication.findUnique).toHaveBeenCalledWith({ where: { userId: 'user-1' }, select: { id: true } });
+  });
+
+  it('answers null before the applicant has signed', async () => {
+    const prisma: any = {
+      technicianApplication: { findUnique: jest.fn().mockResolvedValue({ id: 'application-1' }) },
+      technicianContract: { findUnique: jest.fn().mockResolvedValue(null) },
+    };
+    const contracts = new TechnicianContractService(prisma, { get: () => undefined } as any);
+    await expect(contracts.applicantContract('user-1')).resolves.toBeNull();
+  });
+});

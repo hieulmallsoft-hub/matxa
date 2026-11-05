@@ -277,6 +277,16 @@ export class TechnicianController {
   applicationContractTemplate(@CurrentAuth() auth: AccessTokenPayload) {
     return this.contracts.applicantTemplate(auth.sub);
   }
+  @Get('application/contract')
+  @ApiTags('Technician Application')
+  @ApiOperation({
+    summary: 'Hop dong da ky cua chinh minh (PDF da ghep chu ky)',
+    description:
+      'Tra contractNumber, status, signedAt, signedDocumentUrl (PDF, het han 600 giay), signatureUrl. null neu chua ky.',
+  })
+  applicationContract(@CurrentAuth() auth: AccessTokenPayload) {
+    return this.contracts.applicantContract(auth.sub);
+  }
   @Post('application/signature-upload-url')
   @ApiTags('Technician Application')
   @ApiOperation({
