@@ -5,6 +5,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../database/prisma.service';
 import { buildSignedContractPdf } from './signed-contract-pdf';
+import type { IdCardInfo } from './id-card-qr';
 
 @Injectable()
 export class TechnicianContractService {
@@ -129,6 +130,7 @@ export class TechnicianContractService {
       contractNumber,
       displayName: app.displayName,
       idCardNumber: app.idCardNumber,
+      idCard: (app.idCardInfo as IdCardInfo | null) ?? null,
       phoneNumber: identity?.phoneNumber ?? null,
       area: [app.district, app.city].filter(Boolean).join(', ') || null,
       signedAt,
@@ -145,7 +147,7 @@ export class TechnicianContractService {
       templateVersion: template?.id ?? 'NO_TEMPLATE',
       status: 'PENDING_REVIEW' as const,
       contractData: {
-        displayName: app.displayName, idCardNumber: app.idCardNumber, phoneNumber: identity?.phoneNumber ?? null,
+        displayName: app.displayName, idCardNumber: app.idCardNumber, idCard: app.idCardInfo ?? null, phoneNumber: identity?.phoneNumber ?? null,
         city: app.city, district: app.district, facility: app.facility, address: app.address,
         consent: { ip: meta.ip, userAgent: meta.userAgent, device: meta.device, templateId: template?.id ?? null, templateFileName: template?.fileName ?? null },
       },

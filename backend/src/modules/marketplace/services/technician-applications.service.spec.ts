@@ -85,3 +85,29 @@ describe('TechnicianApplicationsService.getMine', () => {
     );
   });
 });
+
+describe('TechnicianApplicationsService.updateMine with the ID card QR', () => {
+  const setup = () => {
+    const prisma: any = {
+      technicianApplication: {
+        upsert: jest.fn().mockResolvedValue({ status: 'DRAFT', supportedModes: ['HOME'], gender: null }),
+        update: jest.fn(async ({ data }) => data),
+      },
+    };
+    return { prisma, service: new TechnicianApplicationsService(prisma, {} as any, {} as any) };
+  };
+
+  it('stores what the QR says and takes the ID number from it', async () => {
+    const { prisma, service } = setup();
+    await service.updateMine('user-1', { idCardQr: '001099012345|123456789|Nguyễn Văn An|01011999|Nam|Cầu Giấy, Hà Nội|15082021' });
+    const { data } = prisma.technicianApplication.update.mock.calls[0][0];
+    expect(data).toMatchObject({ idCardNumber: '001099012345', gender: 'MALE', idCardInfo: { fullName: 'Nguyễn Văn An', issueDate: '2021-08-15' } });
+    expect(data).not.toHaveProperty('idCardQr');
+  });
+
+  it('says the scan is wrong instead of saving a bad QR', async () => {
+    const { prisma, service } = setup();
+    await expect(service.updateMine('user-1', { idCardQr: 'https://example.com' })).rejects.toThrow('Ma QR CCCD khong hop le');
+    expect(prisma.technicianApplication.update).not.toHaveBeenCalled();
+  });
+});

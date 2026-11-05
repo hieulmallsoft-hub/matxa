@@ -55,6 +55,34 @@ Thiếu bất kỳ trường nào, `POST /api/technician/application/submit` tr�
 Hiện popup theo `missingFields` (ví dụ "Hồ sơ còn thiếu: ảnh CCCD mặt sau, ảnh khuôn mặt") và đưa người dùng về đúng
 bước còn thiếu, thay vì câu chung "Hồ sơ chưa đủ thông tin".
 
+## Quét mã QR trên CCCD
+
+Ở bước "Chụp hình căn cước (mặt trước)", app **quét mã QR in trên thẻ** (thẻ CCCD gắn chip và thẻ căn cước mới đều
+có) bằng thư viện quét QR trên máy, không cần mạng hay dịch vụ ngoài. Gửi **nguyên chuỗi** đọc được, không tự tách:
+
+```http
+PATCH /api/technician/application
+{ "idCardQr": "001099012345|123456789|Nguyễn Văn An|01011999|Nam|Số 1 Trần Duy Hưng, Cầu Giấy, Hà Nội|15082021" }
+```
+
+Có thể gửi chung với các trường khác (ví dụ `idCardFrontKey`). Backend tự tách và lưu vào `idCardInfo`, đồng thời
+**ghi đè `idCardNumber`** theo thẻ; `gender` chỉ được điền nếu chưa có. `GET /api/technician/application` trả về:
+
+```json
+"idCardNumber": "001099012345",
+"idCardInfo": {
+  "source": "QR", "idNumber": "001099012345", "oldIdNumber": "123456789",
+  "fullName": "Nguyễn Văn An", "dateOfBirth": "1999-01-01", "gender": "MALE",
+  "permanentAddress": "Số 1 Trần Duy Hưng, Cầu Giấy, Hà Nội",
+  "issueDate": "2021-08-15", "issuePlace": "Cục Cảnh sát quản lý hành chính về trật tự xã hội"
+}
+```
+
+- Sau khi quét, cho KTV **xem lại** họ tên, ngày sinh, số CCCD, địa chỉ (lấy từ `idCardInfo` trong response PATCH) trước khi bấm Tiếp tục.
+- `400 "Ma QR CCCD khong hop le, vui long quet lai"` → chuỗi quét được không phải QR của CCCD; hiện "Không đọc được mã QR, vui lòng quét lại".
+- Không quét được (thẻ cũ không có QR) thì vẫn cho đi tiếp; quét QR **không bắt buộc** để gửi hồ sơ.
+- Các thông tin này được **tự điền vào hợp đồng** khi KTV ký (phần Bên A) và hiện cho Admin khi duyệt.
+
 ## KYC
 
 Upload đủ `ID_CARD_FRONT`, `ID_CARD_BACK`, `FACE`. Key phải nằm dưới prefix do backend cấp, không tự tạo URL public. KYC được lưu private trên S3. Nếu bị `REJECTED`, Mobile hiển thị lý do và cho phép sửa/gửi lại.

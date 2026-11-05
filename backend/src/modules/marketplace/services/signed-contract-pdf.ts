@@ -1,12 +1,14 @@
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import * as fontkitModule from '@pdf-lib/fontkit';
-import { PDFDocument, PDFFont, PDFPage, rgb } from 'pdf-lib';
+import { PDFDocument, PDFFont, PDFPage, PDFTextField, rgb } from 'pdf-lib';
 
 export type SignedContractInfo = {
   contractNumber: string;
   displayName: string | null;
   idCardNumber: string | null;
+  /** From the ID card QR; null when the applicant typed the number or skipped it. */
+  idCard: { fullName: string; dateOfBirth: string; permanentAddress: string; issueDate: string; issuePlace: string } | null;
   phoneNumber: string | null;
   area: string | null;
   signedAt: Date;
@@ -44,6 +46,7 @@ export async function buildSignedContractPdf(
   const isJpeg = bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
   if (!isPng && !isJpeg) throw new Error('Chu ky phai la anh PNG hoac JPEG');
   const image = isPng ? await pdf.embedPng(bytes) : await pdf.embedJpg(bytes);
+  fillTemplateFields(pdf, regular, info);
 
   const page = pdf.addPage(A4);
   let y = A4[1] - MARGIN;
@@ -57,8 +60,11 @@ export async function buildSignedContractPdf(
 
   const signedAt = info.signedAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });
   const rows: Array<[string, string | null]> = [
-    ['Bên A (Kỹ thuật viên)', info.displayName],
+    ['Bên A (Kỹ thuật viên)', info.idCard?.fullName ?? info.displayName],
+    ['Ngày sinh', info.idCard ? vnDate(info.idCard.dateOfBirth) : null],
     ['Số CCCD', info.idCardNumber],
+    ['Ngày cấp · Nơi cấp', info.idCard ? `${vnDate(info.idCard.issueDate)} · ${info.idCard.issuePlace}` : null],
+    ['Địa chỉ thường trú', info.idCard?.permanentAddress ?? null],
     ['Số điện thoại', info.phoneNumber],
     ['Khu vực', info.area],
     ['Thời điểm ký', `${signedAt} (giờ Việt Nam)`],
@@ -69,7 +75,7 @@ export async function buildSignedContractPdf(
   for (const [label, value] of rows) {
     page.drawText(`${label}:`, { x: MARGIN, y, size: 10.5, font: bold, color: MUTED });
     y = drawWrapped(page, value?.trim() || '—', MARGIN + 150, y, A4[0] - MARGIN * 2 - 150, regular, 10.5);
-    y -= 10;
+    y -= 19;
   }
 
   y -= 12;
@@ -91,11 +97,64 @@ export async function buildSignedContractPdf(
   const size = { width: image.width * scale, height: image.height * scale };
   y -= 14 + box.height;
   page.drawImage(image, { x: MARGIN, y: y + (box.height - size.height), ...size });
-  page.drawText(info.displayName ?? '', { x: MARGIN, y: y - 16, size: 10.5, font: regular, color: INK });
+  page.drawText(info.idCard?.fullName ?? info.displayName ?? '', { x: MARGIN, y: y - 16, size: 10.5, font: regular, color: INK });
 
   pdf.setTitle(`Hợp đồng ${info.contractNumber}`);
   pdf.setProducer('Psyocore');
   return pdf.save();
+}
+
+/** YYYY-MM-DD -> dd/MM/yyyy */
+const vnDate = (iso: string) => iso.split('-').reverse().join('/');
+
+/**
+ * Fields the admin may place on the template (Acrobat > Prepare Form), filled from the application.
+ * Unknown fields are left empty; the form is flattened so nothing can be edited after signing.
+ */
+export const TEMPLATE_FIELDS = {
+  so_hop_dong: 'Số hợp đồng',
+  ngay: 'Ngày ký (dd)',
+  thang: 'Tháng ký (MM)',
+  nam: 'Năm ký (yyyy)',
+  ben_a_ho_ten: 'Họ tên Bên A',
+  ben_a_ngay_sinh: 'Ngày sinh',
+  ben_a_cccd: 'Số CCCD',
+  ben_a_ngay_cap: 'Ngày cấp',
+  ben_a_noi_cap: 'Nơi cấp',
+  ben_a_dia_chi: 'Địa chỉ thường trú',
+  ben_a_sdt: 'Số điện thoại',
+} as const;
+
+function fillTemplateFields(pdf: PDFDocument, font: PDFFont, info: SignedContractInfo) {
+  const form = pdf.getForm();
+  if (!form.getFields().length) return;
+  const [nam, thang, ngay] = info.signedAt.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).split('-');
+  const values: Record<keyof typeof TEMPLATE_FIELDS, string | null> = {
+    so_hop_dong: info.contractNumber,
+    ngay,
+    thang,
+    nam,
+    ben_a_ho_ten: info.idCard?.fullName ?? info.displayName,
+    ben_a_ngay_sinh: info.idCard ? vnDate(info.idCard.dateOfBirth) : null,
+    ben_a_cccd: info.idCardNumber,
+    ben_a_ngay_cap: info.idCard ? vnDate(info.idCard.issueDate) : null,
+    ben_a_noi_cap: info.idCard?.issuePlace ?? null,
+    ben_a_dia_chi: info.idCard?.permanentAddress ?? null,
+    ben_a_sdt: info.phoneNumber?.replace(/^\+84/, '0') ?? null,
+  };
+  for (const field of form.getFields()) {
+    const value = values[field.getName() as keyof typeof TEMPLATE_FIELDS];
+    if (!(field instanceof PDFTextField)) continue;
+    const text = value ?? '';
+    field.setMaxLength(undefined);
+    field.setText(text);
+    // Shrink long values (an address) to fit the box instead of cutting them off.
+    const width = Math.min(...field.acroField.getWidgets().map((widget) => widget.getRectangle().width)) - 4;
+    if (text && width > 0) field.setFontSize(Math.max(6, Math.min(11, width / font.widthOfTextAtSize(text, 1))));
+  }
+  // Draw with DejaVu (the default Helvetica cannot render Vietnamese), then make the text part of the page.
+  form.updateFieldAppearances(font);
+  form.flatten({ updateFieldAppearances: false });
 }
 
 /** Draws text wrapped to `width`; returns the y below the last line. */

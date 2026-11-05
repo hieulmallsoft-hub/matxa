@@ -25,6 +25,22 @@ interface CurrentTemplate {
   expiresIn?: number;
 }
 
+
+/** Form field names the backend fills when the technician signs (see backend signed-contract-pdf.ts). */
+const TEMPLATE_FIELDS: Array<[string, string]> = [
+  ['so_hop_dong', 'Số hợp đồng'],
+  ['ngay', 'Ngày ký (dd)'],
+  ['thang', 'Tháng ký (MM)'],
+  ['nam', 'Năm ký (yyyy)'],
+  ['ben_a_ho_ten', 'Họ tên Bên A (theo CCCD)'],
+  ['ben_a_ngay_sinh', 'Ngày sinh'],
+  ['ben_a_cccd', 'Số CCCD'],
+  ['ben_a_ngay_cap', 'Ngày cấp'],
+  ['ben_a_noi_cap', 'Nơi cấp'],
+  ['ben_a_dia_chi', 'Địa chỉ thường trú'],
+  ['ben_a_sdt', 'Số điện thoại'],
+];
+
 export function ContractTemplatesPage() {
   const { addToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -248,6 +264,24 @@ export function ContractTemplatesPage() {
                 )}
               </button>
             </form>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-[#E5EBE5] p-6 space-y-3">
+            <h3 className="font-bold text-sm text-[#1C2B20]">Tự điền thông tin Bên A vào hợp đồng</h3>
+            <p className="text-xs text-[#66756B] leading-relaxed">
+              Mở file PDF bằng Adobe Acrobat → <b>Chuẩn bị biểu mẫu (Prepare Form)</b>, đặt ô văn bản lên các chỗ trống và đặt
+              <b> tên ô</b> đúng như bảng dưới. Khi KTV ký, hệ thống tự điền từ mã QR trên CCCD rồi khóa lại. Ô có tên khác sẽ để trống.
+            </p>
+            <table className="w-full text-xs">
+              <tbody>
+                {TEMPLATE_FIELDS.map(([name, label]) => (
+                  <tr key={name} className="border-t border-[#E5EBE5]">
+                    <td className="py-1.5 pr-3 font-mono text-[#2E7D4A]">{name}</td>
+                    <td className="py-1.5 text-[#1C2B20]">{label}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 

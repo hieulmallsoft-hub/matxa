@@ -4,6 +4,7 @@ import { UpdateTechnicianApplicationDto } from '../dto/technician-application.dt
 import { TechnicianApplicationStorageService } from './technician-application-storage.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { TechnicianContractService } from './technician-contract.service';
+import { parseIdCardQr } from './id-card-qr';
 
 const ADMIN_USER_SELECT = {
   id: true,
@@ -76,6 +77,9 @@ export class TechnicianApplicationsService {
   async updateMine(userId: string, dto: UpdateTechnicianApplicationDto) {
     if (dto.displayName !== undefined && !dto.displayName.trim())
       throw new BadRequestException('Ho ten khong duoc de trong');
+    const { idCardQr, ...fields } = dto;
+    const idCard = idCardQr === undefined ? undefined : parseIdCardQr(idCardQr);
+    if (idCard === null) throw new BadRequestException('Ma QR CCCD khong hop le, vui long quet lai');
     const current = await this.prisma.technicianApplication.upsert({
       where: { userId },
       create: { userId },
@@ -103,7 +107,13 @@ export class TechnicianApplicationsService {
     return this.prisma.technicianApplication.update({
       where: { userId },
       data: {
-        ...dto,
+        ...fields,
+        // The card is the source of truth for the number; gender only fills in when the app did not send one.
+        ...(idCard && {
+          idCardInfo: idCard,
+          idCardNumber: idCard.idNumber,
+          gender: dto.gender ?? current.gender ?? idCard.gender ?? undefined,
+        }),
         displayName: dto.displayName?.trim(),
         city: dto.city?.trim(),
         district: dto.district?.trim(),

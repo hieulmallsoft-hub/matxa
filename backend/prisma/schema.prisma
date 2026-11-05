@@ -286,6 +286,8 @@ model TechnicianApplication {
   idCardFrontKey String?  @map("id_card_front_key")
   idCardBackKey  String?  @map("id_card_back_key")
   idCardNumber   String?  @map("id_card_number")
+  /// Read from the QR on the ID card: name, birth date, permanent address, issue date and place.
+  idCardInfo     Json?    @map("id_card_info")
   faceImageKey   String?  @map("face_image_key")
   rejectionReason String? @map("rejection_reason")
   submittedAt      DateTime? @map("submitted_at")

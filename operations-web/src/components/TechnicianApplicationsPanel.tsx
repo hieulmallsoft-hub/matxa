@@ -45,6 +45,9 @@ export type TechnicianApplication = {
   idCardFrontKey?: string | null;
   idCardBackKey?: string | null;
   faceImageKey?: string | null;
+  idCardNumber?: string | null;
+  /** Read from the QR on the ID card by the app; dates are YYYY-MM-DD. */
+  idCardInfo?: { fullName: string; dateOfBirth: string; permanentAddress: string; issueDate: string; issuePlace: string } | null;
   submittedAt?: string | null;
   underReviewAt?: string | null;
   approvedAt?: string | null;
@@ -388,6 +391,9 @@ const Section = ({ title, icon, children, aside }: { title: string; icon: ReactN
   </section>
 );
 
+/** YYYY-MM-DD -> dd/MM/yyyy */
+const vnDate = (iso: string) => iso.split('-').reverse().join('/');
+
 const Info = ({ label, value }: { label: string; value?: ReactNode }) => (
   <div className="min-w-0">
     <dt className="text-[11px] text-content-tertiary">{label}</dt>
@@ -504,6 +510,20 @@ function ApplicationDrawer({ detail, busy, onClose, onAction }: {
               <Photo url={back} label="CCCD mặt sau" />
               <Photo url={face} label="Khuôn mặt" tall />
             </div>
+            {app.idCardInfo ? (
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 p-4 rounded-2xl bg-surface-subtle border border-surface-border">
+                <Info label="Họ tên trên CCCD" value={app.idCardInfo.fullName} />
+                <Info label="Số CCCD" value={app.idCardNumber} />
+                <Info label="Ngày sinh" value={vnDate(app.idCardInfo.dateOfBirth)} />
+                <Info label="Ngày cấp · Nơi cấp" value={`${vnDate(app.idCardInfo.issueDate)} · ${app.idCardInfo.issuePlace}`} />
+                <div className="col-span-2"><Info label="Địa chỉ thường trú" value={app.idCardInfo.permanentAddress} /></div>
+                <p className="col-span-2 text-[11px] text-content-tertiary">Đọc từ mã QR trên CCCD. Đối chiếu với ảnh trước khi duyệt.</p>
+              </dl>
+            ) : (
+              <p className="text-xs text-content-secondary">
+                {app.idCardNumber ? `Số CCCD ứng viên nhập: ${app.idCardNumber}. ` : ''}Chưa quét mã QR trên CCCD.
+              </p>
+            )}
             {app.kyc?.status === 'REJECTED' && app.kyc.rejectionReason && (
               <p className="text-xs text-[#B9403A]">KYC bị từ chối: {app.kyc.rejectionReason}</p>
             )}

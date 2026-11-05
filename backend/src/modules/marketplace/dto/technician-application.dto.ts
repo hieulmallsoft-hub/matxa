@@ -20,6 +20,11 @@ export class UpdateTechnicianApplicationDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1024) idCardFrontKey?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1024) idCardBackKey?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(32) idCardNumber?: string;
+  @ApiPropertyOptional({
+    description: 'Nguyen chuoi doc tu ma QR tren CCCD. Backend tach ho ten, ngay sinh, dia chi, ngay cap... va dien vao hop dong.',
+    example: '001099012345|123456789|Nguyễn Văn An|01011999|Nam|Số 1 Trần Duy Hưng, Trung Hòa, Cầu Giấy, Hà Nội|15082021',
+  })
+  @IsOptional() @IsString() @MaxLength(1000) idCardQr?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1024) faceImageKey?: string;
 }
 
