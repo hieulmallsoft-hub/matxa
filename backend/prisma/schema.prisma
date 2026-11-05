@@ -94,6 +94,8 @@ enum ComplaintReasonCode {
   TECHNICIAN_BEHAVIOR
   SAFETY_ISSUE
   PAYMENT_ISSUE
+  CUSTOMER_NO_SHOW
+  CUSTOMER_BEHAVIOR
   OTHER
 }
 
@@ -658,7 +660,8 @@ model Booking {
   applications    BookingTechnicianApplication[]
   conversation    Conversation?
   cancellation    BookingCancellation?
-  complaint       Complaint?
+  /// At most one from the customer and one from the technician.
+  complaints      Complaint[]
 
   @@index([customerId, createdAt(sort: Desc)])
   @@index([technicianId, scheduledStart])
@@ -858,8 +861,10 @@ model Review {
 
 model Complaint {
   id              String              @id @default(uuid()) @db.Uuid
-  bookingId       String              @unique @map("booking_id") @db.Uuid
+  bookingId       String              @map("booking_id") @db.Uuid
+  /// Whoever filed it: the booking's customer or, with reporterRole TECHNICIAN, its technician.
   customerId      String              @map("customer_id") @db.Uuid
+  reporterRole    UserRole            @default(CUSTOMER) @map("reporter_role")
   reasonCode      ComplaintReasonCode @map("reason_code")
   detail          String
   contactEmail    String              @map("contact_email")
@@ -871,6 +876,7 @@ model Complaint {
   evidence        ComplaintEvidence[]
   conversation    Conversation?
 
+  @@unique([bookingId, reporterRole])
   @@index([customerId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
   @@map("complaints")

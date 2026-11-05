@@ -15,6 +15,8 @@ type Context = {
   createdAt: string;
   evidenceCount: number;
   conversationId: string;
+  reporterRole?: 'CUSTOMER' | 'TECHNICIAN';
+  /** The person who filed the complaint (customer or technician). */
   customer?: { id: string; displayName?: string | null } | null;
   booking: {
     code: string;
@@ -114,7 +116,11 @@ export function ComplaintChatDrawer({ complaintId, onClose }: { complaintId: str
       onClose={onClose}
       width="xl"
       title={context ? `Khiếu nại đơn #${context.booking.code}` : 'Chat khiếu nại'}
-      subtitle={context ? `${context.customer?.displayName || 'Khách hàng'} · ${context.contactEmail}` : undefined}
+      subtitle={
+        context
+          ? `${context.reporterRole === 'TECHNICIAN' ? 'KTV' : 'Khách'} ${context.customer?.displayName || ''} · ${context.contactEmail}`
+          : undefined
+      }
       badge={context && <Badge tone={STATUS_TONE[context.status] ?? 'gray'} dot>{context.statusLabel}</Badge>}
       footer={
         <form onSubmit={send} className="flex w-full gap-2">

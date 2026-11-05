@@ -206,9 +206,9 @@ export class CreateReviewDto {
 }
 
 export class CreateComplaintDto {
-  @ApiProperty({ enum: ['SERVICE_ISSUE', 'TECHNICIAN_NO_CONTACT', 'TECHNICIAN_BEHAVIOR', 'SAFETY_ISSUE', 'PAYMENT_ISSUE', 'OTHER'] })
-  @IsIn(['SERVICE_ISSUE', 'TECHNICIAN_NO_CONTACT', 'TECHNICIAN_BEHAVIOR', 'SAFETY_ISSUE', 'PAYMENT_ISSUE', 'OTHER'])
-  reasonCode!: 'SERVICE_ISSUE' | 'TECHNICIAN_NO_CONTACT' | 'TECHNICIAN_BEHAVIOR' | 'SAFETY_ISSUE' | 'PAYMENT_ISSUE' | 'OTHER';
+  @ApiProperty({ enum: ['SERVICE_ISSUE', 'TECHNICIAN_NO_CONTACT', 'TECHNICIAN_BEHAVIOR', 'SAFETY_ISSUE', 'PAYMENT_ISSUE', 'CUSTOMER_NO_SHOW', 'CUSTOMER_BEHAVIOR', 'OTHER'] })
+  @IsIn(['SERVICE_ISSUE', 'TECHNICIAN_NO_CONTACT', 'TECHNICIAN_BEHAVIOR', 'SAFETY_ISSUE', 'PAYMENT_ISSUE', 'CUSTOMER_NO_SHOW', 'CUSTOMER_BEHAVIOR', 'OTHER'])
+  reasonCode!: 'SERVICE_ISSUE' | 'TECHNICIAN_NO_CONTACT' | 'TECHNICIAN_BEHAVIOR' | 'SAFETY_ISSUE' | 'PAYMENT_ISSUE' | 'CUSTOMER_NO_SHOW' | 'CUSTOMER_BEHAVIOR' | 'OTHER';
   @ApiProperty({ maxLength: 4000 }) @IsString() @MaxLength(4000) detail!: string;
   @ApiProperty() @IsEmail() @MaxLength(320) contactEmail!: string;
   @ApiPropertyOptional({ type: [String], maxItems: 5 }) @IsOptional() @IsArray() @ArrayMaxSize(5) @IsString({ each: true }) @MaxLength(1024, { each: true }) evidenceStorageKeys?: string[];

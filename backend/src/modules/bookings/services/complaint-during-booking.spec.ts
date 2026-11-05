@@ -7,7 +7,7 @@ describe('complaints while the booking is in progress', () => {
   const subject = (status: string) => {
     const prisma: any = {
       booking: {
-        findFirst: jest.fn().mockResolvedValue({ id: 'booking-1', status, complaint: null }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'booking-1', status, customerId: 'customer-1', complaints: [] }),
         findUnique: jest.fn().mockResolvedValue({ customerId: 'customer-1', status }),
       },
       complaint: { create: jest.fn(async ({ data }: any) => ({ id: 'complaint-1', ...data })) },

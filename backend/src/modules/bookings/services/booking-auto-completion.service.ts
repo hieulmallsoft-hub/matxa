@@ -39,7 +39,7 @@ export class BookingAutoCompletionService implements OnModuleInit, OnModuleDestr
     const take = Number(this.config.get('BOOKING_AUTO_COMPLETE_BATCH_SIZE', 100));
     const due = await this.prisma.booking.findMany({
       // A booking under complaint waits for the admin instead of closing itself.
-      where: { status: 'CONFIRMED', scheduledEnd: { lte: cutoff }, complaint: { is: null } },
+      where: { status: 'CONFIRMED', scheduledEnd: { lte: cutoff }, complaints: { none: {} } },
       select: { id: true, customerId: true, technician: { select: { userId: true } } },
       orderBy: { scheduledEnd: 'asc' },
       take,

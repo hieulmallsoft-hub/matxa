@@ -18,7 +18,7 @@ describe('BookingAutoCompletionService', () => {
     await expect(service.run(now)).resolves.toEqual({ scanned: 1, completed: 1 });
     expect(prisma.booking.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { status: 'CONFIRMED', scheduledEnd: { lte: new Date('2026-10-09T12:00:00.000Z') }, complaint: { is: null } },
+        where: { status: 'CONFIRMED', scheduledEnd: { lte: new Date('2026-10-09T12:00:00.000Z') }, complaints: { none: {} } },
       }),
     );
     expect(prisma.booking.updateMany).toHaveBeenCalledWith({

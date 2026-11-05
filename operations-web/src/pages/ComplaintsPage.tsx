@@ -31,6 +31,8 @@ type Complaint = {
   contactEmail: string;
   status: Status;
   createdAt: string;
+  /** Who filed it; `customer` is that person, whichever side they are on. */
+  reporterRole?: 'CUSTOMER' | 'TECHNICIAN';
   customer?: { displayName?: string | null; avatarUrl?: string | null } | null;
   booking?: {
     status: string;
@@ -48,6 +50,8 @@ const REASONS: Record<string, string> = {
   TECHNICIAN_BEHAVIOR: 'Thái độ KTV',
   SAFETY_ISSUE: 'An toàn',
   PAYMENT_ISSUE: 'Thanh toán',
+  CUSTOMER_NO_SHOW: 'Khách không có mặt',
+  CUSTOMER_BEHAVIOR: 'Thái độ khách',
   OTHER: 'Khác',
 };
 
@@ -232,7 +236,8 @@ export function ComplaintsPage() {
               {visible.map((complaint, index) => {
                 const state = STATUS[complaint.status];
                 const booking = complaint.booking ? BOOKING_STATUS[complaint.booking.status] : undefined;
-                const name = complaint.customer?.displayName || 'Khách hàng';
+                const byTechnician = complaint.reporterRole === 'TECHNICIAN';
+                const name = complaint.customer?.displayName || (byTechnician ? 'Kỹ thuật viên' : 'Khách hàng');
                 return (
                   <motion.li
                     key={complaint.id}
@@ -256,6 +261,7 @@ export function ComplaintsPage() {
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="font-semibold text-content-primary">{name}</span>
+                              <Badge tone={byTechnician ? 'amber' : 'gray'}>{byTechnician ? 'KTV khiếu nại' : 'Khách khiếu nại'}</Badge>
                               <span className="font-mono text-[11px] px-1.5 py-0.5 rounded-md bg-surface-subtle border border-surface-border text-content-secondary">
                                 #{complaint.bookingId.slice(0, 8)}
                               </span>

@@ -51,7 +51,7 @@ describe('admin notifications', () => {
     const prisma: any = {
       userIdentity: { findFirst: jest.fn().mockResolvedValue({ id: 'phone-1' }) },
       $transaction: jest.fn((callback: any) => callback(tx)),
-      booking: { findFirst: jest.fn().mockResolvedValue({ id: 'booking-1', status: 'COMPLETED', complaint: null }) },
+      booking: { findFirst: jest.fn().mockResolvedValue({ id: 'booking-1', status: 'COMPLETED', customerId: 'customer-1', complaints: [] }) },
       complaint: { create: jest.fn().mockResolvedValue({ id: 'complaint-1' }) },
       conversation: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 'conversation-1' }) },
     };

@@ -197,7 +197,10 @@ export class BookingsController {
   }
 
   @Post(':id/complaint')
-  @ApiOperation({ summary: 'Khach hang gui khieu nai ve lich dat' })
+  @ApiOperation({
+    summary: 'Khach hang hoac KTV cua don gui khieu nai',
+    description: 'Moi ben (khach, KTV) khieu nai duoc 1 lan cho moi don. KTV dung reasonCode CUSTOMER_NO_SHOW, CUSTOMER_BEHAVIOR, PAYMENT_ISSUE, SAFETY_ISSUE, OTHER.',
+  })
   @ApiCreatedResponse({ schema: { type: 'object', properties: { id: { type: 'string' }, bookingId: { type: 'string' }, reasonCode: { type: 'string' }, status: { type: 'string' } } } })
   complaint(
     @CurrentAuth() auth: AccessTokenPayload,
@@ -209,8 +212,8 @@ export class BookingsController {
 
   @Get(':id/complaint')
   @ApiOperation({
-    summary: 'Khach xem khieu nai cua don + thong tin don va KTV cho dau khung chat ho tro',
-    description: 'conversationId la chat ho tro rieng cua khieu nai (khach <-> CSKH). 404 neu don chua co khieu nai.',
+    summary: 'Xem khieu nai cua chinh minh (khach hoac KTV) + thong tin don cho dau khung chat ho tro',
+    description: 'conversationId la chat rieng giua nguoi khieu nai va CSKH. 404 neu minh chua khieu nai don nay.',
   })
   customerComplaint(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.bookings.customerComplaint(auth.sub, id);

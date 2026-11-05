@@ -41,6 +41,8 @@ const COMPLAINT_REASON_LABEL: Record<string, string> = {
   TECHNICIAN_BEHAVIOR: 'Thái độ của KTV',
   SAFETY_ISSUE: 'Vấn đề an toàn',
   PAYMENT_ISSUE: 'Thanh toán',
+  CUSTOMER_NO_SHOW: 'Khách không có mặt, không liên lạc được',
+  CUSTOMER_BEHAVIOR: 'Thái độ của khách',
   OTHER: 'Lý do khác',
 };
 /** What the complaint chat header needs: the booking, its items and the booked technician. */
@@ -53,6 +55,7 @@ const COMPLAINT_CONTEXT_INCLUDE = {
       payment: { select: { method: true } },
       items: { select: { serviceName: true, durationMinutes: true, unitPrice: true } },
       technician: { select: { averageRating: true, reviewCount: true, user: { select: { displayName: true, avatarUrl: true } } } },
+      customer: { select: { displayName: true, avatarUrl: true } },
     },
   },
 } as const;
@@ -976,7 +979,7 @@ export class BookingsService {
           orderBy: { createdAt: 'asc' },
         },
         review: true,
-        complaint: { select: { id: true, status: true, reasonCode: true, createdAt: true, conversation: { select: { id: true } } } },
+        complaints: { select: { id: true, status: true, reasonCode: true, createdAt: true, customerId: true, reporterRole: true, conversation: { select: { id: true } } } },
       },
       orderBy: { scheduledStart: 'desc' },
     });
@@ -999,7 +1002,7 @@ export class BookingsService {
         address: true,
         promotion: true,
         review: true,
-        complaint: { select: { id: true, status: true, reasonCode: true, createdAt: true, conversation: { select: { id: true } } } },
+        complaints: { select: { id: true, status: true, reasonCode: true, createdAt: true, customerId: true, reporterRole: true, conversation: { select: { id: true } } } },
         customer: {
           select: { id: true, displayName: true, avatarUrl: true, gender: true, nationality: true, role: true },
         },
@@ -1093,6 +1096,7 @@ export class BookingsService {
           technician: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } },
           review: true,
           applications: { where: { technicianProfileId: profile.id } },
+          complaints: { select: { id: true, status: true, reasonCode: true, createdAt: true, customerId: true, reporterRole: true, conversation: { select: { id: true } } } },
         },
         orderBy: [{ status: 'asc' }, { scheduledStart: 'asc' }],
       }),
@@ -1549,15 +1553,18 @@ export class BookingsService {
     }
   }
 
+  /** The customer or the technician of a booking files a complaint about it; each side once per booking. */
   async createComplaint(userId: string, id: string, dto: CreateComplaintDto) {
     const booking = await this.prisma.booking.findFirst({
-      where: { id, customerId: userId },
-      select: { id: true, status: true, complaint: { select: { id: true } } },
+      where: { id, OR: [{ customerId: userId }, { technician: { userId } }] },
+      select: { id: true, status: true, customerId: true, complaints: { select: { reporterRole: true } } },
     });
     if (!booking) throw new NotFoundException('Lich dat khong ton tai');
+    const reporterRole = booking.customerId === userId ? 'CUSTOMER' : 'TECHNICIAN';
     if (!COMPLAINABLE_STATUSES.includes(booking.status))
       throw new BadRequestException('Chi co the khieu nai don da co KTV nhan, da hoan thanh hoac da huy');
-    if (booking.complaint) throw new ConflictException('Lich dat da duoc tao khieu nai');
+    if (booking.complaints.some((complaint) => complaint.reporterRole === reporterRole))
+      throw new ConflictException('Lich dat da duoc tao khieu nai');
     if (!dto.detail.trim()) throw new BadRequestException('Vui long nhap chi tiet khieu nai');
     const evidence = dto.evidenceStorageKeys ?? [];
     if (evidence.length && this.complaintStorage) await this.complaintStorage.validateKeys(id, userId, evidence);
@@ -1566,6 +1573,7 @@ export class BookingsService {
         data: {
           bookingId: id,
           customerId: userId,
+          reporterRole,
           reasonCode: dto.reasonCode,
           detail: dto.detail.trim(),
           contactEmail: dto.contactEmail.trim().toLowerCase(),
@@ -1577,7 +1585,7 @@ export class BookingsService {
       });
       void this.notifications.notifyAdmins?.(
         'ADMIN_COMPLAINT_CREATED',
-        'Khiếu nại mới',
+        reporterRole === 'TECHNICIAN' ? 'KTV gửi khiếu nại' : 'Khiếu nại mới',
         `Đơn ${id.slice(0, 8)}: ${dto.detail.trim().slice(0, 120)}`,
         'admin://complaints',
       );
@@ -1591,8 +1599,12 @@ export class BookingsService {
   }
 
   async assertComplaintUploadAllowed(userId: string, id: string) {
-    const booking = await this.prisma.booking.findUnique({ where: { id }, select: { customerId: true, status: true } });
-    if (!booking || booking.customerId !== userId) throw new ForbiddenException('Ban khong co quyen tao minh chung cho lich dat nay');
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      select: { customerId: true, status: true, technician: { select: { userId: true } } },
+    });
+    if (!booking || (booking.customerId !== userId && booking.technician?.userId !== userId))
+      throw new ForbiddenException('Ban khong co quyen tao minh chung cho lich dat nay');
     if (!COMPLAINABLE_STATUSES.includes(booking.status))
       throw new BadRequestException('Chi co the gui minh chung cho don da co KTV nhan, da hoan thanh hoac da huy');
   }
@@ -1605,6 +1617,7 @@ export class BookingsService {
           select: {
             id: true, status: true, totalAmount: true, scheduledStart: true,
             technician: { select: { user: { select: { displayName: true, avatarUrl: true } } } },
+            customer: { select: { displayName: true, avatarUrl: true } },
           },
         },
         customer: { select: { id: true, displayName: true, avatarUrl: true } },
@@ -1637,6 +1650,7 @@ export class BookingsService {
     const technician = booking.technician;
     return {
       id: complaint.id,
+      reporterRole: complaint.reporterRole ?? 'CUSTOMER',
       status: complaint.status,
       statusLabel: COMPLAINT_STATUS_LABEL[complaint.status] ?? complaint.status,
       reasonCode: complaint.reasonCode,
@@ -1670,6 +1684,8 @@ export class BookingsService {
             reviewCount: technician.reviewCount ?? 0,
           }
         : null,
+      // The other side for a technician's complaint.
+      customer: booking.customer ? { displayName: booking.customer.displayName, avatarUrl: booking.customer.avatarUrl } : null,
     };
   }
 
@@ -1907,6 +1923,15 @@ export class BookingsService {
       canCancel: selected && booking.status === 'CONFIRMED',
       canComplete: selected && booking.status === 'CONFIRMED' && new Date(booking.scheduledEnd) <= new Date(),
       customerSelectedAnotherTechnician: takenByAnother,
+      ...(viewerTechnicianId && selected
+        ? (() => {
+            const ownComplaint = (booking.complaints ?? []).find((complaint: any) => complaint.reporterRole === 'TECHNICIAN') ?? null;
+            return {
+              ...this.complaintFields(ownComplaint),
+              canComplain: !ownComplaint && COMPLAINABLE_STATUSES.includes(booking.status),
+            };
+          })()
+        : {}),
       displayStatus: this.jobDisplayStatus(booking, effectiveApplicationStatus, selected, takenByAnother, viewerTechnicianId),
       applicationDeadlineAt: booking.applicationDeadlineAt ?? null,
       expiredAt: booking.expiredAt ?? null,
@@ -2017,6 +2042,7 @@ export class BookingsService {
     const isCustomer = booking.customerId === userId;
     const canCancel = isCustomer && ['OPEN', 'PENDING', 'CONFIRMED'].includes(booking.status);
     const canReview = isCustomer && booking.status === 'COMPLETED' && !booking.review;
+    const ownComplaint = (booking.complaints ?? []).find((complaint: any) => complaint.customerId === userId) ?? null;
     // Financial accounting belongs to KTV/admin responses, never customer history.
     const {
       grossServiceAmount,
@@ -2024,6 +2050,8 @@ export class BookingsService {
       technicianEarning,
       customerPayableAmount,
       feePolicyVersion,
+      // Only the viewer's own complaint is returned, below.
+      complaints: _complaints,
       ...customerSafeBooking
     } = booking;
     return {
@@ -2060,19 +2088,10 @@ export class BookingsService {
       paymentMethod: booking.payment?.method ?? null,
       canCancel,
       canReview,
-      // Complaints are between the customer and the admins; the technician never sees them.
-      canComplain: isCustomer && !booking.complaint && COMPLAINABLE_STATUSES.includes(booking.status),
-      complaint:
-        isCustomer && booking.complaint
-          ? {
-              id: booking.complaint.id,
-              status: booking.complaint.status,
-              statusLabel: COMPLAINT_STATUS_LABEL[booking.complaint.status] ?? booking.complaint.status,
-              reasonCode: booking.complaint.reasonCode,
-              createdAt: booking.complaint.createdAt,
-              conversationId: booking.complaint.conversation?.id ?? null,
-            }
-          : null,
+      // Each side sees only its own complaint, which is between it and the admins.
+      ...this.complaintFields(ownComplaint),
+      canComplain:
+        (isCustomer || booking.technician?.userId === userId) && !ownComplaint && COMPLAINABLE_STATUSES.includes(booking.status),
       review: booking.review
         ? {
             id: booking.review.id,
@@ -2114,6 +2133,21 @@ export class BookingsService {
             })),
           }
         : {}),
+    };
+  }
+
+  private complaintFields(complaint: any) {
+    return {
+      complaint: complaint
+        ? {
+            id: complaint.id,
+            status: complaint.status,
+            statusLabel: COMPLAINT_STATUS_LABEL[complaint.status] ?? complaint.status,
+            reasonCode: complaint.reasonCode,
+            createdAt: complaint.createdAt,
+            conversationId: complaint.conversation?.id ?? null,
+          }
+        : null,
     };
   }
 

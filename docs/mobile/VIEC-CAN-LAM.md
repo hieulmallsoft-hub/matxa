@@ -139,7 +139,32 @@ Lưu ý: với đơn mở, phí chỉ được chốt **khi chọn được KTV*
 `travelFee` của đơn là `0`. Sau khi chốt, `totalAmount` và số tiền thanh toán tăng đúng bằng `travelFee`. Nếu cần hiện
 quy tắc cho người dùng: `GET /api/settings/public` có `travelFeeThresholdKm` và `travelFeeAmount`.
 
-## D. Quy tắc chung về link file
+## D. KTV gửi khiếu nại (app KTV)
+
+KTV giờ khiếu nại được về đơn của mình, **dùng đúng các API khách đang dùng**. Mỗi bên (khách, KTV) khiếu nại **1 lần
+cho mỗi đơn**; khách và KTV **không thấy khiếu nại của nhau**, mỗi bên chat riêng với CSKH.
+
+| Việc | API | Ghi chú |
+|---|---|---|
+| Hiện nút "Khiếu nại" | Đơn của KTV có `canComplain: true` | Có trong danh sách/chi tiết đơn của KTV, khi đơn đã nhận, đã xong hoặc đã hủy |
+| Đã khiếu nại rồi | Đơn có `complaint` (`id`, `status`, `statusLabel`, `conversationId`) | Nút "Xem khiếu nại" mở chat `conversationId` |
+| Upload ảnh minh chứng | `POST /api/bookings/{id}/complaint-evidence-upload-url` | Giống khách |
+| Gửi khiếu nại | `POST /api/bookings/{id}/complaint` | Body giống khách: `reasonCode`, `detail`, `contactEmail`, `evidenceStorageKeys` |
+| Xem khiếu nại + đầu khung chat | `GET /api/bookings/{id}/complaint` | Có thêm `reporterRole` và `customer` (tên, ảnh khách) để hiện ở đầu chat |
+
+Lý do cho KTV chọn (`reasonCode`):
+
+| Mã | Hiện |
+|---|---|
+| `CUSTOMER_NO_SHOW` | Khách không có mặt, không liên lạc được |
+| `CUSTOMER_BEHAVIOR` | Thái độ của khách |
+| `PAYMENT_ISSUE` | Thanh toán (ví dụ khách không trả tiền mặt) |
+| `SAFETY_ISSUE` | Vấn đề an toàn |
+| `OTHER` | Lý do khác |
+
+Lỗi: `409 "Lich dat da duoc tao khieu nai"` = KTV đã khiếu nại đơn này rồi → mở khiếu nại cũ.
+
+## E. Quy tắc chung về link file
 
 Mọi link file (`downloadUrl`, `signedDocumentUrl`, `viewUrl`…) **hết hạn sau 600 giây** vì là dữ liệu riêng tư.
 Luôn gọi API lấy link mới ngay trước khi mở, không lưu link vào bộ nhớ hay cache.

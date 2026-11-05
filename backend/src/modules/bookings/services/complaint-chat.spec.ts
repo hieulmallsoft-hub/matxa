@@ -20,7 +20,7 @@ describe('complaint support chat', () => {
 
   const subject = (existingConversation: { id: string } | null = null) => {
     const prisma: any = {
-      booking: { findFirst: jest.fn().mockResolvedValue({ id: booking.id, status: 'CONFIRMED', complaint: null }) },
+      booking: { findFirst: jest.fn().mockResolvedValue({ id: booking.id, status: 'CONFIRMED', customerId: 'customer-1', complaints: [] }) },
       complaint: {
         create: jest.fn(async ({ data }: any) => ({ id: 'complaint-1', status: 'SUBMITTED', ...data })),
         findFirst: jest.fn().mockResolvedValue(complaint),
@@ -59,7 +59,7 @@ describe('complaint support chat', () => {
   it('gives the chat header the booking, the booked technician and the complaint', async () => {
     const { service } = subject({ id: 'conversation-1' });
     await expect(service.customerComplaint('customer-1', booking.id)).resolves.toEqual({
-      id: 'complaint-1', status: 'SUBMITTED', statusLabel: 'Đã tiếp nhận', reasonCode: 'TECHNICIAN_NO_CONTACT',
+      id: 'complaint-1', reporterRole: 'CUSTOMER', status: 'SUBMITTED', statusLabel: 'Đã tiếp nhận', reasonCode: 'TECHNICIAN_NO_CONTACT',
       reasonLabel: 'KTV không liên hệ, không đến', detail: 'KTV khong den', contactEmail: 'a@b.com',
       createdAt: complaint.createdAt, evidenceCount: 1, conversationId: 'conversation-1',
       booking: {
@@ -69,6 +69,7 @@ describe('complaint support chat', () => {
         items: [{ name: 'Massage Dầu', durationMinutes: 90, price: 600000 }],
       },
       technician: { displayName: 'Duc Nguyen', avatarUrl: null, averageRating: 4.5, reviewCount: 2 },
+      customer: null,
     });
   });
 
