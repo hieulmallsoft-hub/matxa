@@ -1147,3 +1147,24 @@ model SystemSetting {
 
   @@map("system_settings")
 }
+
+/// Terms and policies shown in the apps ("Điều khoản và chính sách"). Each upload of a code is a new
+/// version row; the newest active row of a code is the one the apps show, older rows are the history.
+model LegalDocument {
+  id         String   @id @default(uuid()) @db.Uuid
+  code       String
+  title      String
+  /// CUSTOMER, TECHNICIAN or ALL
+  audience   String   @default("ALL")
+  version    Int
+  storageKey String   @map("storage_key")
+  fileName   String   @map("file_name")
+  sortOrder  Int      @default(0) @map("sort_order")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdBy  String?  @map("created_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([code, version])
+  @@index([code, isActive, version(sort: Desc)])
+  @@map("legal_documents")
+}

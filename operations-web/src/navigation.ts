@@ -16,6 +16,7 @@ import {
   FileText,
   ShieldCheck,
   Scale,
+  BookOpenText,
 } from 'lucide-react';
 import type { PageId } from './types/dashboard';
 
@@ -56,6 +57,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'catalog', label: 'Dịch vụ', description: 'Danh mục và gói giá dịch vụ', icon: FolderTree, keywords: 'service catalog goi gia' },
       { id: 'venues', label: 'Địa điểm & Spa', description: 'Spa, phòng tham vấn, đánh giá', icon: Store, keywords: 'spa dia diem venue' },
       { id: 'contracts', label: 'Mẫu hợp đồng KTV', description: 'Mẫu hợp đồng gửi kỹ thuật viên', icon: FileText, keywords: 'hop dong' },
+      { id: 'legal', label: 'Điều khoản & Chính sách', description: 'Văn bản PDF hiện trong app', icon: BookOpenText, keywords: 'dieu khoan chinh sach bao mat quy che policy terms' },
       { id: 'courses', label: 'Khóa học đào tạo', description: 'Khóa học và bài học online', icon: GraduationCap, keywords: 'khoa hoc bai hoc' },
     ],
   },

@@ -17,7 +17,8 @@ export type PageId =
   | 'technicianPolicy'
   | 'complaints'
   | 'venues'
-  | 'contracts';
+  | 'contracts'
+  | 'legal';
 
 export type TimePeriod = '7d' | '30d' | '3m' | '1y';
 
