@@ -38,6 +38,14 @@ class UpdateBookingRulesDto {
   @ApiPropertyOptional({ example: 15, description: 'Chi goi y va gui don cho KTV trong ban kinh nay (km). 0 = khong gioi han.' })
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(200)
   maxDispatchRadiusKm?: number;
+
+  @ApiPropertyOptional({ example: 10, description: 'Don tai nha co khoang cach khach-KTV vuot so km nay thi cong phi di chuyen.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(200)
+  travelFeeThresholdKm?: number;
+
+  @ApiPropertyOptional({ example: 50000, description: 'Phi di chuyen co dinh (VND), KTV nhan 100%. 0 = khong thu phi di chuyen.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(5_000_000)
+  travelFeeAmount?: number;
 }
 
 @ApiTags('Admin Settings')

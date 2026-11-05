@@ -19,7 +19,7 @@ import { PayosService } from './payos.service';
 import { Optional } from '@nestjs/common';
 import { SettingsService } from '../../settings/settings.service';
 import { ComplaintStorageService } from './complaint-storage.service';
-import { addressPreview, kmBetween, technicianBadge } from './distance';
+import { addressPreview, kmBetween, technicianBadge, travelFeeFor } from './distance';
 import { COMPLAINT_STATUS_LABEL, complaintStatusEvent, ensureComplaintConversation } from './complaint-conversation';
 import {
   BookingHistoryQueryDto,
@@ -128,6 +128,13 @@ export class BookingsService {
     }
     const subtotal = services.reduce((sum, item) => sum.plus(item.price), new Prisma.Decimal(0)).toNumber();
     const serviceFee = dto.mode === 'HOME' ? Number(this.config.get('HOME_SERVICE_FEE', 100000)) : 0;
+    const rules = await this.bookingRules();
+    // Only look the technician up when a travel fee is configured at all.
+    const technicianLocation = addressSnapshot && rules.travelFeeAmount > 0
+      ? await db.technicianProfile.findUnique({ where: { id: dto.technicianId }, select: { latitude: true, longitude: true } })
+      : null;
+    const travelDistanceKm = technicianLocation ? kmBetween(addressSnapshot, technicianLocation) : null;
+    const travelFee = travelFeeFor(dto.mode, travelDistanceKm, rules);
     if (!Number.isFinite(serviceFee) || serviceFee < 0)
       throw new BadRequestException('Phi dich vu chua duoc cau hinh hop le');
     const promotion = dto.promotionCode ? await this.validPromotion(userId, dto.promotionCode, subtotal, db) : null;
@@ -136,7 +143,7 @@ export class BookingsService {
     const discountAmount = promotion ? this.discount(promotion, subtotal, serviceFee) : 0;
     const totalAmount = Prisma.Decimal.max(
       0,
-      new Prisma.Decimal(subtotal).plus(serviceFee).minus(discountAmount),
+      new Prisma.Decimal(subtotal).plus(serviceFee).plus(travelFee).minus(discountAmount),
     ).toNumber();
     const financials = this.feePolicy.calculate({
       assignmentMode: 'DIRECT',
@@ -172,6 +179,8 @@ export class BookingsService {
       subtotal,
       serviceFee,
       homeServiceFee: serviceFee,
+      travelFee,
+      travelDistanceKm,
       promotionId: promotion?.id ?? null,
       promotionUsageLimit: promotion?.usageLimit ?? null,
       promotionCode: promotion?.code ?? null,
@@ -182,7 +191,8 @@ export class BookingsService {
       total: totalAmount,
       grossServiceAmount: financials.grossServiceAmount.toNumber(),
       platformFee: financials.platformFee.toNumber(),
-      technicianEarning: financials.technicianEarning.toNumber(),
+      // The travel fee goes to the technician in full; the commission is only taken on the services.
+      technicianEarning: financials.technicianEarning.toNumber() + travelFee,
       customerPayableAmount: totalAmount,
       feePolicyVersion: financials.feePolicyVersion,
     };
@@ -227,6 +237,8 @@ export class BookingsService {
               scheduledEnd: quote.scheduledEnd,
               subtotal: quote.subtotal,
               serviceFee: quote.serviceFee,
+              travelFee: quote.travelFee,
+              travelDistanceKm: quote.travelDistanceKm,
               discountAmount: quote.discountAmount,
               totalAmount: quote.totalAmount,
               grossServiceAmount: quote.grossServiceAmount,
@@ -449,7 +461,8 @@ export class BookingsService {
     const start = new Date(dto.scheduledStart);
     if (!Number.isFinite(start.getTime()) || start <= new Date()) throw new BadRequestException('Thoi gian dat lich khong hop le');
     await this.assertLeadTime(start);
-    const { maxDispatchRadiusKm } = await this.bookingRules();
+    const rules = await this.bookingRules();
+    const { maxDispatchRadiusKm } = rules;
     const serviceIds: string[] = [...new Set((dto.items ?? []).map((item: any) => String(item.catalogServiceId)))] as string[];
     const optionIds: string[] = [...new Set((dto.items ?? []).map((item: any) => String(item.priceOptionId)))] as string[];
     if (!serviceIds.length || serviceIds.length !== (dto.items ?? []).length) throw new BadRequestException('Danh sach dich vu khong hop le');
@@ -490,7 +503,7 @@ export class BookingsService {
       if (!slot || conflict || !hasAllServices) continue;
       const distance = distanceKm(candidate.latitude, candidate.longitude);
       if (maxDispatchRadiusKm > 0 && distance !== null && distance > maxDispatchRadiusKm) continue;
-       eligible.push({ technicianId: candidate.id, displayName: candidate.user.displayName, avatarUrl: candidate.user.avatarUrl, city: candidate.city, district: candidate.district, distanceKm: distance, rating: Number(candidate.averageRating), reviewCount: candidate.reviewCount });
+       eligible.push({ technicianId: candidate.id, displayName: candidate.user.displayName, avatarUrl: candidate.user.avatarUrl, city: candidate.city, district: candidate.district, distanceKm: distance, travelFee: travelFeeFor(dto.mode, distance, rules), rating: Number(candidate.averageRating), reviewCount: candidate.reviewCount });
     }
     eligible.sort((a, b) => {
       if (dto.sort === 'rating') return b.rating - a.rating;
@@ -803,6 +816,10 @@ export class BookingsService {
             include: { items: { include: { catalogService: true } } },
           });
           await this.assertOpenEligibility(tx, booking, application.technicianProfileId);
+          // The travel fee depends on who comes, so it is only known now; the commission stays on the services.
+          const travelDistanceKm = booking.mode === 'HOME' ? kmBetween(booking.addressSnapshot as any, application.technicianProfile) : null;
+          const travelFee = travelFeeFor(booking.mode, travelDistanceKm, await this.bookingRules());
+          const feeChange = travelFee - Number(booking.travelFee ?? 0);
           await tx.bookingTechnicianApplication.update({
             where: { id: application.id },
             data: { status: 'SELECTED', selectedAt: now },
@@ -813,7 +830,18 @@ export class BookingsService {
           });
           const assigned = await tx.booking.update({
             where: { id: bookingId },
-            data: { technicianId: application.technicianProfileId, status: 'CONFIRMED' },
+            data: {
+              technicianId: application.technicianProfileId,
+              status: 'CONFIRMED',
+              travelFee,
+              travelDistanceKm,
+              ...(feeChange !== 0 && {
+                totalAmount: { increment: feeChange },
+                customerPayableAmount: { increment: feeChange },
+                technicianEarning: { increment: feeChange },
+                payment: { update: { amount: { increment: feeChange } } },
+              }),
+            },
             include: { items: { include: { catalogService: true } }, payment: true },
           });
           // Charged after the assignment: the charge only accepts a booking that belongs to the
@@ -951,12 +979,13 @@ export class BookingsService {
       },
       orderBy: { scheduledStart: 'desc' },
     });
+    const rules = await this.bookingRules();
     if (!query) {
       const bookings = await listQuery;
-      return bookings.map((booking) => this.historyResponse(this.withHistoricalAddress(booking), userId));
+      return bookings.map((booking) => this.historyResponse(this.withHistoricalAddress(booking), userId, rules));
     }
     const [bookings, total] = await Promise.all([listQuery, this.prisma.booking.count({ where })]);
-    const items = bookings.map((booking) => this.historyResponse(this.withHistoricalAddress(booking), userId));
+    const items = bookings.map((booking) => this.historyResponse(this.withHistoricalAddress(booking), userId, rules));
     return query ? { items, total, page: options.page, limit: options.limit } : items;
   }
 
@@ -1008,12 +1037,13 @@ export class BookingsService {
     if (booking.customerId !== userId && booking.technician?.userId !== userId && actor?.role !== 'ADMIN' && !canViewMarketplaceJob)
       throw new ForbiddenException('Ban khong co quyen xem lich dat');
     const historical = this.withHistoricalAddress(booking);
-    return internal ? historical : this.historyResponse(historical, userId);
+    return internal ? historical : this.historyResponse(historical, userId, await this.bookingRules());
   }
 
   async listTechnicianJobs(userId: string, query: TechnicianJobQueryDto) {
     const profile = await this.requireActiveTechnician(userId);
     const commissionPercent = await this.commissionRate();
+    const travelRules = await this.bookingRules();
     const now = new Date();
     // Expired jobs stay in the history of technicians they were announced to, not everyone's.
     const announcements = await this.prisma.notification.findMany({
@@ -1085,7 +1115,7 @@ export class BookingsService {
         continue;
       visible.push(
         booking.assignmentMode === 'OPEN_MARKETPLACE'
-          ? this.openBookingResponse(booking, app?.status ?? null, Boolean(app?.status === 'SELECTED'), true, profile.id, profile, commissionPercent)
+          ? this.openBookingResponse(booking, app?.status ?? null, Boolean(app?.status === 'SELECTED'), true, profile.id, profile, commissionPercent, travelRules)
           : this.technicianJobResponse(this.withHistoricalAddress(booking), userId, commissionPercent),
       );
     }
@@ -1095,6 +1125,7 @@ export class BookingsService {
   async technicianJobDetail(userId: string, id: string) {
     const profile = await this.requireActiveTechnician(userId);
     const commissionPercent = await this.commissionRate();
+    const travelRules = await this.bookingRules();
     const booking = await this.detail(userId, id, true, true);
     if (booking.assignmentMode === 'OPEN_MARKETPLACE') {
       if (booking.status === 'OPEN' && booking.applicationDeadlineAt && booking.applicationDeadlineAt <= new Date()) {
@@ -1103,13 +1134,13 @@ export class BookingsService {
         const application = await this.prisma.bookingTechnicianApplication.findUnique({
           where: { bookingId_technicianProfileId: { bookingId: id, technicianProfileId: profile.id } },
         });
-        return this.openBookingResponse(expired, application?.status ?? null, false, true, profile.id, profile, commissionPercent);
+        return this.openBookingResponse(expired, application?.status ?? null, false, true, profile.id, profile, commissionPercent, travelRules);
       }
       const application = await this.prisma.bookingTechnicianApplication.findUnique({
         where: { bookingId_technicianProfileId: { bookingId: id, technicianProfileId: profile.id } },
       });
       if (booking.status === 'EXPIRED' && !application)
-        return this.openBookingResponse(booking, 'EXPIRED', false, true, profile.id, profile, commissionPercent);
+        return this.openBookingResponse(booking, 'EXPIRED', false, true, profile.id, profile, commissionPercent, travelRules);
       // detail() loads items without catalogService; reload them so eligibility sees catalog data.
       if (booking.status === 'OPEN' && !application) {
         const unavailableReason = await this.openJobForTechnician(id, profile.id, true).then(
@@ -1119,7 +1150,7 @@ export class BookingsService {
         );
         if (unavailableReason)
           return {
-            ...this.openBookingResponse(booking, null, false, true, profile.id, profile, commissionPercent),
+            ...this.openBookingResponse(booking, null, false, true, profile.id, profile, commissionPercent, travelRules),
             displayStatus: 'UNAVAILABLE',
             unavailableReason,
             canApply: false,
@@ -1129,7 +1160,7 @@ export class BookingsService {
       // A cancelled or already-taken job reached detail() through an involvement or notification check; just show it.
       else if (!application && booking.requestedTechnicianId !== profile.id && !['CANCELLED', 'CONFIRMED', 'COMPLETED'].includes(booking.status))
         throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
-      return this.openBookingResponse(booking, application?.status ?? null, application?.status === 'SELECTED', true, profile.id, profile, commissionPercent);
+      return this.openBookingResponse(booking, application?.status ?? null, application?.status === 'SELECTED', true, profile.id, profile, commissionPercent, travelRules);
     }
     if (booking.technician?.userId !== userId) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
     return this.technicianJobResponse(booking, userId, commissionPercent);
@@ -1171,7 +1202,7 @@ export class BookingsService {
 
   /** Admin booking rules; 0 means no limit. Defaults apply when settings are not wired (tests). */
   private async bookingRules() {
-    return (await this.settings?.getBookingRules()) ?? { minAdvanceHours: 0, maxDispatchRadiusKm: 0 };
+    return (await this.settings?.getBookingRules()) ?? { minAdvanceHours: 0, maxDispatchRadiusKm: 0, travelFeeThresholdKm: 10, travelFeeAmount: 0 };
   }
 
   private async assertLeadTime(start: Date) {
@@ -1800,6 +1831,7 @@ export class BookingsService {
     viewerTechnicianId?: string,
     viewerLocation?: { latitude?: unknown; longitude?: unknown },
     commissionPercent?: number,
+    travelRules?: { travelFeeThresholdKm: number; travelFeeAmount: number },
   ) {
     // Also true for a technician who never applied (e.g. the requested one) once someone else got the job.
     const takenByAnother =
@@ -1831,6 +1863,7 @@ export class BookingsService {
       durationMinutes: (booking.items ?? []).reduce((sum: number, item: any) => sum + item.durationMinutes, 0),
       subtotal: Number(booking.subtotal),
       serviceFee: Number(booking.serviceFee),
+      travelFee: Number(booking.travelFee ?? 0),
       totalAmount: Number(booking.totalAmount),
       items: (booking.items ?? []).map((item: any) => ({
         catalogServiceId: item.catalogServiceId,
@@ -1864,7 +1897,16 @@ export class BookingsService {
       displayStatus: this.jobDisplayStatus(booking, effectiveApplicationStatus, selected, takenByAnother, viewerTechnicianId),
       applicationDeadlineAt: booking.applicationDeadlineAt ?? null,
       expiredAt: booking.expiredAt ?? null,
-      ...(includeTechnicianPricing ? { pricing: this.technicianPricing(booking, selected ? undefined : commissionPercent) } : {}),
+      ...(includeTechnicianPricing
+        ? {
+            pricing: this.technicianPricing(
+              booking,
+              selected ? undefined : commissionPercent,
+              // Not theirs yet: the travel fee they would get from their own location.
+              travelRules ? travelFeeFor(booking.mode, kmBetween(booking.addressSnapshot, viewerLocation), travelRules) : 0,
+            ),
+          }
+        : {}),
     };
   }
 
@@ -1944,6 +1986,7 @@ export class BookingsService {
       subtotal: Number(booking.subtotal),
       serviceFee: Number(booking.serviceFee),
       homeServiceFee: Number(booking.serviceFee),
+      travelFee: Number(booking.travelFee ?? 0),
       discount: Number(booking.discountAmount),
       discountAmount: Number(booking.discountAmount),
       total: Number(booking.totalAmount),
@@ -1957,7 +2000,7 @@ export class BookingsService {
     };
   }
 
-  private historyResponse(booking: any, userId: string) {
+  private historyResponse(booking: any, userId: string, travelRules?: { travelFeeThresholdKm: number; travelFeeAmount: number }) {
     const isCustomer = booking.customerId === userId;
     const canCancel = isCustomer && ['OPEN', 'PENDING', 'CONFIRMED'].includes(booking.status);
     const canReview = isCustomer && booking.status === 'COMPLETED' && !booking.review;
@@ -1996,6 +2039,8 @@ export class BookingsService {
       subtotal: Number(booking.subtotal),
       homeServiceFee: Number(booking.serviceFee),
       serviceFee: Number(booking.serviceFee),
+      travelFee: Number(booking.travelFee ?? 0),
+      travelDistanceKm: booking.travelDistanceKm === null || booking.travelDistanceKm === undefined ? null : Number(booking.travelDistanceKm),
       discount: Number(booking.discountAmount),
       total: Number(booking.totalAmount),
       totalAmount: Number(booking.totalAmount),
@@ -2043,6 +2088,10 @@ export class BookingsService {
               averageRating: Number(application.technicianProfile?.averageRating ?? 0),
               reviewCount: application.technicianProfile?.reviewCount ?? 0,
               distanceKm: kmBetween(booking.address, application.technicianProfile),
+              // What choosing this technician adds to the total, so the customer sees it before picking.
+              travelFee: travelRules
+                ? travelFeeFor(booking.mode, kmBetween(booking.address, application.technicianProfile), travelRules)
+                : 0,
               isAvailable: Boolean(application.technicianProfile?.isAvailable),
               badge: technicianBadge(application.technicianProfile),
               status: application.status,
@@ -2098,14 +2147,24 @@ export class BookingsService {
    * With `estimatePercent` (jobs not yet theirs) the fee is what the technician would be charged at today's
    * rate, so "Bạn sẽ nhận được" already has the commission taken off; otherwise it is what was charged.
    */
-  private technicianPricing(booking: any, estimatePercent?: number) {
+  private technicianPricing(booking: any, estimatePercent?: number, estimatedTravelFee = 0) {
     const gross = booking.grossServiceAmount === null || booking.grossServiceAmount === undefined ? null : Number(booking.grossServiceAmount);
     if (estimatePercent !== undefined && gross !== null) {
       const platformFee = Math.round((gross * estimatePercent) / 100);
-      return { grossServiceAmount: gross, platformFee, technicianEarning: gross - platformFee, isEstimate: true, currency: 'VND' };
+      // A direct booking already carries its fee; an open one gets it only when a technician is chosen.
+      const travelFee = Number(booking.travelFee ?? 0) || estimatedTravelFee;
+      return {
+        grossServiceAmount: gross,
+        platformFee,
+        travelFee,
+        technicianEarning: gross - platformFee + travelFee,
+        isEstimate: true,
+        currency: 'VND',
+      };
     }
     return {
       isEstimate: false,
+      travelFee: Number(booking.travelFee ?? 0),
       grossServiceAmount:
         booking.grossServiceAmount === null || booking.grossServiceAmount === undefined
           ? null

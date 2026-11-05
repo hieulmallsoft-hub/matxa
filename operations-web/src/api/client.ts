@@ -57,3 +57,28 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     setPending(-1);
   }
 }
+
+/**
+ * Opens a private S3 file with a link fetched at click time: the links in page data expire after
+ * 600 s, so a page left open longer would otherwise show S3's "Request has expired".
+ * The tab opens synchronously so the browser does not treat it as a popup.
+ */
+export function openFreshLink(getUrl: () => Promise<string | null | undefined>) {
+  const tab = window.open('', '_blank');
+  if (tab) {
+    tab.opener = null;
+    tab.document.title = 'Đang mở file…';
+    tab.document.body.textContent = 'Đang mở file…';
+  }
+  void getUrl()
+    .then((url) => {
+      if (!url) throw new Error('File không tồn tại');
+      if (tab) tab.location.href = url;
+      else window.location.href = url;
+    })
+    .catch((error: unknown) => {
+      const message = `Không mở được file: ${error instanceof Error ? error.message : 'lỗi không xác định'}`;
+      if (tab) tab.document.body.textContent = message;
+      else window.alert(message);
+    });
+}

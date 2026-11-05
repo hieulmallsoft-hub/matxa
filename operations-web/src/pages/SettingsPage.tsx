@@ -58,6 +58,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
   const [supportEmail, setSupportEmail] = useState('');
   const [minAdvanceHours, setMinAdvanceHours] = useState('0');
   const [maxTravelDistanceKm, setMaxTravelDistanceKm] = useState('0');
+  const [travelFeeThresholdKm, setTravelFeeThresholdKm] = useState('10');
+  const [travelFeeAmount, setTravelFeeAmount] = useState('0');
   const [techCommissionRate, setTechCommissionRate] = useState('75');
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
 
@@ -79,10 +81,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         setSupportEmail(value.supportEmail);
       })
       .catch(() => undefined);
-    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number }>('/admin/settings/booking')
+    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number }>('/admin/settings/booking')
       .then((value) => {
         setMinAdvanceHours(String(value.minAdvanceHours));
         setMaxTravelDistanceKm(String(value.maxDispatchRadiusKm));
+        setTravelFeeThresholdKm(String(value.travelFeeThresholdKm ?? 10));
+        setTravelFeeAmount(String(value.travelFeeAmount ?? 0));
       })
       .catch(() => undefined);
   }, []);
@@ -129,9 +133,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         const radius = Number(maxTravelDistanceKm);
         if (!Number.isInteger(hours) || hours < 0 || hours > 72) throw new Error('Thời gian đặt trước phải là số nguyên từ 0 đến 72 giờ');
         if (!Number.isInteger(radius) || radius < 0 || radius > 200) throw new Error('Bán kính phải là số nguyên từ 0 đến 200 km');
+        const feeKm = Number(travelFeeThresholdKm);
+        const fee = Number(travelFeeAmount);
+        if (!Number.isInteger(feeKm) || feeKm < 0 || feeKm > 200) throw new Error('Ngưỡng tính phí di chuyển phải là số nguyên từ 0 đến 200 km');
+        if (!Number.isInteger(fee) || fee < 0 || fee > 5_000_000) throw new Error('Phí di chuyển phải là số nguyên từ 0 đến 5.000.000đ');
         await request('/admin/settings/booking', {
           method: 'PATCH',
-          body: JSON.stringify({ minAdvanceHours: hours, maxDispatchRadiusKm: radius }),
+          body: JSON.stringify({ minAdvanceHours: hours, maxDispatchRadiusKm: radius, travelFeeThresholdKm: feeKm, travelFeeAmount: fee }),
         });
         addToast({ title: 'Đã lưu quy định đặt lịch', message: 'Áp dụng cho các đơn đặt sau khi lưu.', type: 'success' });
       }
@@ -306,6 +314,35 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                   />
                   <span className="text-[11px] text-[#66756B]">
                     Đơn tại nhà chỉ gợi ý và gửi cho KTV trong bán kính này tính từ địa chỉ khách. KTV chưa cập nhật vị trí vẫn nhận được. Nhập 0 để không giới hạn.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[#1C2B20]">Tính phí di chuyển khi xa hơn (km)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="200"
+                      value={travelFeeThresholdKm}
+                      onChange={(e) => setTravelFeeThresholdKm(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[#1C2B20]">Phí di chuyển (đ)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      value={travelFeeAmount}
+                      onChange={(e) => setTravelFeeAmount(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
+                    />
+                  </div>
+                  <span className="sm:col-span-2 text-[11px] text-[#66756B]">
+                    Đơn tại nhà có khoảng cách khách–KTV vượt ngưỡng sẽ cộng một khoản cố định này vào tổng tiền khi chốt KTV.
+                    KTV nhận 100%, không tính hoa hồng. Không biết vị trí KTV thì không tính. Nhập phí 0 để tắt.
                   </span>
                 </div>
               </div>

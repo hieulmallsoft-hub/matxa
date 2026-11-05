@@ -147,7 +147,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onTriggerAction })
           <StatCard
             label="Doanh thu tháng này"
             value={stats ? money(stats.revenueThisMonth ?? 0) : '—'}
-            caption={`${stats?.completedBookingsThisMonth ?? 0} đơn hoàn thành`}
+            caption={`hoa hồng từ ${stats?.completedBookingsThisMonth ?? 0} đơn hoàn thành`}
             icon={<CircleDollarSign className="w-5 h-5" />}
             tone="success"
           />

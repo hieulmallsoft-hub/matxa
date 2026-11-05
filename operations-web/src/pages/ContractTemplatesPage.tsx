@@ -14,7 +14,7 @@ import {
   ArrowRight,
   Info,
 } from 'lucide-react';
-import { request } from '../api/client';
+import { openFreshLink, request } from '../api/client';
 import { PageHeader } from '../components/common/PageHeader';
 import { useToast } from '../components/ui/ToastContainer';
 
@@ -322,16 +322,15 @@ export function ContractTemplatesPage() {
                 </div>
 
                 {currentTemplate.downloadUrl && (
-                  <a
-                    href={currentTemplate.downloadUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => openFreshLink(async () => (await request<CurrentTemplate>('/admin/technician-contracts/template')).downloadUrl)}
                     className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl border border-[#E5EBE5] bg-white hover:bg-[#F6F8F4] text-xs font-bold text-[#1C2B20] transition-colors shadow-2xs"
                   >
                     <Download className="w-3.5 h-3.5 text-[#2E7D4A]" />
                     <span>Xem & Tải bản mẫu (.pdf)</span>
                     <ExternalLink className="w-3.5 h-3.5 text-[#94A399] ml-1" />
-                  </a>
+                  </button>
                 )}
               </div>
             ) : (

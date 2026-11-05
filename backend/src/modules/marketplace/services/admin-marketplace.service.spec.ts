@@ -29,7 +29,7 @@ describe('AdminMarketplaceService', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     db.booking.count.mockResolvedValue(4);
-    db.booking.aggregate.mockResolvedValue({ _sum: { totalAmount: 1250000 }, _count: { id: 3 } });
+    db.booking.aggregate.mockResolvedValue({ _sum: { platformFee: 1250000 }, _count: { id: 3 } });
     db.technicianProfile.count.mockResolvedValue(2);
     db.review.aggregate.mockResolvedValue({ _avg: { rating: 4.5 }, _count: { rating: 10 } });
   });

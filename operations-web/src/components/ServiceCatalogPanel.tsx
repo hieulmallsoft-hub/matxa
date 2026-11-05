@@ -196,7 +196,7 @@ export function ServiceCatalogPanel({
   }
 
   async function remove(item: CatalogItem) {
-    if (!(await confirm({ title: "Xóa dịch vụ?", message: `“${item.name}” sẽ bị xóa khỏi catalog chung. Thao tác này không thể hoàn tác.`, confirmText: "Xóa dịch vụ" }))) return;
+    if (!(await confirm({ title: "Xóa dịch vụ?", message: `“${item.name}” sẽ bị xóa hẳn khỏi catalog, kể cả dịch vụ KTV đã đăng ký theo mục này. Không thể hoàn tác. Dịch vụ đã có đơn đặt lịch thì không xóa được, chỉ ẩn được.`, confirmText: "Xóa dịch vụ", tone: 'danger' }))) return;
     try {
       await request(`/admin/service-catalog/${item.id}`, { method: 'DELETE' });
       notify('Đã xóa dịch vụ thành công');

@@ -1,7 +1,7 @@
 import React, { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { BookOpenText, EyeOff, FileUp, History, RefreshCw, Upload } from 'lucide-react';
-import { request } from '../api/client';
+import { openFreshLink, request } from '../api/client';
 import { PageHeader } from '../components/common/PageHeader';
 import { useToast } from '../components/ui/ToastContainer';
 import { useConfirm } from '../components/ui/useConfirm';
@@ -199,9 +199,13 @@ export function LegalDocumentsPage() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {document.current && (
-                      <a href={document.current.downloadUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-surface-border text-xs font-semibold text-content-primary hover:bg-surface-subtle">
+                      <button
+                        type="button"
+                        onClick={() => openFreshLink(async () => (await request<{ downloadUrl: string }>(`/legal-documents/${encodeURIComponent(document.code)}`)).downloadUrl)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-surface-border text-xs font-semibold text-content-primary hover:bg-surface-subtle"
+                      >
                         Xem PDF
-                      </a>
+                      </button>
                     )}
                     <Button size="sm" variant="soft" icon={<FileUp className="w-4 h-4" />} onClick={() => { choose(document.code); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
                       Phiên bản mới

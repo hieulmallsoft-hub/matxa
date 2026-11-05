@@ -18,7 +18,8 @@ export type PageId =
   | 'complaints'
   | 'venues'
   | 'contracts'
-  | 'legal';
+  | 'legal'
+  | 'walletTopups';
 
 export type TimePeriod = '7d' | '30d' | '3m' | '1y';
 

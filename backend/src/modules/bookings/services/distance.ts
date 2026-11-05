@@ -36,3 +36,17 @@ export function technicianBadge(profile: any): 'QUALITY' | 'NEW' | null {
   if (profile.createdAt && Date.now() - new Date(profile.createdAt).getTime() < 30 * 86_400_000) return 'NEW';
   return null;
 }
+
+/**
+ * The travel fee of a home booking: a flat amount once the customer is farther than the threshold from the
+ * technician. Nothing for other modes, or when either side has no location (the distance is unknown).
+ */
+export function travelFeeFor(
+  mode: string,
+  distanceKm: number | null,
+  rules: { travelFeeThresholdKm?: number; travelFeeAmount?: number },
+) {
+  const amount = Number(rules.travelFeeAmount ?? 0);
+  if (mode !== 'HOME' || distanceKm === null || !(amount > 0)) return 0;
+  return distanceKm > Number(rules.travelFeeThresholdKm ?? 10) ? amount : 0;
+}

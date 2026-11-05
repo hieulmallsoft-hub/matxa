@@ -3,8 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
 
 export type PlatformInfo = { brandName: string; hotline: string; supportEmail: string };
-/** 0 means "no limit" for both rules. */
-export type BookingRules = { minAdvanceHours: number; maxDispatchRadiusKm: number };
+/**
+ * 0 means "no limit" for the advance and radius rules. A home booking farther than `travelFeeThresholdKm`
+ * between customer and technician adds `travelFeeAmount` (VND, 0 = no travel fee), paid in full to the technician.
+ */
+export type BookingRules = { minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number };
 
 const PLATFORM_KEYS: Record<keyof PlatformInfo, string> = {
   brandName: 'PLATFORM_BRAND_NAME',
@@ -15,6 +18,8 @@ const PLATFORM_DEFAULTS: PlatformInfo = { brandName: 'Psyocore', hotline: '', su
 const BOOKING_KEYS: Record<keyof BookingRules, string> = {
   minAdvanceHours: 'BOOKING_MIN_ADVANCE_HOURS',
   maxDispatchRadiusKm: 'BOOKING_MAX_DISPATCH_RADIUS_KM',
+  travelFeeThresholdKm: 'BOOKING_TRAVEL_FEE_THRESHOLD_KM',
+  travelFeeAmount: 'BOOKING_TRAVEL_FEE_AMOUNT',
 };
 
 @Injectable()
@@ -57,6 +62,8 @@ export class SettingsService {
     return {
       minAdvanceHours: Number(stored.get(BOOKING_KEYS.minAdvanceHours) ?? 0),
       maxDispatchRadiusKm: Number(stored.get(BOOKING_KEYS.maxDispatchRadiusKm) ?? 0),
+      travelFeeThresholdKm: Number(stored.get(BOOKING_KEYS.travelFeeThresholdKm) ?? 10),
+      travelFeeAmount: Number(stored.get(BOOKING_KEYS.travelFeeAmount) ?? 0),
     };
   }
 

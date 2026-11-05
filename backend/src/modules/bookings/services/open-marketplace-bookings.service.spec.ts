@@ -65,7 +65,7 @@ describe('open marketplace selection', () => {
       expect.objectContaining({ data: { status: 'NOT_SELECTED' } }),
     );
     expect(tx.booking.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { technicianId: 'tech-profile-1', status: 'CONFIRMED' } }),
+      expect.objectContaining({ data: expect.objectContaining({ technicianId: 'tech-profile-1', status: 'CONFIRMED', travelFee: 0 }) }),
     );
     expect(response).toMatchObject({
       bookingId: 'booking-1',

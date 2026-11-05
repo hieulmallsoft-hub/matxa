@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Scale,
   BookOpenText,
+  Wallet,
 } from 'lucide-react';
 import type { PageId } from './types/dashboard';
 
@@ -46,6 +47,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'dashboard', label: 'Tổng quan', description: 'Tình hình vận hành hôm nay', icon: LayoutDashboard, keywords: 'home trang chu' },
       { id: 'analytics', label: 'Doanh thu & Báo cáo', description: 'Doanh thu, xu hướng và báo cáo', icon: LineChart, keywords: 'bao cao thong ke' },
+      { id: 'walletTopups', label: 'Nạp tiền ví KTV', description: 'Lịch sử KTV nạp tiền vào ví', icon: Wallet, keywords: 'nap tien vi topup payos' },
       { id: 'orders', label: 'Lịch đặt & Đơn hàng', description: 'Theo dõi và xử lý đơn đặt lịch', icon: CalendarDays, keywords: 'booking don dat lich', count: 'pendingBookings' },
     ],
   },

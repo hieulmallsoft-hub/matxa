@@ -85,7 +85,7 @@ export class AdminMarketplaceService {
       this.prisma.review.aggregate({ _avg: { rating: true }, _count: { rating: true } }),
       this.prisma.booking.aggregate({
         where: { status: 'COMPLETED', scheduledStart: { gte: monthStart, lt: nextMonthStart } },
-        _sum: { totalAmount: true },
+        _sum: { platformFee: true },
         _count: { id: true },
       }),
     ]);
@@ -95,7 +95,8 @@ export class AdminMarketplaceService {
       averageRating: number(review._avg.rating),
       reviewCount: review._count.rating,
       completedBookingsThisMonth: completedThisMonth._count.id,
-      revenueThisMonth: number(completedThisMonth._sum.totalAmount),
+      // The platform's revenue is its commission, as on the revenue report; the rest is the technician's.
+      revenueThisMonth: number(completedThisMonth._sum.platformFee),
     };
   }
 
@@ -190,6 +191,7 @@ export class AdminMarketplaceService {
         ...booking,
         subtotal: number(booking.subtotal),
         serviceFee: number(booking.serviceFee),
+        travelFee: number(booking.travelFee),
         discountAmount: number(booking.discountAmount),
         totalAmount: number(booking.totalAmount),
         financials: {

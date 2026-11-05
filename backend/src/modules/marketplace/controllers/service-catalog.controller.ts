@@ -102,7 +102,11 @@ export class AdminServiceCatalogController {
     return this.catalog.update(id, dto);
   }
   @Delete(':id') @HttpCode(HttpStatus.NO_CONTENT) @ApiNoContentResponse()
-  deactivate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.catalog.deactivate(id);
+  @ApiOperation({
+    summary: 'Xoa han dich vu chua co don dat lich',
+    description: 'Xoa ca dich vu KTV da dang ky theo muc nay. 409 neu dich vu da co trong don dat lich: dung PATCH isActive=false de an.',
+  })
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.catalog.remove(id);
   }
 }

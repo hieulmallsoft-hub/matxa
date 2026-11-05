@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { openFreshLink, request } from '../api/client';
 import {
   BadgeCheck,
   CalendarDays,
@@ -546,14 +547,17 @@ function ApplicationDrawer({ detail, busy, onClose, onAction }: {
                   {app.contract.signatureUrl && (
                     <img src={app.contract.signatureUrl} alt="Chữ ký" className="h-20 w-40 object-contain rounded-lg border border-surface-border bg-white" />
                   )}
-                  <a
-                    href={app.contract.signedDocumentUrl}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openFreshLink(async () =>
+                        (await request<TechnicianApplication>(`/admin/marketplace/technician-applications/${app.id}`)).contract?.signedDocumentUrl,
+                      )
+                    }
                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover"
                   >
                     <Download className="w-4 h-4" /> Tải hợp đồng đã ký (PDF)
-                  </a>
+                  </button>
                 </div>
               </div>
             ) : (

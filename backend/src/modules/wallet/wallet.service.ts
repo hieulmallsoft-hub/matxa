@@ -329,16 +329,43 @@ export class WalletService {
         ? { referenceCode: { contains: query.referenceCode, mode: 'insensitive' as const } }
         : {}),
     };
-    const [items, total] = await Promise.all([
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const [rows, total, month] = await Promise.all([
       this.prisma.topUpTransaction.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip: (query.page - 1) * query.limit,
         take: query.limit,
+        // Who topped up and what their wallet holds now, so the admin page needs no second lookup.
+        include: {
+          user: { select: { id: true, displayName: true, identities: { select: { phoneNumber: true } } } },
+          wallet: { select: { balanceVnd: true } },
+        },
       }),
       this.prisma.topUpTransaction.count({ where }),
+      this.prisma.topUpTransaction.aggregate({
+        where: { status: 'SUCCESS', processedAt: { gte: monthStart } },
+        _sum: { amountVnd: true },
+        _count: { id: true },
+      }),
     ]);
-    return { items, total, page: query.page, limit: query.limit };
+    const items = rows.map(({ user, wallet, ...item }) => ({
+      ...item,
+      technician: {
+        userId: user.id,
+        displayName: user.displayName,
+        phoneNumber: user.identities.find((identity) => identity.phoneNumber)?.phoneNumber ?? null,
+      },
+      walletBalanceVnd: wallet.balanceVnd,
+    }));
+    return {
+      items,
+      total,
+      page: query.page,
+      limit: query.limit,
+      summary: { successAmountThisMonth: month._sum.amountVnd ?? 0, successCountThisMonth: month._count.id },
+    };
   }
   async adminDetail(id: string) {
     const item = await this.prisma.topUpTransaction.findUnique({

@@ -18,7 +18,7 @@ describe('SettingsService platform info and booking rules', () => {
   it('falls back to defaults until the admin saves anything', async () => {
     const { service } = subject();
     await expect(service.getPlatformInfo()).resolves.toEqual({ brandName: 'Psyocore', hotline: '', supportEmail: '' });
-    await expect(service.getBookingRules()).resolves.toEqual({ minAdvanceHours: 0, maxDispatchRadiusKm: 0 });
+    await expect(service.getBookingRules()).resolves.toEqual({ minAdvanceHours: 0, maxDispatchRadiusKm: 0, travelFeeThresholdKm: 10, travelFeeAmount: 0 });
   });
 
   it('saves only the fields that were sent and returns the stored values', async () => {
@@ -31,6 +31,8 @@ describe('SettingsService platform info and booking rules', () => {
     await expect(service.setBookingRules({ minAdvanceHours: 2, maxDispatchRadiusKm: 15 })).resolves.toEqual({
       minAdvanceHours: 2,
       maxDispatchRadiusKm: 15,
+      travelFeeThresholdKm: 10,
+      travelFeeAmount: 0,
     });
     expect([...rows.keys()].sort()).toEqual(['BOOKING_MAX_DISPATCH_RADIUS_KM', 'BOOKING_MIN_ADVANCE_HOURS', 'PLATFORM_HOTLINE']);
   });
@@ -44,6 +46,8 @@ describe('SettingsService platform info and booking rules', () => {
       supportEmail: '',
       minAdvanceHours: 1,
       maxDispatchRadiusKm: 0,
+      travelFeeThresholdKm: 10,
+      travelFeeAmount: 0,
     });
   });
 });

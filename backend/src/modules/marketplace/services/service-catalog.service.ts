@@ -1,4 +1,4 @@
-﻿import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+﻿import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { CreateServiceCatalogDto, ServiceCatalogQueryDto, UpdateServiceCatalogDto } from '../dto/service-catalog.dto';
 
@@ -196,11 +196,22 @@ export class ServiceCatalogService {
     });
   }
 
-  async deactivate(id: string) {
+  /**
+   * Deletes a service nobody has booked, together with the technicians' offers of it. A booked one is kept
+   * (booking history and payouts point at it); the admin hides it instead.
+   */
+  async remove(id: string) {
     const item = await this.prisma.serviceCatalogItem.findUnique({ where: { id }, select: { id: true } });
     if (!item) throw new NotFoundException('Catalog service khong ton tai');
-    // Deliberately soft-delete even when unused to preserve stable IDs and audit history.
-    return this.prisma.serviceCatalogItem.update({ where: { id }, data: { isActive: false } });
+    const booked = await this.prisma.bookingItem.count({
+      where: { OR: [{ catalogServiceId: id }, { service: { catalogServiceId: id } }] },
+    });
+    if (booked)
+      throw new ConflictException(`Dich vu da co trong ${booked} don dat lich nen khong xoa duoc (de giu lich su don). Hay dung "An".`);
+    await this.prisma.$transaction([
+      this.prisma.technicianService.deleteMany({ where: { catalogServiceId: id } }),
+      this.prisma.serviceCatalogItem.delete({ where: { id } }),
+    ]);
   }
 
   private async category(id: string) {
