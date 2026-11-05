@@ -23,15 +23,36 @@ Các endpoint Mobile yêu cầu `Authorization: Bearer <accessToken>`. Ảnh KYC
 ```json
 {
   "displayName": "Nguyễn Văn An",
+  "idCardNumber": "001099012345",
   "gender": "MALE",
   "applicationType": "MASSAGE",
   "city": "Hà Nội",
   "district": "Cầu Giấy",
   "supportedModes": ["HOME", "ONSITE"],
   "facility": "Có phòng riêng",
-  "bio": "5 năm kinh nghiệm massage trị liệu"
+  "bio": "5 năm kinh nghiệm massage trị liệu",
+  "idCardFrontKey": "<storageKey ảnh CCCD mặt trước>",
+  "idCardBackKey": "<storageKey ảnh CCCD mặt sau>",
+  "faceImageKey": "<storageKey ảnh khuôn mặt>"
 }
 ```
+
+**Bắt buộc trước khi gửi duyệt (5 trường):** `displayName`, **`idCardNumber` (số CCCD)**, `idCardFrontKey`,
+`idCardBackKey`, `faceImageKey`. Ba trường ảnh là `storageKey` nhận từ `document-upload-url`, phải gửi lại
+bằng `PATCH /api/technician/application` sau khi upload xong (chỉ upload lên S3 là chưa đủ).
+
+Thiếu bất kỳ trường nào, `POST /api/technician/application/submit` trả `400` và **nói rõ thiếu gì**:
+
+```json
+{
+  "statusCode": 400,
+  "message": "Ho so con thieu: so CCCD, anh CCCD mat sau",
+  "missingFields": ["idCardNumber", "idCardBackKey"]
+}
+```
+
+Hiện popup theo `missingFields` (ví dụ "Hồ sơ còn thiếu: số CCCD, ảnh CCCD mặt sau") và đưa người dùng về đúng
+bước còn thiếu, thay vì câu chung "Hồ sơ chưa đủ thông tin".
 
 ## KYC
 

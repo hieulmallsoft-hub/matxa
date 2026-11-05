@@ -24,6 +24,15 @@ function withContact<T extends { user: { identities: Array<{ phoneNumber: string
   };
 }
 
+/** What a technician must provide before submitting, with the label shown when it is missing. */
+const REQUIRED_FOR_SUBMIT = [
+  ['displayName', 'ho ten'],
+  ['idCardNumber', 'so CCCD'],
+  ['idCardFrontKey', 'anh CCCD mat truoc'],
+  ['idCardBackKey', 'anh CCCD mat sau'],
+  ['faceImageKey', 'anh khuon mat'],
+] as const;
+
 @Injectable()
 export class TechnicianApplicationsService {
   constructor(
@@ -131,8 +140,15 @@ export class TechnicianApplicationsService {
   async submit(userId: string) {
     const app = await this.prisma.technicianApplication.findUnique({ where: { userId } });
     if (!app) throw new NotFoundException('Chua co ho so dang ky');
-    if (!app.displayName || !app.idCardNumber || !app.idCardFrontKey || !app.idCardBackKey || !app.faceImageKey)
-      throw new BadRequestException('Vui long bo sung du thong tin va anh giay to');
+    // Say exactly what is missing; a generic "incomplete" left technicians guessing.
+    const missingFields = REQUIRED_FOR_SUBMIT.filter(([field]) => !String(app[field] ?? '').trim());
+    if (missingFields.length)
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: `Ho so con thieu: ${missingFields.map(([, label]) => label).join(', ')}`,
+        missingFields: missingFields.map(([field]) => field),
+      });
     if (app.status === 'APPROVED') throw new ConflictException('Ho so da duoc duyet');
     const result = await this.prisma.technicianApplication.update({
       where: { userId },
