@@ -27,7 +27,6 @@ function withContact<T extends { user: { identities: Array<{ phoneNumber: string
 /** What a technician must provide before submitting, with the label shown when it is missing. */
 const REQUIRED_FOR_SUBMIT = [
   ['displayName', 'ho ten'],
-  ['idCardNumber', 'so CCCD'],
   ['idCardFrontKey', 'anh CCCD mat truoc'],
   ['idCardBackKey', 'anh CCCD mat sau'],
   ['faceImageKey', 'anh khuon mat'],

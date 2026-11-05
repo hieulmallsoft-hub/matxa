@@ -19,19 +19,23 @@ describe('submitting a technician application', () => {
   };
 
   it('names every missing item so the app can say exactly what to fix', async () => {
-    const error = await subject({ idCardNumber: null, idCardBackKey: null })
+    const error = await subject({ faceImageKey: null, idCardBackKey: null })
       .submit('user-1')
       .catch((caught) => caught);
     expect(error).toBeInstanceOf(BadRequestException);
     expect(error.getResponse()).toMatchObject({
-      message: 'Ho so con thieu: so CCCD, anh CCCD mat sau',
-      missingFields: ['idCardNumber', 'idCardBackKey'],
+      message: 'Ho so con thieu: anh CCCD mat sau, anh khuon mat',
+      missingFields: ['idCardBackKey', 'faceImageKey'],
     });
   });
 
   it('treats blank text as missing', async () => {
     const error = await subject({ displayName: '   ' }).submit('user-1').catch((caught) => caught);
     expect(error.getResponse()).toMatchObject({ missingFields: ['displayName'] });
+  });
+
+  it('does not require the ID card number: the admin reads it from the photos', async () => {
+    await expect(subject({ idCardNumber: null }).submit('user-1')).resolves.toMatchObject({ status: 'SUBMITTED' });
   });
 
   it('submits a complete application', async () => {
