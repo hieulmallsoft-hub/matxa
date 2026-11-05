@@ -4,7 +4,8 @@ import * as fontkitModule from '@pdf-lib/fontkit';
 import { PDFDocument, PDFFont, PDFPage, PDFTextField, rgb } from 'pdf-lib';
 
 export type SignedContractInfo = {
-  contractNumber: string;
+  /** Null on a preview before the first signing: the number is issued when the technician signs. */
+  contractNumber: string | null;
   displayName: string | null;
   idCardNumber: string | null;
   /** From the ID card QR; null when the applicant typed the number or skipped it. */
@@ -29,10 +30,11 @@ const MUTED = rgb(0.4, 0.46, 0.42);
 /**
  * The contract the technician signed: every page of the admin's template, then a
  * "Xác nhận ký kết" page with who signed, when, from where, and the signature itself.
+ * Without a signature it is the preview the technician reads before signing: same pages, filled the same way.
  */
 export async function buildSignedContractPdf(
   template: Uint8Array | null,
-  signature: { bytes: Uint8Array; contentType: string },
+  signature: { bytes: Uint8Array; contentType: string } | null,
   info: SignedContractInfo,
 ): Promise<Uint8Array> {
   const pdf = template ? await PDFDocument.load(template, { ignoreEncryption: true }) : await PDFDocument.create();
@@ -40,12 +42,7 @@ export async function buildSignedContractPdf(
   pdf.registerFontkit((fontkitModule as any).default ?? fontkitModule);
   const regular = await pdf.embedFont(REGULAR, { subset: true });
   const bold = await pdf.embedFont(BOLD, { subset: true });
-  // Go by the file's own header, not the declared type: pdf-lib only fails on bad bytes at save time.
-  const bytes = signature.bytes;
-  const isPng = bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
-  const isJpeg = bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-  if (!isPng && !isJpeg) throw new Error('Chu ky phai la anh PNG hoac JPEG');
-  const image = isPng ? await pdf.embedPng(bytes) : await pdf.embedJpg(bytes);
+  const image = signature ? await embedSignature(pdf, signature.bytes) : null;
   fillTemplateFields(pdf, regular, info);
 
   const page = pdf.addPage(A4);
@@ -55,7 +52,11 @@ export async function buildSignedContractPdf(
   };
   center('XÁC NHẬN KÝ KẾT HỢP ĐỒNG', bold, 16);
   y -= 22;
-  center(`Số hợp đồng: ${info.contractNumber}`, regular, 11);
+  center(`Số hợp đồng: ${info.contractNumber ?? 'cấp khi ký'}`, regular, 11);
+  if (!image) {
+    y -= 18;
+    center('BẢN XEM TRƯỚC · CHƯA KÝ', bold, 10);
+  }
   y -= 36;
 
   const signedAt = info.signedAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });
@@ -67,7 +68,7 @@ export async function buildSignedContractPdf(
     ['Địa chỉ thường trú', info.idCard?.permanentAddress ?? null],
     ['Số điện thoại', info.phoneNumber],
     ['Khu vực', info.area],
-    ['Thời điểm ký', `${signedAt} (giờ Việt Nam)`],
+    ['Thời điểm ký', image ? `${signedAt} (giờ Việt Nam)` : 'Chưa ký'],
     ['Mẫu hợp đồng', info.templateLabel],
     ['Địa chỉ IP', info.ip],
     ['Thiết bị', info.device],
@@ -93,15 +94,31 @@ export async function buildSignedContractPdf(
   y -= 40;
   page.drawText('CHỮ KÝ CỦA BÊN A', { x: MARGIN, y, size: 11, font: bold, color: INK });
   const box = { width: 240, height: 120 };
+  if (!image) {
+    y -= 14 + box.height;
+    page.drawRectangle({ x: MARGIN, y, ...box, borderColor: MUTED, borderWidth: 0.8, borderDashArray: [4, 3] });
+    page.drawText('Bên A ký tay ở bước tiếp theo', { x: MARGIN + 40, y: y + box.height / 2 - 4, size: 10, font: regular, color: MUTED });
+    pdf.setTitle('Hợp đồng (bản xem trước)');
+    pdf.setProducer('Psyocore');
+    return pdf.save();
+  }
   const scale = Math.min(box.width / image.width, box.height / image.height, 1);
   const size = { width: image.width * scale, height: image.height * scale };
   y -= 14 + box.height;
   page.drawImage(image, { x: MARGIN, y: y + (box.height - size.height), ...size });
   page.drawText(info.idCard?.fullName ?? info.displayName ?? '', { x: MARGIN, y: y - 16, size: 10.5, font: regular, color: INK });
 
-  pdf.setTitle(`Hợp đồng ${info.contractNumber}`);
+  pdf.setTitle(`Hợp đồng ${info.contractNumber ?? ''}`.trim());
   pdf.setProducer('Psyocore');
   return pdf.save();
+}
+
+/** Goes by the file's own header, not the declared type: pdf-lib only fails on bad bytes at save time. */
+async function embedSignature(pdf: PDFDocument, bytes: Uint8Array) {
+  const isPng = bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+  const isJpeg = bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (!isPng && !isJpeg) throw new Error('Chu ky phai la anh PNG hoac JPEG');
+  return isPng ? pdf.embedPng(bytes) : pdf.embedJpg(bytes);
 }
 
 /** YYYY-MM-DD -> dd/MM/yyyy */

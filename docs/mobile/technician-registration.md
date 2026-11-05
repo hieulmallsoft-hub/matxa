@@ -108,13 +108,19 @@ thiết bị/IP và hình chữ ký). Admin xem và tải PDF này khi duyệt h
 
 | Bước | API | Ghi chú |
 |---|---|---|
-| 1. Lấy nội dung hợp đồng để hiển thị | `GET /api/technician/application/contract-template` | Trả `downloadUrl` (PDF, hết hạn sau 600 giây) và `fileName`. Mở bằng trình xem PDF trong app. `404` = admin chưa tải mẫu |
+| 1. Lấy hợp đồng **đã điền sẵn thông tin theo CCCD** | `GET /api/technician/application/contract-preview` | Gọi **sau khi quét QR CCCD** (`PATCH idCardQr`). Trả `downloadUrl` (PDF, hết hạn 600 giây), `idCardScanned`. Mở bằng trình xem PDF trong app. **Không tự vẽ hợp đồng trong app** |
 | 2. KTV tick đồng ý và ký tay | — | Vẽ chữ ký trên canvas, xuất **PNG nền trắng hoặc trong suốt** (khuyên dùng ~600×300) |
 | 3. Lấy link upload chữ ký | `POST /api/technician/application/signature-upload-url` | Body `{ "contentType": "image/png", "size": 25000 }` (tối đa 2MB). Chỉ gọi được khi hồ sơ `DRAFT` hoặc `REJECTED` |
 | 4. Upload ảnh chữ ký | `PUT {uploadUrl}` | Header `Content-Type` đúng như bước 3 |
 | 5. Gửi hồ sơ kèm chữ ký | `POST /api/technician/application/submit` | Body `{ "signatureKey": "<storageKey bước 3>", "device": "<tên máy>" }` |
 
 | 6. Xem lại hợp đồng đã ký | `GET /api/technician/application/contract` | Trả `contractNumber`, `status`, `signedAt`, **`signedDocumentUrl`** (PDF đã ghép chữ ký, hết hạn 600 giây), `signatureUrl`. `null` nếu chưa ký |
+
+Luồng màn hình: **Chụp CCCD + quét QR → Chụp khuôn mặt → Ký hợp đồng**. Màn "Ký hợp đồng & gửi hồ sơ" mở PDF từ
+`contract-preview`: các trang hợp đồng có sẵn họ tên, số CCCD, ngày cấp, nơi cấp, địa chỉ… của KTV (backend điền), trang
+cuối là "Xác nhận ký kết" ghi *Bản xem trước · chưa ký*. Gửi hồ sơ xong, backend tạo bản chính thức có chữ ký với cùng
+nội dung. `idCardScanned: false` = chưa quét QR → nên đưa KTV quay lại bước quét CCCD. `contract-template` (mẫu trống)
+không cần dùng nữa.
 
 **Màn "hợp đồng đã ký" phải mở `signedDocumentUrl`**, không tự vẽ lại hợp đồng trong app: bản PDF này mới có
 chữ ký tay thật và là bản admin lưu. Không hiển thị kiểu "Đại diện Bên A: <tên đánh máy> / Đã ký điện tử <ngày>"

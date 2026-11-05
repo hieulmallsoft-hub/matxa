@@ -103,6 +103,25 @@ describe('signing the contract while applying', () => {
       data: expect.objectContaining({ status: 'APPROVED', reviewedBy: 'admin-1', rejectionReason: null }),
     });
   });
+
+  it('previews the contract filled from the ID card, before any signature, overwriting one file', async () => {
+    const { contracts, prisma, uploads } = await subject({ templatePages: 2 });
+    prisma.technicianApplication.findUnique.mockResolvedValue({
+      ...application,
+      idCardNumber: '001099012345',
+      idCardInfo: { fullName: 'Nguyễn Văn Đức', dateOfBirth: '1999-01-01', permanentAddress: 'Hà Nội', issueDate: '2021-08-15', issuePlace: 'Bộ Công an' },
+    });
+    jest.spyOn(contracts as any, 'signedLink').mockImplementation(async (_c: any, _b: any, key: any) => `https://signed/${key}`);
+
+    await expect(contracts.applicantPreview('user-1')).resolves.toMatchObject({
+      downloadUrl: 'https://signed/technician-contracts/user-1/preview.pdf',
+      idCardScanned: true,
+    });
+    const preview = await PDFDocument.load(uploads['technician-contracts/user-1/preview.pdf']);
+    expect(preview.getPageCount()).toBe(3);
+    expect(preview.getTitle()).toBe('Hợp đồng (bản xem trước)');
+    expect(prisma.technicianContract.upsert).not.toHaveBeenCalled();
+  });
 });
 
 describe('applicant views their own signed contract', () => {
@@ -135,4 +154,5 @@ describe('applicant views their own signed contract', () => {
     const contracts = new TechnicianContractService(prisma, { get: () => undefined } as any);
     await expect(contracts.applicantContract('user-1')).resolves.toBeNull();
   });
+
 });

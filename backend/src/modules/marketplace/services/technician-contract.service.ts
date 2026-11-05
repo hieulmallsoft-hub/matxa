@@ -111,6 +111,55 @@ export class TechnicianContractService {
     return { uploadUrl, storageKey, expiresIn: 600 };
   }
 
+  /**
+   * The contract as the applicant will sign it, already filled from their ID card, without a signature.
+   * Rebuilt on every call so it always shows the latest scan; one file per applicant, overwritten.
+   */
+  async applicantPreview(userId: string) {
+    const app = await this.prisma.technicianApplication.findUnique({ where: { userId } });
+    if (!app) throw new NotFoundException('Chua co ho so dang ky');
+    const { bucket, client } = this.storage();
+    const { template, templateBytes, phoneNumber, existingNumber } = await this.contractInputs(client, bucket, userId);
+    const pdf = await buildSignedContractPdf(templateBytes, null, {
+      ...this.applicantInfo(app, phoneNumber, template),
+      contractNumber: existingNumber,
+      signedAt: new Date(),
+      ip: null,
+      device: null,
+    });
+    const key = `technician-contracts/${userId}/preview.pdf`;
+    await client.send(new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: 'application/pdf', Body: pdf }));
+    return {
+      downloadUrl: await this.signedLink(client, bucket, key),
+      expiresIn: 600,
+      fileName: 'hop-dong-xem-truoc.pdf',
+      idCardScanned: Boolean(app.idCardInfo),
+    };
+  }
+
+  private async contractInputs(client: S3Client, bucket: string, userId: string) {
+    const template = await this.prisma.contractTemplate.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'desc' } });
+    const templateBytes = template?.contentType === 'application/pdf' ? (await this.readObject(client, bucket, template.storageKey)).bytes : null;
+    const identity = await this.prisma.userIdentity.findFirst({ where: { userId, provider: 'PHONE' }, select: { phoneNumber: true } });
+    const existing = await this.prisma.technicianContract.findUnique({ where: { userId }, select: { contractNumber: true } });
+    return { template, templateBytes, phoneNumber: identity?.phoneNumber ?? null, existingNumber: existing?.contractNumber ?? null };
+  }
+
+  private applicantInfo(
+    app: { displayName: string | null; idCardNumber: string | null; idCardInfo: unknown; district: string | null; city: string | null },
+    phoneNumber: string | null,
+    template: { fileName: string; createdAt: Date } | null,
+  ) {
+    return {
+      displayName: app.displayName,
+      idCardNumber: app.idCardNumber,
+      idCard: (app.idCardInfo as IdCardInfo | null) ?? null,
+      phoneNumber,
+      area: [app.district, app.city].filter(Boolean).join(', ') || null,
+      templateLabel: template ? `${template.fileName} (tải lên ${template.createdAt.toISOString().slice(0, 10)})` : 'Không có mẫu PDF',
+    };
+  }
+
   /** Records who signed, when and from where, and stores the template + signature page as one PDF. */
   async signApplication(userId: string, signatureKey: string, meta: { ip: string | null; userAgent: string | null; device: string | null }) {
     if (!signatureKey?.startsWith(`technician-contracts/${userId}/signatures/`)) throw new BadRequestException('Chu ky khong hop le');
@@ -120,21 +169,13 @@ export class TechnicianContractService {
     const signature = await this.readObject(client, bucket, signatureKey).catch(() => {
       throw new BadRequestException('Chua tai anh chu ky len');
     });
-    const template = await this.prisma.contractTemplate.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'desc' } });
-    const templateBytes = template?.contentType === 'application/pdf' ? (await this.readObject(client, bucket, template.storageKey)).bytes : null;
-    const identity = await this.prisma.userIdentity.findFirst({ where: { userId, provider: 'PHONE' }, select: { phoneNumber: true } });
-    const existing = await this.prisma.technicianContract.findUnique({ where: { userId }, select: { contractNumber: true } });
-    const contractNumber = existing?.contractNumber ?? `HD-${new Date().getFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`;
+    const { template, templateBytes, phoneNumber, existingNumber } = await this.contractInputs(client, bucket, userId);
+    const contractNumber = existingNumber ?? `HD-${new Date().getFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`;
     const signedAt = new Date();
     const pdf = await buildSignedContractPdf(templateBytes, signature, {
+      ...this.applicantInfo(app, phoneNumber, template),
       contractNumber,
-      displayName: app.displayName,
-      idCardNumber: app.idCardNumber,
-      idCard: (app.idCardInfo as IdCardInfo | null) ?? null,
-      phoneNumber: identity?.phoneNumber ?? null,
-      area: [app.district, app.city].filter(Boolean).join(', ') || null,
       signedAt,
-      templateLabel: template ? `${template.fileName} (tải lên ${template.createdAt.toISOString().slice(0, 10)})` : 'Không có mẫu PDF',
       ip: meta.ip,
       device: meta.device ?? meta.userAgent,
     }).catch((error: Error) => {
@@ -147,7 +188,7 @@ export class TechnicianContractService {
       templateVersion: template?.id ?? 'NO_TEMPLATE',
       status: 'PENDING_REVIEW' as const,
       contractData: {
-        displayName: app.displayName, idCardNumber: app.idCardNumber, idCard: app.idCardInfo ?? null, phoneNumber: identity?.phoneNumber ?? null,
+        displayName: app.displayName, idCardNumber: app.idCardNumber, idCard: app.idCardInfo ?? null, phoneNumber,
         city: app.city, district: app.district, facility: app.facility, address: app.address,
         consent: { ip: meta.ip, userAgent: meta.userAgent, device: meta.device, templateId: template?.id ?? null, templateFileName: template?.fileName ?? null },
       },

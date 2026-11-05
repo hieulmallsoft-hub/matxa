@@ -277,6 +277,17 @@ export class TechnicianController {
   applicationContractTemplate(@CurrentAuth() auth: AccessTokenPayload) {
     return this.contracts.applicantTemplate(auth.sub);
   }
+  @Get('application/contract-preview')
+  @ApiTags('Technician Application')
+  @ApiOperation({
+    summary: 'Hop dong da dien san thong tin Ben A (tu QR CCCD) de KTV doc truoc khi ky',
+    description:
+      'Goi sau khi quet CCCD (PATCH idCardQr). Tra downloadUrl (PDF, het han 600 giay), idCardScanned. ' +
+      'Moi lan goi tao lai theo du lieu moi nhat. Chua co chu ky; chu ky ghep vao khi submit.',
+  })
+  applicationContractPreview(@CurrentAuth() auth: AccessTokenPayload) {
+    return this.contracts.applicantPreview(auth.sub);
+  }
   @Get('application/contract')
   @ApiTags('Technician Application')
   @ApiOperation({
