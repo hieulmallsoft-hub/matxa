@@ -15,6 +15,9 @@ export class AuthUser {
   @ApiProperty({ description: 'Da xac thuc so dien thoai de dat dich vu' })
   phoneVerified!: boolean;
 
+  @ApiProperty({ description: 'Tai khoan co mat khau (dang ky bang email). false = an nut Doi mat khau' })
+  hasPassword!: boolean;
+
   @ApiPropertyOptional({ example: 'user@example.com' })
   email?: string;
 

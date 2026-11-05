@@ -7,7 +7,12 @@ describe('signed-in user changes their password', () => {
   const subject = async (identity: { id: string; passwordHash: string | null } | null = { id: 'identity-1', passwordHash: null }) => {
     const prisma: any = {
       userIdentity: { findFirst: jest.fn(), update: jest.fn() },
-      session: { updateMany: jest.fn().mockResolvedValue({ count: 2 }) },
+      session: {
+        updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+        findMany: jest.fn().mockResolvedValue([{ deviceId: 'old-phone' }, { deviceId: 'this-phone' }, { deviceId: null }]),
+        findUnique: jest.fn().mockResolvedValue({ deviceId: 'this-phone' }),
+      },
+      deviceToken: { deleteMany: jest.fn() },
     };
     prisma.$transaction = jest.fn((callback: any) => callback(prisma));
     const config = { get: (_key: string, fallback: unknown) => fallback, getOrThrow: () => 'a'.repeat(32) };
@@ -32,6 +37,8 @@ describe('signed-in user changes their password', () => {
       where: { userId: 'user-1', revokedAt: null, id: { not: 'session-1' } },
       data: { revokedAt: expect.any(Date) },
     });
+    // The signed-out phones stop getting this account's pushes; this one keeps them.
+    expect(prisma.deviceToken.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user-1', deviceId: { in: ['old-phone'] } } });
   });
 
   it('rejects a wrong current password without changing anything', async () => {

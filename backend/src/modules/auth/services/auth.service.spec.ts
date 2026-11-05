@@ -25,7 +25,8 @@ describe('AuthService', () => {
   };
   const prisma = {
     $transaction: jest.fn((callback) => callback(transaction)),
-    session: { create: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn() },
+    session: { create: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn(), findFirst: jest.fn() },
+    deviceToken: { deleteMany: jest.fn() },
     userIdentity: { findUnique: jest.fn() },
     user: { findUnique: jest.fn() },
   };
@@ -165,16 +166,22 @@ describe('AuthService', () => {
     await expect(service.getCurrentUser('user-id')).resolves.toMatchObject({ id: 'user-id', status: 'ACTIVE' });
     prisma.user.findUnique.mockResolvedValue(null);
     await expect(service.getCurrentUser('missing')).rejects.toThrow();
-    await service.logout('session', 'user-id');
+    prisma.session.findFirst.mockResolvedValue({ deviceId: 'device-1' });
+    await service.logout('session', 'user-id', 'fcm-token');
     expect(prisma.session.updateMany).toHaveBeenLastCalledWith({
       where: { id: 'session', userId: 'user-id', revokedAt: null },
       data: { revokedAt: expect.any(Date) },
+    });
+    // A signed-out phone stops getting this account's notifications.
+    expect(prisma.deviceToken.deleteMany).toHaveBeenLastCalledWith({
+      where: { userId: 'user-id', OR: [{ deviceId: 'device-1' }, { token: 'fcm-token' }] },
     });
     await service.logoutAll('user-id');
     expect(prisma.session.updateMany).toHaveBeenLastCalledWith({
       where: { userId: 'user-id', revokedAt: null },
       data: { revokedAt: expect.any(Date) },
     });
+    expect(prisma.deviceToken.deleteMany).toHaveBeenLastCalledWith({ where: { userId: 'user-id' } });
   });
 
   it('creates a local session after a valid Google login', async () => {

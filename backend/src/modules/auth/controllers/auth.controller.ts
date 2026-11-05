@@ -23,6 +23,7 @@ import { ChangePasswordDto } from '../dto/change-password.dto';
 import { VerifyPasswordResetOtpDto } from '../dto/verify-password-reset-otp.dto';
 import { SendEmailOtpDto } from '../dto/send-email-otp.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
+import { LogoutDto } from '../dto/logout.dto';
 import { SendPhoneOtpDto } from '../dto/send-phone-otp.dto';
 import { VerifyPhoneOtpDto } from '../dto/verify-phone-otp.dto';
 import { AccessTokenGuard } from '../guards/access-token.guard';
@@ -261,17 +262,20 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(AccessTokenGuard)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Dang xuat session hien tai' })
+  @ApiOperation({
+    summary: 'Dang xuat session hien tai',
+    description: 'Gui kem deviceToken (FCM) neu co de may nay thoi nhan thong bao cua tai khoan. Body co the bo trong.',
+  })
   @ApiNoContentResponse()
-  logout(@CurrentAuth() auth: AccessTokenPayload): Promise<void> {
-    return this.authService.logout(auth.sid, auth.sub);
+  logout(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: LogoutDto): Promise<void> {
+    return this.authService.logout(auth.sid, auth.sub, dto?.deviceToken);
   }
 
   @Post('logout-all')
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(AccessTokenGuard)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Dang xuat khoi tat ca thiet bi' })
+  @ApiOperation({ summary: 'Dang xuat khoi tat ca thiet bi', description: 'Moi thiet bi deu thoi nhan thong bao day.' })
   @ApiNoContentResponse()
   logoutAll(@CurrentAuth() auth: AccessTokenPayload): Promise<void> {
     return this.authService.logoutAll(auth.sub);

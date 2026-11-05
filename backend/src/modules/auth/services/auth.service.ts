@@ -169,12 +169,22 @@ export class AuthService {
       throw new BadRequestException('Mat khau hien tai khong dung');
     if (currentPassword === newPassword) throw new BadRequestException('Mat khau moi phai khac mat khau hien tai');
     const passwordHash = await this.hashPassword(newPassword);
+    const others = await this.prisma.session.findMany({
+      where: { userId, revokedAt: null, id: { not: sessionId } },
+      select: { deviceId: true },
+    });
+    const current = await this.prisma.session.findUnique({ where: { id: sessionId }, select: { deviceId: true } });
+    const signedOutDevices = others
+      .map((session) => session.deviceId)
+      .filter((deviceId): deviceId is string => Boolean(deviceId) && deviceId !== current?.deviceId);
     await this.prisma.$transaction(async (transaction) => {
       await transaction.userIdentity.update({ where: { id: identity.id }, data: { passwordHash } });
       await transaction.session.updateMany({
         where: { userId, revokedAt: null, id: { not: sessionId } },
         data: { revokedAt: new Date() },
       });
+      if (signedOutDevices.length)
+        await transaction.deviceToken.deleteMany({ where: { userId, deviceId: { in: signedOutDevices } } });
     });
     return { changed: true };
   }
@@ -312,11 +322,21 @@ export class AuthService {
     return this.toAuthUser(user);
   }
 
-  async logout(sessionId: string, userId: string): Promise<void> {
+  /**
+   * Ends this session and stops pushes to the phone it ran on: by its deviceId, or by the FCM token the app
+   * sends, so a signed-out phone no longer shows this account's notifications.
+   */
+  async logout(sessionId: string, userId: string, deviceToken?: string): Promise<void> {
+    const session = await this.prisma.session.findFirst({ where: { id: sessionId, userId }, select: { deviceId: true } });
     await this.prisma.session.updateMany({
       where: { id: sessionId, userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    const devices = [
+      ...(session?.deviceId ? [{ deviceId: session.deviceId }] : []),
+      ...(deviceToken ? [{ token: deviceToken }] : []),
+    ];
+    if (devices.length) await this.prisma.deviceToken.deleteMany({ where: { userId, OR: devices } });
   }
 
   async logoutAll(userId: string): Promise<void> {
@@ -324,6 +344,7 @@ export class AuthService {
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    await this.prisma.deviceToken.deleteMany({ where: { userId } });
   }
 
   private async createSession(
@@ -579,6 +600,8 @@ export class AuthService {
     return {
       id: user.id,
       provider,
+      // Only email accounts have a password; Google, Apple and phone sign-ins have nothing to change.
+      hasPassword: user.identities.some((item) => item.provider === DbAuthProvider.EMAIL && Boolean(item.passwordHash)),
       phoneVerified: Boolean(verifiedPhone),
       ...(verifiedPhone?.phoneNumber ? { phoneNumber: verifiedPhone.phoneNumber } : {}),
       ...(identity?.email ? { email: identity.email } : {}),

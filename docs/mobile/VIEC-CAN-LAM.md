@@ -56,15 +56,19 @@ Khách cần gọi được cho KTV, nên tài khoản đăng nhập bằng Goog
 | KTV đã duyệt nhưng chưa có số | `GET /api/profile/me` → `"phoneRequired": true` | Sau khi đăng nhập, **bắt buộc** hiện màn nhập số điện thoại, chưa nhập thì không vào app được |
 | KTV chưa có số bấm nhận đơn | `409`, `"code": "PHONE_REQUIRED"` ("Vui long cap nhat so dien thoai truoc khi nhan don") | Hiện thông báo và mở màn nhập số |
 
-Lưu số điện thoại:
+Lưu số điện thoại **có xác minh OTP** (dùng 2 API này, không dùng `PATCH /api/profile/me` vì không xác minh số):
 
 ```http
-PATCH /api/profile/me
-{ "phoneNumber": "0901234567" }
+POST /api/auth/phone/link/send-otp
+{ "phoneNumber": "0901234567", "deviceId": "<id máy>" }
+→ { "challengeId": "…", "expiresIn": 300, "resendAfter": 60 }
+
+POST /api/auth/phone/link/verify-otp
+{ "challengeId": "…", "code": "123456", "deviceId": "<id máy>" }
+→ thông tin tài khoản, có "phoneNumber" và "phoneVerified": true
 ```
 
-Response có `phone` và `phoneRequired: false`. Số sai định dạng → `400 "So dien thoai Viet Nam khong hop le"`; số đã
-thuộc tài khoản khác → `409 "So dien thoai da duoc lien ket voi tai khoan khac"`.
+Xong thì gọi lại `GET /api/profile/me`, thấy `phoneRequired: false` là được.
 
 ### A3. Màn "Ký hợp đồng & gửi hồ sơ": mở PDF từ server (bắt buộc làm)
 
@@ -164,7 +168,41 @@ Lý do cho KTV chọn (`reasonCode`):
 
 Lỗi: `409 "Lich dat da duoc tao khieu nai"` = KTV đã khiếu nại đơn này rồi → mở khiếu nại cũ.
 
-## E. Quy tắc chung về link file
+## E. Đăng xuất và đổi mật khẩu (app khách và app KTV)
+
+API đã có sẵn, chỉ cần nối vào màn Cài đặt / Tài khoản.
+
+### Đăng xuất
+
+| Nút | API | Ghi chú |
+|---|---|---|
+| "Đăng xuất" | `POST /api/auth/logout` | Body `{ "deviceToken": "<FCM token của máy>" }` (có thể bỏ trống). Trả `204`. Máy này **thôi nhận thông báo** của tài khoản |
+| "Đăng xuất khỏi mọi thiết bị" (nếu có) | `POST /api/auth/logout-all` | Trả `204`. Mọi máy thôi nhận thông báo |
+
+Sau khi gọi (kể cả khi API lỗi mạng): **xóa accessToken và refreshToken** trong máy rồi về màn đăng nhập.
+Token cũ dùng lại sẽ nhận `401`.
+
+### Đổi mật khẩu
+
+Chỉ tài khoản **đăng ký bằng email** mới có mật khẩu. `GET /api/auth/me` có `hasPassword`:
+`true` → hiện nút "Đổi mật khẩu"; `false` (đăng nhập Google/Apple/số điện thoại) → **ẩn** nút.
+
+```http
+POST /api/auth/password/change
+Authorization: Bearer <token>
+{ "currentPassword": "matkhaucu", "newPassword": "matkhaumoi123" }
+→ 200 { "changed": true }
+```
+
+- Mật khẩu mới **tối thiểu 8 ký tự**.
+- Thành công: máy đang dùng **vẫn đăng nhập**, các máy khác bị đăng xuất.
+- Lỗi `400`: `"Mat khau hien tai khong dung"` · `"Mat khau moi phai khac mat khau hien tai"` ·
+  `"Tai khoan khong dang nhap bang mat khau"` (không nên xảy ra nếu đã ẩn nút theo `hasPassword`).
+- Gọi tối đa 5 lần/phút; quá thì `429`.
+
+Quên mật khẩu (ở màn đăng nhập) dùng 3 API có sẵn: `POST /api/auth/password/forgot/start` → `/verify-otp` → `/complete`.
+
+## F. Quy tắc chung về link file
 
 Mọi link file (`downloadUrl`, `signedDocumentUrl`, `viewUrl`…) **hết hạn sau 600 giây** vì là dữ liệu riêng tư.
 Luôn gọi API lấy link mới ngay trước khi mở, không lưu link vào bộ nhớ hay cache.
