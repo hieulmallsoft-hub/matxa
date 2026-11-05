@@ -657,6 +657,7 @@ export class BookingsService {
 
   async applyToOpenJob(userId: string, bookingId: string) {
     const profile = await this.requireActiveTechnician(userId);
+    await this.requireTechnicianPhone(userId);
     const booking = await this.openJobForTechnician(bookingId, profile.id, true);
     const existing = await this.prisma.bookingTechnicianApplication.findUnique({
       where: { bookingId_technicianProfileId: { bookingId, technicianProfileId: profile.id } },
@@ -1196,7 +1197,8 @@ export class BookingsService {
     return { bookingId: id, displayName: booking.customer.displayName, phoneNumber: phone.phoneNumber };
   }
 
-  acceptTechnicianJob(userId: string, id: string) {
+  async acceptTechnicianJob(userId: string, id: string) {
+    await this.requireTechnicianPhone(userId);
     return this.updateStatus(userId, id, { status: 'CONFIRMED' });
   }
 
@@ -1718,6 +1720,17 @@ export class BookingsService {
       }
       throw error;
     }
+  }
+
+  /** The customer calls the technician they booked, so taking a job needs a phone number on the account. */
+  private async requireTechnicianPhone(userId: string) {
+    const phone = await this.prisma.userIdentity.findFirst({ where: { userId, phoneNumber: { not: null } }, select: { id: true } });
+    if (!phone)
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'PHONE_REQUIRED',
+        message: 'Vui long cap nhat so dien thoai truoc khi nhan don',
+      });
   }
 
   private async requireActiveTechnician(userId: string) {

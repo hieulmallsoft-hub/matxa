@@ -26,6 +26,17 @@ describe('ProfileService', () => {
 
   beforeEach(() => jest.resetAllMocks());
 
+  it('asks a technician without a phone number to add one, but not a customer', async () => {
+    prisma.user.findUnique.mockResolvedValue({ ...user, role: 'TECHNICIAN', identities: [] });
+    await expect(service.getMe(user.id)).resolves.toMatchObject({ phone: null, phoneRequired: true });
+    prisma.user.findUnique.mockResolvedValue({
+      ...user,
+      role: 'TECHNICIAN',
+      identities: [{ provider: 'PHONE', phoneNumber: '+84901234567', email: null, emailVerified: true }],
+    });
+    await expect(service.getMe(user.id)).resolves.toMatchObject({ phoneRequired: false });
+  });
+
   it('returns profile and completed onboarding status', async () => {
     prisma.user.findUnique.mockResolvedValue(user);
     await expect(service.getMe(user.id)).resolves.toEqual({
@@ -35,6 +46,7 @@ describe('ProfileService', () => {
       email: null,
       phone: null,
       phoneVerified: false,
+      phoneRequired: false,
       onboardingCompleted: true,
     });
   });

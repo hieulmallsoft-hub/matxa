@@ -134,6 +134,8 @@ export class ProfileService {
       email: emailIdentity,
       phone: phoneIdentity?.phoneNumber ?? null,
       phoneVerified: Boolean(phoneIdentity?.phoneNumber),
+      // A technician without a phone cannot take bookings; the app must ask for one before anything else.
+      phoneRequired: user.role === 'TECHNICIAN' && !phoneIdentity?.phoneNumber,
       onboardingCompleted: Boolean(user.displayName && user.gender && user.nationality),
     };
   }

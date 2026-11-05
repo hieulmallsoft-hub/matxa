@@ -10,6 +10,7 @@ describe('requested technician accepts an open booking', () => {
 
   const subject = (profileId: string, existing: any = null) => {
     const prisma: any = {
+      userIdentity: { findFirst: jest.fn().mockResolvedValue({ id: 'phone-1' }) },
       bookingTechnicianApplication: {
         findUnique: jest.fn().mockResolvedValue(existing),
         create: jest.fn(async ({ data }: any) => ({ id: `${data.technicianProfileId}-application`, ...data })),

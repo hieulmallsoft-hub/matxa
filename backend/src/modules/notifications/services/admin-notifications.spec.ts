@@ -5,6 +5,7 @@ import { TechnicianApplicationsService } from '../../marketplace/services/techni
 describe('admin notifications', () => {
   it('creates one in-app notification per active admin', async () => {
     const prisma: any = {
+      userIdentity: { findFirst: jest.fn().mockResolvedValue({ id: 'phone-1' }) },
       user: { findMany: jest.fn().mockResolvedValue([{ id: 'admin-1' }, { id: 'admin-2' }]) },
       notification: { createMany: jest.fn().mockResolvedValue({ count: 2 }) },
     };
@@ -25,6 +26,7 @@ describe('admin notifications', () => {
 
   it('notifies admins when a technician submits an application', async () => {
     const prisma: any = {
+      userIdentity: { findFirst: jest.fn().mockResolvedValue({ id: 'phone-1' }) },
       technicianApplication: {
         findUnique: jest.fn().mockResolvedValue({
           id: 'app-1', status: 'DRAFT', displayName: 'Lan', idCardNumber: '1', idCardFrontKey: 'f', idCardBackKey: 'b', faceImageKey: 'x',
@@ -47,6 +49,7 @@ describe('admin notifications', () => {
       bookingTechnicianApplication: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     };
     const prisma: any = {
+      userIdentity: { findFirst: jest.fn().mockResolvedValue({ id: 'phone-1' }) },
       $transaction: jest.fn((callback: any) => callback(tx)),
       booking: { findFirst: jest.fn().mockResolvedValue({ id: 'booking-1', status: 'COMPLETED', complaint: null }) },
       complaint: { create: jest.fn().mockResolvedValue({ id: 'complaint-1' }) },

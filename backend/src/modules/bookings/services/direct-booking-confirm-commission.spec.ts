@@ -15,6 +15,7 @@ describe('technician confirms a direct booking', () => {
   const subject = () => {
     const tx: any = { booking: { update: jest.fn(async ({ data }: any) => ({ ...pending, ...data })) } };
     const prisma: any = {
+      userIdentity: { findFirst: jest.fn().mockResolvedValue({ id: 'phone-1' }) },
       user: { findUnique: jest.fn().mockResolvedValue({ role: 'TECHNICIAN' }) },
       $transaction: jest.fn((callback: any) => callback(tx)),
     };

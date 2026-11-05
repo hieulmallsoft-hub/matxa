@@ -9,6 +9,7 @@ describe('submitting a technician application', () => {
   };
   const subject = (application: object) => {
     const prisma: any = {
+      userIdentity: { findFirst: jest.fn().mockResolvedValue({ id: 'phone-1' }) },
       technicianApplication: {
         findUnique: jest.fn().mockResolvedValue({ ...complete, ...application }),
         update: jest.fn(async ({ data }: any) => ({ ...complete, ...data })),
@@ -40,5 +41,12 @@ describe('submitting a technician application', () => {
 
   it('submits a complete application', async () => {
     await expect(subject({}).submit('user-1')).resolves.toMatchObject({ status: 'SUBMITTED' });
+  });
+
+  it('requires a phone number: an account signed in with Google or email may not have one', async () => {
+    const service = subject({});
+    (service as any).prisma.userIdentity.findFirst.mockResolvedValue(null);
+    const error = await service.submit('user-1').catch((caught) => caught);
+    expect(error.getResponse()).toMatchObject({ message: 'Ho so con thieu: so dien thoai', missingFields: ['phoneNumber'] });
   });
 });

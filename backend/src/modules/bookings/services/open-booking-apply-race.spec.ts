@@ -15,6 +15,7 @@ describe('applying while the booking is being taken', () => {
       bookingTechnicianApplication: { create: jest.fn(async ({ data }: any) => ({ id: 'application', ...data })) },
     };
     const prisma: any = {
+      userIdentity: { findFirst: jest.fn().mockResolvedValue({ id: 'phone-1' }) },
       $transaction: jest.fn((callback: any) => callback(tx)),
       bookingTechnicianApplication: { findUnique: jest.fn().mockResolvedValue(null) },
     };

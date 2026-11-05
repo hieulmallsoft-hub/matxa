@@ -156,7 +156,10 @@ export class TechnicianApplicationsService {
     const app = await this.prisma.technicianApplication.findUnique({ where: { userId } });
     if (!app) throw new NotFoundException('Chua co ho so dang ky');
     // Say exactly what is missing; a generic "incomplete" left technicians guessing.
-    const missingFields = REQUIRED_FOR_SUBMIT.filter(([field]) => !String(app[field] ?? '').trim());
+    const missingFields: Array<readonly [string, string]> = REQUIRED_FOR_SUBMIT.filter(([field]) => !String(app[field] ?? '').trim());
+    // Customers call their technician, so an account signed in with Google/Apple/email must add a phone first.
+    const phone = await this.prisma.userIdentity.findFirst({ where: { userId, phoneNumber: { not: null } }, select: { id: true } });
+    if (!phone) missingFields.push(['phoneNumber', 'so dien thoai']);
     if (missingFields.length)
       throw new BadRequestException({
         statusCode: 400,

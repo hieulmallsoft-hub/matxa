@@ -5,6 +5,7 @@ describe('technician applies to an open booking', () => {
   // 400.000đ of services at the default 25% platform fee = 100.000đ commission on selection.
   const subject = (balanceVnd: number | null, grossServiceAmount = 400000) => {
     const prisma: any = {
+      userIdentity: { findFirst: jest.fn().mockResolvedValue({ id: 'phone-1' }) },
       technicianProfile: { findFirst: jest.fn().mockResolvedValue({ id: 'profile-1' }) },
       bookingTechnicianApplication: {
         findUnique: jest.fn().mockResolvedValue(null),

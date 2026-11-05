@@ -46,6 +46,26 @@ Response (rút gọn):
 - Khi `POST /api/technician/application/submit` trả `400`, đọc `missingFields` (ví dụ `["idCardBackKey", "faceImageKey"]`)
   để hiện "Hồ sơ còn thiếu: ảnh CCCD mặt sau, ảnh khuôn mặt" và đưa về đúng bước.
 
+### A2b. Bắt buộc có số điện thoại (KTV đăng ký mới và KTV đã duyệt)
+
+Khách cần gọi được cho KTV, nên tài khoản đăng nhập bằng Google/Apple/email (chưa có số điện thoại) phải thêm số.
+
+| Trường hợp | Server trả | App làm |
+|---|---|---|
+| Gửi hồ sơ KTV khi chưa có số | `400`, `missingFields` có `"phoneNumber"` ("Ho so con thieu: so dien thoai") | Đưa về màn nhập số điện thoại |
+| KTV đã duyệt nhưng chưa có số | `GET /api/profile/me` → `"phoneRequired": true` | Sau khi đăng nhập, **bắt buộc** hiện màn nhập số điện thoại, chưa nhập thì không vào app được |
+| KTV chưa có số bấm nhận đơn | `409`, `"code": "PHONE_REQUIRED"` ("Vui long cap nhat so dien thoai truoc khi nhan don") | Hiện thông báo và mở màn nhập số |
+
+Lưu số điện thoại:
+
+```http
+PATCH /api/profile/me
+{ "phoneNumber": "0901234567" }
+```
+
+Response có `phone` và `phoneRequired: false`. Số sai định dạng → `400 "So dien thoai Viet Nam khong hop le"`; số đã
+thuộc tài khoản khác → `409 "So dien thoai da duoc lien ket voi tai khoan khac"`.
+
 ### A3. Màn "Ký hợp đồng & gửi hồ sơ": mở PDF từ server (bắt buộc làm)
 
 **Bỏ hợp đồng app đang tự vẽ** (đoạn "Bên A: LÊ HIẾU…"). Thay bằng:
