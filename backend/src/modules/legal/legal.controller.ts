@@ -8,7 +8,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { AccessTokenPayload } from '../auth/entities/access-token-payload.entity';
 import { AccessTokenGuard } from '../auth/guards/access-token.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { LEGAL_AUDIENCES, LegalAudience, LegalService } from './legal.service';
+import { LEGAL_AUDIENCES, LegalAudience, LegalService, MAX_PDF_BYTES } from './legal.service';
 
 class UploadLegalDocumentDto {
   @ApiPropertyOptional({ example: 'PRIVACY_POLICY', description: 'Ma van ban. Bo trong thi tao tu ten. Trung ma = phien ban moi.' })
@@ -70,7 +70,8 @@ export class AdminLegalController {
       },
     },
   })
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10_000_000 } }))
+  // Multer only cuts off runaway uploads; the service gives the readable size error.
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_PDF_BYTES * 2 } }))
   upload(@CurrentAuth() auth: AccessTokenPayload, @UploadedFile() file: any, @Body() dto: UploadLegalDocumentDto) {
     return this.legal.upload(auth.sub, file, dto);
   }

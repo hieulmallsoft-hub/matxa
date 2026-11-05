@@ -32,6 +32,8 @@ const PRESETS: Array<{ code: string; title: string; audience: Audience }> = [
   { code: 'TERMS_OF_USE', title: 'Điều khoản sử dụng', audience: 'ALL' },
 ];
 const OTHER = '__OTHER__';
+const MAX_MB = 30;
+const sizeMb = (bytes: number) => (bytes / 1_000_000).toFixed(1).replace('.', ',');
 const date = (value: string) => new Date(value).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 export function LegalDocumentsPage() {
@@ -76,6 +78,8 @@ export function LegalDocumentsPage() {
   const upload = async (event: FormEvent) => {
     event.preventDefault();
     if (!file) return addToast({ type: 'error', title: 'Chưa chọn file PDF' });
+    if (file.size > MAX_MB * 1_000_000)
+      return addToast({ type: 'error', title: 'File quá lớn', message: `File nặng ${sizeMb(file.size)}MB, tối đa ${MAX_MB}MB. Hãy nén PDF rồi tải lại.` });
     if (!title.trim()) return addToast({ type: 'error', title: 'Chưa nhập tên văn bản' });
     const form = new FormData();
     form.append('file', file);
@@ -147,7 +151,13 @@ export function LegalDocumentsPage() {
           <Field label="Tên hiển thị trên app" required className="md:col-span-2">
             <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="vd: Chính sách hoàn tiền" maxLength={200} />
           </Field>
-          <Field label="File PDF (tối đa 10MB)" required className="md:col-span-2">
+          <Field
+            label={`File PDF (tối đa ${MAX_MB}MB)`}
+            required
+            className="md:col-span-2"
+            hint={file ? `${file.name} · ${sizeMb(file.size)}MB` : undefined}
+            error={file && file.size > MAX_MB * 1_000_000 ? `File nặng ${sizeMb(file.size)}MB, vượt quá ${MAX_MB}MB` : null}
+          >
             <input
               ref={fileInput}
               type="file"

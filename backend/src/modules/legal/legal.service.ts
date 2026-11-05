@@ -7,7 +7,8 @@ import { PrismaService } from '../../database/prisma.service';
 
 export const LEGAL_AUDIENCES = ['CUSTOMER', 'TECHNICIAN', 'ALL'] as const;
 export type LegalAudience = (typeof LEGAL_AUDIENCES)[number];
-const MAX_PDF_BYTES = 10_000_000;
+/** Policy PDFs are often long, scanned documents. */
+export const MAX_PDF_BYTES = 30_000_000;
 
 type LegalRow = {
   code: string; title: string; audience: string; version: number; storageKey: string; fileName: string;
@@ -85,7 +86,7 @@ export class LegalService {
     dto: { code?: string; title: string; audience: string; sortOrder?: number },
   ) {
     if (!file?.buffer?.length || file.mimetype !== 'application/pdf') throw new BadRequestException('Van ban phai la file PDF');
-    if (file.size > MAX_PDF_BYTES) throw new BadRequestException('File PDF toi da 10MB');
+    if (file.size > MAX_PDF_BYTES) throw new BadRequestException(`File PDF toi da ${MAX_PDF_BYTES / 1_000_000}MB`);
     const title = dto.title?.trim();
     if (!title) throw new BadRequestException('Vui long nhap ten van ban');
     if (!LEGAL_AUDIENCES.includes(dto.audience as LegalAudience)) throw new BadRequestException('Doi tuong phai la CUSTOMER, TECHNICIAN hoac ALL');
