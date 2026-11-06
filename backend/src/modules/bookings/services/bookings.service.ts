@@ -19,7 +19,7 @@ import { PayosService } from './payos.service';
 import { Optional } from '@nestjs/common';
 import { SettingsService } from '../../settings/settings.service';
 import { ComplaintStorageService } from './complaint-storage.service';
-import { addressPreview, kmBetween, technicianBadge, travelFeeFor } from './distance';
+import { addressPreview, confirmationDeadline, kmBetween, technicianBadge, travelFeeFor } from './distance';
 import { COMPLAINT_STATUS_LABEL, complaintStatusEvent, ensureComplaintConversation } from './complaint-conversation';
 import {
   BookingHistoryQueryDto,
@@ -202,9 +202,7 @@ export class BookingsService {
   }
 
   async create(userId: string, dto: CreateBookingDto) {
-    const acceptanceDeadlineAt = new Date(
-      Date.now() + Number(this.config.get('OPEN_BOOKING_APPLICATION_TTL_MINUTES', 15)) * 60_000,
-    );
+    const acceptanceDeadlineAt = new Date(Date.now() + (await this.bookingRules()).confirmationWaitMinutes * 60_000);
     try {
       const booking = await this.prisma.$transaction(
         async (tx) => {
@@ -543,9 +541,12 @@ export class BookingsService {
     await this.assertLeadTime(start);
     if (dto.mode !== 'HOME' && dto.addressId) throw new BadRequestException('Chi gui addressId khi dat tai nha');
     const now = new Date();
-    const defaultTtlMinutes = Number(this.config.get('OPEN_BOOKING_APPLICATION_TTL_MINUTES', 15));
-    const requestedDeadline = dto.applicationDeadlineAt ? new Date(dto.applicationDeadlineAt) : null;
-    const deadline = requestedDeadline ?? new Date(now.getTime() + defaultTtlMinutes * 60_000);
+    const deadline = confirmationDeadline(
+      now,
+      start,
+      dto.applicationDeadlineAt ? new Date(dto.applicationDeadlineAt) : null,
+      (await this.bookingRules()).confirmationWaitMinutes,
+    );
     if (!Number.isFinite(deadline.getTime()) || deadline <= now || deadline >= start)
       throw new BadRequestException('Han ung tuyen phai nam giua hien tai va gio dat lich');
     const catalogIds = [...new Set(dto.items.map((item) => item.catalogServiceId))];
@@ -1208,7 +1209,16 @@ export class BookingsService {
 
   /** Admin booking rules; 0 means no limit. Defaults apply when settings are not wired (tests). */
   private async bookingRules() {
-    return (await this.settings?.getBookingRules()) ?? { minAdvanceHours: 0, maxDispatchRadiusKm: 0, travelFeeThresholdKm: 10, travelFeeAmount: 0 };
+    return (
+      (await this.settings?.getBookingRules()) ?? {
+        minAdvanceHours: 0,
+        maxDispatchRadiusKm: 0,
+        travelFeeThresholdKm: 10,
+        travelFeeAmount: 0,
+        confirmationWaitMinutes: Number(this.config.get('OPEN_BOOKING_APPLICATION_TTL_MINUTES', 10)),
+        requireTechnicianPhone: false,
+      }
+    );
   }
 
   private async assertLeadTime(start: Date) {
@@ -1740,6 +1750,7 @@ export class BookingsService {
 
   /** The customer calls the technician they booked, so taking a job needs a phone number on the account. */
   private async requireTechnicianPhone(userId: string) {
+    if (!(await this.bookingRules()).requireTechnicianPhone) return;
     const phone = await this.prisma.userIdentity.findFirst({ where: { userId, phoneNumber: { not: null } }, select: { id: true } });
     if (!phone)
       throw new ConflictException({

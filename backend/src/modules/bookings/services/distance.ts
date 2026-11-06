@@ -50,3 +50,14 @@ export function travelFeeFor(
   if (mode !== 'HOME' || distanceKm === null || !(amount > 0)) return 0;
   return distanceKm > Number(rules.travelFeeThresholdKm ?? 10) ? amount : 0;
 }
+
+/**
+ * When a new booking stops waiting for technicians: at least the admin's waiting time (an app asking for less gets
+ * that much), later if the app asks, but always before the booking starts (a minute before when it starts sooner).
+ */
+export function confirmationDeadline(now: Date, start: Date, requested: Date | null, waitMinutes: number) {
+  const waitUntil = new Date(now.getTime() + waitMinutes * 60_000);
+  const deadline = requested && requested > waitUntil ? requested : waitUntil;
+  if (deadline < start) return deadline;
+  return requested && requested < start ? requested : new Date(start.getTime() - 60_000);
+}

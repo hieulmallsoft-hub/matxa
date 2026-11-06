@@ -60,6 +60,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
   const [maxTravelDistanceKm, setMaxTravelDistanceKm] = useState('0');
   const [travelFeeThresholdKm, setTravelFeeThresholdKm] = useState('10');
   const [travelFeeAmount, setTravelFeeAmount] = useState('0');
+  const [confirmationWaitMinutes, setConfirmationWaitMinutes] = useState('10');
+  const [requireTechnicianPhone, setRequireTechnicianPhone] = useState(false);
   const [techCommissionRate, setTechCommissionRate] = useState('75');
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
 
@@ -81,12 +83,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         setSupportEmail(value.supportEmail);
       })
       .catch(() => undefined);
-    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number }>('/admin/settings/booking')
+    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number; confirmationWaitMinutes: number; requireTechnicianPhone: boolean }>('/admin/settings/booking')
       .then((value) => {
         setMinAdvanceHours(String(value.minAdvanceHours));
         setMaxTravelDistanceKm(String(value.maxDispatchRadiusKm));
         setTravelFeeThresholdKm(String(value.travelFeeThresholdKm ?? 10));
         setTravelFeeAmount(String(value.travelFeeAmount ?? 0));
+        setConfirmationWaitMinutes(String(value.confirmationWaitMinutes ?? 10));
+        setRequireTechnicianPhone(Boolean(value.requireTechnicianPhone));
       })
       .catch(() => undefined);
   }, []);
@@ -137,9 +141,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         const fee = Number(travelFeeAmount);
         if (!Number.isInteger(feeKm) || feeKm < 0 || feeKm > 200) throw new Error('Ngưỡng tính phí di chuyển phải là số nguyên từ 0 đến 200 km');
         if (!Number.isInteger(fee) || fee < 0 || fee > 5_000_000) throw new Error('Phí di chuyển phải là số nguyên từ 0 đến 5.000.000đ');
+        const wait = Number(confirmationWaitMinutes);
+        if (!Number.isInteger(wait) || wait < 1 || wait > 60) throw new Error('Thời gian chờ KTV xác nhận phải từ 1 đến 60 phút');
         await request('/admin/settings/booking', {
           method: 'PATCH',
-          body: JSON.stringify({ minAdvanceHours: hours, maxDispatchRadiusKm: radius, travelFeeThresholdKm: feeKm, travelFeeAmount: fee }),
+          body: JSON.stringify({ minAdvanceHours: hours, maxDispatchRadiusKm: radius, travelFeeThresholdKm: feeKm, travelFeeAmount: fee, confirmationWaitMinutes: wait, requireTechnicianPhone }),
         });
         addToast({ title: 'Đã lưu quy định đặt lịch', message: 'Áp dụng cho các đơn đặt sau khi lưu.', type: 'success' });
       }
@@ -300,6 +306,34 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
                   />
                   <span className="text-[11px] text-[#66756B]">Khách phải đặt trước ca phục vụ ít nhất bao nhiêu giờ. Nhập 0 để không giới hạn.</span>
+                </div>
+
+                <label className="flex items-start gap-3 p-3.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={requireTechnicianPhone}
+                    onChange={(e) => setRequireTechnicianPhone(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-[#2E7D4A]"
+                  />
+                  <span>
+                    <span className="block text-xs font-bold text-[#1C2B20]">Bắt buộc KTV có số điện thoại để nhận đơn</span>
+                    <span className="block text-[11px] text-[#66756B]">
+                      Chỉ bật khi app đã có màn nhập số điện thoại. Bật thì KTV đăng nhập bằng Google/Apple/email chưa thêm số sẽ không nhận được đơn.
+                    </span>
+                  </span>
+                </label>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[#1C2B20]">Thời gian chờ KTV xác nhận (phút)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={confirmationWaitMinutes}
+                    onChange={(e) => setConfirmationWaitMinutes(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
+                  />
+                  <span className="text-[11px] text-[#66756B]">Đơn mới chờ KTV nhận trong bấy nhiêu phút, quá thời gian thì đơn hết hạn. Áp dụng cho đơn đặt sau khi lưu.</span>
                 </div>
 
                 <div className="space-y-1">

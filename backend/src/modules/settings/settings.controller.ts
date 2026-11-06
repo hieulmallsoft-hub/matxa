@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Patch } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { IsEmail, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
+import { IsBoolean, IsEmail, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 import { AccessTokenGuard } from '../auth/guards/access-token.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -46,6 +46,14 @@ class UpdateBookingRulesDto {
   @ApiPropertyOptional({ example: 50000, description: 'Phi di chuyen co dinh (VND), KTV nhan 100%. 0 = khong thu phi di chuyen.' })
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(5_000_000)
   travelFeeAmount?: number;
+
+  @ApiPropertyOptional({ example: 10, description: 'Don moi cho KTV xac nhan bao nhieu phut truoc khi het han.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(60)
+  confirmationWaitMinutes?: number;
+
+  @ApiPropertyOptional({ example: false, description: 'Bat = KTV chua co so dien thoai khong nhan duoc don (409 PHONE_REQUIRED).' })
+  @IsOptional() @IsBoolean()
+  requireTechnicianPhone?: boolean;
 }
 
 @ApiTags('Admin Settings')

@@ -14,6 +14,8 @@ import {
 } from '../dto/booking.dto';
 import { BookingsService } from '../services/bookings.service';
 import { TechnicianBookingCancellationService } from '../services/technician-booking-cancellation.service';
+import { technicianActivity } from '../services/technician-activity';
+import { PrismaService } from '../../../database/prisma.service';
 
 /** One technician job card / detail, as returned by both the list and the detail endpoint. */
 const technicianJobSchema = {
@@ -95,6 +97,7 @@ export class TechnicianJobsController {
   constructor(
     private readonly bookings: BookingsService,
     private readonly cancellations: TechnicianBookingCancellationService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Get()
@@ -112,6 +115,17 @@ export class TechnicianJobsController {
   })
   list(@CurrentAuth() auth: AccessTokenPayload, @Query() query: TechnicianJobQueryDto) {
     return this.bookings.listTechnicianJobs(auth.sub, query);
+  }
+  // Declared before ':id' so "activity" is not read as a booking id.
+  @Get('activity')
+  @ApiOperation({
+    summary: 'Lich su hoat dong: so don, so khach, thu nhap hom nay / tuan nay / thang nay',
+    description:
+      'Tinh theo gio Viet Nam, tuan bat dau thu Hai, chi don COMPLETED (theo gio hen). earning = tien KTV nhan sau hoa hong, ' +
+      'da gom phi di chuyen. recent = 20 don hoan thanh gan nhat.',
+  })
+  activity(@CurrentAuth() auth: AccessTokenPayload) {
+    return technicianActivity(this.prisma, auth.sub);
   }
   @Get(':id')
   @ApiOperation({ summary: 'KTV xem chi tiet don cua minh' })

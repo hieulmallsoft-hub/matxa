@@ -1,4 +1,4 @@
-# Việc mobile cần làm (cập nhật 05/11/2026)
+# Việc mobile cần làm (cập nhật 06/11/2026)
 
 Backend đã xong và đang chạy trên server. Swagger: http://149.28.156.66:5600/api/docs
 
@@ -6,8 +6,8 @@ Backend đã xong và đang chạy trên server. Swagger: http://149.28.156.66:5
 
 Luồng màn hình: **Chụp CCCD + quét QR → Chụp khuôn mặt → Xem hợp đồng đã điền sẵn → Tick + ký tay → Gửi hồ sơ**
 
-> Hiện trạng trên server: app đã upload ảnh CCCD nhưng **chưa gửi chuỗi QR**, và màn ký vẫn là hợp đồng app tự vẽ.
-> Vì vậy hợp đồng chưa tự điền theo CCCD. Hai việc A1 và A3 bên dưới là việc chính cần làm.
+> Hiện trạng (06/11): app **đã gửi chuỗi QR** và **đã mở hợp đồng từ `contract-preview`**; server đã tự điền
+> thông tin Bên A vào trang 1 của mẫu hợp đồng. A1 và A3 coi như xong, chỉ cần giữ đúng như mô tả bên dưới.
 
 ### A1. Quét QR trên CCCD và gửi lên (bắt buộc làm)
 
@@ -54,7 +54,7 @@ Khách cần gọi được cho KTV, nên tài khoản đăng nhập bằng Goog
 |---|---|---|
 | Gửi hồ sơ KTV khi chưa có số | `400`, `missingFields` có `"phoneNumber"` ("Ho so con thieu: so dien thoai") | Đưa về màn nhập số điện thoại |
 | KTV đã duyệt nhưng chưa có số | `GET /api/profile/me` → `"phoneRequired": true` | Sau khi đăng nhập, **bắt buộc** hiện màn nhập số điện thoại, chưa nhập thì không vào app được |
-| KTV chưa có số bấm nhận đơn | `409`, `"code": "PHONE_REQUIRED"` ("Vui long cap nhat so dien thoai truoc khi nhan don") | Hiện thông báo và mở màn nhập số |
+| KTV chưa có số bấm nhận đơn (**chỉ khi admin bật** "Bắt buộc KTV có số điện thoại" trong Cài đặt; hiện đang tắt) | `409`, `"code": "PHONE_REQUIRED"` ("Vui long cap nhat so dien thoai truoc khi nhan don") | Hiện "Bạn cần cập nhật số điện thoại để nhận đơn" và mở màn nhập số, **không** hiện chung chung "Chưa nhận được đơn" |
 
 Lưu số điện thoại **có xác minh OTP** (dùng 2 API này, không dùng `PATCH /api/profile/me` vì không xác minh số):
 
@@ -226,7 +226,7 @@ Người dùng có thể đăng ký lại bằng chính số điện thoại / e
 ## F. Danh sách KTV: 1 request thay vì ~43 (app khách)
 
 Hiện app gọi danh sách, rồi gọi chi tiết và lịch trống **từng KTV** để hiện "Sớm nhất 15:30" và ẩn KTV hết chỗ. Mở
-danh sách khoảng 43 request, máy chủ giới hạn 100 request/phút/IP nên mở 2–3 lần là bị chặn (`429`). Giờ backend
+danh sách khoảng 43 request, cả văn phòng chung 1 IP nên dễ chạm giới hạn request của máy chủ và bị chặn (`429`). Giờ backend
 tính sẵn, **app chỉ gọi 1 lần**:
 
 ```http
@@ -248,7 +248,39 @@ Khi đó:
 - **Mở 1 KTV:** 1 request `GET /api/marketplace/technicians/{id}`.
 - **Đặt lịch:** gọi `…/{id}/availability` 1 lần cho đúng dịch vụ và gói khách đã chọn, như hiện nay.
 
-## G. Quy tắc chung về link file
+## G. Lịch sử hoạt động của KTV (app KTV)
+
+Màn "Lịch sử hoạt động": KTV xem mình đã phục vụ bao nhiêu khách **hôm nay / tuần này / tháng này**. 1 request:
+
+```http
+GET /api/technician/jobs/activity
+Authorization: Bearer <token KTV>
+```
+
+```json
+{
+  "timezone": "Asia/Ho_Chi_Minh",
+  "today": { "from": "…", "to": "…", "completedBookings": 2, "customers": 1, "earning": 500000 },
+  "week":  { "from": "…", "to": "…", "completedBookings": 3, "customers": 2, "earning": 650000 },
+  "month": { "from": "…", "to": "…", "completedBookings": 4, "customers": 3, "earning": 650000 },
+  "recent": [
+    { "bookingId": "…", "code": "ECEE5154", "scheduledStart": "…", "scheduledEnd": "…", "mode": "HOME",
+      "customer": { "displayName": "Tester", "avatarUrl": "…" },
+      "services": [{ "name": "Massage body", "durationMinutes": 90 }], "earning": 300000 }
+  ]
+}
+```
+
+| Trường | Hiện |
+|---|---|
+| `completedBookings` | Số đơn đã hoàn thành trong kỳ |
+| `customers` | Số khách đã phục vụ (1 khách đặt 2 lần tính 1) |
+| `earning` | Thu nhập của KTV (đã trừ hoa hồng, đã gồm phí di chuyển) |
+| `recent` | 20 đơn hoàn thành gần nhất, mới nhất trên cùng; bấm vào mở `GET /api/technician/jobs/{bookingId}` |
+
+Chỉ tính đơn **đã hoàn thành**, theo **giờ hẹn**, giờ Việt Nam; tuần bắt đầu **thứ Hai**, tháng từ ngày 1.
+
+## H. Quy tắc chung về link file
 
 Mọi link file (`downloadUrl`, `signedDocumentUrl`, `viewUrl`…) **hết hạn sau 600 giây** vì là dữ liệu riêng tư.
 Luôn gọi API lấy link mới ngay trước khi mở, không lưu link vào bộ nhớ hay cache.

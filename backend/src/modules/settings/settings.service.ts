@@ -7,7 +7,16 @@ export type PlatformInfo = { brandName: string; hotline: string; supportEmail: s
  * 0 means "no limit" for the advance and radius rules. A home booking farther than `travelFeeThresholdKm`
  * between customer and technician adds `travelFeeAmount` (VND, 0 = no travel fee), paid in full to the technician.
  */
-export type BookingRules = { minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number };
+export type BookingRules = {
+  minAdvanceHours: number;
+  maxDispatchRadiusKm: number;
+  travelFeeThresholdKm: number;
+  travelFeeAmount: number;
+  /** How long a new booking waits for technicians to accept before it expires. */
+  confirmationWaitMinutes: number;
+  /** Off until the apps can ask a technician for their phone; on, a technician without one cannot take bookings. */
+  requireTechnicianPhone: boolean;
+};
 
 const PLATFORM_KEYS: Record<keyof PlatformInfo, string> = {
   brandName: 'PLATFORM_BRAND_NAME',
@@ -20,6 +29,8 @@ const BOOKING_KEYS: Record<keyof BookingRules, string> = {
   maxDispatchRadiusKm: 'BOOKING_MAX_DISPATCH_RADIUS_KM',
   travelFeeThresholdKm: 'BOOKING_TRAVEL_FEE_THRESHOLD_KM',
   travelFeeAmount: 'BOOKING_TRAVEL_FEE_AMOUNT',
+  confirmationWaitMinutes: 'BOOKING_CONFIRMATION_WAIT_MINUTES',
+  requireTechnicianPhone: 'BOOKING_REQUIRE_TECHNICIAN_PHONE',
 };
 
 @Injectable()
@@ -64,6 +75,8 @@ export class SettingsService {
       maxDispatchRadiusKm: Number(stored.get(BOOKING_KEYS.maxDispatchRadiusKm) ?? 0),
       travelFeeThresholdKm: Number(stored.get(BOOKING_KEYS.travelFeeThresholdKm) ?? 10),
       travelFeeAmount: Number(stored.get(BOOKING_KEYS.travelFeeAmount) ?? 0),
+      confirmationWaitMinutes: Number(stored.get(BOOKING_KEYS.confirmationWaitMinutes) ?? 10),
+      requireTechnicianPhone: stored.get(BOOKING_KEYS.requireTechnicianPhone) === 'true',
     };
   }
 
