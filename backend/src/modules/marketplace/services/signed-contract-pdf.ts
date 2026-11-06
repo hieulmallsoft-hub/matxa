@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import * as fontkitModule from '@pdf-lib/fontkit';
 import { PDFDocument, PDFFont, PDFPage, PDFTextField, rgb } from 'pdf-lib';
+import { fillLabelledBlanks, readTemplateLines } from './contract-label-fill';
 
 export type SignedContractInfo = {
   /** Null on a preview before the first signing: the number is issued when the technician signs. */
@@ -43,7 +44,26 @@ export async function buildSignedContractPdf(
   const regular = await pdf.embedFont(REGULAR, { subset: true });
   const bold = await pdf.embedFont(BOLD, { subset: true });
   const image = signature ? await embedSignature(pdf, signature.bytes) : null;
+  // A template prepared with form fields is filled through them; a plain one by finding its "Bên A: ....." lines.
+  const hasFields = pdf.getForm().getFields().length > 0;
   fillTemplateFields(pdf, regular, info);
+  if (template && !hasFields) {
+    const lines = await readTemplateLines(template).catch(() => []);
+    const [year, month, day] = info.signedAt.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).split('-');
+    fillLabelledBlanks(pdf, [regular, bold], lines, {
+      // The template prints "/HĐDV-PSYOCORE" after the blank, so the "HD-" prefix would only repeat it.
+      contractNumber: info.contractNumber?.replace(/^HD-/, '') ?? null,
+      day,
+      month,
+      year,
+      fullName: info.idCard?.fullName ?? info.displayName,
+      idNumber: info.idCardNumber,
+      issueDate: info.idCard ? vnDate(info.idCard.issueDate) : null,
+      issuePlace: info.idCard?.issuePlace ?? null,
+      address: info.idCard?.permanentAddress ?? null,
+      phone: info.phoneNumber?.replace(/^\+84/, '0') ?? null,
+    });
+  }
 
   const page = pdf.addPage(A4);
   let y = A4[1] - MARGIN;
