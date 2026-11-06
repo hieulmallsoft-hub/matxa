@@ -1,12 +1,16 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { static as serveStatic } from 'express';
 import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // nginx on the same machine forwards the client's address; without this every request through it looks like
+  // 127.0.0.1, so all users shared one rate-limit bucket and the IPs logged for contract signing were nginx's.
+  app.set('trust proxy', 'loopback');
   app.setGlobalPrefix('api');
   // Keep the operations portal on the API origin so browser requests do not
   // require a broad CORS policy.

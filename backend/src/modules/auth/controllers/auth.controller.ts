@@ -24,6 +24,7 @@ import { VerifyPasswordResetOtpDto } from '../dto/verify-password-reset-otp.dto'
 import { SendEmailOtpDto } from '../dto/send-email-otp.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { LogoutDto } from '../dto/logout.dto';
+import { DeleteAccountDto } from '../dto/delete-account.dto';
 import { SendPhoneOtpDto } from '../dto/send-phone-otp.dto';
 import { VerifyPhoneOtpDto } from '../dto/verify-phone-otp.dto';
 import { AccessTokenGuard } from '../guards/access-token.guard';
@@ -269,6 +270,22 @@ export class AuthController {
   @ApiNoContentResponse()
   logout(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: LogoutDto): Promise<void> {
     return this.authService.logout(auth.sid, auth.sub, dto?.deviceToken);
+  }
+
+  @Post('account/delete')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AccessTokenGuard)
+  @ApiBearerAuth('access-token')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Nguoi dung xoa tai khoan cua minh',
+    description:
+      'Tai khoan dang ky bang email phai gui password. Khong xoa duoc khi con don dang dien ra (409 ACTIVE_BOOKINGS) ' +
+      'hoac vi KTV con tien (409 WALLET_NOT_EMPTY). Xoa xong moi thiet bi bi dang xuat; so dien thoai/email dung dang ky lai duoc.',
+  })
+  @ApiOkResponse({ schema: { type: 'object', properties: { deleted: { type: 'boolean', example: true } } } })
+  deleteAccount(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: DeleteAccountDto): Promise<{ deleted: true }> {
+    return this.authService.deleteAccount(auth.sub, dto?.password);
   }
 
   @Post('logout-all')

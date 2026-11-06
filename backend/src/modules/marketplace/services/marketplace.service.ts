@@ -131,6 +131,7 @@ export class MarketplaceService {
       conditions.push(Prisma.sql`u.display_name ILIKE ${pattern}`);
     }
     if (query.gender) conditions.push(Prisma.sql`p.gender::text = ${query.gender}`);
+    if (query.city) conditions.push(Prisma.sql`p.city = ${query.city}`);
     if (tags.length) conditions.push(Prisma.sql`p.tags @> ARRAY[${Prisma.join(tags)}]::text[]`);
     if (query.available !== undefined) conditions.push(Prisma.sql`p.is_available = ${query.available}`);
     if (query.mode) conditions.push(Prisma.sql`${query.mode} = ANY(p.service_modes::text[])`);
@@ -190,14 +191,23 @@ export class MarketplaceService {
           WHERE ${Prisma.join(conditions, ' AND ')}
         ), page AS (
           SELECT * FROM filtered ORDER BY ${order}
-          LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}
+          ${query.onlyAvailable ? Prisma.empty : Prisma.sql`LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}`}
         )
         SELECT (SELECT COUNT(*) FROM filtered) AS total,
           COALESCE(jsonb_agg(jsonb_build_object('id', id, 'distance', distance) ORDER BY ${order}), '[]'::jsonb) AS ranked
         FROM page
       `);
-        const ids = result.ranked.map((row) => row.id);
-        if (!ids.length) return { items: [], total: Number(result.total), page: query.page, limit: query.limit };
+        let ranked = result.ranked;
+        let total = Number(result.total);
+        // One batch for the whole list, so the app no longer asks each technician's calendar itself.
+        const nextAvailable = await this.nextAvailableStarts(tx, ranked.map((row) => row.id), query);
+        if (query.onlyAvailable) {
+          ranked = ranked.filter((row) => nextAvailable.get(row.id));
+          total = ranked.length;
+          ranked = ranked.slice((query.page - 1) * query.limit, query.page * query.limit);
+        }
+        const ids = ranked.map((row) => row.id);
+        if (!ids.length) return { items: [], total, page: query.page, limit: query.limit };
         const profiles = await tx.technicianProfile.findMany({
           where: { id: { in: ids } },
           include: {
@@ -220,18 +230,76 @@ export class MarketplaceService {
           : [];
         const favoriteIds = new Set(favorites.map((favorite) => favorite.technicianId));
         const byId = new Map(profiles.map((profile) => [profile.id, profile]));
-        const items = result.ranked.map(({ id, distance }) => {
+        const items = ranked.map(({ id, distance }) => {
           const profile = byId.get(id)!;
-          return this.technicianCard(
-            profile,
-            favoriteIds.has(id),
-            distance === null ? null : Math.round(distance * 10) / 10,
-          );
+          return {
+            ...this.technicianCard(profile, favoriteIds.has(id), distance === null ? null : Math.round(distance * 10) / 10),
+            nextAvailableAt: nextAvailable.get(id)?.toISOString() ?? null,
+          };
         });
-        return { items, total: Number(result.total), page: query.page, limit: query.limit };
+        return { items, total, page: query.page, limit: query.limit };
       },
       { isolationLevel: 'RepeatableRead' },
     );
+  }
+
+  /**
+   * Earliest start each technician can still take on `date` (today by default), for their shortest package among
+   * the services matching the filters; null when the day is full. Same rule as the availability endpoint.
+   */
+  private async nextAvailableStarts(
+    db: Prisma.TransactionClient,
+    ids: string[],
+    query: Pick<SearchTechniciansDto, 'date' | 'categoryId' | 'serviceId' | 'mode'>,
+  ) {
+    const result = new Map<string, Date | null>();
+    if (!ids.length) return result;
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: BOOKING_TIMEZONE });
+    const { start, end } = availabilityRange({ date: query.date ?? today });
+    const [services, working, occupied] = await Promise.all([
+      db.technicianService.findMany({
+        where: {
+          technicianId: { in: ids },
+          isActive: true,
+          category: { isActive: true },
+          ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+          ...(query.serviceId ? { id: query.serviceId } : {}),
+          ...(query.mode ? { modes: { has: query.mode } } : {}),
+        },
+        select: { technicianId: true, durationMinutes: true, priceOptions: { where: { isActive: true }, select: { durationMinutes: true } } },
+      }),
+      db.availabilitySlot.findMany({
+        where: { technicianId: { in: ids }, isAvailable: true, startAt: { lt: end }, endAt: { gt: start } },
+        select: { technicianId: true, startAt: true, endAt: true },
+      }),
+      db.booking.findMany({
+        where: { technicianId: { in: ids }, status: { in: ['PENDING', 'CONFIRMED'] }, scheduledStart: { lt: end }, scheduledEnd: { gt: start } },
+        select: { technicianId: true, scheduledStart: true, scheduledEnd: true },
+      }),
+    ]);
+    const now = new Date();
+    for (const id of ids) {
+      const durations = services
+        .filter((service) => service.technicianId === id)
+        .flatMap((service) => (service.priceOptions.length ? service.priceOptions.map((option) => option.durationMinutes) : [service.durationMinutes]))
+        .filter((minutes) => minutes > 0);
+      if (!durations.length) {
+        result.set(id, null);
+        continue;
+      }
+      const slots = buildAvailableSlots(
+        working.filter((slot) => slot.technicianId === id),
+        occupied
+          .filter((booking) => booking.technicianId === id)
+          .map((booking) => ({ startAt: booking.scheduledStart, endAt: booking.scheduledEnd })),
+        Math.min(...durations),
+        { startAt: start, endAt: end },
+        now,
+        30,
+      );
+      result.set(id, slots[0]?.startAt ?? null);
+    }
+    return result;
   }
 
   async technicianDetail(id: string, location: MarketplaceHomeQueryDto = {}, userId?: string) {

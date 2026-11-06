@@ -20,7 +20,8 @@ import { LegalModule } from './modules/legal/legal.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
+    // Per client IP. Mobile carriers put many phones behind one IP, so keep room for several users at once.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 300 }]),
     DatabaseModule,
     RedisModule,
     AuthModule,

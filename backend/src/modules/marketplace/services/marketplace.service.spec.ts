@@ -6,7 +6,11 @@ describe('MarketplaceService', () => {
   const favorite = { findMany: jest.fn(), upsert: jest.fn(), deleteMany: jest.fn() };
   const promotion = { findMany: jest.fn(), count: jest.fn() };
   const $queryRaw = jest.fn();
-  const tx = { technicianProfile, favorite, promotion, $queryRaw };
+  // Free time for nextAvailableAt: services, working hours and bookings of the listed technicians.
+  const technicianService = { findMany: jest.fn().mockResolvedValue([]) };
+  const availabilitySlot = { findMany: jest.fn().mockResolvedValue([]) };
+  const booking = { findMany: jest.fn().mockResolvedValue([]) };
+  const tx = { technicianProfile, favorite, promotion, $queryRaw, technicianService, availabilitySlot, booking };
   const prisma = {
     ...tx,
     $transaction: jest.fn(async (operation: unknown) =>
@@ -75,6 +79,56 @@ describe('MarketplaceService', () => {
         ? 'average_rating DESC, is_available DESC, id ASC'
         : 'is_available DESC, average_rating DESC, id ASC',
     );
+  });
+
+  describe('free time in the technician list (one request instead of one per technician)', () => {
+    // Tomorrow in Viet Nam, so "now" never cuts the day short.
+    const day = new Date(Date.now() + 86_400_000).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const at = (hour: number) => new Date(`${day}T${String(hour).padStart(2, '0')}:00:00+07:00`);
+    const card = (id: string) => ({
+      id, userId: `u-${id}`, user: {}, tags: [], serviceModes: ['HOME'], isVerified: true, isAvailable: true,
+      averageRating: 5, reviewCount: 0, city: 'HN', services: [],
+    });
+    beforeEach(() => {
+      $queryRaw.mockResolvedValue([{ total: 2n, ranked: [{ id: 'busy', distance: null }, { id: 'full', distance: null }] }]);
+      technicianProfile.findMany.mockImplementation(async ({ where }: any) => where.id.in.map(card));
+      // Both offer 60 and 90 minute packages; the shortest decides.
+      technicianService.findMany.mockResolvedValue([
+        { technicianId: 'busy', durationMinutes: 90, priceOptions: [{ durationMinutes: 60 }, { durationMinutes: 90 }] },
+        { technicianId: 'full', durationMinutes: 60, priceOptions: [] },
+      ]);
+      availabilitySlot.findMany.mockResolvedValue([
+        { technicianId: 'busy', startAt: at(9), endAt: at(12) },
+        { technicianId: 'full', startAt: at(9), endAt: at(10) },
+      ]);
+      booking.findMany.mockResolvedValue([
+        { technicianId: 'busy', scheduledStart: at(9), scheduledEnd: at(10) },
+        { technicianId: 'full', scheduledStart: at(9), scheduledEnd: at(10) },
+      ]);
+    });
+
+    it('gives each technician the first start still free that day', async () => {
+      const result = await service.searchTechnicians({ date: day, page: 1, limit: 20 } as any);
+      expect(result.items.map((item: any) => [item.id, item.nextAvailableAt])).toEqual([
+        ['busy', at(10).toISOString()],
+        ['full', null],
+      ]);
+      // Three queries for the whole page, whatever the number of technicians.
+      expect(technicianService.findMany).toHaveBeenCalledTimes(1);
+      expect(availabilitySlot.findMany).toHaveBeenCalledTimes(1);
+      expect(booking.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops technicians with no free time when onlyAvailable is set, and counts only the rest', async () => {
+      const result = await service.searchTechnicians({ date: day, onlyAvailable: true, page: 1, limit: 20 } as any);
+      expect(result.items.map((item: any) => item.id)).toEqual(['busy']);
+      expect(result.total).toBe(1);
+    });
+
+    it('filters by city in the query', async () => {
+      await service.searchTechnicians({ city: 'HN', page: 1, limit: 20 } as any);
+      expect(JSON.stringify($queryRaw.mock.calls[0][0].values)).toContain('"HN"');
+    });
   });
 
   it('sorts technicians by distance from the customer', async () => {

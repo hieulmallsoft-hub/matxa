@@ -339,6 +339,62 @@ export class AuthService {
     if (devices.length) await this.prisma.deviceToken.deleteMany({ where: { userId, OR: devices } });
   }
 
+  /**
+   * The user deletes their account. Bookings, reviews and payouts stay for the other side and the books, so
+   * the row is anonymised rather than removed; the sign-in methods are released so the person can register again.
+   * Refused while a booking is still running or a technician wallet still holds money.
+   */
+  async deleteAccount(userId: string, password?: string): Promise<{ deleted: true }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        status: true,
+        identities: { select: { provider: true, passwordHash: true } },
+        wallets: { select: { balanceVnd: true } },
+      },
+    });
+    if (!user || user.status === 'DELETED') throw new UnauthorizedException('Tai khoan khong con hoat dong');
+    const passwordHash = user.identities.find((item) => item.provider === DbAuthProvider.EMAIL && item.passwordHash)?.passwordHash;
+    if (passwordHash && !(password && (await this.verifyPassword(password, passwordHash))))
+      throw new BadRequestException('Mat khau khong dung');
+    const activeBookings = await this.prisma.booking.count({
+      where: {
+        status: { in: ['OPEN', 'PENDING', 'CONFIRMED'] },
+        OR: [{ customerId: userId }, { technician: { userId } }],
+      },
+    });
+    if (activeBookings)
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'ACTIVE_BOOKINGS',
+        message: `Con ${activeBookings} don dang dien ra. Hoan thanh hoac huy truoc khi xoa tai khoan`,
+        activeBookings,
+      });
+    const walletBalanceVnd = user.wallets.reduce((sum, wallet) => sum + wallet.balanceVnd, 0);
+    if (walletBalanceVnd > 0)
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'WALLET_NOT_EMPTY',
+        message: `Vi con ${walletBalanceVnd.toLocaleString('vi-VN')}d. Lien he CSKH de xu ly truoc khi xoa tai khoan`,
+        walletBalanceVnd,
+      });
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { status: 'DELETED', displayName: 'Tài khoản đã xóa', avatarUrl: null, avatarKey: null, gender: null, nationality: null },
+      }),
+      // Frees the phone, email and Google/Apple account for a new registration.
+      this.prisma.userIdentity.deleteMany({ where: { userId } }),
+      this.prisma.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: now } }),
+      this.prisma.deviceToken.deleteMany({ where: { userId } }),
+      this.prisma.address.updateMany({ where: { userId, deletedAt: null }, data: { deletedAt: now } }),
+      this.prisma.favorite.deleteMany({ where: { userId } }),
+      this.prisma.technicianProfile.updateMany({ where: { userId }, data: { isActive: false, isAvailable: false } }),
+    ]);
+    return { deleted: true };
+  }
+
   async logoutAll(userId: string): Promise<void> {
     await this.prisma.session.updateMany({
       where: { userId, revokedAt: null },

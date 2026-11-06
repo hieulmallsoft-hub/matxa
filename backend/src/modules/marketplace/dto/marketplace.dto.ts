@@ -92,6 +92,24 @@ export class SearchTechniciansDto {
   available?: boolean;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsLatitude() latitude?: number;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsLongitude() longitude?: number;
+  @ApiPropertyOptional({ example: 'HN', description: 'Ma thanh pho (locations/cities). Chi tra KTV o thanh pho nay' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  city?: string;
+  @ApiPropertyOptional({
+    example: '2026-11-05',
+    description: 'Ngay (gio Viet Nam) de tinh nextAvailableAt cua tung KTV. Mac dinh hom nay.',
+  })
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsDateString({ strict: true })
+  date?: string;
+  @ApiPropertyOptional({ description: 'true = bo KTV het cho trong ngay `date` (nextAvailableAt = null)' })
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  onlyAvailable?: boolean;
   @ApiPropertyOptional({ default: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
   @ApiPropertyOptional({ default: 20, maximum: 100 })
   @IsOptional()

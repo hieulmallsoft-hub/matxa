@@ -168,7 +168,7 @@ Lý do cho KTV chọn (`reasonCode`):
 
 Lỗi: `409 "Lich dat da duoc tao khieu nai"` = KTV đã khiếu nại đơn này rồi → mở khiếu nại cũ.
 
-## E. Đăng xuất và đổi mật khẩu (app khách và app KTV)
+## E. Đăng xuất, đổi mật khẩu, xóa tài khoản (app khách và app KTV)
 
 API đã có sẵn, chỉ cần nối vào màn Cài đặt / Tài khoản.
 
@@ -202,7 +202,53 @@ Authorization: Bearer <token>
 
 Quên mật khẩu (ở màn đăng nhập) dùng 3 API có sẵn: `POST /api/auth/password/forgot/start` → `/verify-otp` → `/complete`.
 
-## F. Quy tắc chung về link file
+### Xóa tài khoản
+
+Nút "Xóa tài khoản" ở màn Tài khoản (App Store và Google Play đều bắt buộc có). Hiện hộp xác nhận nói rõ
+**không khôi phục được**; tài khoản có mật khẩu (`hasPassword: true`) thì bắt nhập mật khẩu.
+
+```http
+POST /api/auth/account/delete
+Authorization: Bearer <token>
+{ "password": "matkhau" }        ← bỏ trống nếu hasPassword = false
+→ 200 { "deleted": true }
+```
+
+Thành công: **xóa token trong máy, về màn đăng nhập** (mọi máy đã bị đăng xuất, không nhận thông báo nữa).
+Người dùng có thể đăng ký lại bằng chính số điện thoại / email / Google đó như tài khoản mới.
+
+| Lỗi | Ý nghĩa | App hiện |
+|---|---|---|
+| `400 "Mat khau khong dung"` | Sai hoặc thiếu mật khẩu | "Mật khẩu không đúng" |
+| `409`, `code: "ACTIVE_BOOKINGS"` | Còn đơn đang diễn ra (`activeBookings` = số đơn) | "Bạn còn N đơn đang diễn ra. Hoàn thành hoặc hủy đơn trước khi xóa tài khoản" |
+| `409`, `code: "WALLET_NOT_EMPTY"` | Ví KTV còn tiền (`walletBalanceVnd`) | "Ví còn X đ. Vui lòng liên hệ CSKH trước khi xóa tài khoản" |
+
+## F. Danh sách KTV: 1 request thay vì ~43 (app khách)
+
+Hiện app gọi danh sách, rồi gọi chi tiết và lịch trống **từng KTV** để hiện "Sớm nhất 15:30" và ẩn KTV hết chỗ. Mở
+danh sách khoảng 43 request, máy chủ giới hạn 100 request/phút/IP nên mở 2–3 lần là bị chặn (`429`). Giờ backend
+tính sẵn, **app chỉ gọi 1 lần**:
+
+```http
+GET /api/marketplace/technicians?city=HN&categoryId=…&mode=HOME&date=2026-11-06&latitude=…&longitude=…&onlyAvailable=true&sort=availability
+```
+
+| Tham số mới | Ý nghĩa |
+|---|---|
+| `city` | Mã thành phố (`HN`…). Server lọc luôn, **bỏ** bước tự lọc bằng `/locations/cities` |
+| `date` | Ngày `YYYY-MM-DD` (giờ VN) để tính giờ trống. Bỏ trống = hôm nay |
+| `onlyAvailable=true` | Bỏ KTV hết chỗ trong ngày `date`. `total` và phân trang tính sau khi lọc |
+
+Mỗi KTV có **`nextAvailableAt`**: giờ bắt đầu sớm nhất còn đặt được trong ngày `date`, theo gói ngắn nhất của các
+dịch vụ khớp bộ lọc (`categoryId`, `serviceId`, `mode`). `null` = hết chỗ. Hiện "Sớm nhất HH:mm" theo giờ VN.
+
+Khi đó:
+
+- **Danh sách:** 1 request (bỏ vòng lặp gọi `technicians/{id}` và `…/availability` cho từng KTV).
+- **Mở 1 KTV:** 1 request `GET /api/marketplace/technicians/{id}`.
+- **Đặt lịch:** gọi `…/{id}/availability` 1 lần cho đúng dịch vụ và gói khách đã chọn, như hiện nay.
+
+## G. Quy tắc chung về link file
 
 Mọi link file (`downloadUrl`, `signedDocumentUrl`, `viewUrl`…) **hết hạn sau 600 giây** vì là dữ liệu riêng tư.
 Luôn gọi API lấy link mới ngay trước khi mở, không lưu link vào bộ nhớ hay cache.
