@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import * as fontkitModule from '@pdf-lib/fontkit';
+import { Logger } from '@nestjs/common';
 import { PDFDocument, PDFFont, PDFPage, PDFTextField, rgb } from 'pdf-lib';
 import { fillLabelledBlanks, readTemplateLines } from './contract-label-fill';
 
@@ -48,7 +49,11 @@ export async function buildSignedContractPdf(
   const hasFields = pdf.getForm().getFields().length > 0;
   fillTemplateFields(pdf, regular, info);
   if (template && !hasFields) {
-    const lines = await readTemplateLines(template).catch(() => []);
+    // Reading the template must never block signing, but a failure has to be visible in the server log.
+    const lines = await readTemplateLines(template).catch((error: Error) => {
+      new Logger('SignedContractPdf').warn(`Khong doc duoc chu trong mau hop dong, bo qua tu dien: ${error?.stack ?? error}`);
+      return [];
+    });
     const [year, month, day] = info.signedAt.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).split('-');
     fillLabelledBlanks(pdf, [regular, bold], lines, {
       // The template prints "/HĐDV-PSYOCORE" after the blank, so the "HD-" prefix would only repeat it.
