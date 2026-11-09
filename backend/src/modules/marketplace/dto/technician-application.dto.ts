@@ -48,6 +48,15 @@ export class TechnicianGalleryUploadDto {
 export class AddTechnicianGalleryImageDto {
   @ApiProperty() @IsString() @MaxLength(1024) storageKey!: string;
   @ApiPropertyOptional({ minimum: 0 }) @IsOptional() @Type(() => Number) @IsInt() @Min(0) sortOrder?: number;
+  @ApiPropertyOptional({ enum: ['GALLERY', 'CERTIFICATE'], default: 'GALLERY', description: 'GALLERY = anh ho so (toi da 6), CERTIFICATE = chung chi (toi da 2)' })
+  @IsOptional()
+  @IsIn(['GALLERY', 'CERTIFICATE'])
+  kind?: 'GALLERY' | 'CERTIFICATE';
+}
+
+export class ReviewTechnicianPhotoDto {
+  @ApiProperty({ enum: ['APPROVED', 'REJECTED'] }) @IsIn(['APPROVED', 'REJECTED']) status!: 'APPROVED' | 'REJECTED';
+  @ApiPropertyOptional({ description: 'Bat buoc khi REJECTED' }) @IsOptional() @IsString() @MaxLength(500) reason?: string;
 }
 
 export class AdminTechnicianApplicationQueryDto {

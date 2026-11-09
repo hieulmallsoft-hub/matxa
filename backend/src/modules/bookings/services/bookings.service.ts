@@ -19,7 +19,7 @@ import { PayosService } from './payos.service';
 import { Optional } from '@nestjs/common';
 import { SettingsService } from '../../settings/settings.service';
 import { ComplaintStorageService } from './complaint-storage.service';
-import { addressPreview, confirmationDeadline, kmBetween, technicianBadge, travelFeeFor } from './distance';
+import { addressPreview, confirmationDeadline, kmBetween, roundVnd, technicianBadge, travelFeeFor } from './distance';
 import { COMPLAINT_STATUS_LABEL, complaintStatusEvent, ensureComplaintConversation } from './complaint-conversation';
 import {
   BookingHistoryQueryDto,
@@ -130,7 +130,7 @@ export class BookingsService {
       };
     }
     const subtotal = services.reduce((sum, item) => sum.plus(item.price), new Prisma.Decimal(0)).toNumber();
-    const serviceFee = dto.mode === 'HOME' ? Number(this.config.get('HOME_SERVICE_FEE', 100000)) : 0;
+    const serviceFee = dto.mode === 'HOME' ? (await this.bookingRules()).homeServiceFee : 0;
     const rules = await this.bookingRules();
     // Only look the technician up when a travel fee is configured at all.
     const technicianLocation = addressSnapshot && rules.travelFeeAmount > 0
@@ -585,7 +585,7 @@ export class BookingsService {
       return { service, option };
     });
     const durationMinutes = ordered.reduce((sum, item) => sum + item.option.durationMinutes, 0);
-    const serviceFee = dto.mode === 'HOME' ? Number(this.config.get('HOME_SERVICE_FEE', 100000)) : 0;
+    const serviceFee = dto.mode === 'HOME' ? (await this.bookingRules()).homeServiceFee : 0;
     const subtotal = ordered.reduce((sum, item) => sum + Number(item.option.price), 0);
     const financials = this.feePolicy.calculate({
       assignmentMode: 'OPEN_MARKETPLACE',
@@ -1217,6 +1217,7 @@ export class BookingsService {
         travelFeeAmount: 0,
         confirmationWaitMinutes: Number(this.config.get('OPEN_BOOKING_APPLICATION_TTL_MINUTES', 10)),
         requireTechnicianPhone: false,
+        homeServiceFee: Number(this.config.get('HOME_SERVICE_FEE', 100000)),
       }
     );
   }
@@ -1235,7 +1236,7 @@ export class BookingsService {
 
   /** Commission the technician's wallet is charged when the booking is confirmed for them. */
   private async commissionFor(grossServiceAmount: unknown) {
-    return Math.round((Number(grossServiceAmount ?? 0) * (await this.commissionRate())) / 100);
+    return roundVnd((Number(grossServiceAmount ?? 0) * (await this.commissionRate())) / 100);
   }
 
   private async chargeTechnicianCommission(
@@ -1243,7 +1244,10 @@ export class BookingsService {
     bookingId: string,
     db: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
-    const booking = await db.booking.findFirst({ where: { id: bookingId, technician: { userId } }, select: { grossServiceAmount: true } });
+    const booking = await db.booking.findFirst({
+      where: { id: bookingId, technician: { userId } },
+      select: { grossServiceAmount: true, travelFee: true },
+    });
     if (!booking) throw new ForbiddenException('Don khong thuoc KTV nay');
     const rate = await this.commissionRate();
     const fee = await this.commissionFor(booking.grossServiceAmount);
@@ -1256,7 +1260,12 @@ export class BookingsService {
       if (!updated.count) throw new ConflictException('So du vi khong du de nhan don');
       const current = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id }, select: { balanceVnd: true } });
       await tx.walletLedgerEntry.create({ data: { walletId: wallet.id, type: 'COMMISSION_DEBIT', amountVnd: -fee, balanceBeforeVnd: current.balanceVnd + fee, balanceAfterVnd: current.balanceVnd, referenceType: 'BOOKING_COMMISSION', referenceId: bookingId } });
-      await tx.booking.update({ where: { id: bookingId }, data: { platformFee: fee, technicianEarning: Number(booking.grossServiceAmount ?? 0) - fee, feePolicyVersion: `COMMISSION_${rate}_V1` } });
+      await tx.booking.update({ where: { id: bookingId }, data: {
+          platformFee: fee,
+          // The travel fee is the technician's in full; only the services carry the commission.
+          technicianEarning: Number(booking.grossServiceAmount ?? 0) - fee + Number(booking.travelFee ?? 0),
+          feePolicyVersion: `COMMISSION_${rate}_V1`,
+        } });
     };
     if (db === this.prisma) await this.prisma.$transaction(debit);
     else await debit(db);
@@ -2208,7 +2217,7 @@ export class BookingsService {
   private technicianPricing(booking: any, estimatePercent?: number, estimatedTravelFee = 0) {
     const gross = booking.grossServiceAmount === null || booking.grossServiceAmount === undefined ? null : Number(booking.grossServiceAmount);
     if (estimatePercent !== undefined && gross !== null) {
-      const platformFee = Math.round((gross * estimatePercent) / 100);
+      const platformFee = roundVnd((gross * estimatePercent) / 100);
       // A direct booking already carries its fee; an open one gets it only when a technician is chosen.
       const travelFee = Number(booking.travelFee ?? 0) || estimatedTravelFee;
       return {

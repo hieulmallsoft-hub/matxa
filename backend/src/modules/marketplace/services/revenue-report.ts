@@ -107,7 +107,8 @@ export function buildRevenueReport(input: {
     const total = done + (counts.CANCELLED ?? 0) + (counts.EXPIRED ?? 0);
     return total ? Math.round((done / total) * 1000) / 10 : 0;
   };
-  const average = (bookings: CompletedBooking[]) => (bookings.length ? Math.round(gmv(bookings) / bookings.length) : 0);
+  // An average shown as money: whole thousands of VND (666.667 -> 667.000).
+  const average = (bookings: CompletedBooking[]) => (bookings.length ? Math.round(gmv(bookings) / bookings.length / 1000) * 1000 : 0);
 
   const labels = bucketLabels(period, now);
   const timeline = labels.map((label) => ({ label, current: 0, previous: 0 }));

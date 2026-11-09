@@ -10,7 +10,7 @@ import { SettingsService } from './settings.service';
 
 class UpdateCommissionDto {
   @Type(() => Number)
-  @IsNumber()
+  @IsInt({ message: "Ty le KTV nhan phai la so nguyen (vd 80)" })
   @Min(0)
   @Max(100)
   technicianSharePercent!: number;
@@ -54,6 +54,10 @@ class UpdateBookingRulesDto {
   @ApiPropertyOptional({ example: false, description: 'Bat = KTV chua co so dien thoai khong nhan duoc don (409 PHONE_REQUIRED).' })
   @IsOptional() @IsBoolean()
   requireTechnicianPhone?: boolean;
+
+  @ApiPropertyOptional({ example: 100000, description: 'Phu phi (VND) cong vao moi don tai nha. 0 = khong thu.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(5_000_000)
+  homeServiceFee?: number;
 }
 
 @ApiTags('Admin Settings')

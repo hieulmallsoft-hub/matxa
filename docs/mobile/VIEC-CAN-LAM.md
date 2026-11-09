@@ -280,7 +280,32 @@ Authorization: Bearer <token KTV>
 
 Chỉ tính đơn **đã hoàn thành**, theo **giờ hẹn**, giờ Việt Nam; tuần bắt đầu **thứ Hai**, tháng từ ngày 1.
 
-## H. Quy tắc chung về link file
+## H. Ảnh hồ sơ và chứng chỉ của KTV (app KTV + app khách)
+
+Trước đây server **khóa** ảnh khi hồ sơ đã gửi/đã duyệt (`409`), nên bấm lưu xong ảnh không hiện. Giờ KTV thêm/xóa
+ảnh **bất cứ lúc nào**, kể cả sau khi được duyệt. Ảnh mới ở trạng thái **chờ duyệt**; admin duyệt xong khách mới thấy.
+
+Màn "Thông tin dịch vụ" của KTV:
+
+- Đổi chữ **"Hình ảnh dịch vụ" → "Ảnh hồ sơ"**, **bỏ** dòng "hình ảnh không gian làm việc hoặc kết quả dịch vụ".
+- Thêm mục **"Chứng chỉ"** bên dưới: không bắt buộc, **tối đa 2 ảnh**. Ảnh hồ sơ tối đa **6 ảnh**.
+
+| Việc | API | Ghi chú |
+|---|---|---|
+| Lấy link upload (dùng chung cho cả 2 loại) | `POST /api/technician/application/gallery-upload-url` | Body `{ "contentType": "image/jpeg", "size": <bytes> }`, rồi `PUT` ảnh lên `uploadUrl` |
+| Lưu ảnh hồ sơ | `POST /api/technician/application/gallery` | `{ "storageKey": "…", "kind": "GALLERY" }` |
+| Lưu chứng chỉ | `POST /api/technician/application/gallery` | `{ "storageKey": "…", "kind": "CERTIFICATE" }` |
+| Xóa ảnh | `DELETE /api/technician/application/gallery/{id}` | |
+| Xem lại ảnh của mình | `GET /api/technician/application` → `gallery[]` | Mỗi ảnh có `kind`, `status` (`PENDING` / `APPROVED` / `REJECTED`), `rejectionReason`, `viewUrl` |
+
+- Response khi lưu có luôn `viewUrl` → **hiện ảnh ngay**, kèm nhãn "Chờ duyệt" nếu `status = PENDING`.
+- `status = REJECTED` → hiện `rejectionReason` (KTV cũng nhận thông báo), cho xóa và tải ảnh khác.
+- Lỗi `400 "Toi da 6 anh ho so"` / `"Toi da 2 anh chung chi"`.
+
+**App khách**, trang chi tiết KTV `GET /api/marketplace/technicians/{id}` có thêm `gallery[]` và `certificates[]`
+(chỉ ảnh đã duyệt; mỗi ảnh `{ id, viewUrl, expiresIn }`, link hết hạn sau 300 giây, mở lại trang thì gọi lại API).
+
+## I. Quy tắc chung về link file
 
 Mọi link file (`downloadUrl`, `signedDocumentUrl`, `viewUrl`…) **hết hạn sau 600 giây** vì là dữ liệu riêng tư.
 Luôn gọi API lấy link mới ngay trước khi mở, không lưu link vào bộ nhớ hay cache.

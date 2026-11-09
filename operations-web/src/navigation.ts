@@ -18,6 +18,7 @@ import {
   Scale,
   BookOpenText,
   Wallet,
+  Images,
 } from 'lucide-react';
 import type { PageId } from './types/dashboard';
 
@@ -56,6 +57,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'technicians', label: 'Kỹ thuật viên', description: 'Hồ sơ, trạng thái và bảng giá KTV', icon: UsersRound, keywords: 'ktv nhan vien' },
       { id: 'applications', label: 'Duyệt hồ sơ KTV', description: 'Hồ sơ đăng ký đang chờ duyệt', icon: UserCheck, keywords: 'ung tuyen dang ky', count: 'pendingApplications' },
+      { id: 'technicianPhotos', label: 'Duyệt ảnh KTV', description: 'Ảnh hồ sơ và chứng chỉ KTV cập nhật', icon: Images, keywords: 'anh ho so chung chi gallery certificate' },
       { id: 'catalog', label: 'Dịch vụ', description: 'Danh mục và gói giá dịch vụ', icon: FolderTree, keywords: 'service catalog goi gia' },
       { id: 'venues', label: 'Địa điểm & Spa', description: 'Spa, phòng tham vấn, đánh giá', icon: Store, keywords: 'spa dia diem venue' },
       { id: 'contracts', label: 'Mẫu hợp đồng KTV', description: 'Mẫu hợp đồng gửi kỹ thuật viên', icon: FileText, keywords: 'hop dong' },

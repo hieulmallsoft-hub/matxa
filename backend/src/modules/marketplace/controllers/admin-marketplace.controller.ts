@@ -35,6 +35,7 @@ import { TechnicianApplicationsService } from '../services/technician-applicatio
 import {
   AdminTechnicianApplicationQueryDto,
   RejectTechnicianApplicationDto,
+  ReviewTechnicianPhotoDto,
   ReviewTechnicianKycDto,
 } from '../dto/technician-application.dto';
 import {
@@ -97,6 +98,21 @@ export class AdminMarketplaceController {
     @Body() dto: RejectTechnicianApplicationDto,
   ) {
     return this.applications.reject(auth.sub, id, dto.reason);
+  }
+  @Get('technician-photos')
+  @ApiTags('Admin - Technician Applications')
+  @ApiOperation({
+    summary: 'Anh ho so va chung chi KTV theo trang thai (mac dinh cho duyet)',
+    description: 'Anh KTV them sau khi da duoc duyet. Anh gui kem ho so dang ky duoc duyet cung ho so.',
+  })
+  photoReviews(@Query('status') status?: 'PENDING' | 'APPROVED' | 'REJECTED') {
+    return this.applications.photoReviews(['APPROVED', 'REJECTED'].includes(status ?? '') ? status : 'PENDING');
+  }
+  @Patch('technician-photos/:id')
+  @ApiTags('Admin - Technician Applications')
+  @ApiOperation({ summary: 'Duyet hoac tu choi 1 anh ho so / chung chi cua KTV (tu choi phai co ly do)' })
+  reviewPhoto(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReviewTechnicianPhotoDto) {
+    return this.applications.reviewPhoto(id, dto.status, dto.reason);
   }
   @Get('technician-applications/:id')
   @ApiTags('Admin - Technician Applications')

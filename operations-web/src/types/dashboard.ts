@@ -19,7 +19,8 @@ export type PageId =
   | 'venues'
   | 'contracts'
   | 'legal'
-  | 'walletTopups';
+  | 'walletTopups'
+  | 'technicianPhotos';
 
 export type TimePeriod = '7d' | '30d' | '3m' | '1y';
 

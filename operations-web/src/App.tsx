@@ -23,6 +23,7 @@ const VenuesPage = lazy(() => import('./pages/VenuesPage').then((module) => ({ d
 const ContractTemplatesPage = lazy(() => import('./pages/ContractTemplatesPage').then((module) => ({ default: module.ContractTemplatesPage })));
 const LegalDocumentsPage = lazy(() => import('./pages/LegalDocumentsPage').then((module) => ({ default: module.LegalDocumentsPage })));
 const WalletTopupsPage = lazy(() => import('./pages/WalletTopupsPage').then((module) => ({ default: module.WalletTopupsPage })));
+const TechnicianPhotosPage = lazy(() => import('./pages/TechnicianPhotosPage').then((module) => ({ default: module.TechnicianPhotosPage })));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then((module) => ({ default: module.AdminDashboard })));
 const ComplaintsPage = lazy(() => import('./pages/ComplaintsPage').then((module) => ({ default: module.ComplaintsPage })));
 import { usePageRoute } from './hooks/usePageRoute';
@@ -264,6 +265,8 @@ function AppInner() {
         return <LegalDocumentsPage />;
       case 'walletTopups':
         return <WalletTopupsPage />;
+      case 'technicianPhotos':
+        return <TechnicianPhotosPage />;
       case 'technicians':
       case 'applications':
       case 'catalog':

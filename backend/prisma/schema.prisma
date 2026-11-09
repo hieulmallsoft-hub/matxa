@@ -366,14 +366,31 @@ model TechnicianKycDocument {
   @@map("technician_kyc_documents")
 }
 
+enum TechnicianPhotoKind {
+  GALLERY
+  CERTIFICATE
+}
+
+enum TechnicianPhotoStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// Profile photos ("ảnh hồ sơ") and certificates of a technician. Customers only see APPROVED ones.
 model TechnicianApplicationGalleryImage {
   id            String                @id @default(uuid()) @db.Uuid
   applicationId String                @map("application_id") @db.Uuid
   storageKey    String                @map("storage_key")
   sortOrder     Int                   @default(0) @map("sort_order")
+  kind          TechnicianPhotoKind   @default(GALLERY)
+  status        TechnicianPhotoStatus @default(PENDING)
+  rejectionReason String?             @map("rejection_reason")
+  reviewedAt    DateTime?             @map("reviewed_at")
   createdAt     DateTime              @default(now()) @map("created_at")
   application   TechnicianApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   @@index([applicationId, sortOrder])
+  @@index([status, createdAt])
   @@map("technician_application_gallery")
 }
 

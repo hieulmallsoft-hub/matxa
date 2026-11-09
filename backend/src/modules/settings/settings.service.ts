@@ -16,6 +16,8 @@ export type BookingRules = {
   confirmationWaitMinutes: number;
   /** Off until the apps can ask a technician for their phone; on, a technician without one cannot take bookings. */
   requireTechnicianPhone: boolean;
+  /** "Phụ phí" added to every home booking (VND); the server's HOME_SERVICE_FEE until the admin sets one. */
+  homeServiceFee: number;
 };
 
 const PLATFORM_KEYS: Record<keyof PlatformInfo, string> = {
@@ -31,6 +33,7 @@ const BOOKING_KEYS: Record<keyof BookingRules, string> = {
   travelFeeAmount: 'BOOKING_TRAVEL_FEE_AMOUNT',
   confirmationWaitMinutes: 'BOOKING_CONFIRMATION_WAIT_MINUTES',
   requireTechnicianPhone: 'BOOKING_REQUIRE_TECHNICIAN_PHONE',
+  homeServiceFee: 'BOOKING_HOME_SERVICE_FEE',
 };
 
 @Injectable()
@@ -45,7 +48,8 @@ export class SettingsService {
   }
 
   async setCommission(value: number) {
-    if (!Number.isFinite(value) || value < 0 || value > 100) throw new BadRequestException('Ty le KTV nhan phai tu 0 den 100');
+    if (!Number.isInteger(value) || value < 0 || value > 100)
+      throw new BadRequestException('Ty le KTV nhan phai la so nguyen tu 0 den 100');
     await this.prisma.systemSetting.upsert({ where: { key: 'TECHNICIAN_SHARE_PERCENT' }, create: { key: 'TECHNICIAN_SHARE_PERCENT', value: String(value) }, update: { value: String(value) } });
     return this.getCommission();
   }
@@ -77,6 +81,7 @@ export class SettingsService {
       travelFeeAmount: Number(stored.get(BOOKING_KEYS.travelFeeAmount) ?? 0),
       confirmationWaitMinutes: Number(stored.get(BOOKING_KEYS.confirmationWaitMinutes) ?? 10),
       requireTechnicianPhone: stored.get(BOOKING_KEYS.requireTechnicianPhone) === 'true',
+      homeServiceFee: Number(stored.get(BOOKING_KEYS.homeServiceFee) ?? this.config.get('HOME_SERVICE_FEE', 100000)),
     };
   }
 

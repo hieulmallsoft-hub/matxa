@@ -58,7 +58,7 @@ export type TechnicianApplication = {
   kyc?: { status: string; rejectionReason?: string | null; documents?: Array<{ type: string; storageKey: string }> } | null;
   _count?: { gallery: number };
   signedKyc?: Array<{ storageKey: string; viewUrl?: string }>;
-  signedGallery?: Array<{ id: string; viewUrl?: string }>;
+  signedGallery?: Array<{ id: string; viewUrl?: string; kind?: 'GALLERY' | 'CERTIFICATE'; status?: 'PENDING' | 'APPROVED' | 'REJECTED' }>;
   contract?: {
     contractNumber: string;
     status: 'DRAFT' | 'SIGNED' | 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
@@ -412,7 +412,9 @@ function ApplicationDrawer({ detail, busy, onClose, onAction }: {
   const front = app ? signedUrl(app, app.idCardFrontKey, 'ID_CARD_FRONT') : undefined;
   const back = app ? signedUrl(app, app.idCardBackKey, 'ID_CARD_BACK') : undefined;
   const face = app ? signedUrl(app, app.faceImageKey, 'FACE_IMAGE') : undefined;
-  const gallery = (app?.signedGallery ?? []).filter((image) => image.viewUrl);
+  const photos = (app?.signedGallery ?? []).filter((image) => image.viewUrl);
+  const gallery = photos.filter((image) => image.kind !== 'CERTIFICATE');
+  const certificates = photos.filter((image) => image.kind === 'CERTIFICATE');
 
   const checks = app
     ? [
@@ -583,19 +585,31 @@ function ApplicationDrawer({ detail, busy, onClose, onAction }: {
             </div>
           </Section>
 
-          <Section title="Ảnh dịch vụ" icon={<Images className="w-4 h-4" />} aside={<span className="text-[11px] text-content-tertiary">{gallery.length} ảnh</span>}>
-            {gallery.length ? (
-              <div className="grid grid-cols-3 gap-2">
-                {gallery.map((image) => (
-                  <a key={image.id} href={image.viewUrl} target="_blank" rel="noreferrer" className="group block aspect-square rounded-xl overflow-hidden border border-surface-border">
-                    <img src={image.viewUrl} alt="Ảnh dịch vụ" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-content-tertiary">Ứng viên chưa tải ảnh dịch vụ.</p>
-            )}
-          </Section>
+          {(
+            [
+              ['Ảnh hồ sơ', gallery, 'Ứng viên chưa tải ảnh hồ sơ.'],
+              ['Chứng chỉ', certificates, 'Ứng viên chưa tải chứng chỉ (không bắt buộc).'],
+            ] as const
+          ).map(([title, images, empty]) => (
+            <Section key={title} title={title} icon={<Images className="w-4 h-4" />} aside={<span className="text-[11px] text-content-tertiary">{images.length} ảnh</span>}>
+              {images.length ? (
+                <div className="grid grid-cols-3 gap-2">
+                  {images.map((image) => (
+                    <a key={image.id} href={image.viewUrl} target="_blank" rel="noreferrer" className="group relative block aspect-square rounded-xl overflow-hidden border border-surface-border">
+                      <img src={image.viewUrl} alt={title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                      {image.status && image.status !== 'APPROVED' && (
+                        <span className="absolute left-1.5 top-1.5">
+                          <Badge tone={image.status === 'REJECTED' ? 'red' : 'amber'}>{image.status === 'REJECTED' ? 'Từ chối' : 'Chờ duyệt'}</Badge>
+                        </span>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-content-tertiary">{empty}</p>
+              )}
+            </Section>
+          ))}
 
           {timeline.length > 0 && (
             <Section title="Lịch sử" icon={<CalendarDays className="w-4 h-4" />}>

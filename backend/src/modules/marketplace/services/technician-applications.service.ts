@@ -26,6 +26,9 @@ function withContact<T extends { user: { identities: Array<{ phoneNumber: string
   };
 }
 
+/** At most this many photos of each kind (rejected ones do not count). */
+const PHOTO_LIMITS = { GALLERY: 6, CERTIFICATE: 2 } as const;
+
 /** What a technician must provide before submitting, with the label shown when it is missing. */
 const REQUIRED_FOR_SUBMIT = [
   ['displayName', 'ho ten'],
@@ -130,17 +133,96 @@ export class TechnicianApplicationsService {
   galleryUploadUrl(userId: string, dto: { contentType: string; size: number }) {
     return this.storage.createGalleryUploadUrl(userId, dto);
   }
-  async addGalleryImage(userId: string, storageKey: string, sortOrder = 0) {
+  /**
+   * Adds a profile photo or certificate at any time, also after approval. It waits for an admin: with the application
+   * while that is under review, on the photo review page once the technician is approved. Customers see approved ones.
+   */
+  async addGalleryImage(userId: string, storageKey: string, sortOrder = 0, kind: 'GALLERY' | 'CERTIFICATE' = 'GALLERY') {
     if (!storageKey.startsWith(`technician-applications/${userId}/gallery/`))
       throw new BadRequestException('Gallery key khong hop le');
     const app = await this.prisma.technicianApplication.upsert({ where: { userId }, create: { userId }, update: {} });
-    if (app.status === 'SUBMITTED' || app.status === 'UNDER_REVIEW' || app.status === 'APPROVED')
-      throw new ConflictException('Khong the sua gallery khi ho so dang cho duyet hoac da duoc duyet');
-    const count = await this.prisma.technicianApplicationGalleryImage.count({ where: { applicationId: app.id } });
-    if (count >= 6) throw new BadRequestException('Toi da 6 anh gallery');
-    return this.prisma.technicianApplicationGalleryImage.create({
-      data: { applicationId: app.id, storageKey, sortOrder },
+    const limit = PHOTO_LIMITS[kind];
+    const count = await this.prisma.technicianApplicationGalleryImage.count({
+      where: { applicationId: app.id, kind, status: { not: 'REJECTED' } },
     });
+    if (count >= limit) throw new BadRequestException(`Toi da ${limit} ${kind === 'CERTIFICATE' ? 'anh chung chi' : 'anh ho so'}`);
+    const image = await this.prisma.technicianApplicationGalleryImage.create({
+      data: { applicationId: app.id, storageKey, sortOrder, kind, status: 'PENDING' },
+    });
+    if (app.status === 'APPROVED')
+      void this.notifications.notifyAdmins?.(
+        'ADMIN_TECHNICIAN_PHOTO_PENDING',
+        'KTV cập nhật ảnh',
+        `${app.displayName ?? 'KTV'} vừa thêm ${kind === 'CERTIFICATE' ? 'chứng chỉ' : 'ảnh hồ sơ'}, cần duyệt.`,
+        'admin://technicianPhotos',
+      );
+    return { ...image, ...(await this.storage.createPrivateViewUrl(storageKey)) };
+  }
+
+  /** Photos waiting for (or done with) review, newest first, with who they belong to and a short-lived link. */
+  async photoReviews(status: 'PENDING' | 'APPROVED' | 'REJECTED' = 'PENDING') {
+    const photos = await this.prisma.technicianApplicationGalleryImage.findMany({
+      where: { status },
+      orderBy: { createdAt: status === 'PENDING' ? 'asc' : 'desc' },
+      take: 200,
+      include: {
+        application: {
+          select: { id: true, status: true, displayName: true, user: { select: { id: true, displayName: true, avatarUrl: true } } },
+        },
+      },
+    });
+    return Promise.all(
+      photos.map(async ({ application, ...photo }) => ({
+        ...photo,
+        ...(await this.storage.createPrivateViewUrl(photo.storageKey)),
+        technician: {
+          userId: application.user.id,
+          applicationId: application.id,
+          applicationStatus: application.status,
+          displayName: application.displayName ?? application.user.displayName,
+          avatarUrl: application.user.avatarUrl,
+        },
+      })),
+    );
+  }
+
+  async reviewPhoto(id: string, status: 'APPROVED' | 'REJECTED', reason?: string) {
+    if (status === 'REJECTED' && !reason?.trim()) throw new BadRequestException('Can nhap ly do tu choi anh');
+    const photo = await this.prisma.technicianApplicationGalleryImage.findUnique({
+      where: { id },
+      select: { kind: true, application: { select: { userId: true } } },
+    });
+    if (!photo) throw new NotFoundException('Anh khong ton tai');
+    const updated = await this.prisma.technicianApplicationGalleryImage.update({
+      where: { id },
+      data: { status, rejectionReason: status === 'REJECTED' ? reason!.trim() : null, reviewedAt: new Date() },
+    });
+    if (status === 'REJECTED') {
+      const what = photo.kind === 'CERTIFICATE' ? 'Chứng chỉ' : 'Ảnh hồ sơ';
+      const title = `${what} chưa được duyệt`;
+      await this.notifications.create(photo.application.userId, 'TECHNICIAN_PHOTO_REJECTED', title, reason!.trim(), 'matxa://technician/application');
+      void this.notifications
+        .sendPush?.(photo.application.userId, title, reason!.trim(), { type: 'TECHNICIAN_PHOTO_REJECTED', photoId: id })
+        ?.catch(() => undefined);
+    }
+    return updated;
+  }
+
+  /** What customers see on a technician's page: approved profile photos and certificates. */
+  async publicPhotos(technicianProfileId: string) {
+    const photos = await this.prisma.technicianApplicationGalleryImage.findMany({
+      where: { status: 'APPROVED', application: { user: { technicianProfile: { id: technicianProfileId } } } },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      select: { id: true, kind: true, storageKey: true },
+    });
+    const signed = await Promise.all(
+      photos.map(async (photo) => ({ id: photo.id, kind: photo.kind, ...(await this.storage.createPrivateViewUrl(photo.storageKey)) })),
+    );
+    const strip = ({ kind, ...photo }: (typeof signed)[number]) => photo;
+    return {
+      gallery: signed.filter((photo) => photo.kind === 'GALLERY').map(strip),
+      certificates: signed.filter((photo) => photo.kind === 'CERTIFICATE').map(strip),
+    };
   }
   async removeGalleryImage(userId: string, imageId: string) {
     const result = await this.prisma.technicianApplicationGalleryImage.deleteMany({
@@ -319,6 +401,11 @@ export class TechnicianApplicationsService {
       await tx.technicianKyc.updateMany({
         where: { applicationId: id },
         data: { status: 'VERIFIED', reviewedBy: adminId, reviewedAt: now },
+      });
+      // Photos sent with the application were reviewed with it.
+      await tx.technicianApplicationGalleryImage.updateMany({
+        where: { applicationId: id, status: 'PENDING' },
+        data: { status: 'APPROVED', reviewedAt: now },
       });
       return tx.technicianApplication.update({
         where: { id },

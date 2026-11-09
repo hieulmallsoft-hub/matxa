@@ -62,6 +62,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
   const [travelFeeAmount, setTravelFeeAmount] = useState('0');
   const [confirmationWaitMinutes, setConfirmationWaitMinutes] = useState('10');
   const [requireTechnicianPhone, setRequireTechnicianPhone] = useState(false);
+  const [homeServiceFee, setHomeServiceFee] = useState('100000');
   const [techCommissionRate, setTechCommissionRate] = useState('75');
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
 
@@ -83,7 +84,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         setSupportEmail(value.supportEmail);
       })
       .catch(() => undefined);
-    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number; confirmationWaitMinutes: number; requireTechnicianPhone: boolean }>('/admin/settings/booking')
+    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number; confirmationWaitMinutes: number; requireTechnicianPhone: boolean; homeServiceFee: number }>('/admin/settings/booking')
       .then((value) => {
         setMinAdvanceHours(String(value.minAdvanceHours));
         setMaxTravelDistanceKm(String(value.maxDispatchRadiusKm));
@@ -91,6 +92,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         setTravelFeeAmount(String(value.travelFeeAmount ?? 0));
         setConfirmationWaitMinutes(String(value.confirmationWaitMinutes ?? 10));
         setRequireTechnicianPhone(Boolean(value.requireTechnicianPhone));
+        setHomeServiceFee(String(value.homeServiceFee ?? 100000));
       })
       .catch(() => undefined);
   }, []);
@@ -120,7 +122,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
     try {
       if (activeCategory === 'technician') {
         const share = Number(techCommissionRate);
-        if (!Number.isFinite(share) || share < 0 || share > 100) throw new Error('Tỷ lệ KTV nhận phải từ 0 đến 100%');
+        if (!Number.isInteger(share) || share < 0 || share > 100) throw new Error('Tỷ lệ KTV nhận phải là số nguyên từ 0 đến 100 (ví dụ 80)');
         await request('/admin/settings/commission', { method: 'PATCH', body: JSON.stringify({ technicianSharePercent: share }) });
         addToast({ title: 'Đã lưu chính sách KTV', message: `KTV nhận ${techCommissionRate}% giá trị dịch vụ.`, type: 'success' });
       }
@@ -141,11 +143,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         const fee = Number(travelFeeAmount);
         if (!Number.isInteger(feeKm) || feeKm < 0 || feeKm > 200) throw new Error('Ngưỡng tính phí di chuyển phải là số nguyên từ 0 đến 200 km');
         if (!Number.isInteger(fee) || fee < 0 || fee > 5_000_000) throw new Error('Phí di chuyển phải là số nguyên từ 0 đến 5.000.000đ');
+        const surcharge = Number(homeServiceFee);
+        if (!Number.isInteger(surcharge) || surcharge < 0 || surcharge > 5_000_000) throw new Error('Phụ phí phải là số nguyên từ 0 đến 5.000.000đ');
         const wait = Number(confirmationWaitMinutes);
         if (!Number.isInteger(wait) || wait < 1 || wait > 60) throw new Error('Thời gian chờ KTV xác nhận phải từ 1 đến 60 phút');
         await request('/admin/settings/booking', {
           method: 'PATCH',
-          body: JSON.stringify({ minAdvanceHours: hours, maxDispatchRadiusKm: radius, travelFeeThresholdKm: feeKm, travelFeeAmount: fee, confirmationWaitMinutes: wait, requireTechnicianPhone }),
+          body: JSON.stringify({ minAdvanceHours: hours, maxDispatchRadiusKm: radius, travelFeeThresholdKm: feeKm, travelFeeAmount: fee, confirmationWaitMinutes: wait, requireTechnicianPhone, homeServiceFee: surcharge }),
         });
         addToast({ title: 'Đã lưu quy định đặt lịch', message: 'Áp dụng cho các đơn đặt sau khi lưu.', type: 'success' });
       }
@@ -351,6 +355,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                   </span>
                 </div>
 
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[#1C2B20]">Phụ phí đơn tại nhà (đ)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={homeServiceFee}
+                    onChange={(e) => setHomeServiceFee(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
+                  />
+                  <span className="text-[11px] text-[#66756B]">
+                    Dòng "Phụ phí" ở màn thanh toán của khách: cộng vào mọi đơn tại nhà, không áp dụng đơn tại cơ sở. Nhập 0 để không thu. Áp dụng cho đơn đặt sau khi lưu.
+                  </span>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-[#1C2B20]">Tính phí di chuyển khi xa hơn (km)</label>
@@ -425,16 +444,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
 
               <div className="space-y-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-[#1C2B20]">Tỷ lệ hoa hồng cho KTV (%)</label>
+                  <label className="text-xs font-bold text-[#1C2B20]">KTV nhận (% giá dịch vụ)</label>
                   <input
                     type="number"
-                    min="50"
-                    max="90"
+                    min="0"
+                    max="100"
+                    step="1"
                     value={techCommissionRate}
                     onChange={(e) => setTechCommissionRate(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
                   />
-                  <span className="text-[11px] text-[#66756B]">KTV hưởng {techCommissionRate}% tổng giá trị ca phục vụ, sàn Psyocore giữ lại {100 - Number(techCommissionRate)}%.</span>
+                  <span className="text-[11px] text-[#66756B]">
+                    KTV nhận {techCommissionRate}%, sàn Psyocore thu hoa hồng {100 - Number(techCommissionRate)}% (trừ vào ví KTV khi nhận đơn).
+                    Ví dụ dịch vụ 500.000đ: sàn thu {(Math.round((500000 * (100 - Number(techCommissionRate))) / 100 / 1000) * 1000).toLocaleString('vi-VN')}đ.
+                    Hoa hồng được làm tròn đến 1.000đ; phí di chuyển KTV nhận đủ, không tính hoa hồng.
+                  </span>
                 </div>
               </div>
             </div>

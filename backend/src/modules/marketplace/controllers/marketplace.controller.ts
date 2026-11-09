@@ -6,6 +6,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Optional,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -69,7 +70,10 @@ import {
 @ApiTags('Marketplace')
 @Controller('marketplace')
 export class MarketplaceController {
-  constructor(private readonly marketplace: MarketplaceService) {}
+  constructor(
+    private readonly marketplace: MarketplaceService,
+    @Optional() private readonly applications?: TechnicianApplicationsService,
+  ) {}
 
   @Get('home')
   @UseGuards(OptionalAccessTokenGuard)
@@ -107,12 +111,17 @@ export class MarketplaceController {
   @UseGuards(OptionalAccessTokenGuard)
   @ApiOkResponse({ type: TechnicianDetailResponse })
   @ApiOperation({ summary: 'Chi tiet ky thuat vien, bang gia va danh gia' })
-  technician(
+  async technician(
     @Param('id', ParseUUIDPipe) id: string,
     @Query() location: MarketplaceHomeQueryDto,
     @CurrentAuth() auth?: AccessTokenPayload,
   ) {
-    return this.marketplace.technicianDetail(id, location, auth?.sub);
+    const [detail, photos] = await Promise.all([
+      this.marketplace.technicianDetail(id, location, auth?.sub),
+      this.applications?.publicPhotos(id) ?? { gallery: [], certificates: [] },
+    ]);
+    // Approved profile photos and certificates; links expire after 300 seconds.
+    return { ...detail, ...photos };
   }
 
   @Get('technicians/:id/availability')
@@ -235,10 +244,13 @@ export class TechnicianController {
   }
   @Post('application/gallery')
   @ApiTags('Technician Application')
-  @ApiOperation({ summary: 'Luu anh gallery da upload, toi da 6 anh' })
+  @ApiOperation({
+    summary: 'Luu anh ho so (toi da 6) hoac chung chi (toi da 2) da upload',
+    description: 'Them duoc ca khi ho so dang cho duyet hoac da duyet. Anh moi o trang thai PENDING, admin duyet xong khach moi thay.',
+  })
   @ApiCreatedResponse({ type: UploadResponseDto })
   addGallery(@CurrentAuth() auth: AccessTokenPayload, @Body() dto: AddTechnicianGalleryImageDto) {
-    return this.applications.addGalleryImage(auth.sub, dto.storageKey, dto.sortOrder);
+    return this.applications.addGalleryImage(auth.sub, dto.storageKey, dto.sortOrder, dto.kind);
   }
   @Delete('application/gallery/:id')
   @HttpCode(HttpStatus.NO_CONTENT)

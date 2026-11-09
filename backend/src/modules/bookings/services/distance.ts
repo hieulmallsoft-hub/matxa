@@ -61,3 +61,8 @@ export function confirmationDeadline(now: Date, start: Date, requested: Date | n
   if (deadline < start) return deadline;
   return requested && requested < start ? requested : new Date(start.getTime() - 60_000);
 }
+
+/** Amounts charged in VND are whole thousands, the smallest money people actually pay with. */
+export function roundVnd(value: number) {
+  return Math.round(value / 1000) * 1000;
+}
