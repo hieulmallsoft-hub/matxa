@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
+import { VenueStorageService } from './venue-storage.service';
 import { CreateVenueDto, UpdateVenueDto, VENUE_CATEGORIES, VenueQueryDto, VenueHourDto } from '../dto/venue.dto';
 
 const include = {
@@ -22,7 +23,7 @@ const distanceKm = (fromLat: number, fromLng: number, toLat: number, toLng: numb
 
 @Injectable()
 export class VenueService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly storage?: VenueStorageService) {}
 
   async list(query: VenueQueryDto, includeInactive = false) {
     const venues = await this.prisma.venue.findMany({
@@ -38,7 +39,7 @@ export class VenueService {
       include,
       orderBy: [{ rating: 'desc' }, { reviewCount: 'desc' }],
     });
-    const items = venues.map((venue) => this.response(venue, query));
+    const items = await Promise.all(venues.map((venue) => this.response(venue, query)));
     if (query.sort === 'distance' && this.hasOrigin(query))
       items.sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
     return items;
@@ -57,7 +58,7 @@ export class VenueService {
     const created = await this.prisma.venue.create({
       data: {
         ...venue,
-        images: dto.images ?? [],
+        images: this.storedImages(dto.images) ?? [],
         services: services?.length ? { create: services } : undefined,
         hours: hours?.length ? { create: this.hoursData(hours) } : undefined,
       },
@@ -77,6 +78,7 @@ export class VenueService {
       where: { id },
       data: {
         ...data,
+        ...(data.images ? { images: this.storedImages(data.images) } : {}),
         ...(services ? { services: { deleteMany: {}, create: services } } : {}),
         ...(hours ? { hours: { deleteMany: {}, create: this.hoursData(hours) } } : {}),
       },
@@ -141,12 +143,17 @@ export class VenueService {
     };
   }
 
-  private response(venue: any, origin: Pick<VenueQueryDto, 'latitude' | 'longitude'> = {}) {
+  private storedImages(images?: string[] | null) {
+    return images?.map((url) => this.storage?.storedUrl(url) ?? url);
+  }
+
+  private async response(venue: any, origin: Pick<VenueQueryDto, 'latitude' | 'longitude'> = {}) {
     const { promotion, ...rest } = venue;
     const latitude = Number(venue.latitude);
     const longitude = Number(venue.longitude);
     return {
       ...rest,
+      images: await Promise.all((venue.images ?? []).map((url: string) => this.storage?.viewUrl(url) ?? url)),
       rating: Number(venue.rating),
       latitude,
       longitude,

@@ -49,3 +49,4 @@ describe('venue image uploads', () => {
     expect(destroy).toHaveBeenCalled();
   });
 });
+

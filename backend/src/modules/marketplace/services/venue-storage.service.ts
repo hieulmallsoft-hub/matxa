@@ -1,9 +1,15 @@
 import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 
 export type VenueImageFile = { buffer: Buffer; mimetype: string; size: number };
+
+/** A venue image this service uploaded: `venues/<uuid>.<ext>` anywhere in the URL, with or without a signature. */
+const OWN_IMAGE = /\/(venues\/[0-9a-f-]{36}\.(?:jpg|png|webp))(?:[?#]|$)/i;
+/** Long enough that a list the app keeps open for the day still shows its images. */
+const VIEW_SECONDS = 24 * 3600;
 
 @Injectable()
 export class VenueStorageService {
@@ -46,9 +52,40 @@ export class VenueStorageService {
     } finally {
       client.destroy();
     }
-    const base =
+    return { url: `${this.base()}/${storageKey}` };
+  }
+
+  /**
+   * The bucket is private (only avatars are public), so an uploaded venue image is shown through a signed link.
+   * Image URLs from elsewhere are returned as they are.
+   */
+  async viewUrl(url: string) {
+    const key = OWN_IMAGE.exec(url)?.[1];
+    const bucket = this.config.get<string>('S3_BUCKET');
+    const region = this.config.get<string>('S3_REGION');
+    const accessKeyId = this.config.get<string>('S3_ACCESS_KEY_ID');
+    const secretAccessKey = this.config.get<string>('S3_SECRET_ACCESS_KEY');
+    if (!key || !bucket || !region || !accessKeyId || !secretAccessKey) return url;
+    const endpoint = this.config.get<string>('S3_ENDPOINT') || undefined;
+    this.signer ??= new S3Client({ region, endpoint, forcePathStyle: Boolean(endpoint), credentials: { accessKeyId, secretAccessKey } });
+    return getSignedUrl(this.signer, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: VIEW_SECONDS });
+  }
+
+  /** The admin form sends back the signed links it was shown; store the plain URL instead. */
+  storedUrl(url: string) {
+    const key = OWN_IMAGE.exec(url)?.[1];
+    return key && this.config.get<string>('S3_BUCKET') ? `${this.base()}/${key}` : url;
+  }
+
+  private signer?: S3Client;
+
+  private base() {
+    const bucket = this.config.get<string>('S3_BUCKET');
+    const region = this.config.get<string>('S3_REGION');
+    const endpoint = this.config.get<string>('S3_ENDPOINT') || undefined;
+    return (
       this.config.get<string>('S3_PUBLIC_BASE_URL')?.replace(/\/$/, '') ||
-      (endpoint ? `${endpoint.replace(/\/$/, '')}/${bucket}` : `https://${bucket}.s3.${region}.amazonaws.com`);
-    return { url: `${base}/${storageKey}` };
+      (endpoint ? `${endpoint.replace(/\/$/, '')}/${bucket}` : `https://${bucket}.s3.${region}.amazonaws.com`)
+    );
   }
 }
