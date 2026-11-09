@@ -14,7 +14,7 @@ describe('daily commission discount', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findUniqueOrThrow: jest.fn().mockResolvedValue({ balanceVnd: 1_000_000 }),
       },
-      walletLedgerEntry: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn() },
+      walletLedgerEntry: { findUnique: jest.fn().mockResolvedValue(null), findFirst: jest.fn().mockResolvedValue(null), create: jest.fn() },
     };
     tx.$transaction = jest.fn((callback: any) => callback(tx));
     const settings = { platformFeePercent: jest.fn().mockResolvedValue(30), getBookingRules: jest.fn().mockResolvedValue(rules) };

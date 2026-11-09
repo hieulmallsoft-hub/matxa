@@ -7,7 +7,18 @@ import { useConfirm } from '../components/ui/useConfirm';
 import { PageHeader } from '../components/common/PageHeader';
 import { request } from '../api/client';
 
-type Participant = { id: string; displayName?: string | null; avatarUrl?: string | null };
+type Participant = { id: string; displayName?: string | null; avatarUrl?: string | null; role?: string };
+
+/** Technicians use the same "Hỗ trợ nhanh" chat as customers; the badge tells CSKH who is asking. */
+function RoleBadge({ participant }: { participant?: Participant | null }) {
+  if (!participant?.role) return null;
+  const technician = participant.role === 'TECHNICIAN';
+  return (
+    <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold align-middle ${technician ? 'bg-[#E8F0FE] text-[#1F5FBF]' : 'bg-[#F1F5EF] text-[#66756B]'}`}>
+      {technician ? 'KTV' : 'Khách'}
+    </span>
+  );
+}
 type ApiMessage = {
   id: string;
   senderId: string;
@@ -322,7 +333,7 @@ export const MessagesPage: React.FC = () => {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
       <PageHeader
         title="Tin nhắn CSKH"
-        subtitle="Chọn khách hàng để tư vấn và lưu lịch sử hỗ trợ trực tiếp với CSKH"
+        subtitle="Hỗ trợ khách hàng và KTV qua chat CSKH (mục Hỗ trợ nhanh trên app)"
         badge={unreadCount ? `${unreadCount} tin chưa đọc` : undefined}
         badgeTone="blue"
         breadcrumbs={[{ label: 'Psyocore' }, { label: 'Tin nhắn CSKH' }]}
@@ -372,7 +383,7 @@ export const MessagesPage: React.FC = () => {
               >
                 <Avatar participant={thread.participant} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold truncate">{thread.participant?.displayName || 'Khách hàng'}</p>
+                  <p className="text-xs font-bold truncate">{thread.participant?.displayName || 'Khách hàng'}<RoleBadge participant={thread.participant} /></p>
                   <p className="text-xs text-[#66756B] truncate mt-1">{messageText(thread.lastMessage)}</p>
                   <div className="flex justify-between gap-2 mt-1 text-[10px] text-[#94A399]">
                     <span>{formatTime(thread.lastMessageAt || thread.lastMessage?.createdAt)}</span>
@@ -387,7 +398,7 @@ export const MessagesPage: React.FC = () => {
           <div className="px-4 py-3 border-b border-[#E5EBE5] flex items-center gap-3 shrink-0">
             <Avatar participant={activeThread?.participant} />
             <div>
-              <h3 className="font-bold text-xs">{activeThread?.participant?.displayName || 'Chọn hội thoại'}</h3>
+              <h3 className="font-bold text-xs">{activeThread?.participant?.displayName || 'Chọn hội thoại'}<RoleBadge participant={activeThread?.participant} /></h3>
               <p className="text-[11px] text-[#66756B]">
                 {activeThread ? 'Tự cập nhật tin nhắn mỗi 3 giây' : 'Chọn khách hàng ở danh sách bên trái'}
               </p>
@@ -492,7 +503,7 @@ export const MessagesPage: React.FC = () => {
             <strong>{activeThread?.participant?.displayName || 'Thông tin hội thoại'}</strong>
           </div>
           <div>
-            <p className="text-[#66756B] mb-1">Mã khách hàng</p>
+            <p className="text-[#66756B] mb-1">{activeThread?.participant?.role === 'TECHNICIAN' ? 'Mã KTV' : 'Mã khách hàng'}</p>
             <p className="break-all">{activeThread?.supportCustomerId || activeThread?.participant?.id || 'Chưa chọn khách'}</p>
           </div>
           <p className="text-[#66756B] leading-relaxed">

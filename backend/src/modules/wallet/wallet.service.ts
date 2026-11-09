@@ -9,6 +9,14 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
 import { PayosService } from '../bookings/services/payos.service';
 
+const TRANSACTION_TITLES: Record<string, string> = {
+  TOP_UP: 'Nạp tiền vào số dư quảng cáo',
+  COMMISSION_DEBIT: 'Phí nhận đơn',
+  COMMISSION_REFUND: 'Hoàn phí đơn bị hủy',
+  PROMOTION_CREDIT: 'Psyocore bù mã giảm giá của khách',
+  PROMOTION_CREDIT_REVERSAL: 'Thu lại tiền bù mã giảm giá (đơn bị hủy)',
+};
+
 @Injectable()
 export class WalletService {
   constructor(
@@ -213,7 +221,6 @@ export class WalletService {
   private transactionResponse(item: any) {
     const amountVnd = Number(item.amountVnd);
     const topUp = item.topUp;
-    const isTopUp = item.type === 'TOP_UP';
     return {
       id: item.id,
       type: item.type,
@@ -221,7 +228,7 @@ export class WalletService {
       amountVnd,
       balanceBeforeVnd: Number(item.balanceBeforeVnd),
       balanceAfterVnd: Number(item.balanceAfterVnd),
-      title: isTopUp ? 'Nạp tiền vào số dư quảng cáo' : 'Thanh toán dịch vụ',
+      title: TRANSACTION_TITLES[item.type as string] ?? 'Thanh toán dịch vụ',
       referenceType: item.referenceType,
       referenceId: item.referenceId,
       createdAt: item.createdAt,

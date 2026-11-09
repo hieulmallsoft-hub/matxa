@@ -39,6 +39,7 @@ describe('assigning an open booking charges the chosen technician', () => {
       },
       walletLedgerEntry: {
         findUnique: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(async ({ data }: any) => state.ledger.push(data)),
       },
     };

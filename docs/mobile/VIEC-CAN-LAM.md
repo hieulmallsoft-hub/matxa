@@ -336,7 +336,39 @@ Trước đây đơn đặt qua `POST /api/bookings` (đơn mở, có hoặc kh�
 
 - Gửi `promotionCode` trong body `POST /api/bookings` như cũ. Server kiểm tra mã ngay lúc tạo đơn; mã sai/hết lượt trả `400` ("Ma khuyen mai khong hop le hoac da het han" / "Ma khuyen mai da het luot su dung" / "Don hang chua dat gia tri toi thieu") → hiện lỗi ở ô mã, **không** tạo đơn.
 - `GET /api/bookings/{id}` có `discount` / `discountAmount`, `totalAmount` **đã trừ** giảm giá. Khi KTV được chốt mà có phí di chuyển thì `totalAmount` cộng thêm phí, giảm giá giữ nguyên.
-- "Bạn sẽ nhận được" của KTV **không** bị trừ phần giảm giá.
+- **Sàn chịu** phần giảm giá. Khách trả tiền mặt cho KTV ít hơn, nên lúc KTV nhận đơn, ví KTV được **cộng** đúng phần giảm giá (giao dịch `PROMOTION_CREDIT`) rồi mới trừ hoa hồng (`COMMISSION_DEBIT`). Đơn bị hủy thì đảo lại cả hai (`COMMISSION_REFUND` và `PROMOTION_CREDIT_REVERSAL`).
+
+**Màn "Chi tiết đơn" của KTV** — dùng `pricing` trong `GET /api/technician/jobs/{id}`:
+
+| Dòng trên màn | Trường | Ví dụ (DV 500k + phụ phí 100k, mã −250k, phí sàn 20%) |
+|---|---|---|
+| Tổng thu từ khách (tiền mặt) | `pricing.customerPaysAmount` | 350.000đ |
+| Psyocore bù mã giảm giá (vào ví) | `pricing.discountAmount` (ẩn nếu 0) | +250.000đ |
+| Phí gửi về Psyocore (trừ ví) | `pricing.platformFee` | −100.000đ |
+| **Thực nhận** | `pricing.technicianEarning` | **500.000đ** (= 350k tiền mặt + 250k − 100k) |
+
+`pricing.netToPlatform` = phí − tiền bù; **âm** nghĩa là Psyocore trả thêm cho KTV (ví dụ trên: −150.000đ → "Ví được cộng 150.000đ").
+Khi nhận đơn, ví chỉ cần đủ `netToPlatform` (nếu dương), không cần đủ toàn bộ phí.
+
+**Lịch sử ví** (`GET /api/wallet/transactions`) có thêm 2 loại, `title` server đã trả sẵn tiếng Việt:
+`PROMOTION_CREDIT` "Psyocore bù mã giảm giá của khách" (dương), `PROMOTION_CREDIT_REVERSAL` "Thu lại tiền bù mã giảm giá (đơn bị hủy)" (âm).
+
+## L. KTV chat với CSKH — "Hỗ trợ nhanh" (app KTV)
+
+KTV dùng **đúng API chat CSKH của app khách**, không có API mới. Trước đây server trả `403` khi KTV mở chat này; nay đã mở.
+
+| Việc | API |
+|---|---|
+| Mở (hoặc mở lại) cuộc chat CSKH của mình | `POST /api/conversations/support` — **không cần body** → `{ id, type: "SUPPORT", participant: { displayName: "Psyocore CSKH" } }` |
+| Lấy tin nhắn | `GET /api/conversations/{id}/messages` |
+| Gửi tin (text/ảnh) | `POST /api/conversations/{id}/messages`; ảnh: `POST /api/conversations/{id}/image-upload-url` trước |
+| Đánh dấu đã đọc | như chat khách |
+| Realtime | socket chat như app khách |
+
+- Mỗi KTV có **một** cuộc chat CSKH; bấm "Hỗ trợ nhanh" nhiều lần vẫn ra cùng cuộc chat.
+- Admin trả lời ở trang **Tin nhắn CSKH**, cuộc chat của KTV có nhãn **KTV**.
+- Admin bấm "Kết thúc" hoặc 24 giờ không ai nhắn thì cuộc chat bị xóa; lần sau KTV bấm "Hỗ trợ nhanh" sẽ mở cuộc chat mới (giống app khách).
+- Có thể **dùng lại nguyên màn chat CSKH** của app khách; chi tiết API xem [support-chat.md](support-chat.md).
 
 ## Cách tự kiểm tra trên Swagger
 

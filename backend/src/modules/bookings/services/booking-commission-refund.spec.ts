@@ -41,3 +41,24 @@ describe('refundBookingCommission', () => {
     expect(tx.walletLedgerEntry.create).not.toHaveBeenCalled();
   });
 });
+
+describe('cancelling a booking paid with a voucher', () => {
+  it('takes back the voucher credit along with refunding the commission', async () => {
+    const entries: Record<string, unknown> = {
+      BOOKING_COMMISSION: { walletId: 'wallet-1', amountVnd: -100000 },
+      BOOKING_PROMOTION_CREDIT: { walletId: 'wallet-1', amountVnd: 250000 },
+    };
+    const tx: any = {
+      walletLedgerEntry: {
+        findUnique: jest.fn(async ({ where }: any) => entries[where.referenceType_referenceId.referenceType] ?? null),
+        create: jest.fn(),
+      },
+      wallet: { update: jest.fn().mockResolvedValue({ balanceVnd: 0 }) },
+    };
+    await expect(refundBookingCommission(tx, 'booking-1')).resolves.toBe(100000);
+    expect(tx.wallet.update).toHaveBeenCalledWith(expect.objectContaining({ data: { balanceVnd: { decrement: 250000 } } }));
+    expect(tx.walletLedgerEntry.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ type: 'PROMOTION_CREDIT_REVERSAL', amountVnd: -250000, referenceType: 'BOOKING_PROMOTION_CREDIT_REVERSAL' }),
+    });
+  });
+});

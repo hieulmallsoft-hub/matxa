@@ -64,9 +64,26 @@ describe('support conversations', () => {
     expect(opened.participant).toMatchObject({ id: 'support', displayName: 'Psyocore CSKH' });
   });
 
-  it('rejects technicians, admins without a customer, and non-customer targets', async () => {
-    const { service } = setup('TECHNICIAN', null, 'tech');
-    await expect(service.createSupportConversation('tech')).rejects.toBeInstanceOf(ForbiddenException);
+  it('gives a technician their own "Hỗ trợ nhanh" thread, like a customer', async () => {
+    const { prisma, service } = setup('TECHNICIAN', null, 'tech');
+    prisma.user.findUnique.mockResolvedValue({ id: 'tech', role: 'TECHNICIAN', status: 'ACTIVE', displayName: 'KTV' });
+    const opened = await service.createSupportConversation('tech', 'someone-else');
+    expect(prisma.conversation.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { supportCustomerId: 'tech' } }));
+    expect(opened.participant).toMatchObject({ id: 'support', displayName: 'Psyocore CSKH' });
+  });
+
+  it('lets an admin open the thread of a technician', async () => {
+    const { prisma, service } = setup();
+    prisma.user.findUnique.mockImplementation(({ where }: any) => Promise.resolve(where.id === 'admin'
+      ? { id: 'admin', role: 'ADMIN', status: 'ACTIVE' }
+      : { id: where.id, role: 'TECHNICIAN', status: 'ACTIVE', displayName: 'KTV' }));
+    const opened = await service.createSupportConversation('admin', 'tech');
+    expect(opened.participant).toMatchObject({ id: 'tech', displayName: 'KTV' });
+  });
+
+  it('rejects other roles, admins without a requester, and admin targets', async () => {
+    const other = setup('PARTNER', null, 'partner');
+    await expect(other.service.createSupportConversation('partner')).rejects.toBeInstanceOf(ForbiddenException);
     const admin = setup();
     await expect(admin.service.createSupportConversation('admin')).rejects.toBeInstanceOf(BadRequestException);
     admin.prisma.user.findUnique.mockResolvedValue({ role: 'ADMIN', status: 'ACTIVE' });

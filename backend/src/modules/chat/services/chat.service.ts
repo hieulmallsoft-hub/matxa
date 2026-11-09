@@ -6,6 +6,7 @@ import { CreateConversationDto, EditMessageDto, ListMessagesDto, SendMessageDto 
 import { COMPLAINT_CREATED, COMPLAINT_STATUS_LABEL } from '../../bookings/services/complaint-conversation';
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000;
+const SUPPORT_REQUESTER_ROLES: string[] = ['CUSTOMER', 'TECHNICIAN'];
 const SUPPORT_PARTICIPANT = { id: 'support', displayName: 'Psyocore CSKH', avatarUrl: null, role: 'ADMIN' };
 // Support SYSTEM messages store a stable event code in `text`; responses expose it as
 // `systemEvent` and replace `text` with the display copy.
@@ -52,8 +53,9 @@ export class ChatService {
   /** An admin opens the thread of a chosen customer; a customer opens their own. */
   async createSupportConversation(actorId: string, requestedCustomerId?: string) {
     const actor = await this.prisma.user.findUnique({ where: { id: actorId }, select: { role: true, status: true } });
-    if (actor?.status !== 'ACTIVE' || !['ADMIN', 'CUSTOMER'].includes(actor.role))
-      throw new ForbiddenException('Chi admin hoac khach hang duoc mo hoi thoai ho tro');
+    // Technicians get the same "Hỗ trợ nhanh" thread as customers; the thread is keyed by whoever asks for help.
+    if (actor?.status !== 'ACTIVE' || !['ADMIN', ...SUPPORT_REQUESTER_ROLES].includes(actor.role))
+      throw new ForbiddenException('Chi admin, khach hang hoac KTV duoc mo hoi thoai ho tro');
     const isAdmin = actor.role === 'ADMIN';
     // A customer can only open their own thread, whatever customerId the body carries.
     const customerId = isAdmin ? requestedCustomerId : actorId;
@@ -61,8 +63,8 @@ export class ChatService {
     const customer = await this.prisma.user.findUnique({
       where: { id: customerId }, select: { id: true, role: true, status: true, displayName: true, avatarUrl: true },
     });
-    if (!customer || customer.role !== 'CUSTOMER' || customer.status !== 'ACTIVE')
-      throw new BadRequestException('Vui long chon khach hang dang hoat dong');
+    if (!customer || !SUPPORT_REQUESTER_ROLES.includes(customer.role) || customer.status !== 'ACTIVE')
+      throw new BadRequestException('Vui long chon khach hang hoac KTV dang hoat dong');
     const conversation = await this.prisma.$transaction(async (tx) => {
       // A unique customer key makes reopening and concurrent creation idempotent.
       const thread = await tx.conversation.upsert({
