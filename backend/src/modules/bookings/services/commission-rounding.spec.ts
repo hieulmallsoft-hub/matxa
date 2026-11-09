@@ -21,7 +21,7 @@ describe('commission in real VND', () => {
       walletLedgerEntry: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn() },
     };
     tx.$transaction = jest.fn((callback: any) => callback(tx));
-    const settings = { platformFeePercent: jest.fn().mockResolvedValue(rate) };
+    const settings = { platformFeePercent: jest.fn().mockResolvedValue(rate), getBookingRules: jest.fn().mockResolvedValue({ dailyDiscountThreshold: 0 }) };
     const service = new BookingsService(
       tx, { get: (_k: string, d: unknown) => d } as any, {} as any, {} as any, undefined, undefined, undefined, settings as any,
     );

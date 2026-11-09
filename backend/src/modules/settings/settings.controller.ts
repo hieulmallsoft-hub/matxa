@@ -58,6 +58,14 @@ class UpdateBookingRulesDto {
   @ApiPropertyOptional({ example: 100000, description: 'Phu phi (VND) cong vao moi don tai nha. 0 = khong thu.' })
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(5_000_000)
   homeServiceFee?: number;
+
+  @ApiPropertyOptional({ example: 5, description: 'KTV hoan thanh du so don nay trong ngay thi cac don nhan sau do chi bi tru dailyDiscountFeePercent. 0 = tat.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100)
+  dailyDiscountThreshold?: number;
+
+  @ApiPropertyOptional({ example: 20, description: 'Phi chiet khau (%) sau khi KTV dat moc don trong ngay. So nguyen 0-100.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100)
+  dailyDiscountFeePercent?: number;
 }
 
 @ApiTags('Admin Settings')

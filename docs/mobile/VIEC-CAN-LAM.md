@@ -310,6 +310,13 @@ Màn "Thông tin dịch vụ" của KTV:
 Mọi link file (`downloadUrl`, `signedDocumentUrl`, `viewUrl`…) **hết hạn sau 600 giây** vì là dữ liệu riêng tư.
 Luôn gọi API lấy link mới ngay trước khi mở, không lưu link vào bộ nhớ hay cache.
 
+## J. Giảm chiết khấu khi KTV làm đủ đơn trong ngày (app KTV, không bắt buộc)
+
+Admin đặt trong Cài đặt → Chính sách KTV, ví dụ "5 đơn/ngày → phí còn 20%". KTV đã **hoàn thành** đủ 5 đơn trong ngày (giờ Việt Nam) thì các đơn nhận tiếp theo hôm đó chỉ bị trừ 20%. Các đơn trước mốc giữ nguyên phí.
+
+- Không cần sửa gì để tính đúng tiền: `pricing.platformFee` / `pricing.technicianEarning` trong `GET /technician/jobs` và `GET /technician/jobs/{id}` đã tính theo mức giảm khi KTV đạt mốc.
+- Nếu muốn hiện dòng "Làm thêm X đơn hôm nay để phí chỉ còn 20%": lấy `dailyDiscountThreshold`, `dailyDiscountFeePercent` từ `GET /settings/public` (`dailyDiscountThreshold = 0` là đang tắt, khi đó ẩn dòng này). Số đơn đã hoàn thành hôm nay lấy ở `today.completedBookings` của `GET /technician/jobs/activity`.
+
 ## Cách tự kiểm tra trên Swagger
 
 1. `PATCH /api/technician/application` với `idCardQr` = chuỗi app quét được → response có `idCardInfo` đúng tên trên thẻ.

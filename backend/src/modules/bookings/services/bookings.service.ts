@@ -20,6 +20,7 @@ import { Optional } from '@nestjs/common';
 import { SettingsService } from '../../settings/settings.service';
 import { ComplaintStorageService } from './complaint-storage.service';
 import { addressPreview, confirmationDeadline, kmBetween, roundVnd, technicianBadge, travelFeeFor } from './distance';
+import { activityPeriods } from './technician-activity';
 import { COMPLAINT_STATUS_LABEL, complaintStatusEvent, ensureComplaintConversation } from './complaint-conversation';
 import {
   BookingHistoryQueryDto,
@@ -671,7 +672,7 @@ export class BookingsService {
       return requested ? this.acceptAsRequestedTechnician(userId, booking, existing.id) : { ...existing, idempotent: true };
     if (existing) throw new ConflictException('Trang thai ung tuyen hien tai khong cho phep apply lai');
     // Selection charges the commission, so a technician who could not pay it must not be selectable.
-    const fee = await this.commissionFor(booking.grossServiceAmount);
+    const fee = await this.commissionFor(booking.grossServiceAmount, userId);
     if (fee > 0) {
       const wallet = await this.prisma.wallet.findUnique({
         where: { userId_type: { userId, type: 'ADVERTISING_CREDIT' } },
@@ -1047,7 +1048,7 @@ export class BookingsService {
 
   async listTechnicianJobs(userId: string, query: TechnicianJobQueryDto) {
     const profile = await this.requireActiveTechnician(userId);
-    const commissionPercent = await this.commissionRate();
+    const commissionPercent = await this.commissionRate(userId);
     const travelRules = await this.bookingRules();
     const now = new Date();
     // Expired jobs stay in the history of technicians they were announced to, not everyone's.
@@ -1130,7 +1131,7 @@ export class BookingsService {
 
   async technicianJobDetail(userId: string, id: string) {
     const profile = await this.requireActiveTechnician(userId);
-    const commissionPercent = await this.commissionRate();
+    const commissionPercent = await this.commissionRate(userId);
     const travelRules = await this.bookingRules();
     const booking = await this.detail(userId, id, true, true);
     if (booking.assignmentMode === 'OPEN_MARKETPLACE') {
@@ -1218,6 +1219,8 @@ export class BookingsService {
         confirmationWaitMinutes: Number(this.config.get('OPEN_BOOKING_APPLICATION_TTL_MINUTES', 10)),
         requireTechnicianPhone: false,
         homeServiceFee: Number(this.config.get('HOME_SERVICE_FEE', 100000)),
+        dailyDiscountThreshold: 0,
+        dailyDiscountFeePercent: 20,
       }
     );
   }
@@ -1228,15 +1231,30 @@ export class BookingsService {
       throw new BadRequestException(`Vui long dat lich truoc it nhat ${minAdvanceHours} gio`);
   }
 
-  private async commissionRate() {
+  private async commissionRate(userId?: string, db: Prisma.TransactionClient | PrismaService = this.prisma) {
+    return (await this.commissionPolicy(userId, db)).rate;
+  }
+
+  /**
+   * The platform's cut for this technician right now: the usual rate, or the admin's lower daily rate once they
+   * have completed `dailyDiscountThreshold` bookings today (Viet Nam time). Bookings charged earlier keep their fee.
+   */
+  private async commissionPolicy(userId?: string, db: Prisma.TransactionClient | PrismaService = this.prisma) {
     const rate = this.settings ? await this.settings.platformFeePercent() : Number(this.config.get('TECHNICIAN_COMMISSION_RATE_PERCENT', 25));
     if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new BadRequestException('Ty le chiet khau KTV khong hop le');
-    return rate;
+    const usual = { rate, version: `COMMISSION_${rate}_V1` };
+    const { dailyDiscountThreshold: threshold, dailyDiscountFeePercent: discounted } = await this.bookingRules();
+    if (!userId || !(threshold > 0) || !(discounted >= 0 && discounted < rate)) return usual;
+    const { today } = activityPeriods(new Date());
+    const completedToday = await db.booking.count({
+      where: { technician: { userId }, status: 'COMPLETED', scheduledStart: { gte: today.from, lt: today.to } },
+    });
+    return completedToday >= threshold ? { rate: discounted, version: `COMMISSION_${discounted}_DAILY${threshold}_V1` } : usual;
   }
 
   /** Commission the technician's wallet is charged when the booking is confirmed for them. */
-  private async commissionFor(grossServiceAmount: unknown) {
-    return roundVnd((Number(grossServiceAmount ?? 0) * (await this.commissionRate())) / 100);
+  private async commissionFor(grossServiceAmount: unknown, userId?: string) {
+    return roundVnd((Number(grossServiceAmount ?? 0) * (await this.commissionRate(userId))) / 100);
   }
 
   private async chargeTechnicianCommission(
@@ -1249,8 +1267,8 @@ export class BookingsService {
       select: { grossServiceAmount: true, travelFee: true },
     });
     if (!booking) throw new ForbiddenException('Don khong thuoc KTV nay');
-    const rate = await this.commissionRate();
-    const fee = await this.commissionFor(booking.grossServiceAmount);
+    const { rate, version } = await this.commissionPolicy(userId, db);
+    const fee = roundVnd((Number(booking.grossServiceAmount ?? 0) * rate) / 100);
     if (fee <= 0) return;
     const debit = async (tx: Prisma.TransactionClient) => {
       const wallet = await tx.wallet.upsert({ where: { userId_type: { userId, type: 'ADVERTISING_CREDIT' } }, create: { userId, type: 'ADVERTISING_CREDIT' }, update: {} });
@@ -1264,7 +1282,7 @@ export class BookingsService {
           platformFee: fee,
           // The travel fee is the technician's in full; only the services carry the commission.
           technicianEarning: Number(booking.grossServiceAmount ?? 0) - fee + Number(booking.travelFee ?? 0),
-          feePolicyVersion: `COMMISSION_${rate}_V1`,
+          feePolicyVersion: version,
         } });
     };
     if (db === this.prisma) await this.prisma.$transaction(debit);

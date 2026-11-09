@@ -64,6 +64,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
   const [requireTechnicianPhone, setRequireTechnicianPhone] = useState(false);
   const [homeServiceFee, setHomeServiceFee] = useState('100000');
   const [techCommissionRate, setTechCommissionRate] = useState('75');
+  const [dailyDiscountThreshold, setDailyDiscountThreshold] = useState('0');
+  const [dailyDiscountFeePercent, setDailyDiscountFeePercent] = useState('20');
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
 
   React.useEffect(() => {
@@ -84,7 +86,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         setSupportEmail(value.supportEmail);
       })
       .catch(() => undefined);
-    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number; confirmationWaitMinutes: number; requireTechnicianPhone: boolean; homeServiceFee: number }>('/admin/settings/booking')
+    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number; confirmationWaitMinutes: number; requireTechnicianPhone: boolean; homeServiceFee: number; dailyDiscountThreshold: number; dailyDiscountFeePercent: number }>('/admin/settings/booking')
       .then((value) => {
         setMinAdvanceHours(String(value.minAdvanceHours));
         setMaxTravelDistanceKm(String(value.maxDispatchRadiusKm));
@@ -93,6 +95,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         setConfirmationWaitMinutes(String(value.confirmationWaitMinutes ?? 10));
         setRequireTechnicianPhone(Boolean(value.requireTechnicianPhone));
         setHomeServiceFee(String(value.homeServiceFee ?? 100000));
+        setDailyDiscountThreshold(String(value.dailyDiscountThreshold ?? 0));
+        setDailyDiscountFeePercent(String(value.dailyDiscountFeePercent ?? 20));
       })
       .catch(() => undefined);
   }, []);
@@ -123,7 +127,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
       if (activeCategory === 'technician') {
         const share = Number(techCommissionRate);
         if (!Number.isInteger(share) || share < 0 || share > 100) throw new Error('Tỷ lệ KTV nhận phải là số nguyên từ 0 đến 100 (ví dụ 80)');
+        const threshold = Number(dailyDiscountThreshold);
+        const discounted = Number(dailyDiscountFeePercent);
+        if (!Number.isInteger(threshold) || threshold < 0 || threshold > 100) throw new Error('Số đơn/ngày phải là số nguyên từ 0 đến 100');
+        if (!Number.isInteger(discounted) || discounted < 0 || discounted > 100) throw new Error('Phí chiết khấu sau mốc phải là số nguyên từ 0 đến 100');
         await request('/admin/settings/commission', { method: 'PATCH', body: JSON.stringify({ technicianSharePercent: share }) });
+        await request('/admin/settings/booking', { method: 'PATCH', body: JSON.stringify({ dailyDiscountThreshold: threshold, dailyDiscountFeePercent: discounted }) });
         addToast({ title: 'Đã lưu chính sách KTV', message: `KTV nhận ${techCommissionRate}% giá trị dịch vụ.`, type: 'success' });
       }
       if (activeCategory === 'brand') {
@@ -458,6 +467,38 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                     KTV nhận {techCommissionRate}%, sàn Psyocore thu hoa hồng {100 - Number(techCommissionRate)}% (trừ vào ví KTV khi nhận đơn).
                     Ví dụ dịch vụ 500.000đ: sàn thu {(Math.round((500000 * (100 - Number(techCommissionRate))) / 100 / 1000) * 1000).toLocaleString('vi-VN')}đ.
                     Hoa hồng được làm tròn đến 1.000đ; phí di chuyển KTV nhận đủ, không tính hoa hồng.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[#1C2B20]">Giảm chiết khấu khi KTV hoàn thành (đơn/ngày)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={dailyDiscountThreshold}
+                      onChange={(e) => setDailyDiscountThreshold(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[#1C2B20]">Phí chiết khấu sau mốc (%)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={dailyDiscountFeePercent}
+                      onChange={(e) => setDailyDiscountFeePercent(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
+                    />
+                  </div>
+                  <span className="sm:col-span-2 text-[11px] text-[#66756B]">
+                    {Number(dailyDiscountThreshold) > 0
+                      ? `KTV đã hoàn thành ${dailyDiscountThreshold} đơn trong ngày thì các đơn nhận tiếp theo hôm đó chỉ bị trừ ${dailyDiscountFeePercent}% (thay vì ${100 - Number(techCommissionRate)}%). Các đơn trước mốc giữ nguyên phí. Tính theo giờ Việt Nam, sang ngày mới đếm lại.`
+                      : 'Nhập 0 để tắt. Ví dụ 5 và 20: KTV làm xong 5 đơn trong ngày thì từ đơn tiếp theo chỉ bị trừ 20%.'}
                   </span>
                 </div>
               </div>

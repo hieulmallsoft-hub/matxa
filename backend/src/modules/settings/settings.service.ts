@@ -18,6 +18,10 @@ export type BookingRules = {
   requireTechnicianPhone: boolean;
   /** "Phụ phí" added to every home booking (VND); the server's HOME_SERVICE_FEE until the admin sets one. */
   homeServiceFee: number;
+  /** Completed bookings in a day (Viet Nam time) after which the technician's next bookings carry
+   *  `dailyDiscountFeePercent` instead of the usual commission. 0 = off. */
+  dailyDiscountThreshold: number;
+  dailyDiscountFeePercent: number;
 };
 
 const PLATFORM_KEYS: Record<keyof PlatformInfo, string> = {
@@ -34,6 +38,8 @@ const BOOKING_KEYS: Record<keyof BookingRules, string> = {
   confirmationWaitMinutes: 'BOOKING_CONFIRMATION_WAIT_MINUTES',
   requireTechnicianPhone: 'BOOKING_REQUIRE_TECHNICIAN_PHONE',
   homeServiceFee: 'BOOKING_HOME_SERVICE_FEE',
+  dailyDiscountThreshold: 'BOOKING_DAILY_DISCOUNT_THRESHOLD',
+  dailyDiscountFeePercent: 'BOOKING_DAILY_DISCOUNT_FEE_PERCENT',
 };
 
 @Injectable()
@@ -82,6 +88,8 @@ export class SettingsService {
       confirmationWaitMinutes: Number(stored.get(BOOKING_KEYS.confirmationWaitMinutes) ?? 10),
       requireTechnicianPhone: stored.get(BOOKING_KEYS.requireTechnicianPhone) === 'true',
       homeServiceFee: Number(stored.get(BOOKING_KEYS.homeServiceFee) ?? this.config.get('HOME_SERVICE_FEE', 100000)),
+      dailyDiscountThreshold: Number(stored.get(BOOKING_KEYS.dailyDiscountThreshold) ?? 0),
+      dailyDiscountFeePercent: Number(stored.get(BOOKING_KEYS.dailyDiscountFeePercent) ?? 20),
     };
   }
 
