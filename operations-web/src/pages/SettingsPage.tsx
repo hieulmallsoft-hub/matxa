@@ -13,6 +13,7 @@ import {
   Check,
   Save,
   HelpCircle,
+  Receipt,
 } from 'lucide-react';
 import { useToast } from '../components/ui/ToastContainer';
 import { request } from '../api/client';
@@ -40,6 +41,7 @@ interface SettingsPageProps {
 type SettingCategory =
   | 'brand'
   | 'booking'
+  | 'fees'
   | 'payment'
   | 'technician'
   | 'notifications'
@@ -148,19 +150,26 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         const radius = Number(maxTravelDistanceKm);
         if (!Number.isInteger(hours) || hours < 0 || hours > 72) throw new Error('Thời gian đặt trước phải là số nguyên từ 0 đến 72 giờ');
         if (!Number.isInteger(radius) || radius < 0 || radius > 200) throw new Error('Bán kính phải là số nguyên từ 0 đến 200 km');
-        const feeKm = Number(travelFeeThresholdKm);
-        const fee = Number(travelFeeAmount);
-        if (!Number.isInteger(feeKm) || feeKm < 0 || feeKm > 200) throw new Error('Ngưỡng tính phí di chuyển phải là số nguyên từ 0 đến 200 km');
-        if (!Number.isInteger(fee) || fee < 0 || fee > 5_000_000) throw new Error('Phí di chuyển phải là số nguyên từ 0 đến 5.000.000đ');
-        const surcharge = Number(homeServiceFee);
-        if (!Number.isInteger(surcharge) || surcharge < 0 || surcharge > 5_000_000) throw new Error('Phụ phí phải là số nguyên từ 0 đến 5.000.000đ');
         const wait = Number(confirmationWaitMinutes);
         if (!Number.isInteger(wait) || wait < 1 || wait > 60) throw new Error('Thời gian chờ KTV xác nhận phải từ 1 đến 60 phút');
         await request('/admin/settings/booking', {
           method: 'PATCH',
-          body: JSON.stringify({ minAdvanceHours: hours, maxDispatchRadiusKm: radius, travelFeeThresholdKm: feeKm, travelFeeAmount: fee, confirmationWaitMinutes: wait, requireTechnicianPhone, homeServiceFee: surcharge }),
+          body: JSON.stringify({ minAdvanceHours: hours, maxDispatchRadiusKm: radius, confirmationWaitMinutes: wait, requireTechnicianPhone }),
         });
         addToast({ title: 'Đã lưu quy định đặt lịch', message: 'Áp dụng cho các đơn đặt sau khi lưu.', type: 'success' });
+      }
+      if (activeCategory === 'fees') {
+        const surcharge = Number(homeServiceFee);
+        if (!Number.isInteger(surcharge) || surcharge < 0 || surcharge > 5_000_000) throw new Error('Phụ phí phải là số nguyên từ 0 đến 5.000.000đ');
+        const feeKm = Number(travelFeeThresholdKm);
+        const fee = Number(travelFeeAmount);
+        if (!Number.isInteger(feeKm) || feeKm < 0 || feeKm > 200) throw new Error('Ngưỡng tính phí di chuyển phải là số nguyên từ 0 đến 200 km');
+        if (!Number.isInteger(fee) || fee < 0 || fee > 5_000_000) throw new Error('Phí di chuyển phải là số nguyên từ 0 đến 5.000.000đ');
+        await request('/admin/settings/booking', {
+          method: 'PATCH',
+          body: JSON.stringify({ homeServiceFee: surcharge, travelFeeThresholdKm: feeKm, travelFeeAmount: fee }),
+        });
+        addToast({ title: 'Đã lưu phụ phí', message: `Phụ phí đơn tại nhà: ${surcharge.toLocaleString('vi-VN')}đ. Áp dụng cho đơn đặt sau khi lưu.`, type: 'success' });
       }
       setIsSaving(false);
     } catch (error) {
@@ -171,10 +180,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
 
   // Only these categories are stored on the server. The rest are layout only for now,
   // so they are read-only and never report a successful save.
-  const SAVED_ON_SERVER: SettingCategory[] = ['brand', 'booking', 'technician', 'notifications'];
+  const SAVED_ON_SERVER: SettingCategory[] = ['brand', 'booking', 'fees', 'technician', 'notifications'];
   const SAVE_BAR: Partial<Record<SettingCategory, { label: string; hint: string }>> = {
     brand: { label: 'Lưu thông tin hệ thống', hint: 'Hiển thị trên ứng dụng khách hàng và KTV.' },
     booking: { label: 'Lưu quy định đặt lịch', hint: 'Áp dụng cho các đơn đặt sau khi lưu.' },
+    fees: { label: 'Lưu phụ phí', hint: 'Áp dụng cho các đơn đặt sau khi lưu.' },
     technician: { label: 'Lưu chính sách KTV', hint: 'Tỷ lệ mới áp dụng cho các đơn được nhận sau khi lưu.' },
   };
   const saveBar = SAVE_BAR[activeCategory];
@@ -182,6 +192,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
 
   const categories = [
     { id: 'brand', label: 'Thông tin hệ thống', icon: Store, desc: 'Tên thương hiệu, hotline, email CSKH' },
+    { id: 'fees', label: 'Phụ phí & Phí di chuyển', icon: Receipt, desc: `Phụ phí đơn tại nhà: ${Number(homeServiceFee || 0).toLocaleString('vi-VN')}đ` },
     { id: 'booking', label: 'Cấu hình Đặt lịch', icon: CalendarCheck, desc: 'Thời gian đặt trước, điều phối KTV' },
     { id: 'payment', label: 'Cổng thanh toán', icon: CreditCard, desc: 'VietQR, tài khoản thụ hưởng' },
     { id: 'technician', label: 'Chính sách KTV', icon: UserCheck, desc: 'Hoa hồng, cước phí di chuyển' },
@@ -363,7 +374,38 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                     Đơn tại nhà chỉ gợi ý và gửi cho KTV trong bán kính này tính từ địa chỉ khách. KTV chưa cập nhật vị trí vẫn nhận được. Nhập 0 để không giới hạn.
                   </span>
                 </div>
+              </div>
+            </div>
+          )}
 
+          {/* PHỤ PHÍ & PHÍ DI CHUYỂN */}
+          {activeCategory === 'fees' && (
+            <div className="space-y-5">
+              <div className="border-b border-[#E5EBE5] pb-3">
+                <h3 className="text-base font-bold text-[#1C2B20]">Phụ phí & Phí di chuyển</h3>
+                <p className="text-xs text-[#66756B]">Các khoản cộng thêm vào tiền khách trả, hiện ở màn thanh toán của khách</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-4 rounded-2xl bg-[#EAF5EC] border border-[#CFE6D5]">
+                  <div className="text-[11px] font-semibold text-[#2E7D4A]">Phụ phí đơn tại nhà</div>
+                  <div className="text-2xl font-bold text-[#1C2B20] mt-1">
+                    {Number(homeServiceFee) > 0 ? `${Number(homeServiceFee).toLocaleString('vi-VN')}đ` : 'Không thu'}
+                  </div>
+                  <div className="text-[11px] text-[#66756B] mt-1">Cộng vào mọi đơn tại nhà</div>
+                </div>
+                <div className="p-4 rounded-2xl bg-[#F6F8F4] border border-[#E5EBE5]">
+                  <div className="text-[11px] font-semibold text-[#66756B]">Phí di chuyển</div>
+                  <div className="text-2xl font-bold text-[#1C2B20] mt-1">
+                    {Number(travelFeeAmount) > 0 ? `${Number(travelFeeAmount).toLocaleString('vi-VN')}đ` : 'Đang tắt'}
+                  </div>
+                  <div className="text-[11px] text-[#66756B] mt-1">
+                    {Number(travelFeeAmount) > 0 ? `Khi khách xa KTV hơn ${travelFeeThresholdKm} km, KTV nhận 100%` : 'Nhập số tiền bên dưới để bật'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-[#1C2B20]">Phụ phí đơn tại nhà (đ)</label>
                   <input

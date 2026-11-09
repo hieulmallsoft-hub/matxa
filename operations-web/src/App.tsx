@@ -252,9 +252,11 @@ function AppInner() {
       case 'notifications':
         return <NotificationsPage />;
       case 'settings':
-        return <SettingsPage theme={theme} onToggleTheme={setTheme} />;
+        return <SettingsPage key="settings" theme={theme} onToggleTheme={setTheme} />;
+      case 'fees':
+        return <SettingsPage key="fees" theme={theme} onToggleTheme={setTheme} initialCategory="fees" />;
       case 'technicianPolicy':
-        return <SettingsPage theme={theme} onToggleTheme={setTheme} initialCategory="technician" />;
+        return <SettingsPage key="technicianPolicy" theme={theme} onToggleTheme={setTheme} initialCategory="technician" />;
       case 'complaints':
         return <ComplaintsPage />;
       case 'venues':

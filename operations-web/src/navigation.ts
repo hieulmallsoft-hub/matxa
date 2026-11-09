@@ -19,6 +19,7 @@ import {
   BookOpenText,
   Wallet,
   Images,
+  Receipt,
 } from 'lucide-react';
 import type { PageId } from './types/dashboard';
 
@@ -78,6 +79,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'notifications', label: 'Thông báo hệ thống', description: 'Hồ sơ mới, khiếu nại, đơn hết hạn, tin nhắn', icon: Bell, keywords: 'thong bao canh bao', count: 'unreadNotifications' },
       { id: 'complaints', label: 'Khiếu nại', description: 'Khiếu nại về đơn dịch vụ', icon: ShieldCheck, keywords: 'complaint' },
+      { id: 'fees', label: 'Phụ phí', description: 'Phụ phí đơn tại nhà và phí di chuyển', icon: Receipt, keywords: 'phu phi phi di chuyen surcharge fee' },
       { id: 'technicianPolicy', label: 'Chính sách KTV', description: 'Tỷ lệ hoa hồng và chính sách KTV', icon: Scale, keywords: 'hoa hong commission' },
       { id: 'settings', label: 'Cấu hình hệ thống', description: 'Thông tin nền tảng và cấu hình', icon: Settings, keywords: 'setting cai dat' },
     ],
