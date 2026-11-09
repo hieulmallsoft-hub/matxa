@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../database/prisma.service';
 import { ChatGateway } from '../gateways/chat.gateway';
 import { ChatStorageService } from './chat-storage.service';
+import { SUPPORT_ENDED } from './chat.service';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -18,9 +19,9 @@ export type SupportChatEndReason = 'AGENT_ENDED' | 'IDLE';
 
 /**
  * A support chat is one session: it ends when an admin closes it or after SUPPORT_CHAT_IDLE_HOURS
- * without a message (default 24; 0 disables). Ending deletes the thread, its messages, images and
- * the notifications that quote them, so the customer's next "Chat ngay" starts a fresh thread.
- * Deleting is idempotent, so several PM2/Nest instances may run the idle sweep.
+ * without a message (default 24; 0 disables). An ended thread stays in both sides' history, read-only;
+ * it gives up its per-user key so the next "Chat ngay" starts a fresh thread. Each side can still
+ * delete it from their own list. Ending is idempotent, so several PM2/Nest instances may run the sweep.
  */
 @Injectable()
 export class SupportChatRetentionService implements OnModuleInit, OnModuleDestroy {
@@ -71,6 +72,7 @@ export class SupportChatRetentionService implements OnModuleInit, OnModuleDestro
     const idle = await this.prisma.conversation.findMany({
       where: {
         type: 'SUPPORT',
+        endedAt: null,
         OR: [{ lastMessageAt: { lt: cutoff } }, { lastMessageAt: null, createdAt: { lt: cutoff } }],
       },
       select: { id: true },
@@ -84,18 +86,25 @@ export class SupportChatRetentionService implements OnModuleInit, OnModuleDestro
   }
 
   private async end(conversationId: string, reason: SupportChatEndReason) {
-    const [members, images] = await Promise.all([
-      this.prisma.conversationMember.findMany({ where: { conversationId }, select: { userId: true } }),
-      this.prisma.message.findMany({ where: { conversationId, mediaKey: { not: null } }, select: { mediaKey: true } }),
-    ]);
-    const [, deleted] = await this.prisma.$transaction([
-      // Chat notifications quote the message text, so they go with the thread.
-      this.prisma.notification.deleteMany({ where: { actionUrl: `matxa://chat/${conversationId}` } }),
-      // Messages and members cascade with the conversation.
-      this.prisma.conversation.deleteMany({ where: { id: conversationId, type: 'SUPPORT' } }),
-    ]);
-    if (!deleted.count) return false;
-    await this.storage.deleteObjects(images.map((image) => image.mediaKey!));
+    const now = new Date();
+    const ended = await this.prisma.$transaction(async (tx) => {
+      const thread = await tx.conversation.findFirst({
+        where: { id: conversationId, type: 'SUPPORT', endedAt: null },
+        select: { supportCustomerId: true, customerId: true },
+      });
+      const owner = thread?.supportCustomerId ?? thread?.customerId;
+      if (!thread || !owner) return false;
+      // Releasing supportCustomerId lets the owner's next "Chat ngay" create a new thread.
+      const closed = await tx.conversation.updateMany({
+        where: { id: conversationId, endedAt: null },
+        data: { endedAt: now, endReason: reason, supportCustomerId: null, customerId: owner, lastMessageAt: now },
+      });
+      if (!closed.count) return false;
+      await tx.message.create({ data: { conversationId, senderId: owner, type: 'SYSTEM', text: SUPPORT_ENDED, createdAt: now } });
+      return true;
+    });
+    if (!ended) return false;
+    const members = await this.prisma.conversationMember.findMany({ where: { conversationId }, select: { userId: true } });
     this.gateway.publishConversationEnded(conversationId, members.map((member) => member.userId), reason);
     return true;
   }

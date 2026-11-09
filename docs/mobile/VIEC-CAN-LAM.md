@@ -367,7 +367,9 @@ KTV dùng **đúng API chat CSKH của app khách**, không có API mới. Trư�
 
 - Mỗi KTV có **một** cuộc chat CSKH; bấm "Hỗ trợ nhanh" nhiều lần vẫn ra cùng cuộc chat.
 - Admin trả lời ở trang **Tin nhắn CSKH**, cuộc chat của KTV có nhãn **KTV**.
-- Admin bấm "Kết thúc" hoặc 24 giờ không ai nhắn thì cuộc chat bị xóa; lần sau KTV bấm "Hỗ trợ nhanh" sẽ mở cuộc chat mới (giống app khách).
+- Admin bấm "Kết thúc" hoặc 24 giờ không ai nhắn thì phiên **kết thúc nhưng không bị xóa**: vẫn nằm trong "Cuộc trò chuyện gần đây", chỉ xem được (`canSendMessage: false`, `endedAt`). Bấm "Chat ngay" mở cuộc **mới**.
+- Người dùng (khách/KTV) xóa cuộc cũ: `DELETE /api/conversations/{id}` — chỉ ẩn ở phía mình; admin xóa cũng chỉ ẩn ở phía admin.
+- Áp dụng cho **cả app khách và app KTV**; chi tiết và cách xử lý trên màn hình ở [support-chat.md](support-chat.md).
 - Có thể **dùng lại nguyên màn chat CSKH** của app khách; chi tiết API xem [support-chat.md](support-chat.md).
 
 ## Cách tự kiểm tra trên Swagger

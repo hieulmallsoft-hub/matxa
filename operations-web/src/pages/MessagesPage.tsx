@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Search, RefreshCw, MessageSquare, Check, Plus, ImagePlus, CircleStop } from 'lucide-react';
+import { Send, Search, RefreshCw, MessageSquare, Check, Plus, ImagePlus, CircleStop, Trash2 } from 'lucide-react';
 import { SupportCustomerPicker } from '../components/SupportCustomerPicker';
 import { useToast } from '../components/ui/ToastContainer';
 import { useConfirm } from '../components/ui/useConfirm';
@@ -39,6 +39,8 @@ type Conversation = {
   lastMessage?: ApiMessage | null;
   lastMessageAt?: string | null;
   unreadCount?: number;
+  /** Set once the support session ended: the thread stays readable but takes no new messages. */
+  endedAt?: string | null;
 };
 const formatTime = (value?: string | null) =>
   value
@@ -79,6 +81,7 @@ export const MessagesPage: React.FC = () => {
   const { addToast } = useToast();
   const { confirm, dialog } = useConfirm();
   const [ending, setEnding] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [threads, setThreads] = useState<Conversation[]>([]);
   const [activeThreadId, setActiveThreadId] = useState('');
   const [currentUserId, setCurrentUserId] = useState('');
@@ -255,28 +258,50 @@ export const MessagesPage: React.FC = () => {
     finally { setCreating(false); }
   };
 
-  // Ending deletes the thread for good; the customer's next "Chat ngay" starts a new one.
+  // Ending closes the session: both sides keep it to read, and the next "Chat ngay" starts a new thread.
   const handleEndSupport = async () => {
     const thread = activeThread;
     if (!thread || ending) return;
     const ok = await confirm({
       title: 'Kết thúc hỗ trợ?',
-      message: `Toàn bộ tin nhắn và ảnh với ${thread.participant?.displayName || 'khách hàng'} sẽ bị xóa vĩnh viễn, không xem lại được. Lần sau khách nhắn sẽ bắt đầu cuộc trò chuyện mới.`,
-      confirmText: 'Kết thúc & xóa',
-      tone: 'danger',
+      message: `Phiên hỗ trợ với ${thread.participant?.displayName || 'khách hàng'} sẽ đóng lại: hai bên vẫn xem lại được nhưng không nhắn tiếp. Lần sau họ bấm "Chat ngay" sẽ mở cuộc trò chuyện mới.`,
+      confirmText: 'Kết thúc',
     });
     if (!ok) return;
     setEnding(true);
     try {
       await request(`/conversations/${thread.id}/end`, { method: 'POST' });
-      setThreads((rows) => rows.filter((row) => row.id !== thread.id));
-      setActiveThreadId((current) => (current === thread.id ? '' : current));
-      addToast({ title: 'Đã kết thúc hỗ trợ', message: 'Cuộc trò chuyện đã được xóa.', type: 'success' });
+      setThreads((rows) => rows.map((row) => (row.id === thread.id ? { ...row, endedAt: new Date().toISOString() } : row)));
+      addToast({ title: 'Đã kết thúc hỗ trợ', message: 'Cuộc trò chuyện vẫn còn trong lịch sử để xem lại.', type: 'success' });
       setRefreshKey((key) => key + 1);
     } catch (error) {
       addToast({ title: 'Không kết thúc được', message: errorText(error), type: 'error' });
     } finally {
       setEnding(false);
+    }
+  };
+
+  // Deleting hides the thread from this admin's inbox only; the customer/KTV and other admins keep it.
+  const handleDeleteThread = async () => {
+    const thread = activeThread;
+    if (!thread || deleting) return;
+    const ok = await confirm({
+      title: 'Xóa cuộc trò chuyện?',
+      message: `Cuộc trò chuyện với ${thread.participant?.displayName || 'khách hàng'} sẽ biến mất khỏi hộp thư của bạn. ${thread.participant?.role === 'TECHNICIAN' ? 'KTV' : 'Khách'} và admin khác vẫn xem được.`,
+      confirmText: 'Xóa',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await request(`/conversations/${thread.id}`, { method: 'DELETE' });
+      setThreads((rows) => rows.filter((row) => row.id !== thread.id));
+      setActiveThreadId((current) => (current === thread.id ? '' : current));
+      addToast({ title: 'Đã xóa cuộc trò chuyện', type: 'success' });
+    } catch (error) {
+      addToast({ title: 'Không xóa được', message: errorText(error), type: 'error' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -327,7 +352,8 @@ export const MessagesPage: React.FC = () => {
       .includes(query),
   );
   const unreadCount = threads.reduce((sum, thread) => sum + (thread.unreadCount || 0), 0);
-  const canSend = Boolean(activeThread && currentUserId && !sending && !loading && !messagesLoading);
+  const activeEnded = Boolean(activeThread?.endedAt);
+  const canSend = Boolean(activeThread && !activeEnded && currentUserId && !sending && !loading && !messagesLoading);
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
@@ -383,7 +409,10 @@ export const MessagesPage: React.FC = () => {
               >
                 <Avatar participant={thread.participant} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold truncate">{thread.participant?.displayName || 'Khách hàng'}<RoleBadge participant={thread.participant} /></p>
+                  <p className="text-xs font-bold truncate">
+                    {thread.participant?.displayName || 'Khách hàng'}<RoleBadge participant={thread.participant} />
+                    {thread.endedAt && <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold align-middle bg-[#F1F1F1] text-[#8A8F8B]">Đã kết thúc</span>}
+                  </p>
                   <p className="text-xs text-[#66756B] truncate mt-1">{messageText(thread.lastMessage)}</p>
                   <div className="flex justify-between gap-2 mt-1 text-[10px] text-[#94A399]">
                     <span>{formatTime(thread.lastMessageAt || thread.lastMessage?.createdAt)}</span>
@@ -469,6 +498,11 @@ export const MessagesPage: React.FC = () => {
               </button>
             ))}
           </div>
+          {activeEnded && (
+            <p role="status" className="px-3 py-2 text-[11px] text-[#66756B] bg-[#F6F8F4] border-t border-[#E5EBE5] shrink-0">
+              Phiên hỗ trợ đã kết thúc, chỉ xem lại được. Khách/KTV bấm "Chat ngay" để mở cuộc trò chuyện mới.
+            </p>
+          )}
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -483,8 +517,8 @@ export const MessagesPage: React.FC = () => {
               value={inputMessage}
               onChange={(event) => setInputMessage(event.target.value)}
               maxLength={4000}
-              disabled={!activeThread || !currentUserId}
-              placeholder={activeThread ? 'Nhập nội dung phản hồi...' : 'Chọn hội thoại để gửi tin'}
+              disabled={!activeThread || activeEnded || !currentUserId}
+              placeholder={!activeThread ? 'Chọn hội thoại để gửi tin' : activeEnded ? 'Phiên hỗ trợ đã kết thúc' : 'Nhập nội dung phản hồi...'}
               className="flex-1 min-w-0 px-3.5 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs"
             />
             <button
@@ -507,9 +541,9 @@ export const MessagesPage: React.FC = () => {
             <p className="break-all">{activeThread?.supportCustomerId || activeThread?.participant?.id || 'Chưa chọn khách'}</p>
           </div>
           <p className="text-[#66756B] leading-relaxed">
-            Mỗi cuộc trò chuyện là một lần hỗ trợ. Khi xong, bấm Kết thúc để xóa hẳn; nếu 24 giờ không ai nhắn, hệ thống tự kết thúc và xóa.
+            Mỗi cuộc trò chuyện là một lần hỗ trợ. Khi xong, bấm Kết thúc; nếu 24 giờ không ai nhắn, hệ thống tự kết thúc. Cuộc trò chuyện đã kết thúc vẫn xem lại được; Xóa chỉ ẩn khỏi hộp thư của bạn.
           </p>
-          {activeThread && (
+          {activeThread && !activeEnded && (
             <button
               type="button"
               onClick={() => void handleEndSupport()}
@@ -518,6 +552,17 @@ export const MessagesPage: React.FC = () => {
             >
               <CircleStop className="w-4 h-4" />
               {ending ? 'Đang kết thúc...' : 'Kết thúc hỗ trợ'}
+            </button>
+          )}
+          {activeThread && (
+            <button
+              type="button"
+              onClick={() => void handleDeleteThread()}
+              disabled={deleting}
+              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-[#E5EBE5] bg-white text-[#66756B] text-xs font-semibold hover:bg-[#F6F8F4] disabled:opacity-50 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              {deleting ? 'Đang xóa...' : 'Xóa khỏi hộp thư của tôi'}
             </button>
           )}
         </aside>

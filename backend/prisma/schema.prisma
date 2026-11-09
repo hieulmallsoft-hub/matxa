@@ -1031,6 +1031,9 @@ model Conversation {
   technicianUserId String?           @map("technician_user_id") @db.Uuid
   participantKey String              @map("participant_key")
   lastMessageAt DateTime?            @map("last_message_at")
+  /// A support session that ended (admin "Kết thúc" or idle): kept read-only; "Chat ngay" opens a new thread.
+  endedAt       DateTime?            @map("ended_at")
+  endReason     String?              @map("end_reason")
   createdAt     DateTime             @default(now()) @map("created_at")
   updatedAt     DateTime             @updatedAt @map("updated_at")
   members       ConversationMember[]

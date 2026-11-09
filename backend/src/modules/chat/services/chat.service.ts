@@ -12,11 +12,14 @@ const SUPPORT_PARTICIPANT = { id: 'support', displayName: 'Psyocore CSKH', avata
 // `systemEvent` and replace `text` with the display copy.
 const SUPPORT_WELCOME = 'SUPPORT_WELCOME';
 const SUPPORT_AGENT_JOINED = 'SUPPORT_AGENT_JOINED';
+export const SUPPORT_ENDED = 'SUPPORT_ENDED';
 /** Customer <-> admin threads: the general CSKH one and the per-complaint one. */
 const ADMIN_THREAD_TYPES = ['SUPPORT', 'COMPLAINT'];
-/** The customer a CSKH or complaint thread belongs to. */
+/** The customer/KTV a CSKH or complaint thread belongs to. An ended support thread keeps its owner in customerId. */
 const threadOwner = (conversation: { type?: string | null; supportCustomerId?: string | null; customerId?: string | null } | null) =>
-  conversation?.type === 'SUPPORT' ? conversation.supportCustomerId : conversation?.type === 'COMPLAINT' ? conversation.customerId : null;
+  conversation?.type === 'SUPPORT'
+    ? conversation.supportCustomerId ?? conversation.customerId
+    : conversation?.type === 'COMPLAINT' ? conversation.customerId : null;
 const COMPLAINT_SUMMARY_SELECT = { id: true, bookingId: true, status: true, reasonCode: true } as const;
 const complaintSummary = (complaint: { id: string; bookingId: string; status: string; reasonCode: string } | null | undefined) =>
   complaint
@@ -31,6 +34,7 @@ const CLOSED_BOOKING_STATUSES = ['CANCELLED', 'EXPIRED'];
 const SUPPORT_SYSTEM_TEXT: Record<string, string> = {
   [SUPPORT_WELCOME]: 'Psyocore CSKH có thể giúp gì cho bạn?',
   [SUPPORT_AGENT_JOINED]: 'Psyocore CSKH đã tham gia cuộc trò chuyện',
+  [SUPPORT_ENDED]: 'Phiên hỗ trợ đã kết thúc. Bấm "Chat ngay" nếu bạn cần hỗ trợ thêm.',
 };
 
 @Injectable()
@@ -154,7 +158,8 @@ export class ChatService {
     const currentUser = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     if (currentUser?.role === 'ADMIN') {
       const conversations = await this.prisma.conversation.findMany({
-        where: type ? { type } : undefined,
+        // "Xóa" by an admin hides the thread for that admin only.
+        where: { ...(type ? { type } : {}), NOT: { members: { some: { userId, hiddenAt: { not: null } } } } },
         orderBy: { lastMessageAt: 'desc' },
         include: {
           members: { include: { user: { select: { id: true, displayName: true, avatarUrl: true, role: true } } } },
@@ -191,6 +196,8 @@ export class ChatService {
           supportCustomerId: conversation.supportCustomerId ?? null,
           bookingId: conversation.bookingId,
           participant,
+          endedAt: conversation.endedAt ?? null,
+          canSendMessage: !conversation.endedAt,
           complaint: complaintSummary(conversation.complaint),
           lastMessage: conversation.messages[0] ? this.withSupportSystemText(conversation.messages[0]) : null,
           lastMessageAt: conversation.lastMessageAt,
@@ -252,8 +259,10 @@ export class ChatService {
           bookingStatus: conversation.booking?.status ?? null,
           // "Khiếu nại đơn #XXXX" threads carry the complaint they are about.
           complaint: complaintSummary(conversation.complaint),
-          // false once the booking is cancelled/expired: show the history, hide the message box.
-          canSendMessage: !conversation.booking || !CLOSED_BOOKING_STATUSES.includes(conversation.booking.status),
+          endedAt: conversation.endedAt ?? null,
+          // false once the booking is cancelled/expired or the support session ended: show the history, hide the message box.
+          canSendMessage:
+            !conversation.endedAt && (!conversation.booking || !CLOSED_BOOKING_STATUSES.includes(conversation.booking.status)),
         });
       } catch (error) {
         if (!(error instanceof ForbiddenException)) throw error;
@@ -293,6 +302,12 @@ export class ChatService {
     const access = await this.ensureAccess(userId, conversationId);
     if (access.bookingStatus && CLOSED_BOOKING_STATUSES.includes(access.bookingStatus))
       throw new ForbiddenException('Don da ket thuc, cuoc tro chuyen chi con xem lai');
+    if (access.conversation.endedAt)
+      throw new ForbiddenException({
+        statusCode: 403,
+        code: 'SUPPORT_ENDED',
+        message: 'Phien ho tro da ket thuc, bam Chat ngay de mo cuoc tro chuyen moi',
+      });
     return access;
   }
 
@@ -457,7 +472,7 @@ export class ChatService {
     const [member, user, conversation] = await Promise.all([
       this.prisma.conversationMember.findUnique({ where: { conversationId_userId: { conversationId, userId } } }),
       this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } }),
-      this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { id: true, bookingId: true, type: true, supportCustomerId: true, customerId: true } }),
+      this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { id: true, bookingId: true, type: true, supportCustomerId: true, customerId: true, endedAt: true } }),
     ]);
     if (!conversation) throw new NotFoundException('Cuoc tro chuyen khong ton tai');
     if (!member && user?.role !== 'ADMIN') throw new ForbiddenException('Ban khong co quyen xem cuoc tro chuyen');

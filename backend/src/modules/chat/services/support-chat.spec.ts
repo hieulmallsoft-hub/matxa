@@ -171,6 +171,17 @@ describe('support conversations', () => {
   it('filters the admin inbox to support threads', async () => {
     const { service, prisma } = setup();
     await service.listConversations('admin', 'SUPPORT');
-    expect(prisma.conversation.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { type: 'SUPPORT' } }));
+    expect(prisma.conversation.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      // Threads this admin deleted stay out of their inbox only.
+      where: { type: 'SUPPORT', NOT: { members: { some: { userId: 'admin', hiddenAt: { not: null } } } } },
+    }));
+  });
+
+  it('keeps an ended session readable but refuses new messages, pointing to "Chat ngay"', async () => {
+    const { service, prisma } = setup('CUSTOMER', { userId: 'customer' }, 'customer');
+    prisma.conversation.findUnique.mockResolvedValue({ ...thread, supportCustomerId: null, endedAt: new Date() });
+    await expect(service.sendMessage('customer', thread.id, { type: 'TEXT', text: 'Hello' } as any, false))
+      .rejects.toMatchObject({ response: expect.objectContaining({ code: 'SUPPORT_ENDED' }) });
+    await expect(service.listMessages('customer', thread.id, { page: 1, limit: 20 } as any)).resolves.toMatchObject({ total: 0 });
   });
 });

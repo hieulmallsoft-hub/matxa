@@ -130,7 +130,7 @@ export class ChatController {
 
   @Post(':id/end')
   @ApiOperation({
-    summary: 'Admin ket thuc chat CSKH: xoa han cuoc tro chuyen, tin nhan va anh; lan sau khach mo chat moi',
+    summary: 'Admin ket thuc phien chat CSKH: cuoc tro chuyen chi con xem lai (canSendMessage=false); lan sau khach/KTV bam Chat ngay se mo cuoc moi',
   })
   @ApiOkResponse({ schema: { example: { conversationId: 'uuid', ended: true } } })
   end(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
@@ -139,7 +139,7 @@ export class ChatController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'An/xoa cuoc tro chuyen chi o phia minh' })
+  @ApiOperation({ summary: 'Xoa cuoc tro chuyen chi o phia minh (khach/KTV hoac tung admin); phia ben kia van con' })
   @ApiNoContentResponse()
   hide(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.chat.hideConversation(auth.sub, id);

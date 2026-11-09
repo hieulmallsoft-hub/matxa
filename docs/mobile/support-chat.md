@@ -17,23 +17,25 @@ gửi tin/ảnh, nhận tin realtime.
 | Gửi ảnh | `POST /api/conversations/{id}/image-upload-url` → `PUT` lên S3 → `POST .../messages` |
 | Đánh dấu đã đọc | `PATCH /api/conversations/{id}/read` |
 | Realtime | Socket.IO namespace `/chat`, sự kiện `message.created` |
-| Biết chat đã kết thúc | Socket `conversation.ended`, hoặc API trả `404` |
+| Biết chat đã kết thúc | `canSendMessage: false` / `endedAt` trong danh sách, socket `conversation.ended`, hoặc gửi tin bị `403 SUPPORT_ENDED` |
+| Xóa cuộc trò chuyện (chỉ phía mình) | `DELETE /api/conversations/{id}` |
 
-Mọi request dùng `Authorization: Bearer <accessToken của khách>`. App **không bao giờ**
+Mọi request dùng `Authorization: Bearer <accessToken của khách hoặc KTV>` (app KTV dùng y hệt, mục "Hỗ trợ nhanh"). App **không bao giờ**
 gửi ID admin, ID KTV hay `senderId`: backend lấy người gửi từ token.
 
 **2. Có tách thành nhiều cuộc trò chuyện nhỏ không?**
 
 **Có, theo từng lần hỗ trợ.** Mỗi lần hỗ trợ là một cuộc trò chuyện. Tại một thời điểm, mỗi
 khách chỉ có **tối đa một** cuộc đang mở: gọi "Chat ngay" nhiều lần trong lúc đang mở vẫn trả về
-cùng một `id`. Vì vậy mục **"Cuộc trò chuyện gần đây"** trong Figma chỉ có tối đa **một dòng**.
+cùng một `id`. Các cuộc **đã kết thúc vẫn nằm trong "Cuộc trò chuyện gần đây"** để xem lại.
 
 Cuộc trò chuyện **kết thúc** khi:
 - nhân viên CSKH bấm **Kết thúc hỗ trợ** trên web admin, hoặc
 - **24 giờ** không ai nhắn tin.
 
-Kết thúc là **xóa hẳn**: tin nhắn, ảnh và thông báo của cuộc đó đều bị xóa. Lần sau khách bấm
-"Chat ngay", backend tạo cuộc mới với `id` mới và lời chào mới.
+Kết thúc **không xóa**: cuộc trò chuyện chuyển sang **chỉ xem** (`endedAt` có giá trị, `canSendMessage: false`),
+cuối cuộc có tin hệ thống `systemEvent: "SUPPORT_ENDED"` ("Phiên hỗ trợ đã kết thúc. Bấm "Chat ngay" nếu bạn cần hỗ trợ thêm.").
+Lần sau khách bấm "Chat ngay", backend tạo cuộc **mới** với `id` mới và lời chào mới; cuộc cũ vẫn còn trong danh sách.
 
 Chat hỗ trợ tách biệt với chat theo đơn (khách ↔ KTV, `type: BOOKING`). Màn Hỗ trợ
 không dùng endpoint chat booking.
@@ -42,10 +44,10 @@ không dùng endpoint chat booking.
 
 - **Trong lúc cuộc trò chuyện còn mở**, lịch sử lưu trên server: đóng app, đăng xuất, đổi máy
   **không mất**.
-- **Khi cuộc trò chuyện kết thúc**, lịch sử bị xóa vĩnh viễn ở cả phía khách và admin.
-  App phải xóa tin đã lưu tạm (cache) của cuộc đó.
-- Khách bấm xoá cuộc trò chuyện (`DELETE /api/conversations/{id}`) chỉ **ẩn** ở phía khách,
-  không kết thúc cuộc trò chuyện. Mở lại chat hoặc có tin mới thì hiện lại đầy đủ lịch sử.
+- **Khi cuộc trò chuyện kết thúc**, lịch sử **vẫn giữ** ở cả phía khách và admin, chỉ không nhắn tiếp được.
+- Khách bấm xóa cuộc trò chuyện (`DELETE /api/conversations/{id}`, trả `204`) chỉ **ẩn ở phía khách**;
+  admin vẫn xem được. Ngược lại admin xóa cũng chỉ ẩn ở hộp thư của admin đó, khách vẫn còn.
+  Nên cho xóa các cuộc **đã kết thúc**; xóa cuộc đang mở thì lần bấm "Chat ngay" sau nó hiện lại.
 
 ## Luồng màn hình (theo Figma)
 
@@ -123,7 +125,8 @@ Response là **mảng** (không có `items`), tối đa 1 phần tử:
 ]
 ```
 
-Mảng rỗng: khách chưa mở chat, hoặc cuộc trước đã kết thúc.
+Mỗi phần tử có thêm `endedAt` (null = đang mở) và `canSendMessage`. Cuộc đã kết thúc: hiện nhãn "Đã kết thúc",
+mở vào chỉ xem (ẩn ô nhập), kèm nút "Chat ngay" để mở cuộc mới. Mảng rỗng: khách chưa từng chat hoặc đã xóa hết.
 
 ## 3. Lịch sử tin nhắn
 
@@ -263,14 +266,13 @@ socket.on('conversation.ended', ({ conversationId, reason }) => {
 ```
 
 Khi nhận sự kiện này cho cuộc đang mở:
-1. Xóa tin đã lưu tạm của `conversationId` và bỏ dòng đó khỏi "Cuộc trò chuyện gần đây".
-2. Nếu khách đang ở màn chat: hiện "Cuộc trò chuyện đã kết thúc" và khóa ô nhập. Khi khách muốn
-   nhắn tiếp, gọi lại `POST /api/conversations/support` để lấy cuộc **mới** rồi mở bằng `id` mới.
+1. **Giữ** dòng đó trong "Cuộc trò chuyện gần đây", gắn nhãn "Đã kết thúc".
+2. Nếu khách đang ở màn chat: hiện "Phiên hỗ trợ đã kết thúc" và khóa ô nhập (lịch sử vẫn xem được).
+   Khi khách muốn nhắn tiếp, gọi `POST /api/conversations/support` để lấy cuộc **mới** rồi mở bằng `id` mới.
 
-Nếu app offline lúc kết thúc thì sẽ không nhận được sự kiện. Khi đó mọi API với `id` cũ trả
-`404` ("Cuoc tro chuyen khong ton tai"); app xử lý giống như nhận `conversation.ended`.
-**Không giữ `id` cũ lâu dài**: mỗi lần vào màn Hỗ trợ, gọi `POST /api/conversations/support`
-để lấy `id` hiện tại.
+Nếu app offline lúc kết thúc thì không nhận được sự kiện; lần tải danh sách sau sẽ có `endedAt`,
+và gửi tin vào cuộc cũ trả `403` `code: "SUPPORT_ENDED"` → xử lý như trên.
+Nút "Chat ngay" luôn gọi `POST /api/conversations/support` để lấy `id` cuộc đang mở (hoặc tạo mới).
 
 ## 9. Push notification
 
@@ -281,7 +283,7 @@ Khi app chạy nền, khách nhận push loại `CHAT_MESSAGE_RECEIVED`, data g�
 ```
 
 Không có `bookingId`. Chạm push → mở màn chat Hỗ trợ theo `conversationId`. Nếu cuộc đó
-đã kết thúc (API trả `404`), mở màn Hỗ trợ bình thường.
+đã kết thúc thì vẫn mở được ở chế độ chỉ xem.
 Push cần device token đã đăng ký và FCM cấu hình đúng; tin vẫn được lưu khi máy offline.
 
 ## 10. Quyền truy cập và lỗi thường gặp
@@ -289,9 +291,9 @@ Push cần device token đã đăng ký và FCM cấu hình đúng; tin vẫn đ
 | Tình huống | Kết quả |
 |---|---|
 | Khách xem/gửi vào cuộc trò chuyện của khách khác | `403` |
-| Tài khoản KTV gọi các API hỗ trợ | `403` |
 | `venueId` không tồn tại hoặc địa điểm đã ẩn | `404`, không tạo/gửi gì |
-| Gọi API với `id` của cuộc đã kết thúc | `404` "Cuoc tro chuyen khong ton tai": mở cuộc mới bằng `POST /api/conversations/support` |
+| Gửi tin vào cuộc đã kết thúc | `403`, `code: "SUPPORT_ENDED"`: mở cuộc mới bằng `POST /api/conversations/support` |
+| Cuộc đã bị xóa hẳn trước bản cập nhật này | `404` "Cuoc tro chuyen khong ton tai" |
 | Gửi tin `type: "SYSTEM"` từ app | `400` (app không được gửi tin hệ thống) |
 | `mediaKey` không phải key backend cấp cho đúng cuộc trò chuyện này | `400` |
 | Tin chữ rỗng | `400` |
