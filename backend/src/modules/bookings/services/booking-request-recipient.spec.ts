@@ -45,6 +45,7 @@ describe('booking request recipient', () => {
         priceOptions: [{ id: 'option', durationMinutes: 60, price: 100000 }] },
     ]) };
     prisma.booking.create = jest.fn().mockResolvedValue(booking);
+    prisma.$transaction = jest.fn((callback: any) => callback(prisma));
     jest.spyOn(service as any, 'notifyEligibleTechniciansForOpenBooking').mockResolvedValue(undefined);
     const response = await service.createOpen('customer-1', {
       items: [{ catalogServiceId: 'catalog', priceOptionId: 'option' }],

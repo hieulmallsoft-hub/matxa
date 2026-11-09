@@ -195,8 +195,8 @@ export class BookingsService {
       total: totalAmount,
       grossServiceAmount: financials.grossServiceAmount.toNumber(),
       platformFee: financials.platformFee.toNumber(),
-      // The travel fee goes to the technician in full; the commission is only taken on the services.
-      technicianEarning: financials.technicianEarning.toNumber() + travelFee,
+      // The home surcharge and travel fee go to the technician in full; the commission is only taken on the services.
+      technicianEarning: financials.technicianEarning.toNumber() + serviceFee + travelFee,
       customerPayableAmount: totalAmount,
       feePolicyVersion: financials.feePolicyVersion,
     };
@@ -209,23 +209,7 @@ export class BookingsService {
         async (tx) => {
           // Same domain/pricing validation as quote, re-run inside the write transaction.
           const quote = await this.quote(userId, dto, tx);
-          if (quote.promotionId) {
-            // Atomic reservation prevents two concurrent requests from consuming the
-            // final voucher usage. A later failure rolls this increment back.
-            const reserved = await tx.promotion.updateMany({
-              where: {
-                id: quote.promotionId,
-                isActive: true,
-                startsAt: { lte: new Date() },
-                endsAt: { gte: new Date() },
-                ...(quote.promotionUsageLimit === null
-                  ? {}
-                  : { usageLimit: quote.promotionUsageLimit, usedCount: { lt: quote.promotionUsageLimit } }),
-              },
-              data: { usedCount: { increment: 1 } },
-            });
-            if (!reserved.count) throw new BadRequestException('Ma khuyen mai da het luot su dung');
-          }
+          if (quote.promotionId) await this.reservePromotion(tx, quote.promotionId, quote.promotionUsageLimit);
           const created = await tx.booking.create({
             data: {
               customerId: userId,
@@ -594,7 +578,10 @@ export class BookingsService {
       paymentMethod: dto.paymentMethod,
       calculatedAt: new Date(),
     });
-    const customerPayableAmount = new Prisma.Decimal(subtotal).plus(serviceFee);
+    // Same voucher rules as a direct booking; the travel fee added at selection does not change the discount.
+    const promotion = dto.promotionCode ? await this.validPromotion(userId, dto.promotionCode, subtotal, this.prisma as any) : null;
+    const discountAmount = promotion ? this.discount(promotion, subtotal, serviceFee) : 0;
+    const customerPayableAmount = Prisma.Decimal.max(0, new Prisma.Decimal(subtotal).plus(serviceFee).minus(discountAmount));
     const scheduledEnd = new Date(start.getTime() + durationMinutes * 60_000);
     // A chosen technician who cannot take this booking would never be notified and the customer
     // would wait for nothing; refuse it now so the app can ask for another technician.
@@ -612,10 +599,13 @@ export class BookingsService {
         },
         requestedTechnicianId,
       );
-    const created = await this.prisma.booking.create({
+    const created = await this.prisma.$transaction(async (tx) => {
+      if (promotion) await this.reservePromotion(tx, promotion.id, promotion.usageLimit);
+      return tx.booking.create({
       data: {
         customerId: userId,
         requestedTechnicianId,
+        promotionId: promotion?.id ?? null,
         assignmentMode: 'OPEN_MARKETPLACE',
         status: 'OPEN',
         mode: dto.mode,
@@ -626,11 +616,11 @@ export class BookingsService {
         scheduledEnd,
         subtotal,
         serviceFee,
-        discountAmount: 0,
+        discountAmount,
         totalAmount: customerPayableAmount,
         grossServiceAmount: financials.grossServiceAmount,
         platformFee: financials.platformFee,
-        technicianEarning: financials.technicianEarning,
+        technicianEarning: financials.technicianEarning.plus(serviceFee),
         customerPayableAmount,
         feePolicyVersion: financials.feePolicyVersion,
         note: dto.note,
@@ -645,9 +635,11 @@ export class BookingsService {
             unitPrice: option.price,
           })),
         },
-        payment: { create: { method: dto.paymentMethod, status: 'UNPAID', amount: subtotal + serviceFee } },
+        payment: { create: { method: dto.paymentMethod, status: 'UNPAID', amount: customerPayableAmount } },
+        ...(promotion ? { promotionUsage: { create: { promotionId: promotion.id, userId } } } : {}),
       },
       include: { items: { include: { catalogService: true } }, payment: true },
+      });
     });
     // Complete the in-app notification fan-out before returning.  Previously
     // this was fire-and-forget, so clients could immediately query jobs or
@@ -1264,7 +1256,7 @@ export class BookingsService {
   ) {
     const booking = await db.booking.findFirst({
       where: { id: bookingId, technician: { userId } },
-      select: { grossServiceAmount: true, travelFee: true },
+      select: { grossServiceAmount: true, serviceFee: true, travelFee: true },
     });
     if (!booking) throw new ForbiddenException('Don khong thuoc KTV nay');
     const { rate, version } = await this.commissionPolicy(userId, db);
@@ -1280,8 +1272,8 @@ export class BookingsService {
       await tx.walletLedgerEntry.create({ data: { walletId: wallet.id, type: 'COMMISSION_DEBIT', amountVnd: -fee, balanceBeforeVnd: current.balanceVnd + fee, balanceAfterVnd: current.balanceVnd, referenceType: 'BOOKING_COMMISSION', referenceId: bookingId } });
       await tx.booking.update({ where: { id: bookingId }, data: {
           platformFee: fee,
-          // The travel fee is the technician's in full; only the services carry the commission.
-          technicianEarning: Number(booking.grossServiceAmount ?? 0) - fee + Number(booking.travelFee ?? 0),
+          // The home surcharge and travel fee are the technician's in full; only the services carry the commission.
+          technicianEarning: Number(booking.grossServiceAmount ?? 0) - fee + Number(booking.serviceFee ?? 0) + Number(booking.travelFee ?? 0),
           feePolicyVersion: version,
         } });
     };
@@ -2238,17 +2230,20 @@ export class BookingsService {
       const platformFee = roundVnd((gross * estimatePercent) / 100);
       // A direct booking already carries its fee; an open one gets it only when a technician is chosen.
       const travelFee = Number(booking.travelFee ?? 0) || estimatedTravelFee;
+      const serviceFee = Number(booking.serviceFee ?? 0);
       return {
         grossServiceAmount: gross,
         platformFee,
+        serviceFee,
         travelFee,
-        technicianEarning: gross - platformFee + travelFee,
+        technicianEarning: gross - platformFee + serviceFee + travelFee,
         isEstimate: true,
         currency: 'VND',
       };
     }
     return {
       isEstimate: false,
+      serviceFee: Number(booking.serviceFee ?? 0),
       travelFee: Number(booking.travelFee ?? 0),
       grossServiceAmount:
         booking.grossServiceAmount === null || booking.grossServiceAmount === undefined
@@ -2262,6 +2257,22 @@ export class BookingsService {
           : Number(booking.technicianEarning),
       currency: 'VND',
     };
+  }
+
+  /** Takes one use of the voucher atomically, so two bookings cannot both consume its last use. */
+  private async reservePromotion(tx: Prisma.TransactionClient, promotionId: string, usageLimit: number | null) {
+    const now = new Date();
+    const reserved = await tx.promotion.updateMany({
+      where: {
+        id: promotionId,
+        isActive: true,
+        startsAt: { lte: now },
+        endsAt: { gte: now },
+        ...(usageLimit === null ? {} : { usageLimit, usedCount: { lt: usageLimit } }),
+      },
+      data: { usedCount: { increment: 1 } },
+    });
+    if (!reserved.count) throw new BadRequestException('Ma khuyen mai da het luot su dung');
   }
 
   private async validPromotion(userId: string, code: string, subtotal: number, db: Prisma.TransactionClient) {

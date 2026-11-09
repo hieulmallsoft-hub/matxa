@@ -10,7 +10,7 @@ describe('commission in real VND', () => {
     expect(roundVnd(150_000)).toBe(150_000);
   });
 
-  const charge = async (rate: number, booking: { grossServiceAmount: number; travelFee: number }) => {
+  const charge = async (rate: number, booking: { grossServiceAmount: number; travelFee: number; serviceFee?: number }) => {
     const tx: any = {
       booking: { findFirst: jest.fn().mockResolvedValue(booking), update: jest.fn() },
       wallet: {
@@ -34,6 +34,13 @@ describe('commission in real VND', () => {
     expect(tx.wallet.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { balanceVnd: { decrement: 98_000 } } }));
     expect(tx.booking.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ platformFee: 98_000, technicianEarning: 650_000 - 98_000 + 50_000 }) }),
+    );
+  });
+
+  it('gives the technician the home surcharge in full, without commission on it', async () => {
+    const tx = await charge(10, { grossServiceAmount: 550_000, serviceFee: 100_000, travelFee: 0 });
+    expect(tx.booking.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ platformFee: 55_000, technicianEarning: 495_000 + 100_000 }) }),
     );
   });
 

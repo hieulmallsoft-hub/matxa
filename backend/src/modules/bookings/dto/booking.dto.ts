@@ -85,6 +85,7 @@ export class CreateOpenBookingDto {
   applicationDeadlineAt?: string;
   @ApiProperty({ enum: ['CASH', 'ONLINE'] }) @IsIn(['CASH', 'ONLINE']) paymentMethod!: 'CASH' | 'ONLINE';
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) note?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) promotionCode?: string;
 }
 
 /** Single mobile booking payload. The server always finds eligible technicians. */

@@ -56,6 +56,19 @@ Khách cần gọi được cho KTV, nên tài khoản đăng nhập bằng Goog
 | KTV đã duyệt nhưng chưa có số | `GET /api/profile/me` → `"phoneRequired": true` | Sau khi đăng nhập, **bắt buộc** hiện màn nhập số điện thoại, chưa nhập thì không vào app được |
 | KTV chưa có số bấm nhận đơn (**chỉ khi admin bật** "Bắt buộc KTV có số điện thoại" trong Cài đặt; hiện đang tắt) | `409`, `"code": "PHONE_REQUIRED"` ("Vui long cap nhat so dien thoai truoc khi nhan don") | Hiện "Bạn cần cập nhật số điện thoại để nhận đơn" và mở màn nhập số, **không** hiện chung chung "Chưa nhận được đơn" |
 
+#### Lỗi khi KTV bấm "Nhận đơn" (`POST /api/technician/jobs/{id}/apply` hoặc `/accept`)
+
+App đang hiện chung "Đơn này không còn nhận ứng tuyển" cho **mọi** lỗi 409, nên KTV không biết vì sao không nhận được. Cần hiện theo `code`/`message` server trả:
+
+| Server trả | Nghĩa | App hiện |
+|---|---|---|
+| `409 "So du vi khong du de nhan don"` | Ví KTV không đủ tiền trả hoa hồng đơn này | "Số dư ví không đủ để nhận đơn" + nút **Nạp tiền** |
+| `409`, `code: "PHONE_REQUIRED"` | Chưa có số điện thoại (chỉ khi admin bật) | Mở màn nhập số điện thoại |
+| `409 "BOOKING_EXPIRED"` | Hết thời gian chờ nhận | "Đơn đã hết hạn" |
+| `409 "Don khong con mo de ung tuyen"` / `"Don khong con mo"` | KTV khác đã nhận hoặc khách đã hủy | "Đơn này không còn nhận ứng tuyển" (câu hiện tại) |
+| `403 "Tai khoan KTV chua du dieu kien nhan don"` | Tài khoản KTV chưa duyệt hoặc đang bị khóa | "Tài khoản chưa đủ điều kiện nhận đơn, liên hệ CSKH" |
+| Lỗi khác | — | Hiện nguyên `message` server trả |
+
 Lưu số điện thoại **có xác minh OTP** (dùng 2 API này, không dùng `PATCH /api/profile/me` vì không xác minh số):
 
 ```http
@@ -137,7 +150,7 @@ trí KTV, thì không có phí. Phí này **khác** `serviceFee` (phí phục v�
 | Danh sách KTV phù hợp (khách) | `POST /api/bookings/matching-technicians` → mỗi KTV có `travelFee` | `travelFee > 0` → ghi "+ Phí di chuyển 50.000đ" dưới KTV đó |
 | Danh sách KTV ứng tuyển (khách) | `GET /api/bookings/{id}` → `applications[].travelFee` | Như trên, để khách biết trước khi chọn |
 | Chi tiết đơn / thanh toán (khách) | `GET /api/bookings/{id}` → `travelFee`, `travelDistanceKm`, `totalAmount` | Thêm dòng "Phí di chuyển" khi `travelFee > 0`. `totalAmount` **đã gồm** phí |
-| Đơn của KTV | `pricing.travelFee`, `pricing.technicianEarning` | "Bạn sẽ nhận được" (`technicianEarning`) **đã gồm** phí di chuyển; có thể ghi thêm dòng "Phí di chuyển" |
+| Đơn của KTV | `pricing.serviceFee`, `pricing.travelFee`, `pricing.technicianEarning` | "Bạn sẽ nhận được" (`technicianEarning`) **đã gồm** phụ phí đơn tại nhà và phí di chuyển (KTV nhận 100% hai khoản này, sàn chỉ lấy hoa hồng trên giá dịch vụ); có thể ghi thêm dòng "Phụ phí", "Phí di chuyển" |
 
 Lưu ý: với đơn mở, phí chỉ được chốt **khi chọn được KTV** (khách chọn, hoặc KTV được khách đặt bấm nhận). Trước đó
 `travelFee` của đơn là `0`. Sau khi chốt, `totalAmount` và số tiền thanh toán tăng đúng bằng `travelFee`. Nếu cần hiện
@@ -292,7 +305,7 @@ Màn "Thông tin dịch vụ" của KTV:
 
 | Việc | API | Ghi chú |
 |---|---|---|
-| Lấy link upload (dùng chung cho cả 2 loại) | `POST /api/technician/application/gallery-upload-url` | Body `{ "contentType": "image/jpeg", "size": <bytes> }`, rồi `PUT` ảnh lên `uploadUrl` |
+| Lấy link upload (dùng chung cho cả 2 loại) | `POST /api/technician/application/gallery-upload-url` | Body `{ "contentType": "image/jpeg", "size": <bytes> }` → `{ uploadUrl, mediaKey, expiresIn: 300 }`. `PUT` file lên `uploadUrl` với header `Content-Type` **đúng** contentType đã gửi, trong 5 phút. Bước lưu gửi `storageKey = mediaKey` |
 | Lưu ảnh hồ sơ | `POST /api/technician/application/gallery` | `{ "storageKey": "…", "kind": "GALLERY" }` |
 | Lưu chứng chỉ | `POST /api/technician/application/gallery` | `{ "storageKey": "…", "kind": "CERTIFICATE" }` |
 | Xóa ảnh | `DELETE /api/technician/application/gallery/{id}` | |
@@ -316,6 +329,14 @@ Admin đặt trong Cài đặt → Chính sách KTV, ví dụ "5 đơn/ngày →
 
 - Không cần sửa gì để tính đúng tiền: `pricing.platformFee` / `pricing.technicianEarning` trong `GET /technician/jobs` và `GET /technician/jobs/{id}` đã tính theo mức giảm khi KTV đạt mốc.
 - Nếu muốn hiện dòng "Làm thêm X đơn hôm nay để phí chỉ còn 20%": lấy `dailyDiscountThreshold`, `dailyDiscountFeePercent` từ `GET /settings/public` (`dailyDiscountThreshold = 0` là đang tắt, khi đó ẩn dòng này). Số đơn đã hoàn thành hôm nay lấy ở `today.completedBookings` của `GET /technician/jobs/activity`.
+
+## K. Mã giảm giá khi đặt đơn (app khách) — sửa lỗi 6/11
+
+Trước đây đơn đặt qua `POST /api/bookings` (đơn mở, có hoặc không chọn KTV) **bỏ qua** `promotionCode`, nên sau khi KTV nhận đơn chi tiết không có giảm giá. Đã sửa:
+
+- Gửi `promotionCode` trong body `POST /api/bookings` như cũ. Server kiểm tra mã ngay lúc tạo đơn; mã sai/hết lượt trả `400` ("Ma khuyen mai khong hop le hoac da het han" / "Ma khuyen mai da het luot su dung" / "Don hang chua dat gia tri toi thieu") → hiện lỗi ở ô mã, **không** tạo đơn.
+- `GET /api/bookings/{id}` có `discount` / `discountAmount`, `totalAmount` **đã trừ** giảm giá. Khi KTV được chốt mà có phí di chuyển thì `totalAmount` cộng thêm phí, giảm giá giữ nguyên.
+- "Bạn sẽ nhận được" của KTV **không** bị trừ phần giảm giá.
 
 ## Cách tự kiểm tra trên Swagger
 

@@ -143,6 +143,7 @@ describe('creating a booking for a chosen technician', () => {
       address: { findFirst: jest.fn().mockResolvedValue({ id: 'address', city: 'HN', district: null }) },
       booking: { create: jest.fn().mockResolvedValue({ id: 'booking-1', items: [] }) },
     };
+    prisma.$transaction = jest.fn((callback: any) => callback(prisma));
     const service = new BookingsService(prisma, { get: (_key: string, fallback: unknown) => fallback } as any, {} as any, {} as any);
     jest.spyOn(service as any, 'notifyEligibleTechniciansForOpenBooking').mockResolvedValue(undefined);
     const dto: any = {
