@@ -1,5 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
+import { creditBookingPromotion } from './booking-promotion-credit';
+jest.mock('./booking-promotion-credit', () => ({ creditBookingPromotion: jest.fn().mockResolvedValue(0) }));
 
 describe('technician confirms a direct booking', () => {
   const pending = {
@@ -59,7 +61,10 @@ describe('technician confirms a direct booking', () => {
     const { service, prisma, charge } = subject();
     (service.detail as jest.Mock).mockResolvedValue({ ...pending, status: 'CONFIRMED', scheduledEnd: new Date(Date.now() - 1000) });
     prisma.booking = { update: jest.fn().mockResolvedValue({ ...pending, status: 'COMPLETED' }) };
+    prisma.$transaction = jest.fn((callback: any) => callback(prisma));
     await expect(service.updateStatus('tech', 'b1', { status: 'COMPLETED' })).resolves.toMatchObject({ status: 'COMPLETED' });
     expect(charge).not.toHaveBeenCalled();
+    // Completing is what earns the voucher credit.
+    expect(creditBookingPromotion).toHaveBeenCalledWith(prisma, 'b1');
   });
 });

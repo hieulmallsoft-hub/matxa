@@ -132,7 +132,7 @@ Các loại giao dịch (`type`):
 | `TOP_UP` | Nạp ví thành công | dương |
 | `COMMISSION_DEBIT` | KTV nhận đơn (hoặc được khách chọn): trừ hoa hồng nền tảng | âm |
 | `COMMISSION_REFUND` | Đơn đã nhận bị hủy (khách, KTV hoặc admin hủy): hoàn lại đúng số hoa hồng đã trừ, mỗi đơn một lần | dương |
-| `PROMOTION_CREDIT` | KTV nhận đơn khách dùng mã giảm giá: Psyocore bù đúng phần giảm (khách trả tiền mặt ít hơn) | dương |
+| `PROMOTION_CREDIT` | Đơn khách dùng mã giảm giá **hoàn thành**: Psyocore bù đúng phần giảm (khách trả tiền mặt ít hơn) | dương |
 | `PROMOTION_CREDIT_REVERSAL` | Đơn có mã giảm giá bị hủy: thu lại phần đã bù | âm |
 
 Gợi ý nhãn hiển thị: `TOP_UP` "Nạp ví", `COMMISSION_DEBIT` "Phí nhận đơn", `COMMISSION_REFUND` "Hoàn phí đơn bị hủy".

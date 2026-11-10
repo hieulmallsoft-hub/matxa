@@ -50,43 +50,24 @@ describe('commission in real VND', () => {
   });
 });
 
-// Vouchers are the platform's: the customer pays the technician less in cash, so the wallet is credited the discount.
-describe('voucher paid by the platform', () => {
-  it('credits the discount and charges the commission, so a credit larger than the fee needs no balance', async () => {
+// The voucher credit is earned by completing the job; taking it only charges the commission.
+describe('taking a voucher booking', () => {
+  it('charges the commission and credits nothing yet', async () => {
     const tx: any = {
-      booking: { findFirst: jest.fn().mockResolvedValue({ grossServiceAmount: 500_000, serviceFee: 100_000, travelFee: 0, discountAmount: 250_000 }), update: jest.fn() },
+      booking: { findFirst: jest.fn().mockResolvedValue({ grossServiceAmount: 500_000, serviceFee: 0, travelFee: 0, discountAmount: 500_000 }), update: jest.fn() },
       wallet: {
-        upsert: jest.fn().mockResolvedValue({ id: 'w1', balanceVnd: 0 }),
-        update: jest.fn().mockResolvedValue({ balanceVnd: 250_000 }),
+        upsert: jest.fn().mockResolvedValue({ id: 'w1' }),
+        update: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        findUniqueOrThrow: jest.fn().mockResolvedValue({ balanceVnd: 150_000 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ balanceVnd: 0 }),
       },
-      walletLedgerEntry: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn() },
-    };
-    tx.$transaction = jest.fn((callback: any) => callback(tx));
-    const settings = { platformFeePercent: jest.fn().mockResolvedValue(20), getBookingRules: jest.fn().mockResolvedValue({ dailyDiscountThreshold: 0 }) };
-    const service = new BookingsService(tx, { get: (_k: string, d: unknown) => d } as any, {} as any, {} as any, undefined, undefined, undefined, settings as any);
-    await (service as any).chargeTechnicianCommission('tech', 'b1', tx);
-    const ledger = tx.walletLedgerEntry.create.mock.calls.map((call: any) => call[0].data);
-    expect(ledger).toEqual([
-      expect.objectContaining({ type: 'PROMOTION_CREDIT', amountVnd: 250_000, referenceType: 'BOOKING_PROMOTION_CREDIT' }),
-      expect.objectContaining({ type: 'COMMISSION_DEBIT', amountVnd: -100_000, referenceType: 'BOOKING_COMMISSION' }),
-    ]);
-    // 350k cash from the customer + 150k net into the wallet = 500k, the same as without the voucher.
-    expect(tx.booking.update.mock.calls[0][0].data).toMatchObject({ platformFee: 100_000, technicianEarning: 500_000 });
-  });
-
-  it('never settles the same booking twice', async () => {
-    const tx: any = {
-      booking: { findFirst: jest.fn().mockResolvedValue({ grossServiceAmount: 500_000, discountAmount: 250_000 }), update: jest.fn() },
-      wallet: { upsert: jest.fn().mockResolvedValue({ id: 'w1' }), update: jest.fn(), updateMany: jest.fn() },
-      walletLedgerEntry: { findFirst: jest.fn().mockResolvedValue({ id: 'credit' }), create: jest.fn() },
+      walletLedgerEntry: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn() },
     };
     tx.$transaction = jest.fn((callback: any) => callback(tx));
     const settings = { platformFeePercent: jest.fn().mockResolvedValue(20), getBookingRules: jest.fn().mockResolvedValue({ dailyDiscountThreshold: 0 }) };
     const service = new BookingsService(tx, { get: (_k: string, d: unknown) => d } as any, {} as any, {} as any, undefined, undefined, undefined, settings as any);
     await (service as any).chargeTechnicianCommission('tech', 'b1', tx);
     expect(tx.wallet.update).not.toHaveBeenCalled();
-    expect(tx.walletLedgerEntry.create).not.toHaveBeenCalled();
+    expect(tx.walletLedgerEntry.create.mock.calls.map((call: any) => call[0].data.type)).toEqual(['COMMISSION_DEBIT']);
   });
 });

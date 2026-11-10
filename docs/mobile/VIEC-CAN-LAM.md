@@ -337,19 +337,19 @@ Trước đây đơn đặt qua `POST /api/bookings` (đơn mở, có hoặc kh�
 - Gửi `promotionCode` trong body `POST /api/bookings` như cũ. Server kiểm tra mã ngay lúc tạo đơn; mã sai/hết lượt trả `400` ("Ma khuyen mai khong hop le hoac da het han" / "Ma khuyen mai da het luot su dung" / "Don hang chua dat gia tri toi thieu") → hiện lỗi ở ô mã, **không** tạo đơn.
 - Đơn **bị hủy** (khách, KTV hay admin hủy) hoặc **hết hạn không có KTV nhận** thì khách được **trả lại lượt dùng mã**, dùng lại được cho đơn sau. Đơn hoàn thành thì mã tính là đã dùng. App không cần làm gì thêm: danh sách mã `GET /api/marketplace/promotions` tự hiện lại mã đó.
 - `GET /api/bookings/{id}` có `discount` / `discountAmount`, `totalAmount` **đã trừ** giảm giá. Khi KTV được chốt mà có phí di chuyển thì `totalAmount` cộng thêm phí, giảm giá giữ nguyên.
-- **Sàn chịu** phần giảm giá. Khách trả tiền mặt cho KTV ít hơn, nên lúc KTV nhận đơn, ví KTV được **cộng** đúng phần giảm giá (giao dịch `PROMOTION_CREDIT`) rồi mới trừ hoa hồng (`COMMISSION_DEBIT`). Đơn bị hủy thì đảo lại cả hai (`COMMISSION_REFUND` và `PROMOTION_CREDIT_REVERSAL`).
+- **Sàn chịu** phần giảm giá. Khách trả tiền mặt cho KTV ít hơn, nên Psyocore bù đúng phần giảm vào ví KTV (`PROMOTION_CREDIT`) — **chỉ khi đơn hoàn thành** (KTV bấm Hoàn thành hoặc hệ thống tự hoàn thành sau 24h), **không** cộng lúc nhận đơn. Lúc nhận đơn ví chỉ bị trừ hoa hồng (`COMMISSION_DEBIT`). Đơn bị hủy thì hoàn hoa hồng (`COMMISSION_REFUND`); nếu đã lỡ cộng tiền bù (đơn nhận trước bản sửa 10/11) thì thu lại (`PROMOTION_CREDIT_REVERSAL`).
 
 **Màn "Chi tiết đơn" của KTV** — dùng `pricing` trong `GET /api/technician/jobs/{id}`:
 
 | Dòng trên màn | Trường | Ví dụ (DV 500k + phụ phí 100k, mã −250k, phí sàn 20%) |
 |---|---|---|
 | Tổng thu từ khách (tiền mặt) | `pricing.customerPaysAmount` | 350.000đ |
-| Psyocore bù mã giảm giá (vào ví) | `pricing.discountAmount` (ẩn nếu 0) | +250.000đ |
+| Psyocore bù mã giảm giá (vào ví **khi hoàn thành đơn**) | `pricing.discountAmount` (ẩn nếu 0) | +250.000đ |
 | Phí gửi về Psyocore (trừ ví) | `pricing.platformFee` | −100.000đ |
 | **Thực nhận** | `pricing.technicianEarning` | **500.000đ** (= 350k tiền mặt + 250k − 100k) |
 
 `pricing.netToPlatform` = phí − tiền bù; **âm** nghĩa là Psyocore trả thêm cho KTV (ví dụ trên: −150.000đ → "Ví được cộng 150.000đ").
-Khi nhận đơn, ví chỉ cần đủ `netToPlatform` (nếu dương), không cần đủ toàn bộ phí.
+Khi nhận đơn, ví cần đủ toàn bộ `platformFee` (tiền bù chưa được cộng lúc này).
 
 **Lịch sử ví** (`GET /api/wallet/transactions`) có thêm 2 loại, `title` server đã trả sẵn tiếng Việt:
 `PROMOTION_CREDIT` "Psyocore bù mã giảm giá của khách" (dương), `PROMOTION_CREDIT_REVERSAL` "Thu lại tiền bù mã giảm giá (đơn bị hủy)" (âm).

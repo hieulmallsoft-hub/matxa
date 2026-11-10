@@ -1,6 +1,9 @@
 import { BookingAutoCompletionService } from './booking-auto-completion.service';
+import { creditBookingPromotion } from './booking-promotion-credit';
+jest.mock('./booking-promotion-credit', () => ({ creditBookingPromotion: jest.fn().mockResolvedValue(0) }));
 
 describe('BookingAutoCompletionService', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('completes only confirmed bookings due after the 24-hour grace period', async () => {
     const now = new Date('2026-10-10T12:00:00.000Z');
     const prisma: any = {
@@ -11,6 +14,7 @@ describe('BookingAutoCompletionService', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
+    prisma.$transaction = jest.fn((callback: any) => callback(prisma));
     const notifications = { create: jest.fn(), sendPush: jest.fn().mockResolvedValue({ successCount: 1 }) };
     const config = { get: jest.fn((_key: string, fallback: number) => fallback) };
     const service = new BookingAutoCompletionService(prisma, notifications as any, config as any);
@@ -26,6 +30,8 @@ describe('BookingAutoCompletionService', () => {
       data: { status: 'COMPLETED' },
     });
     expect(notifications.sendPush).toHaveBeenCalledTimes(2);
+    // Auto-completed counts as done: the technician gets the voucher credit.
+    expect(creditBookingPromotion).toHaveBeenCalledWith(prisma, 'booking-1');
   });
 
   it('does not notify when another action completed the booking first', async () => {
@@ -35,6 +41,7 @@ describe('BookingAutoCompletionService', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
     };
+    prisma.$transaction = jest.fn((callback: any) => callback(prisma));
     const notifications = { create: jest.fn(), sendPush: jest.fn() };
     const service = new BookingAutoCompletionService(
       prisma,

@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../database/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
+import { creditBookingPromotion } from './booking-promotion-credit';
 
 /** Automatically completes confirmed bookings after the post-service grace period. */
 @Injectable()
@@ -46,9 +47,14 @@ export class BookingAutoCompletionService implements OnModuleInit, OnModuleDestr
     });
     let completed = 0;
     for (const booking of due) {
-      const updated = await this.prisma.booking.updateMany({
-        where: { id: booking.id, status: 'CONFIRMED', scheduledEnd: { lte: cutoff } },
-        data: { status: 'COMPLETED' },
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const claimed = await tx.booking.updateMany({
+          where: { id: booking.id, status: 'CONFIRMED', scheduledEnd: { lte: cutoff } },
+          data: { status: 'COMPLETED' },
+        });
+        // Completed is completed, by hand or after 24 hours: the technician gets the voucher credit either way.
+        if (claimed.count) await creditBookingPromotion(tx, booking.id);
+        return claimed;
       });
       if (!updated.count) continue;
       completed++;

@@ -22,6 +22,7 @@ import { ComplaintStorageService } from './complaint-storage.service';
 import { addressPreview, confirmationDeadline, kmBetween, roundVnd, technicianBadge, travelFeeFor } from './distance';
 import { activityPeriods } from './technician-activity';
 import { releaseBookingPromotion } from './booking-promotion-release';
+import { creditBookingPromotion } from './booking-promotion-credit';
 import { COMPLAINT_STATUS_LABEL, complaintStatusEvent, ensureComplaintConversation } from './complaint-conversation';
 import {
   BookingHistoryQueryDto,
@@ -670,8 +671,7 @@ export class BookingsService {
       return requested ? this.acceptAsRequestedTechnician(userId, booking, existing.id) : { ...existing, idempotent: true };
     if (existing) throw new ConflictException('Trang thai ung tuyen hien tai khong cho phep apply lai');
     // Selection charges the commission, so a technician who could not pay it must not be selectable.
-    // The platform credits the voucher discount back when charging, so only the rest has to be in the wallet.
-    const fee = (await this.commissionFor(booking.grossServiceAmount, userId)) - Math.round(Number(booking.discountAmount ?? 0));
+    const fee = await this.commissionFor(booking.grossServiceAmount, userId);
     if (fee > 0) {
       const wallet = await this.prisma.wallet.findUnique({
         where: { userId_type: { userId, type: 'ADVERTISING_CREDIT' } },
@@ -1277,26 +1277,17 @@ export class BookingsService {
   ) {
     const booking = await db.booking.findFirst({
       where: { id: bookingId, technician: { userId } },
-      select: { grossServiceAmount: true, serviceFee: true, travelFee: true, discountAmount: true },
+      select: { grossServiceAmount: true, serviceFee: true, travelFee: true },
     });
     if (!booking) throw new ForbiddenException('Don khong thuoc KTV nay');
     const { rate, version } = await this.commissionPolicy(userId, db);
     const fee = roundVnd((Number(booking.grossServiceAmount ?? 0) * rate) / 100);
-    // Vouchers are the platform's: the customer pays the technician that much less in cash, so the wallet gets it back.
-    const discount = Math.round(Number(booking.discountAmount ?? 0));
-    if (fee <= 0 && discount <= 0) return;
+    // The voucher discount is credited back only when the booking completes (creditBookingPromotion), not here.
+    if (fee <= 0) return;
     const debit = async (tx: Prisma.TransactionClient) => {
       const wallet = await tx.wallet.upsert({ where: { userId_type: { userId, type: 'ADVERTISING_CREDIT' } }, create: { userId, type: 'ADVERTISING_CREDIT' }, update: {} });
-      const settled = await tx.walletLedgerEntry.findFirst({
-        where: { referenceId: bookingId, referenceType: { in: ['BOOKING_COMMISSION', 'BOOKING_PROMOTION_CREDIT'] } },
-      });
-      if (settled) return;
-      // Credited first, so a technician whose voucher credit covers the commission does not need the balance up front.
-      if (discount > 0) {
-        const credited = await tx.wallet.update({ where: { id: wallet.id }, data: { balanceVnd: { increment: discount } }, select: { balanceVnd: true } });
-        await tx.walletLedgerEntry.create({ data: { walletId: wallet.id, type: 'PROMOTION_CREDIT', amountVnd: discount, balanceBeforeVnd: credited.balanceVnd - discount, balanceAfterVnd: credited.balanceVnd, referenceType: 'BOOKING_PROMOTION_CREDIT', referenceId: bookingId } });
-      }
-      if (fee <= 0) return;
+      const existing = await tx.walletLedgerEntry.findUnique({ where: { referenceType_referenceId: { referenceType: 'BOOKING_COMMISSION', referenceId: bookingId } } });
+      if (existing) return;
       const updated = await tx.wallet.updateMany({ where: { id: wallet.id, balanceVnd: { gte: fee } }, data: { balanceVnd: { decrement: fee } } });
       if (!updated.count) throw new ConflictException('So du vi khong du de nhan don');
       const current = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id }, select: { balanceVnd: true } });
@@ -1552,7 +1543,12 @@ export class BookingsService {
             await this.chargeTechnicianCommission(userId, id, tx);
             return confirmed;
           })
-        : await this.transition(id, booking.status, { status: dto.status });
+        : await this.prisma.$transaction(async (tx) => {
+            const completed = await this.transition(id, booking.status, { status: dto.status }, tx);
+            // The voucher credit is earned by doing the job, so it lands only now.
+            await creditBookingPromotion(tx, id);
+            return completed;
+          });
     const title = dto.status === 'CONFIRMED' ? 'Đặt lịch thành công' : 'Dịch vụ đã hoàn thành';
     void this.notifyStatus(booking.customerId, id, `BOOKING_${dto.status}`, title, title);
     if (dto.status === 'CONFIRMED' && booking.technicianId)
@@ -2263,8 +2259,9 @@ export class BookingsService {
    * rate, so "Bạn sẽ nhận được" already has the commission taken off; otherwise it is what was charged.
    */
   /**
-   * What changes hands for the technician: the customer pays `customerPaysAmount` (after the voucher), the platform
-   * credits `discountAmount` to the wallet and takes `platformFee` from it; `netToPlatform` < 0 means the platform pays.
+   * What changes hands for the technician: the customer pays `customerPaysAmount` (after the voucher); the wallet pays
+   * `platformFee` when the job is taken and is credited `discountAmount` when it is completed. `netToPlatform` < 0
+   * means the platform pays the technician overall.
    */
   private settlement(booking: any, platformFee: number) {
     const discountAmount = Math.round(Number(booking.discountAmount ?? 0));
