@@ -260,6 +260,10 @@ dịch vụ khớp bộ lọc (`categoryId`, `serviceId`, `mode`). `null` = hế
 thành hoặc bị hủy. Mobile **không phải sửa gì**: chỉ cần kéo-để-làm-mới để lấy danh sách mới. Mục yêu thích và
 trang chi tiết KTV vẫn mở được như cũ.
 
+**KTV không thấy chính mình (10/11):** khi gọi 2 API trên **có gửi token**, server bỏ hồ sơ KTV của chính người đang
+đăng nhập khỏi danh sách. Mobile chỉ cần nhớ gửi header `Authorization` khi đã đăng nhập (khách chưa đăng nhập vẫn
+gọi không token như cũ).
+
 Khi đó:
 
 - **Danh sách:** 1 request (bỏ vòng lặp gọi `technicians/{id}` và `…/availability` cho từng KTV).

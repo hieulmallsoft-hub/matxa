@@ -128,6 +128,8 @@ export class MarketplaceService {
       // job at a time (same rule as matchingTechnicians / assertOpenEligibility), whatever its hour.
       Prisma.sql`NOT EXISTS (SELECT 1 FROM bookings busy WHERE busy.technician_id = p.id AND busy.status = 'CONFIRMED')`,
     ];
+    // A technician browsing as a customer never sees their own profile (they cannot book themselves).
+    if (userId) conditions.push(Prisma.sql`p.user_id <> ${userId}::uuid`);
     if (keyword) {
       // Escape LIKE wildcards so search text remains literal, and bind it as a parameter.
       const pattern = `%${keyword.replace(/[\\%_]/g, '\\$&')}%`;

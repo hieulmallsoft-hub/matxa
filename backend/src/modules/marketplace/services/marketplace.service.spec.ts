@@ -219,6 +219,20 @@ describe('MarketplaceService', () => {
     );
   });
 
+  it('never lists the signed-in technician their own profile', async () => {
+    $queryRaw.mockResolvedValue([{ total: 0n, ranked: [] }]);
+    await service.searchTechnicians({ page: 1, limit: 10 }, '20000000-0000-4000-8000-000000000001');
+    const sql = $queryRaw.mock.calls[0][0];
+    expect(sql.text).toContain('p.user_id <> ');
+    expect(sql.values).toContain('20000000-0000-4000-8000-000000000001');
+  });
+
+  it('does not filter by user for guests', async () => {
+    $queryRaw.mockResolvedValue([{ total: 0n, ranked: [] }]);
+    await service.searchTechnicians({ page: 1, limit: 10 });
+    expect($queryRaw.mock.calls[0][0].text).not.toContain('p.user_id <> ');
+  });
+
   it('filters technicians by a complete requested time window and radius', async () => {
     $queryRaw.mockResolvedValue([{ total: 0n, ranked: [] }]);
     await service.searchTechnicians({
