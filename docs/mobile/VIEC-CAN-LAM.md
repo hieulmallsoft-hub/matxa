@@ -394,6 +394,14 @@ KTV **vẫn đặt lịch được** (đặt KTV khác như một khách hàng),
 
 App: gặp `OWN_BOOKING` hiện "Bạn không thể đặt lịch cho chính mình".
 
+## N. Ảnh bìa (banner) khóa học (app khách và app KTV)
+
+`GET /api/courses` và `GET /api/courses/{id}` trả thêm **`coverUrl`**: link ảnh bìa xem được ngay, hiệu lực 24 giờ.
+`null` = khóa học chưa có ảnh bìa (hiện ảnh mặc định). Không dùng `coverKey` để hiện ảnh.
+
+Link hết hạn sau 24 giờ, nên **không lưu link lâu dài**: mỗi lần mở màn khóa học thì gọi lại API.
+Admin tải ảnh bìa trên web admin; app không cần API tải lên.
+
 ## Cách tự kiểm tra trên Swagger
 
 1. `PATCH /api/technician/application` với `idCardQr` = chuỗi app quét được → response có `idCardInfo` đúng tên trên thẻ.

@@ -29,6 +29,9 @@ export class AdminCoursesController {
   @Patch(':id') update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateCourseDto) { return this.courses.update(id, dto); }
   @Delete(':id') remove(@Param('id', ParseUUIDPipe) id: string) { return this.courses.remove(id); }
   @Post(':id/cover-upload-url') coverUploadUrl(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateCoverUploadUrlDto) { return this.courses.coverUploadUrl(id, dto); }
+  @Post(':id/cover-upload')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  uploadCover(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: any) { return this.courses.uploadCover(id, file); }
   @Patch(':id/cover') setCover(@Param('id', ParseUUIDPipe) id: string, @Body('coverKey') coverKey: string) { return this.courses.setCover(id, coverKey); }
   @Post(':id/lessons') lesson(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateLessonDto) { return this.courses.createLesson(id, dto); }
   @Patch('lessons/:id') updateLesson(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateLessonDto) { return this.courses.updateLesson(id, dto); }

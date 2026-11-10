@@ -27,6 +27,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { PageHeader } from '../components/common/PageHeader';
 import { DetailDrawer } from '../components/common/DetailDrawer';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { LocationPicker } from '../components/LocationPicker';
 import {
   AnimatedNumber,
   Badge,
@@ -451,7 +452,7 @@ export const VenuesPage: React.FC = () => {
   };
   const locate = () => {
     if (!window.isSecureContext || !navigator.geolocation) {
-      setSaveError('Trình duyệt cần HTTPS để lấy vị trí. Bạn có thể nhập tọa độ địa điểm trực tiếp từ bản đồ.');
+      setSaveError('Trang admin chưa chạy HTTPS nên trình duyệt không cho lấy vị trí hiện tại. Hãy tìm địa chỉ hoặc bấm lên bản đồ phía trên.');
       return;
     }
     setLocating(true);
@@ -706,6 +707,19 @@ export const VenuesPage: React.FC = () => {
                   <Input required type="number" min={-180} max={180} step="any" placeholder="105.8542" {...textField('longitude')} />
                 </Field>
               </FormGrid>
+              <LocationPicker
+                latitude={form.latitude}
+                longitude={form.longitude}
+                onPick={(latitude, longitude, address) =>
+                  setForm((current) => ({
+                    ...current,
+                    latitude: String(latitude),
+                    longitude: String(longitude),
+                    // A searched address fills an empty address field; a typed one is never overwritten.
+                    address: address && !current.address.trim() ? address : current.address,
+                  }))
+                }
+              />
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" icon={<Navigation className="w-3.5 h-3.5" />} loading={locating} onClick={locate}>
                   {locating ? 'Đang lấy vị trí...' : 'Lấy vị trí hiện tại'}
@@ -721,7 +735,6 @@ export const VenuesPage: React.FC = () => {
                   </a>
                 )}
               </div>
-              <p className="text-[11px] text-content-secondary">Mẹo: trên Google Maps, nhấp chuột phải vào địa điểm để sao chép tọa độ.</p>
             </FormSection>
 
             <FormSection title="Liên hệ & hiển thị trên app" icon={<Phone className="w-4 h-4" />}>

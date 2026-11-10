@@ -33,6 +33,7 @@ type Course = {
   slug: string;
   description?: string | null;
   coverKey?: string | null;
+  coverUrl?: string | null;
   access: 'FREE' | 'VIP';
   isPublished: boolean;
   lessons: Lesson[];
@@ -178,13 +179,12 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
     if (!(file instanceof File) || !file.size) return;
     setBusy(true);
     try {
-      const signed = await request<{ uploadUrl: string; storageKey: string }>(`/admin/courses/${selected.id}/cover-upload-url`, {
-        method: 'POST',
-        body: JSON.stringify({ fileName: file.name, contentType: file.type }),
-      });
-      const put = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
-      if (!put.ok) throw new Error('Tải ảnh bìa lên thất bại');
-      await request(`/admin/courses/${selected.id}/cover`, { method: 'PATCH', body: JSON.stringify({ coverKey: signed.storageKey }) });
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Ảnh bìa phải là JPG, PNG hoặc WEBP');
+      if (file.size > 5 * 1024 * 1024) throw new Error('Ảnh bìa tối đa 5MB');
+      // Uploaded through the API: the S3 bucket does not accept direct browser uploads (no CORS).
+      const body = new FormData();
+      body.append('file', file);
+      await request(`/admin/courses/${selected.id}/cover-upload`, { method: 'POST', body });
       notify('Đã cập nhật ảnh bìa');
       const fresh = await request<Course>(`/admin/courses/${selected.id}`);
       setSelected(fresh);
@@ -439,14 +439,16 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
                     <ImageIcon className="w-3.5 h-3.5" /> Ảnh bìa khóa học
                   </h4>
                   <div className={`h-32 rounded-xl border-2 border-dashed border-[#C6E2CE] bg-[#F6F8F4] flex items-center justify-center ${selected.coverKey ? 'border-solid border-[#E5EBE5]' : ''}`}>
-                    {selected.coverKey ? (
+                    {selected.coverUrl ? (
+                      <img src={selected.coverUrl} alt="Ảnh bìa khóa học" className="h-full w-full object-cover rounded-xl" />
+                    ) : selected.coverKey ? (
                       <span className="text-xs text-[#2E7D4A] font-semibold">✓ Đã có ảnh bìa</span>
                     ) : (
                       <span className="text-xs text-[#94A399]">Chưa có ảnh bìa</span>
                     )}
                   </div>
                   <form onSubmit={uploadCover} className="flex items-center gap-2">
-                    <input name="file" type="file" accept="image/*" required className="flex-1 text-xs text-[#66756B] file:mr-2 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-[#EAF5EC] file:text-[#2E7D4A] file:text-xs file:font-semibold file:cursor-pointer hover:file:bg-[#DDF0E1]" />
+                    <input name="file" type="file" accept="image/jpeg,image/png,image/webp" required className="flex-1 text-xs text-[#66756B] file:mr-2 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-[#EAF5EC] file:text-[#2E7D4A] file:text-xs file:font-semibold file:cursor-pointer hover:file:bg-[#DDF0E1]" />
                     <button type="submit" disabled={busy} className="px-3 py-1.5 rounded-lg bg-[#2E7D4A] text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-60">
                       <Upload className="w-3 h-3" /> {busy ? 'Đang tải…' : selected.coverKey ? 'Đổi ảnh' : 'Tải lên'}
                     </button>
