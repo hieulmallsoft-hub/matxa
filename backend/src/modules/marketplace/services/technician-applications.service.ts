@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException, 
 import { PrismaService } from '../../../database/prisma.service';
 import { UpdateTechnicianApplicationDto } from '../dto/technician-application.dto';
 import { TechnicianApplicationStorageService } from './technician-application-storage.service';
+import { resolveLocationCodes } from './location-code';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { TechnicianContractService } from './technician-contract.service';
 import { parseIdCardQr } from './id-card-qr';
@@ -95,14 +96,8 @@ export class TechnicianApplicationsService {
       if (dto[key] !== undefined && !dto[key]!.startsWith(`technician-applications/${userId}/`))
         throw new BadRequestException('Document key khong hop le');
     const modes = dto.supportedModes ?? current.supportedModes;
-    const city = dto.city ?? current.city;
-    const district = dto.district ?? current.district;
-    if (city && district) {
-      const validDistrict = await this.prisma.district.findFirst({
-        where: { code: district, cityCode: city, isActive: true },
-      });
-      if (!validDistrict) throw new BadRequestException('Quan/huyen khong thuoc thanh pho da chon');
-    }
+    // Stored as codes ("HN"), whether the app sent the code or the name ("Hà Nội"); unknown values are rejected.
+    const location = await resolveLocationCodes(this.prisma, dto.city ?? current.city, dto.district ?? current.district);
     if (modes.includes('ONSITE') && !(dto.facility ?? current.facility)?.trim())
       throw new BadRequestException('Phuc vu tai co so can co thong tin co so');
     if (modes.includes('ONSITE') && !(dto.address ?? current.address)?.trim())
@@ -118,8 +113,8 @@ export class TechnicianApplicationsService {
           gender: dto.gender ?? current.gender ?? idCard.gender ?? undefined,
         }),
         displayName: dto.displayName?.trim(),
-        city: dto.city?.trim(),
-        district: dto.district?.trim(),
+        city: location.city,
+        district: location.district,
         facility: dto.facility?.trim(),
         address: dto.address?.trim(),
         bio: dto.bio?.trim(),
@@ -371,6 +366,8 @@ export class TechnicianApplicationsService {
     if (!app) throw new NotFoundException('Ho so khong ton tai');
     if (app.status !== 'SUBMITTED' && app.status !== 'UNDER_REVIEW')
       throw new ConflictException('Ho so khong o trang thai cho duyet');
+    // Applications saved before codes were enforced may still hold a name ("Hà Nội"): publish the code instead.
+    const location = await resolveLocationCodes(this.prisma, app.city, app.district).catch(() => ({ city: app.city, district: app.district }));
     const result = await this.prisma.$transaction(async (tx) => {
       const now = new Date();
       await tx.user.update({ where: { id: app.userId }, data: { role: 'TECHNICIAN' } });
@@ -380,8 +377,8 @@ export class TechnicianApplicationsService {
           userId: app.userId,
           gender: app.gender,
           bio: app.bio,
-          city: app.city,
-          district: app.district,
+          city: location.city,
+          district: location.district,
           facility: app.facility,
           address: app.address,
           serviceModes: app.supportedModes.length ? app.supportedModes : ['HOME'],
@@ -390,8 +387,8 @@ export class TechnicianApplicationsService {
         update: {
           gender: app.gender,
           bio: app.bio,
-          city: app.city,
-          district: app.district,
+          city: location.city,
+          district: location.district,
           facility: app.facility,
           address: app.address,
           serviceModes: app.supportedModes.length ? app.supportedModes : ['HOME'],

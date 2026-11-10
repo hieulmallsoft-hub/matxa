@@ -16,6 +16,7 @@ import {
   UpdateTechnicianServicePriceOptionDto,
   UpsertTechnicianProfileDto,
 } from '../dto/marketplace.dto';
+import { resolveLocationCodes } from './location-code';
 import { applyPriceOptions, loadBookableServices, publicTechnicianWhere } from './technician-selection';
 import { availabilityRange, BOOKING_TIMEZONE, buildAvailableSlots } from './availability-slots';
 import { MarketplaceRealtimeService } from './marketplace-realtime.service';
@@ -510,10 +511,12 @@ export class MarketplaceService {
 
   async upsertMyProfile(userId: string, dto: UpsertTechnicianProfileDto) {
     await this.requireRole(userId, ['TECHNICIAN', 'ADMIN']);
+    // City is stored as its code ("HN"), even when the app sends the name.
+    const data = dto.city === undefined ? dto : { ...dto, city: (await resolveLocationCodes(this.prisma, dto.city)).city };
     return this.prisma.technicianProfile.upsert({
       where: { userId },
-      create: { userId, ...dto },
-      update: dto,
+      create: { userId, ...data },
+      update: data,
     });
   }
 

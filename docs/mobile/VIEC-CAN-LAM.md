@@ -46,6 +46,18 @@ Response (rút gọn):
 - Khi `POST /api/technician/application/submit` trả `400`, đọc `missingFields` (ví dụ `["idCardBackKey", "faceImageKey"]`)
   để hiện "Hồ sơ còn thiếu: ảnh CCCD mặt sau, ảnh khuôn mặt" và đưa về đúng bước.
 
+### A2a. Thành phố / quận luôn lưu bằng mã (10/11)
+
+Khi lưu hồ sơ đăng ký KTV và hồ sơ KTV, server giờ tự đổi tên thành phố hoặc quận sang **mã** (`"Hà Nội"` → `"HN"`,
+`"Quận Hoàn Kiếm"` → mã quận). Nếu không khớp danh sách thì trả `400`:
+
+| `code` | Khi nào | App hiện |
+|---|---|---|
+| `INVALID_CITY` | Thành phố không có trong `GET /api/locations/cities` | "Thành phố chưa được hỗ trợ, vui lòng chọn lại" |
+| `INVALID_DISTRICT` | Quận không thuộc thành phố đã chọn | "Quận/huyện không thuộc thành phố đã chọn" |
+
+App vẫn nên gửi **mã** như cũ. Nếu tải danh sách thành phố bị lỗi thì báo lỗi và cho thử lại, **không gửi tên**.
+
 ### A2b. Bắt buộc có số điện thoại (KTV đăng ký mới và KTV đã duyệt)
 
 Khách cần gọi được cho KTV, nên tài khoản đăng nhập bằng Google/Apple/email (chưa có số điện thoại) phải thêm số.
