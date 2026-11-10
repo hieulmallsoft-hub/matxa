@@ -127,6 +127,8 @@ export class MarketplaceService {
       // A technician who has taken a booking is hidden until it is completed or cancelled — they can only take one
       // job at a time (same rule as matchingTechnicians / assertOpenEligibility), whatever its hour.
       Prisma.sql`NOT EXISTS (SELECT 1 FROM bookings busy WHERE busy.technician_id = p.id AND busy.status = 'CONFIRMED')`,
+      // Same while they are being served themselves: a technician who booked another technician as a customer.
+      Prisma.sql`NOT EXISTS (SELECT 1 FROM bookings served WHERE served.customer_id = p.user_id AND served.status = 'CONFIRMED')`,
     ];
     // A technician browsing as a customer never sees their own profile (they cannot book themselves).
     if (userId) conditions.push(Prisma.sql`p.user_id <> ${userId}::uuid`);

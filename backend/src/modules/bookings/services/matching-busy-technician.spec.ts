@@ -5,18 +5,22 @@ beforeEach(() => jest.spyOn(BookingsService.prototype as any, 'assertCustomer').
 // A technician with an unfinished confirmed booking cannot take another one, so the customer
 // must not be offered them (they would pick them and get 409 when creating the booking).
 describe('matching technicians', () => {
-  it('leaves out technicians who still have an unfinished confirmed booking', async () => {
+  it('leaves out technicians doing, or being served in, an unfinished confirmed booking', async () => {
     const candidate = (id: string) => ({
-      id, city: 'HN', district: null, latitude: null, longitude: null, averageRating: 5, reviewCount: 0,
+      id, userId: `${id}-user`, city: 'HN', district: null, latitude: null, longitude: null, averageRating: 5, reviewCount: 0,
       user: { id: `${id}-user`, displayName: id, avatarUrl: null },
     });
     const prisma: any = {
       serviceCatalogItem: { findMany: jest.fn().mockResolvedValue([{ id: 'catalog-1', categoryId: 'category-1' }]) },
       serviceCatalogPriceOption: { findMany: jest.fn().mockResolvedValue([{ id: 'option-1', durationMinutes: 90 }]) },
-      technicianProfile: { findMany: jest.fn().mockResolvedValue([candidate('free'), candidate('busy')]) },
+      technicianProfile: { findMany: jest.fn().mockResolvedValue([candidate('free'), candidate('busy'), candidate('served')]) },
       availabilitySlot: { findFirst: jest.fn().mockResolvedValue({ id: 'slot' }) },
-      // "busy" has a confirmed booking at another time that is not finished yet.
-      booking: { findFirst: jest.fn(async ({ where }: any) => (where.technicianId === 'busy' && where.status === 'CONFIRMED' && !where.scheduledStart ? { id: 'other' } : null)) },
+      // "busy" is doing a confirmed booking (any hour); "served" booked another technician as a customer and it was taken.
+      booking: {
+        findFirst: jest.fn(async ({ where }: any) =>
+          where.status === 'CONFIRMED' && !where.scheduledStart &&
+          (where.OR ?? []).some((c: any) => c.technicianId === 'busy' || c.customerId === 'served-user') ? { id: 'other' } : null),
+      },
       technicianService: { findMany: jest.fn().mockResolvedValue([{ catalogServiceId: 'catalog-1', categoryId: 'category-1' }]) },
     };
     const service = new BookingsService(prisma, { get: (_k: string, f: unknown) => f } as any, {} as any, {} as any);
