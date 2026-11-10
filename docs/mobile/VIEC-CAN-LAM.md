@@ -373,15 +373,16 @@ KTV dùng **đúng API chat CSKH của app khách**, không có API mới. Trư�
 - Áp dụng cho **cả app khách và app KTV**; chi tiết và cách xử lý trên màn hình ở [support-chat.md](support-chat.md).
 - Có thể **dùng lại nguyên màn chat CSKH** của app khách; chi tiết API xem [support-chat.md](support-chat.md).
 
-## M. Chỉ tài khoản khách được đặt lịch
+## M. KTV không đặt lịch cho chính mình
 
-Trước đây tài khoản KTV vẫn đặt được đơn như khách. Nay `POST /api/bookings`, `POST /api/bookings/open`,
-`POST /api/bookings/quote`, `POST /api/bookings/matching-technicians` chỉ nhận **tài khoản khách**; KTV/admin gọi sẽ nhận
-`403`, `code: "CUSTOMER_ONLY"` ("Tai khoan KTV khong dat lich duoc. Vui long dung tai khoan khach hang").
+KTV **vẫn đặt lịch được** (đặt KTV khác như một khách hàng), nhưng **không được đặt/nhận đơn của chính mình**:
 
-- KTV **không thấy, không được báo và không nhận được đơn do chính tài khoản mình đặt** (ví dụ đơn đặt từ lúc còn là khách, trước khi hồ sơ KTV được duyệt). Nhận đơn đó trả `403`, `code: "OWN_BOOKING"`.
-- **App KTV**: ẩn mọi nút đặt lịch/"Đặt ngay".
-- Nếu app dùng chung cho cả 2 vai trò: dựa vào `role` trong `GET /api/auth/me` để ẩn luồng đặt lịch với KTV; gặp `CUSTOMER_ONLY` thì hiện "Tài khoản KTV không đặt lịch được, vui lòng dùng tài khoản khách hàng".
+- `POST /api/bookings/matching-technicians`: danh sách KTV phù hợp **không bao giờ có chính người đang đặt**.
+- Chọn chính mình khi đặt (`technicianId` là hồ sơ KTV của mình) → `403`, `code: "OWN_BOOKING"` ("Khong the dat lich cho chinh minh").
+- KTV **không thấy, không được báo và không nhận được đơn do chính tài khoản mình đặt** (kể cả đơn đặt từ lúc còn là khách). Nhận đơn đó → `403`, `code: "OWN_BOOKING"`.
+- Tài khoản admin hoặc bị khóa gọi các API đặt lịch → `403`, `code: "CUSTOMER_ONLY"`.
+
+App: gặp `OWN_BOOKING` hiện "Bạn không thể đặt lịch cho chính mình".
 
 ## Cách tự kiểm tra trên Swagger
 

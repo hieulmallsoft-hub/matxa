@@ -80,7 +80,7 @@ export class BookingsService {
   ) {}
 
   async quote(userId: string, dto: QuoteBookingDto, db: Prisma.TransactionClient = this.prisma) {
-    await this.assertCustomer(userId);
+    await this.assertCustomer(userId, dto.technicianId);
     await this.assertLeadTime(new Date(dto.scheduledStart));
     const baseServices = await loadBookableServices(db, dto.technicianId, dto.serviceIds, dto.mode);
     const services = await applyPriceOptions(db, baseServices, dto.priceOptionIds);
@@ -470,7 +470,8 @@ export class BookingsService {
         city: dto.city,
         ...(dto.district ? { district: dto.district } : {}),
         serviceModes: { has: dto.mode },
-        user: { status: 'ACTIVE', role: 'TECHNICIAN', ...(dto.search ? { displayName: { contains: dto.search, mode: 'insensitive' } } : {}), technicianApplication: { is: { status: 'APPROVED' } } },
+        // A technician booking for themselves never sees their own profile among the candidates.
+        user: { id: { not: userId }, status: 'ACTIVE', role: 'TECHNICIAN', ...(dto.search ? { displayName: { contains: dto.search, mode: 'insensitive' } } : {}), technicianApplication: { is: { status: 'APPROVED' } } },
         services: { some: { isActive: true, catalogServiceId: { in: serviceIds }, modes: { has: dto.mode } } },
       },
       include: { user: { select: { id: true, displayName: true, avatarUrl: true } } },
@@ -505,7 +506,7 @@ export class BookingsService {
   }
 
   async createSelectedFromCatalog(userId: string, dto: any) {
-    await this.assertCustomer(userId);
+    await this.assertCustomer(userId, dto.technicianId);
     const serviceIds = dto.items.map((item: any) => item.catalogServiceId);
     const catalogOptions = await this.prisma.serviceCatalogPriceOption.findMany({ where: { id: { in: dto.items.map((item: any) => item.priceOptionId) }, isActive: true } });
     const selected = await this.prisma.technicianService.findMany({ where: { technicianId: dto.technicianId, catalogServiceId: { in: serviceIds }, isActive: true }, include: { priceOptions: { where: { isActive: true } } } });
@@ -1224,18 +1225,20 @@ export class BookingsService {
     );
   }
 
-  /** Only customer accounts book; a technician (or admin) account must use a customer account to order a service. */
-  private async assertCustomer(userId: string) {
+  /**
+   * Customers and technicians may book (a technician can book another technician); admins and locked accounts cannot.
+   * Booking oneself is refused separately (OWN_BOOKING).
+   */
+  private async assertCustomer(userId: string, chosenTechnicianId?: string | null) {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true, status: true } });
-    if (user?.role === 'CUSTOMER' && user.status === 'ACTIVE') return;
-    throw new ForbiddenException({
-      statusCode: 403,
-      code: 'CUSTOMER_ONLY',
-      message:
-        user?.role === 'TECHNICIAN'
-          ? 'Tai khoan KTV khong dat lich duoc. Vui long dung tai khoan khach hang'
-          : 'Chi tai khoan khach hang moi dat lich duoc',
-    });
+    if (!(user?.status === 'ACTIVE' && ['CUSTOMER', 'TECHNICIAN'].includes(user.role)))
+      throw new ForbiddenException({ statusCode: 403, code: 'CUSTOMER_ONLY', message: 'Tai khoan nay khong dat lich duoc' });
+    if (
+      chosenTechnicianId &&
+      user.role === 'TECHNICIAN' &&
+      (await this.prisma.technicianProfile.findFirst({ where: { id: chosenTechnicianId, userId }, select: { id: true } }))
+    )
+      throw new ForbiddenException({ statusCode: 403, code: 'OWN_BOOKING', message: 'Khong the dat lich cho chinh minh' });
   }
 
   private async assertLeadTime(start: Date) {
