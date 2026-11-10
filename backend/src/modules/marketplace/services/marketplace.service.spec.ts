@@ -211,6 +211,14 @@ describe('MarketplaceService', () => {
     expect(technicianProfile.findMany).not.toHaveBeenCalled();
   });
 
+  it('hides technicians who have taken a booking that is not finished yet', async () => {
+    $queryRaw.mockResolvedValue([{ total: 0n, ranked: [] }]);
+    await service.searchTechnicians({ page: 1, limit: 10 });
+    expect($queryRaw.mock.calls[0][0].text).toContain(
+      "NOT EXISTS (SELECT 1 FROM bookings busy WHERE busy.technician_id = p.id AND busy.status = 'CONFIRMED')",
+    );
+  });
+
   it('filters technicians by a complete requested time window and radius', async () => {
     $queryRaw.mockResolvedValue([{ total: 0n, ranked: [] }]);
     await service.searchTechnicians({

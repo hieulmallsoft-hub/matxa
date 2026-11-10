@@ -124,6 +124,9 @@ export class MarketplaceService {
       Prisma.sql`p.is_active = true`,
       Prisma.sql`p.is_verified = true`,
       Prisma.sql`u.status = 'ACTIVE'`,
+      // A technician who has taken a booking is hidden until it is completed or cancelled — they can only take one
+      // job at a time (same rule as matchingTechnicians / assertOpenEligibility), whatever its hour.
+      Prisma.sql`NOT EXISTS (SELECT 1 FROM bookings busy WHERE busy.technician_id = p.id AND busy.status = 'CONFIRMED')`,
     ];
     if (keyword) {
       // Escape LIKE wildcards so search text remains literal, and bind it as a parameter.
