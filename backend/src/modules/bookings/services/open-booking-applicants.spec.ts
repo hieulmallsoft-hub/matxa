@@ -1,4 +1,7 @@
 import { BookingsService } from './bookings.service';
+jest.mock('./booking-promotion-release', () => ({ releaseBookingPromotion: jest.fn().mockResolvedValue(false) }));
+// These cover other rules; the customer-only check has its own spec.
+beforeEach(() => jest.spyOn(BookingsService.prototype as any, 'assertCustomer').mockResolvedValue(undefined));
 
 describe('customer sees technicians who applied to an open booking', () => {
   const application = {

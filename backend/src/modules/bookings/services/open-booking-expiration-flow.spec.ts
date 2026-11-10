@@ -1,6 +1,9 @@
 import { BookingsService } from './bookings.service';
+import { releaseBookingPromotion } from './booking-promotion-release';
+jest.mock('./booking-promotion-release', () => ({ releaseBookingPromotion: jest.fn().mockResolvedValue(false) }));
 
 describe('open booking expiry transition', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('atomically expires only OPEN unassigned marketplace bookings and APPLIED applications', async () => {
     const tx: any = {
       booking: {
@@ -43,6 +46,8 @@ describe('open booking expiry transition', () => {
       where: { bookingId: 'booking-1', status: 'APPLIED' },
       data: { status: 'EXPIRED', expiredAt: now },
     });
+    // No technician came, so the customer gets their voucher back.
+    expect(releaseBookingPromotion).toHaveBeenCalledWith(tx, 'booking-1');
   });
 
   it('moves an overdue DIRECT booking to the marketplace fallback', async () => {
@@ -104,5 +109,6 @@ describe('open booking expiry transition', () => {
     );
     await expect(service.expireOpenBookingIfDue('booking-1', new Date('2026-10-06T01:00:00.000Z'))).resolves.toBeNull();
     expect(tx.bookingTechnicianApplication.updateMany).not.toHaveBeenCalled();
+    expect(releaseBookingPromotion).not.toHaveBeenCalled();
   });
 });

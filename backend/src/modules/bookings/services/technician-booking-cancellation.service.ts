@@ -10,6 +10,7 @@ import { NotificationsService } from '../../notifications/services/notifications
 import { TechnicianCancelBookingDto } from '../dto/booking.dto';
 import { BookingCancellationStorageService } from './booking-cancellation-storage.service';
 import { refundBookingCommission } from './booking-commission-refund';
+import { releaseBookingPromotion } from './booking-promotion-release';
 
 const EVIDENCE_REQUIRED = new Set(['CUSTOMER_NO_SHOW', 'UNSAFE_SITUATION', 'INAPPROPRIATE_REQUEST']);
 
@@ -97,6 +98,8 @@ export class TechnicianBookingCancellationService {
         });
         if (!update.count) throw new ConflictException('Trang thai lich dat da thay doi, vui long tai lai');
         await refundBookingCommission(tx, bookingId);
+        // A technician cancelling must not cost the customer their voucher.
+        await releaseBookingPromotion(tx, bookingId);
         return {
           bookingId,
           status: 'CANCELLED' as const,

@@ -1,5 +1,7 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
+// These cover other rules; the customer-only check has its own spec.
+beforeEach(() => jest.spyOn(BookingsService.prototype as any, 'assertCustomer').mockResolvedValue(undefined));
 
 // Admin-configured booking rules: minimum advance time and maximum dispatch radius (0 = no limit).
 describe('booking rules from admin settings', () => {

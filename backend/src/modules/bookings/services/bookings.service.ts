@@ -21,6 +21,7 @@ import { SettingsService } from '../../settings/settings.service';
 import { ComplaintStorageService } from './complaint-storage.service';
 import { addressPreview, confirmationDeadline, kmBetween, roundVnd, technicianBadge, travelFeeFor } from './distance';
 import { activityPeriods } from './technician-activity';
+import { releaseBookingPromotion } from './booking-promotion-release';
 import { COMPLAINT_STATUS_LABEL, complaintStatusEvent, ensureComplaintConversation } from './complaint-conversation';
 import {
   BookingHistoryQueryDto,
@@ -78,6 +79,7 @@ export class BookingsService {
   ) {}
 
   async quote(userId: string, dto: QuoteBookingDto, db: Prisma.TransactionClient = this.prisma) {
+    await this.assertCustomer(userId);
     await this.assertLeadTime(new Date(dto.scheduledStart));
     const baseServices = await loadBookableServices(db, dto.technicianId, dto.serviceIds, dto.mode);
     const services = await applyPriceOptions(db, baseServices, dto.priceOptionIds);
@@ -444,6 +446,7 @@ export class BookingsService {
 
   /** Creates an unassigned marketplace request from platform-owned catalog items. */
   async matchingTechnicians(userId: string, dto: any) {
+    await this.assertCustomer(userId);
     const start = new Date(dto.scheduledStart);
     if (!Number.isFinite(start.getTime()) || start <= new Date()) throw new BadRequestException('Thoi gian dat lich khong hop le');
     await this.assertLeadTime(start);
@@ -501,6 +504,7 @@ export class BookingsService {
   }
 
   async createSelectedFromCatalog(userId: string, dto: any) {
+    await this.assertCustomer(userId);
     const serviceIds = dto.items.map((item: any) => item.catalogServiceId);
     const catalogOptions = await this.prisma.serviceCatalogPriceOption.findMany({ where: { id: { in: dto.items.map((item: any) => item.priceOptionId) }, isActive: true } });
     const selected = await this.prisma.technicianService.findMany({ where: { technicianId: dto.technicianId, catalogServiceId: { in: serviceIds }, isActive: true }, include: { priceOptions: { where: { isActive: true } } } });
@@ -520,6 +524,7 @@ export class BookingsService {
   }
 
   async createOpen(userId: string, dto: CreateOpenBookingDto, requestedTechnicianId?: string) {
+    await this.assertCustomer(userId);
     const start = new Date(dto.scheduledStart);
     if (!Number.isFinite(start.getTime()) || start <= new Date())
       throw new BadRequestException('Thoi gian dat lich phai o tuong lai');
@@ -589,6 +594,7 @@ export class BookingsService {
       await this.assertOpenEligibility(
         this.prisma,
         {
+          customerId: userId,
           assignmentMode: 'OPEN_MARKETPLACE',
           status: 'OPEN',
           mode: dto.mode,
@@ -1218,6 +1224,20 @@ export class BookingsService {
     );
   }
 
+  /** Only customer accounts book; a technician (or admin) account must use a customer account to order a service. */
+  private async assertCustomer(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true, status: true } });
+    if (user?.role === 'CUSTOMER' && user.status === 'ACTIVE') return;
+    throw new ForbiddenException({
+      statusCode: 403,
+      code: 'CUSTOMER_ONLY',
+      message:
+        user?.role === 'TECHNICIAN'
+          ? 'Tai khoan KTV khong dat lich duoc. Vui long dung tai khoan khach hang'
+          : 'Chi tai khoan khach hang moi dat lich duoc',
+    });
+  }
+
   private async assertLeadTime(start: Date) {
     const { minAdvanceHours } = await this.bookingRules();
     if (minAdvanceHours > 0 && start.getTime() < Date.now() + minAdvanceHours * 3_600_000)
@@ -1328,6 +1348,8 @@ export class BookingsService {
         tx,
       );
       await refundBookingCommission(tx, id);
+      // The customer did not get the service, so the voucher can be used again.
+      await releaseBookingPromotion(tx, id);
       return cancelled;
     });
     if (booking.assignmentMode === 'OPEN_MARKETPLACE' && booking.status === 'OPEN') {
@@ -1389,6 +1411,7 @@ export class BookingsService {
         data: { status: 'EXPIRED', expiredAt: now },
       });
       if (!claimed.count) return null;
+      await releaseBookingPromotion(tx, bookingId);
       const applied = typeof tx.bookingTechnicianApplication.findMany === 'function'
         ? await tx.bookingTechnicianApplication.findMany({
             where: { bookingId, status: 'APPLIED' },
@@ -1829,9 +1852,13 @@ export class BookingsService {
         isVerified: true,
         user: { status: 'ACTIVE', role: 'TECHNICIAN', technicianApplication: { is: { status: 'APPROVED' } } },
       },
-      select: { id: true, city: true, district: true, serviceModes: true, latitude: true, longitude: true },
+      select: { id: true, userId: true, city: true, district: true, serviceModes: true, latitude: true, longitude: true },
     });
     if (!profile) throw new ForbiddenException('Tai khoan KTV chua du dieu kien nhan don');
+    // An account that booked as a customer (before becoming a technician) must not serve its own booking:
+    // it is neither shown, announced, nor accepted/selected.
+    if (booking.customerId && profile.userId === booking.customerId)
+      throw new ForbiddenException({ statusCode: 403, code: 'OWN_BOOKING', message: 'Khong the nhan don do chinh minh dat' });
     const snapshot =
       booking.addressSnapshot && typeof booking.addressSnapshot === 'object' ? (booking.addressSnapshot as any) : null;
     // Only home bookings carry coordinates; technicians without a location are not filtered out.

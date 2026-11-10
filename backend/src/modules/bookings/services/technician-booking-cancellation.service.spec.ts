@@ -1,5 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { TechnicianBookingCancellationService } from './technician-booking-cancellation.service';
+import { releaseBookingPromotion } from './booking-promotion-release';
+jest.mock('./booking-promotion-release', () => ({ releaseBookingPromotion: jest.fn().mockResolvedValue(false) }));
 
 const assignedBooking = (overrides: Record<string, unknown> = {}) => ({
   id: 'booking-1',
@@ -57,6 +59,12 @@ describe('TechnicianBookingCancellationService', () => {
     expect(tx.walletLedgerEntry.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ type: 'COMMISSION_REFUND', amountVnd: 75000, balanceBeforeVnd: 100000, balanceAfterVnd: 175000 }),
     });
+  });
+
+  it('gives the customer their voucher back when the technician cancels', async () => {
+    const { service, tx } = createSubject();
+    await service.cancel('tech-user-1', 'booking-1', otherReason);
+    expect(releaseBookingPromotion).toHaveBeenCalledWith(tx, 'booking-1');
   });
 
   it('lets the assigned DIRECT technician cancel and writes the legacy fields plus audit', async () => {
@@ -146,3 +154,4 @@ describe('TechnicianBookingCancellationService', () => {
     expect(tx.booking.updateMany).toHaveBeenCalled();
   });
 });
+

@@ -1,6 +1,7 @@
 import { NotificationsService } from './notifications.service';
 import { BookingsService } from '../../bookings/services/bookings.service';
 import { TechnicianApplicationsService } from '../../marketplace/services/technician-applications.service';
+jest.mock('../../bookings/services/booking-promotion-release', () => ({ releaseBookingPromotion: jest.fn().mockResolvedValue(false) }));
 
 describe('admin notifications', () => {
   it('creates one in-app notification per active admin', async () => {

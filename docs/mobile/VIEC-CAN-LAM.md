@@ -335,6 +335,7 @@ Admin đặt trong Cài đặt → Chính sách KTV, ví dụ "5 đơn/ngày →
 Trước đây đơn đặt qua `POST /api/bookings` (đơn mở, có hoặc không chọn KTV) **bỏ qua** `promotionCode`, nên sau khi KTV nhận đơn chi tiết không có giảm giá. Đã sửa:
 
 - Gửi `promotionCode` trong body `POST /api/bookings` như cũ. Server kiểm tra mã ngay lúc tạo đơn; mã sai/hết lượt trả `400` ("Ma khuyen mai khong hop le hoac da het han" / "Ma khuyen mai da het luot su dung" / "Don hang chua dat gia tri toi thieu") → hiện lỗi ở ô mã, **không** tạo đơn.
+- Đơn **bị hủy** (khách, KTV hay admin hủy) hoặc **hết hạn không có KTV nhận** thì khách được **trả lại lượt dùng mã**, dùng lại được cho đơn sau. Đơn hoàn thành thì mã tính là đã dùng. App không cần làm gì thêm: danh sách mã `GET /api/marketplace/promotions` tự hiện lại mã đó.
 - `GET /api/bookings/{id}` có `discount` / `discountAmount`, `totalAmount` **đã trừ** giảm giá. Khi KTV được chốt mà có phí di chuyển thì `totalAmount` cộng thêm phí, giảm giá giữ nguyên.
 - **Sàn chịu** phần giảm giá. Khách trả tiền mặt cho KTV ít hơn, nên lúc KTV nhận đơn, ví KTV được **cộng** đúng phần giảm giá (giao dịch `PROMOTION_CREDIT`) rồi mới trừ hoa hồng (`COMMISSION_DEBIT`). Đơn bị hủy thì đảo lại cả hai (`COMMISSION_REFUND` và `PROMOTION_CREDIT_REVERSAL`).
 
@@ -371,6 +372,16 @@ KTV dùng **đúng API chat CSKH của app khách**, không có API mới. Trư�
 - Người dùng (khách/KTV) xóa cuộc cũ: `DELETE /api/conversations/{id}` — chỉ ẩn ở phía mình; admin xóa cũng chỉ ẩn ở phía admin.
 - Áp dụng cho **cả app khách và app KTV**; chi tiết và cách xử lý trên màn hình ở [support-chat.md](support-chat.md).
 - Có thể **dùng lại nguyên màn chat CSKH** của app khách; chi tiết API xem [support-chat.md](support-chat.md).
+
+## M. Chỉ tài khoản khách được đặt lịch
+
+Trước đây tài khoản KTV vẫn đặt được đơn như khách. Nay `POST /api/bookings`, `POST /api/bookings/open`,
+`POST /api/bookings/quote`, `POST /api/bookings/matching-technicians` chỉ nhận **tài khoản khách**; KTV/admin gọi sẽ nhận
+`403`, `code: "CUSTOMER_ONLY"` ("Tai khoan KTV khong dat lich duoc. Vui long dung tai khoan khach hang").
+
+- KTV **không thấy, không được báo và không nhận được đơn do chính tài khoản mình đặt** (ví dụ đơn đặt từ lúc còn là khách, trước khi hồ sơ KTV được duyệt). Nhận đơn đó trả `403`, `code: "OWN_BOOKING"`.
+- **App KTV**: ẩn mọi nút đặt lịch/"Đặt ngay".
+- Nếu app dùng chung cho cả 2 vai trò: dựa vào `role` trong `GET /api/auth/me` để ẩn luồng đặt lịch với KTV; gặp `CUSTOMER_ONLY` thì hiện "Tài khoản KTV không đặt lịch được, vui lòng dùng tài khoản khách hàng".
 
 ## Cách tự kiểm tra trên Swagger
 

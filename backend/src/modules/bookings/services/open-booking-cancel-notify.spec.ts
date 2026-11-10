@@ -1,4 +1,6 @@
 import { BookingsService } from './bookings.service';
+import { releaseBookingPromotion } from './booking-promotion-release';
+jest.mock('./booking-promotion-release', () => ({ releaseBookingPromotion: jest.fn().mockResolvedValue(false) }));
 
 describe('customer cancels an open booking', () => {
   const booking: any = {
@@ -55,6 +57,12 @@ describe('customer cancels an open booking', () => {
       'applied-user', 'BOOKING_CANCELLED', expect.any(String), 'Khách hàng đã hủy đơn mà bạn đang ứng tuyển.', 'matxa://bookings/booking-1');
     expect(notifications.create).toHaveBeenCalledWith(
       'notified-user', 'BOOKING_CANCELLED', expect.any(String), 'Khách hàng đã hủy đơn này.', 'matxa://bookings/booking-1');
+  });
+
+  it('gives the customer their voucher back when they cancel', async () => {
+    const { service, prisma } = subject();
+    await service.cancel('customer-1', 'booking-1', { reasonCode: 'WAIT_TOO_LONG' });
+    expect(releaseBookingPromotion).toHaveBeenCalledWith(prisma, 'booking-1');
   });
 
   it('lets a notified technician open the cancelled job from that notification', async () => {

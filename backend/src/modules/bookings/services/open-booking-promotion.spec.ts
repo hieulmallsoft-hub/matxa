@@ -1,4 +1,6 @@
 import { BookingsService } from './bookings.service';
+// These cover other rules; the customer-only check has its own spec.
+beforeEach(() => jest.spyOn(BookingsService.prototype as any, 'assertCustomer').mockResolvedValue(undefined));
 
 // Lỗi 6/11: khách nhập mã giảm giá khi đặt, nhưng đơn tạo ra (và chi tiết đơn sau khi KTV nhận) không có giảm giá.
 describe('promotion code on an open booking', () => {

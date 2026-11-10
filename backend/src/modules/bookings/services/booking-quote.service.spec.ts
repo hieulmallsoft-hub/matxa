@@ -1,5 +1,7 @@
 import { BookingsService } from './bookings.service';
 import { QuoteBookingDto } from '../dto/booking.dto';
+// These cover other rules; the customer-only check has its own spec.
+beforeEach(() => jest.spyOn(BookingsService.prototype as any, 'assertCustomer').mockResolvedValue(undefined));
 
 describe('Quote and create share pricing/validation; address snapshots are immutable', () => {
   const db = {

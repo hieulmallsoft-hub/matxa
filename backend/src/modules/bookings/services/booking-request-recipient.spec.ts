@@ -1,4 +1,6 @@
 import { BookingsService } from './bookings.service';
+// These cover other rules; the customer-only check has its own spec.
+beforeEach(() => jest.spyOn(BookingsService.prototype as any, 'assertCustomer').mockResolvedValue(undefined));
 
 describe('booking request recipient', () => {
   const booking: any = {

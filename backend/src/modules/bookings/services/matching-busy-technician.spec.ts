@@ -1,4 +1,6 @@
 import { BookingsService } from './bookings.service';
+// These cover other rules; the customer-only check has its own spec.
+beforeEach(() => jest.spyOn(BookingsService.prototype as any, 'assertCustomer').mockResolvedValue(undefined));
 
 // A technician with an unfinished confirmed booking cannot take another one, so the customer
 // must not be offered them (they would pick them and get 409 when creating the booking).
