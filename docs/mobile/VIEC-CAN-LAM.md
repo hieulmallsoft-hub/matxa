@@ -452,6 +452,29 @@ Trong chi tiết đơn (sau khi KTV được chọn), `address.phone` cũng có 
   `latitude`/`longitude` có thể `null` riêng: khi đó chỉ hiện địa chỉ, ẩn bản đồ.
 - Đơn mở tại cơ sở: mỗi KTV ứng tuyển trong `applications[]` cũng có `facility`, để khách so sánh trước khi chọn.
 
+## Q. Admin bật/tắt "Nơi phục vụ" (app khách + app KTV)
+
+Admin chọn nơi phục vụ nào đang mở (Tận nơi `HOME`, `ONLINE`, Cơ sở `ONSITE`). `GET /api/settings/public`
+(không cần đăng nhập) trả thêm:
+
+```json
+"enabledServiceModes": ["HOME", "ONLINE"]
+```
+
+- **App KTV, màn đăng ký / sửa hồ sơ "Nơi phục vụ":** chỉ hiện các ô có trong `enabledServiceModes`. Nếu KTV **đã chọn
+  sẵn** một mục giờ bị tắt thì vẫn hiện ô đó (đã tích), cho bỏ tích nhưng không cho tích lại.
+- **App khách, chọn hình thức đặt lịch:** chỉ hiện các hình thức có trong `enabledServiceModes`.
+- Gọi lại `settings/public` mỗi lần mở các màn trên (admin có thể đổi bất cứ lúc nào).
+
+Server cũng tự chặn:
+
+| Khi | Lỗi | App hiện |
+|---|---|---|
+| Đặt lịch / tìm KTV với hình thức đang tắt | `409`, `code: "SERVICE_MODE_DISABLED"` | "Hình thức này đang tạm dừng, vui lòng chọn hình thức khác" |
+| KTV chọn **mới** một nơi phục vụ đang tắt | `400`, `code: "SERVICE_MODE_DISABLED"`, `modes: ["ONSITE"]` | như trên |
+
+Đơn đã đặt trước khi tắt vẫn làm bình thường.
+
 ## Cách tự kiểm tra trên Swagger
 
 1. `PATCH /api/technician/application` với `idCardQr` = chuỗi app quét được → response có `idCardInfo` đúng tên trên thẻ.

@@ -3,6 +3,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { UpdateTechnicianApplicationDto } from '../dto/technician-application.dto';
 import { TechnicianApplicationStorageService } from './technician-application-storage.service';
 import { resolveLocationCodes } from './location-code';
+import { readEnabledServiceModes } from '../../settings/settings.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { TechnicianContractService } from './technician-contract.service';
 import { parseIdCardQr } from './id-card-qr';
@@ -96,6 +97,13 @@ export class TechnicianApplicationsService {
       if (dto[key] !== undefined && !dto[key]!.startsWith(`technician-applications/${userId}/`))
         throw new BadRequestException('Document key khong hop le');
     const modes = dto.supportedModes ?? current.supportedModes;
+    // A switched-off "nơi phục vụ" cannot be newly chosen; ones the technician already had are kept.
+    if (dto.supportedModes) {
+      const enabled = await readEnabledServiceModes(this.prisma);
+      const added = dto.supportedModes.filter((mode) => !current.supportedModes.includes(mode) && !(enabled as string[]).includes(mode));
+      if (added.length)
+        throw new BadRequestException({ code: 'SERVICE_MODE_DISABLED', message: 'Hinh thuc phuc vu nay dang tam dung', modes: added });
+    }
     // Stored as codes ("HN"), whether the app sent the code or the name ("Hà Nội"); unknown values are rejected.
     const location = await resolveLocationCodes(this.prisma, dto.city ?? current.city, dto.district ?? current.district);
     if (modes.includes('ONSITE') && !(dto.facility ?? current.facility)?.trim())

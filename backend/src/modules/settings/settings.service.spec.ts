@@ -18,7 +18,7 @@ describe('SettingsService platform info and booking rules', () => {
   it('falls back to defaults until the admin saves anything', async () => {
     const { service } = subject();
     await expect(service.getPlatformInfo()).resolves.toEqual({ brandName: 'Psyocore', hotline: '', supportEmail: '' });
-    await expect(service.getBookingRules()).resolves.toEqual({ minAdvanceHours: 0, maxDispatchRadiusKm: 0, travelFeeThresholdKm: 10, travelFeeAmount: 0, confirmationWaitMinutes: 10, requireTechnicianPhone: false, homeServiceFee: 100000, dailyDiscountThreshold: 0, dailyDiscountFeePercent: 20 });
+    await expect(service.getBookingRules()).resolves.toEqual({ minAdvanceHours: 0, maxDispatchRadiusKm: 0, travelFeeThresholdKm: 10, travelFeeAmount: 0, confirmationWaitMinutes: 10, requireTechnicianPhone: false, homeServiceFee: 100000, dailyDiscountThreshold: 0, dailyDiscountFeePercent: 20, enabledServiceModes: ['HOME', 'ONLINE', 'ONSITE'] });
   });
 
   it('saves only the fields that were sent and returns the stored values', async () => {
@@ -38,6 +38,7 @@ describe('SettingsService platform info and booking rules', () => {
       homeServiceFee: 100000,
       dailyDiscountThreshold: 0,
       dailyDiscountFeePercent: 20,
+      enabledServiceModes: ['HOME', 'ONLINE', 'ONSITE'],
     });
     expect([...rows.keys()].sort()).toEqual(['BOOKING_MAX_DISPATCH_RADIUS_KM', 'BOOKING_MIN_ADVANCE_HOURS', 'PLATFORM_HOTLINE']);
   });
@@ -58,6 +59,15 @@ describe('SettingsService platform info and booking rules', () => {
       homeServiceFee: 100000,
       dailyDiscountThreshold: 0,
       dailyDiscountFeePercent: 20,
+      enabledServiceModes: ['HOME', 'ONLINE', 'ONSITE'],
     });
+  });
+
+  it('stores the switched-on service modes as a list and reads them back', async () => {
+    const { service, rows } = subject();
+    await expect(service.setBookingRules({ enabledServiceModes: ['HOME', 'ONLINE'] })).resolves.toMatchObject({
+      enabledServiceModes: ['HOME', 'ONLINE'],
+    });
+    expect(rows.get('BOOKING_ENABLED_SERVICE_MODES')).toBe('HOME,ONLINE');
   });
 });

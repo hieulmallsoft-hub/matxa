@@ -1,12 +1,12 @@
 import { Body, Controller, Get, Patch } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { IsBoolean, IsEmail, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
+import { IsBoolean, IsEmail, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf, IsArray, ArrayMinSize, ArrayUnique, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 import { AccessTokenGuard } from '../auth/guards/access-token.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UseGuards } from '@nestjs/common';
-import { SettingsService } from './settings.service';
+import { SettingsService, SERVICE_MODES, ServiceModeName } from './settings.service';
 
 class UpdateCommissionDto {
   @Type(() => Number)
@@ -66,6 +66,15 @@ class UpdateBookingRulesDto {
   @ApiPropertyOptional({ example: 20, description: 'Phi chiet khau (%) sau khi KTV dat moc don trong ngay. So nguyen 0-100.' })
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100)
   dailyDiscountFeePercent?: number;
+
+  @ApiPropertyOptional({
+    example: ['HOME', 'ONLINE'],
+    enum: SERVICE_MODES,
+    isArray: true,
+    description: 'Noi phuc vu dang mo (HOME = tan noi, ONLINE, ONSITE = co so). It nhat 1. App an cac lua chon bi tat.',
+  })
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayUnique() @IsIn(SERVICE_MODES, { each: true })
+  enabledServiceModes?: ServiceModeName[];
 }
 
 @ApiTags('Admin Settings')

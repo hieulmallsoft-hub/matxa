@@ -17,6 +17,7 @@ import {
   UpsertTechnicianProfileDto,
 } from '../dto/marketplace.dto';
 import { resolveLocationCodes } from './location-code';
+import { readEnabledServiceModes } from '../../settings/settings.service';
 import { applyPriceOptions, loadBookableServices, publicTechnicianWhere } from './technician-selection';
 import { availabilityRange, BOOKING_TIMEZONE, buildAvailableSlots } from './availability-slots';
 import { MarketplaceRealtimeService } from './marketplace-realtime.service';
@@ -513,6 +514,16 @@ export class MarketplaceService {
     await this.requireRole(userId, ['TECHNICIAN', 'ADMIN']);
     // City is stored as its code ("HN"), even when the app sends the name.
     const data = dto.city === undefined ? dto : { ...dto, city: (await resolveLocationCodes(this.prisma, dto.city)).city };
+    // A switched-off "nơi phục vụ" cannot be newly chosen; ones the technician already had are kept.
+    if (dto.serviceModes) {
+      const [enabled, current] = await Promise.all([
+        readEnabledServiceModes(this.prisma),
+        this.prisma.technicianProfile.findUnique({ where: { userId }, select: { serviceModes: true } }),
+      ]);
+      const added = dto.serviceModes.filter((mode) => !(current?.serviceModes ?? []).includes(mode) && !(enabled as string[]).includes(mode));
+      if (added.length)
+        throw new BadRequestException({ code: 'SERVICE_MODE_DISABLED', message: 'Hinh thuc phuc vu nay dang tam dung', modes: added });
+    }
     return this.prisma.technicianProfile.upsert({
       where: { userId },
       create: { userId, ...data },

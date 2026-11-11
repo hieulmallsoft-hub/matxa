@@ -81,6 +81,7 @@ export class BookingsService {
 
   async quote(userId: string, dto: QuoteBookingDto, db: Prisma.TransactionClient = this.prisma) {
     await this.assertCustomer(userId, dto.technicianId);
+    await this.assertModeEnabled(dto.mode);
     await this.assertLeadTime(new Date(dto.scheduledStart));
     const baseServices = await loadBookableServices(db, dto.technicianId, dto.serviceIds, dto.mode);
     const services = await applyPriceOptions(db, baseServices, dto.priceOptionIds);
@@ -450,6 +451,7 @@ export class BookingsService {
   /** Creates an unassigned marketplace request from platform-owned catalog items. */
   async matchingTechnicians(userId: string, dto: any) {
     await this.assertCustomer(userId);
+    await this.assertModeEnabled(dto.mode);
     const start = new Date(dto.scheduledStart);
     if (!Number.isFinite(start.getTime()) || start <= new Date()) throw new BadRequestException('Thoi gian dat lich khong hop le');
     await this.assertLeadTime(start);
@@ -530,6 +532,7 @@ export class BookingsService {
 
   async createOpen(userId: string, dto: CreateOpenBookingDto, requestedTechnicianId?: string) {
     await this.assertCustomer(userId);
+    await this.assertModeEnabled(dto.mode);
     const start = new Date(dto.scheduledStart);
     if (!Number.isFinite(start.getTime()) || start <= new Date())
       throw new BadRequestException('Thoi gian dat lich phai o tuong lai');
@@ -1219,6 +1222,13 @@ export class BookingsService {
   }
 
   /** Admin booking rules; 0 means no limit. Defaults apply when settings are not wired (tests). */
+  /** A "nơi phục vụ" the admin switched off cannot be booked (409 SERVICE_MODE_DISABLED). */
+  private async assertModeEnabled(mode: string) {
+    const enabled = (await this.bookingRules()).enabledServiceModes as string[] | undefined;
+    if (mode && enabled && !enabled.includes(mode))
+      throw new ConflictException({ code: 'SERVICE_MODE_DISABLED', message: 'Hinh thuc phuc vu nay dang tam dung' });
+  }
+
   private async bookingRules() {
     return (
       (await this.settings?.getBookingRules()) ?? {
@@ -1231,6 +1241,7 @@ export class BookingsService {
         homeServiceFee: Number(this.config.get('HOME_SERVICE_FEE', 100000)),
         dailyDiscountThreshold: 0,
         dailyDiscountFeePercent: 20,
+        enabledServiceModes: ['HOME', 'ONLINE', 'ONSITE'] as Array<'HOME' | 'ONLINE' | 'ONSITE'>,
       }
     );
   }

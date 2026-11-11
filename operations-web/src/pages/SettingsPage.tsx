@@ -47,6 +47,13 @@ type SettingCategory =
   | 'notifications'
   | 'security';
 
+
+const SERVICE_MODE_OPTIONS = [
+  { value: 'HOME', label: 'Phục vụ tận nơi' },
+  { value: 'ONLINE', label: 'Online' },
+  { value: 'ONSITE', label: 'Cơ sở' },
+];
+
 export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme, initialCategory = 'brand' }) => {
   const { addToast } = useToast();
   const [activeCategory, setActiveCategory] = useState<SettingCategory>(initialCategory);
@@ -64,6 +71,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
   const [travelFeeAmount, setTravelFeeAmount] = useState('0');
   const [confirmationWaitMinutes, setConfirmationWaitMinutes] = useState('10');
   const [requireTechnicianPhone, setRequireTechnicianPhone] = useState(false);
+  const [enabledServiceModes, setEnabledServiceModes] = useState<string[]>(['HOME', 'ONLINE', 'ONSITE']);
   const [homeServiceFee, setHomeServiceFee] = useState('100000');
   const [techCommissionRate, setTechCommissionRate] = useState('75');
   const [dailyDiscountThreshold, setDailyDiscountThreshold] = useState('0');
@@ -88,7 +96,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         setSupportEmail(value.supportEmail);
       })
       .catch(() => undefined);
-    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number; confirmationWaitMinutes: number; requireTechnicianPhone: boolean; homeServiceFee: number; dailyDiscountThreshold: number; dailyDiscountFeePercent: number }>('/admin/settings/booking')
+    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number; confirmationWaitMinutes: number; requireTechnicianPhone: boolean; homeServiceFee: number; dailyDiscountThreshold: number; dailyDiscountFeePercent: number; enabledServiceModes?: string[] }>('/admin/settings/booking')
       .then((value) => {
         setMinAdvanceHours(String(value.minAdvanceHours));
         setMaxTravelDistanceKm(String(value.maxDispatchRadiusKm));
@@ -96,6 +104,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         setTravelFeeAmount(String(value.travelFeeAmount ?? 0));
         setConfirmationWaitMinutes(String(value.confirmationWaitMinutes ?? 10));
         setRequireTechnicianPhone(Boolean(value.requireTechnicianPhone));
+        if (value.enabledServiceModes?.length) setEnabledServiceModes(value.enabledServiceModes);
         setHomeServiceFee(String(value.homeServiceFee ?? 100000));
         setDailyDiscountThreshold(String(value.dailyDiscountThreshold ?? 0));
         setDailyDiscountFeePercent(String(value.dailyDiscountFeePercent ?? 20));
@@ -152,9 +161,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         if (!Number.isInteger(radius) || radius < 0 || radius > 200) throw new Error('Bán kính phải là số nguyên từ 0 đến 200 km');
         const wait = Number(confirmationWaitMinutes);
         if (!Number.isInteger(wait) || wait < 1 || wait > 60) throw new Error('Thời gian chờ KTV xác nhận phải từ 1 đến 60 phút');
+        if (!enabledServiceModes.length) throw new Error('Phải bật ít nhất 1 nơi phục vụ');
         await request('/admin/settings/booking', {
           method: 'PATCH',
-          body: JSON.stringify({ minAdvanceHours: hours, maxDispatchRadiusKm: radius, confirmationWaitMinutes: wait, requireTechnicianPhone }),
+          body: JSON.stringify({ minAdvanceHours: hours, maxDispatchRadiusKm: radius, confirmationWaitMinutes: wait, requireTechnicianPhone, enabledServiceModes }),
         });
         addToast({ title: 'Đã lưu quy định đặt lịch', message: 'Áp dụng cho các đơn đặt sau khi lưu.', type: 'success' });
       }
@@ -330,6 +340,40 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
                   />
                   <span className="text-[11px] text-[#66756B]">Khách phải đặt trước ca phục vụ ít nhất bao nhiêu giờ. Nhập 0 để không giới hạn.</span>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-[#1C2B20]">Nơi phục vụ đang mở</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {SERVICE_MODE_OPTIONS.map((option) => {
+                      const on = enabledServiceModes.includes(option.value);
+                      return (
+                        <label
+                          key={option.value}
+                          className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer ${on ? 'bg-[#EAF5EC] border-[#2E7D4A]' : 'bg-[#F6F8F4] border-[#E5EBE5]'}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            onChange={(e) =>
+                              setEnabledServiceModes((current) =>
+                                e.target.checked ? [...current, option.value] : current.filter((mode) => mode !== option.value),
+                              )
+                            }
+                            className="mt-0.5 w-4 h-4 accent-[#2E7D4A]"
+                          />
+                          <span>
+                            <span className="block text-xs font-bold text-[#1C2B20]">{option.label}</span>
+                            <span className="block text-[11px] text-[#66756B]">{on ? 'Đang mở' : 'Đang tắt'}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <span className="text-[11px] text-[#66756B]">
+                    Tắt một mục thì app ẩn lựa chọn đó khi khách đặt lịch và khi KTV đăng ký, khách không đặt được hình thức đó nữa.
+                    KTV đã chọn từ trước vẫn giữ nguyên trong hồ sơ, đơn đã đặt vẫn làm bình thường. Phải mở ít nhất 1 mục.
+                  </span>
                 </div>
 
                 <label className="flex items-start gap-3 p-3.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] cursor-pointer">

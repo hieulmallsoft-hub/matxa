@@ -22,7 +22,11 @@ export type BookingRules = {
    *  `dailyDiscountFeePercent` instead of the usual commission. 0 = off. */
   dailyDiscountThreshold: number;
   dailyDiscountFeePercent: number;
+  /** "Nơi phục vụ" the admin has switched on. The apps hide the others; bookings and new KTV choices are refused. */
+  enabledServiceModes: ServiceModeName[];
 };
+export const SERVICE_MODES = ['HOME', 'ONLINE', 'ONSITE'] as const;
+export type ServiceModeName = (typeof SERVICE_MODES)[number];
 
 const PLATFORM_KEYS: Record<keyof PlatformInfo, string> = {
   brandName: 'PLATFORM_BRAND_NAME',
@@ -40,6 +44,7 @@ const BOOKING_KEYS: Record<keyof BookingRules, string> = {
   homeServiceFee: 'BOOKING_HOME_SERVICE_FEE',
   dailyDiscountThreshold: 'BOOKING_DAILY_DISCOUNT_THRESHOLD',
   dailyDiscountFeePercent: 'BOOKING_DAILY_DISCOUNT_FEE_PERCENT',
+  enabledServiceModes: 'BOOKING_ENABLED_SERVICE_MODES',
 };
 
 @Injectable()
@@ -90,6 +95,7 @@ export class SettingsService {
       homeServiceFee: Number(stored.get(BOOKING_KEYS.homeServiceFee) ?? this.config.get('HOME_SERVICE_FEE', 100000)),
       dailyDiscountThreshold: Number(stored.get(BOOKING_KEYS.dailyDiscountThreshold) ?? 0),
       dailyDiscountFeePercent: Number(stored.get(BOOKING_KEYS.dailyDiscountFeePercent) ?? 20),
+      enabledServiceModes: parseModes(stored.get(BOOKING_KEYS.enabledServiceModes)),
     };
   }
 
@@ -119,4 +125,16 @@ export class SettingsService {
       ),
     );
   }
+}
+
+/** Stored as "HOME,ONLINE"; never set (or nothing valid) = every mode on. */
+export function parseModes(value: string | undefined): ServiceModeName[] {
+  const modes = SERVICE_MODES.filter((mode) => (value ?? '').split(',').map((part) => part.trim()).includes(mode));
+  return value === undefined || !modes.length ? [...SERVICE_MODES] : modes;
+}
+
+/** For services without SettingsService injected: the admin's enabled "nơi phục vụ". */
+export async function readEnabledServiceModes(db: Pick<PrismaService, 'systemSetting'>) {
+  const row = await db.systemSetting.findUnique({ where: { key: BOOKING_KEYS.enabledServiceModes } });
+  return parseModes(row?.value);
 }
