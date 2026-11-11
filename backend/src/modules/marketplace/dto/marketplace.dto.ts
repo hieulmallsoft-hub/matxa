@@ -207,7 +207,13 @@ export class UpsertTechnicianProfileDto {
   serviceModes!: ('HOME' | 'ONSITE' | 'ONLINE')[];
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsLatitude() latitude?: number;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsLongitude() longitude?: number;
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) city?: string;
+  @ApiPropertyOptional({ example: 'HN', description: 'Ma tinh/thanh (GET /locations/cities)' })
+  @IsOptional() @IsString() @MaxLength(100) city?: string;
+  @ApiPropertyOptional({
+    example: 'HN-PHUONG-CAU-GIAY',
+    description: 'Ma phuong/xa thuoc tinh da chon (GET /locations/cities/{code}/districts). Chuoi rong = bo chon. Doi city ma khong gui district thi phuong/xa cu bi xoa.',
+  })
+  @IsOptional() @IsString() @MaxLength(100) district?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) address?: string;
   @ApiPropertyOptional() @IsOptional() @Type(() => Boolean) @IsBoolean() isAvailable?: boolean;
 }

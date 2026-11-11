@@ -63,7 +63,10 @@ Hai ô trong form đăng ký KTV:
   trùng chữ cái đầu thì thêm chữ: `LCH`/`LCI` (Lai Châu/Lào Cai), `TNG`/`TNI` (Thái Nguyên/Tây Ninh), `QNI`/`QNG`
   (Quảng Ninh/Quảng Ngãi), `DNI` (Đồng Nai). App không cần nhớ mã, chỉ lấy `code` từ API.
 - **Bỏ danh sách tỉnh/quận cài sẵn trong app** (nếu có), chỉ dùng 2 API trên.
-- Gửi lưu: `PATCH /api/technician/application` với `{"city":"HN","district":"HN-PHUONG-CAU-GIAY"}`. Lưu ý: `PATCH /api/technician/profile` (sau khi duyệt) hiện **chưa nhận `district`**.
+- Gửi lưu: màn đăng ký dùng `PATCH /api/technician/application`, màn sửa hồ sơ sau khi duyệt dùng
+  `PATCH /api/technician/profile` (**đã nhận `district`**, 11/11). Cả hai cùng body `{"city":"HN","district":"HN-PHUONG-CAU-GIAY"}`.
+  Ở `profile`: chỉ gửi `district` thì server kiểm tra theo tỉnh đang lưu; đổi `city` mà không gửi `district` thì phường/xã
+  cũ bị xóa (`null`), app nên bắt chọn lại; gửi `"district": ""` để bỏ chọn.
 
 KTV đã lưu quận cũ được server tự chuyển: `HN-CAU-GIAY` → `HN-PHUONG-CAU-GIAY` (phường cùng tên). Mã không có phường
 tương ứng (ví dụ `HCM-Q1`) bị xóa trống, khi đó app bắt KTV chọn lại phường/xã.

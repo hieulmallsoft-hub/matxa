@@ -512,8 +512,20 @@ export class MarketplaceService {
 
   async upsertMyProfile(userId: string, dto: UpsertTechnicianProfileDto) {
     await this.requireRole(userId, ['TECHNICIAN', 'ADMIN']);
-    // City is stored as its code ("HN"), even when the app sends the name.
-    const data = dto.city === undefined ? dto : { ...dto, city: (await resolveLocationCodes(this.prisma, dto.city)).city };
+    // City and ward are stored as codes ("HN", "HN-PHUONG-CAU-GIAY"), even when the app sends names. A ward must belong
+    // to the city (the one sent, or the saved one); changing city without sending a ward clears the old ward.
+    let data: Omit<UpsertTechnicianProfileDto, 'city' | 'district'> & { city?: string | null; district?: string | null } = dto;
+    if (dto.city !== undefined || dto.district !== undefined) {
+      const current = await this.prisma.technicianProfile.findUnique({ where: { userId }, select: { city: true, district: true } });
+      const city = dto.city !== undefined ? dto.city : current?.city ?? null;
+      const location = await resolveLocationCodes(this.prisma, city, dto.district);
+      const cityChanged = dto.city !== undefined && location.city !== (current?.city ?? null);
+      data = {
+        ...dto,
+        ...(dto.city !== undefined ? { city: location.city } : {}),
+        district: dto.district !== undefined ? location.district : cityChanged ? null : undefined,
+      };
+    }
     // A switched-off "nơi phục vụ" cannot be newly chosen; ones the technician already had are kept.
     if (dto.serviceModes) {
       const [enabled, current] = await Promise.all([
