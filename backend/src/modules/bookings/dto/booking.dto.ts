@@ -73,7 +73,7 @@ export class CreateOpenBookingDto {
   @IsString()
   @MaxLength(50)
   city!: string;
-  @ApiPropertyOptional({ example: 'HN-CAU-GIAY' }) @IsOptional() @IsString() @MaxLength(50) district?: string;
+  @ApiPropertyOptional({ example: 'HN-PHUONG-CAU-GIAY' }) @IsOptional() @IsString() @MaxLength(50) district?: string;
   @ApiProperty({ description: 'ISO timestamp with explicit Z or timezone offset' })
   @IsDateString({ strict: true })
   @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
@@ -101,7 +101,7 @@ export class CreateUnifiedBookingDto {
   @ApiProperty({ example: 'HN', description: 'Ma thanh pho theo location master' })
   @IsString() @MaxLength(50)
   city!: string;
-  @ApiPropertyOptional({ example: 'HN-CAU-GIAY' }) @IsOptional() @IsString() @MaxLength(50) district?: string;
+  @ApiPropertyOptional({ example: 'HN-PHUONG-CAU-GIAY' }) @IsOptional() @IsString() @MaxLength(50) district?: string;
   @ApiProperty({ description: 'ISO timestamp with explicit Z or timezone offset' })
   @IsDateString({ strict: true }) @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
   scheduledStart!: string;

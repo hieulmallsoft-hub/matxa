@@ -149,7 +149,10 @@ export class LocationsController {
   cities() {
     return this.locations.cities();
   }
-  @Get('cities/:cityCode/districts') @ApiOperation({ summary: 'Danh sach quan/huyen theo thanh pho' })
+  @Get('cities/:cityCode/districts') @ApiOperation({
+    summary: 'Danh sach phuong/xa theo tinh/thanh pho',
+    description: 'Don vi hanh chinh sau 1/7/2025 (34 tinh/thanh, 3.321 phuong/xa/dac khu). Ten duong dan giu "districts" de khong doi API.',
+  })
   @ApiOkResponse({ type: LocationListResponseDto })
   districts(
     @Param('cityCode') cityCode: string,

@@ -34,6 +34,20 @@ describe('technician city/district are stored as codes', () => {
     await expect(resolveLocationCodes(db, 'HN', 'HN-BD')).resolves.toEqual({ city: 'HN', district: 'HN-BD' });
   });
 
+  it('maps a ward name with or without its "Phuong/Xa" prefix, preferring the exact full name', async () => {
+    const wards: any = {
+      city: db.city,
+      district: { findMany: jest.fn().mockResolvedValue([
+        { code: 'HN-PHUONG-CAU-GIAY', name: 'Phường Cầu Giấy' },
+        { code: 'HN-PHUONG-YEN-HOA', name: 'Phường Yên Hòa' },
+        { code: 'HN-XA-YEN-HOA', name: 'Xã Yên Hòa' },
+      ]) },
+    };
+    await expect(resolveLocationCodes(wards, 'HN', 'Cầu Giấy')).resolves.toEqual({ city: 'HN', district: 'HN-PHUONG-CAU-GIAY' });
+    await expect(resolveLocationCodes(wards, 'HN', 'phuong cau giay')).resolves.toEqual({ city: 'HN', district: 'HN-PHUONG-CAU-GIAY' });
+    await expect(resolveLocationCodes(wards, 'HN', 'Xã Yên Hòa')).resolves.toEqual({ city: 'HN', district: 'HN-XA-YEN-HOA' });
+  });
+
   it('rejects an unknown city or a district of another city', async () => {
     await expect(resolveLocationCodes(db, 'Paris')).rejects.toBeInstanceOf(BadRequestException);
     await expect(resolveLocationCodes(db, 'HCM', 'Hoàn Kiếm')).rejects.toBeInstanceOf(BadRequestException);

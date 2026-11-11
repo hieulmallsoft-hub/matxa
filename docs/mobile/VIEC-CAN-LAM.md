@@ -46,17 +46,36 @@ Response (rút gọn):
 - Khi `POST /api/technician/application/submit` trả `400`, đọc `missingFields` (ví dụ `["idCardBackKey", "faceImageKey"]`)
   để hiện "Hồ sơ còn thiếu: ảnh CCCD mặt sau, ảnh khuôn mặt" và đưa về đúng bước.
 
-### A2a. Thành phố / quận luôn lưu bằng mã (10/11)
+### A2a. Tỉnh/thành → Phường/xã theo đơn vị hành chính mới (sửa 11/11)
 
-Khi lưu hồ sơ đăng ký KTV và hồ sơ KTV, server giờ tự đổi tên thành phố hoặc quận sang **mã** (`"Hà Nội"` → `"HN"`,
-`"Quận Hoàn Kiếm"` → mã quận). Nếu không khớp danh sách thì trả `400`:
+Server đã có **đủ 34 tỉnh/thành và 3.321 phường/xã/đặc khu** (sau sáp nhập 1/7/2025, không còn cấp quận/huyện).
+Hai ô trong form đăng ký KTV:
+
+| Ô | Lấy danh sách | Hiện | Gửi lên |
+|---|---|---|---|
+| **Tỉnh/Thành phố hoạt động** | `GET /api/locations/cities` (34 mục, không cần token) | `name` ("Hà Nội", "Hải Phòng"…) | `code` |
+| **Phường/Xã hoạt động** (đổi nhãn từ "Quận/Huyện") | `GET /api/locations/cities/{code}/districts` | `name` ("Phường Cầu Giấy", "Xã …") | `code` |
+
+- Đường dẫn vẫn là `.../districts`, nhưng giờ trả về **phường/xã**. Ví dụ: `{"code":"HN-PHUONG-CAU-GIAY","name":"Phường Cầu Giấy","cityCode":"HN"}`.
+- Mỗi tỉnh có khoảng 40–170 phường/xã, nên ô thứ 2 **cần có ô tìm kiếm**. App tự lọc trên danh sách đã tải, không có API tìm riêng.
+- Đổi tỉnh/thành thì xóa phường/xã đã chọn và tải lại danh sách.
+- Mã tỉnh là chữ viết tắt: `HN`, `HCM`, `DN` giữ nguyên; các tỉnh khác như `HP` (Hải Phòng), `CT` (Cần Thơ), `HUE`… Tỉnh
+  trùng chữ cái đầu thì thêm chữ: `LCH`/`LCI` (Lai Châu/Lào Cai), `TNG`/`TNI` (Thái Nguyên/Tây Ninh), `QNI`/`QNG`
+  (Quảng Ninh/Quảng Ngãi), `DNI` (Đồng Nai). App không cần nhớ mã, chỉ lấy `code` từ API.
+- **Bỏ danh sách tỉnh/quận cài sẵn trong app** (nếu có), chỉ dùng 2 API trên.
+- Gửi lưu: `PATCH /api/technician/application` với `{"city":"HN","district":"HN-PHUONG-CAU-GIAY"}`. Lưu ý: `PATCH /api/technician/profile` (sau khi duyệt) hiện **chưa nhận `district`**.
+
+KTV đã lưu quận cũ được server tự chuyển: `HN-CAU-GIAY` → `HN-PHUONG-CAU-GIAY` (phường cùng tên). Mã không có phường
+tương ứng (ví dụ `HCM-Q1`) bị xóa trống, khi đó app bắt KTV chọn lại phường/xã.
+
+Server vẫn tự đổi tên sang mã nếu app lỡ gửi tên (`"Hà Nội"` → `HN`, `"Cầu Giấy"` → `HN-PHUONG-CAU-GIAY`). Không khớp thì trả `400`:
 
 | `code` | Khi nào | App hiện |
 |---|---|---|
-| `INVALID_CITY` | Thành phố không có trong `GET /api/locations/cities` | "Thành phố chưa được hỗ trợ, vui lòng chọn lại" |
-| `INVALID_DISTRICT` | Quận không thuộc thành phố đã chọn | "Quận/huyện không thuộc thành phố đã chọn" |
+| `INVALID_CITY` | Tỉnh/thành không có trong `GET /api/locations/cities` | "Tỉnh/thành phố không hợp lệ, vui lòng chọn lại" |
+| `INVALID_DISTRICT` | Phường/xã không thuộc tỉnh/thành đã chọn | "Phường/xã không thuộc tỉnh/thành phố đã chọn" |
 
-App vẫn nên gửi **mã** như cũ. Nếu tải danh sách thành phố bị lỗi thì báo lỗi và cho thử lại, **không gửi tên**.
+App vẫn nên gửi **mã**. Nếu tải danh sách bị lỗi thì báo lỗi và cho thử lại, **không gửi tên**.
 
 ### A2b. Bắt buộc có số điện thoại (KTV đăng ký mới và KTV đã duyệt)
 
