@@ -2138,6 +2138,8 @@ export class BookingsService {
         displayName: booking.technician?.user?.displayName ?? null,
         avatarUrl: booking.technician?.user?.avatarUrl ?? null,
       },
+      // ONSITE: where the customer goes — the technician's facility, with coordinates for the map. null otherwise.
+      facility: booking.mode === 'ONSITE' ? facilityLocation(booking.technician) : null,
       items: (booking.items ?? []).map((item: any) => ({
         ...item,
         technicianServiceId: item.serviceId,
@@ -2194,6 +2196,8 @@ export class BookingsService {
               technicianId: application.technicianProfileId,
               displayName: application.technicianProfile?.user?.displayName ?? null,
               avatarUrl: application.technicianProfile?.user?.avatarUrl ?? null,
+              // Lets the customer compare where each applicant's facility is before choosing.
+              facility: booking.mode === 'ONSITE' ? facilityLocation(application.technicianProfile) : null,
               averageRating: Number(application.technicianProfile?.averageRating ?? 0),
               reviewCount: application.technicianProfile?.reviewCount ?? 0,
               distanceKm: kmBetween(booking.address, application.technicianProfile),
@@ -2461,4 +2465,18 @@ export class BookingsService {
       this.logger.warn(`Khong gui duoc push ${type}: ${error instanceof Error ? error.message : 'khong ro ly do'}`);
     }
   }
+}
+
+/** Public location of a technician's facility for an ONSITE booking; null when the profile has none. */
+function facilityLocation(profile: any) {
+  if (!profile || (!profile.facility && !profile.address)) return null;
+  const coordinate = (value: unknown) => (value === null || value === undefined ? null : Number(value));
+  return {
+    name: profile.facility ?? null,
+    address: profile.address ?? null,
+    city: profile.city ?? null,
+    district: profile.district ?? null,
+    latitude: coordinate(profile.latitude),
+    longitude: coordinate(profile.longitude),
+  };
 }

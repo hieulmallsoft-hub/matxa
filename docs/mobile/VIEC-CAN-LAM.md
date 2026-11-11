@@ -431,6 +431,27 @@ PATCH /api/addresses/{id}   { "phone": "0912345678" }     // gửi "" hoặc nul
 khách. Có thêm `source`: `"ADDRESS"` hoặc `"ACCOUNT"`. Không phải sửa gì, vẫn gọi số trong `phoneNumber`.
 Trong chi tiết đơn (sau khi KTV được chọn), `address.phone` cũng có số này.
 
+## P. Đơn tại cơ sở: địa chỉ và bản đồ (app khách)
+
+`GET /api/bookings/{id}` và `GET /api/bookings` có thêm **`facility`** khi đơn đặt tại cơ sở (`mode = "ONSITE"`):
+
+```json
+"facility": {
+  "name": "Spa Hoa Sen",
+  "address": "12 Lý Thường Kiệt, Hoàn Kiếm",
+  "city": "HN",
+  "district": "HN-HK",
+  "latitude": 21.0208713,
+  "longitude": 105.8577338
+}
+```
+
+- Hiện tên + địa chỉ cơ sở trong chi tiết đơn. Có `latitude`/`longitude` thì hiện bản đồ và nút "Chỉ đường"
+  (mở Google Maps / Apple Maps bằng tọa độ).
+- `facility = null` khi đặt tại nhà, khi đơn chưa có KTV (đơn mở đang chờ), hoặc khi KTV chưa nhập cơ sở.
+  `latitude`/`longitude` có thể `null` riêng: khi đó chỉ hiện địa chỉ, ẩn bản đồ.
+- Đơn mở tại cơ sở: mỗi KTV ứng tuyển trong `applications[]` cũng có `facility`, để khách so sánh trước khi chọn.
+
 ## Cách tự kiểm tra trên Swagger
 
 1. `PATCH /api/technician/application` với `idCardQr` = chuỗi app quét được → response có `idCardInfo` đúng tên trên thẻ.
