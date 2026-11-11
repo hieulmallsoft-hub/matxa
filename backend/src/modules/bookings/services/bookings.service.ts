@@ -116,12 +116,13 @@ export class BookingsService {
       latitude: number;
       longitude: number;
       label: string | null;
+      phone: string | null;
     } | null = null;
     if (dto.mode === 'HOME') {
       if (!dto.addressId) throw new BadRequestException('Dat tai nha can chon dia chi');
       const address = await db.address.findFirst({
         where: { id: dto.addressId, userId, deletedAt: null },
-        select: { id: true, address: true, latitude: true, longitude: true, label: true },
+        select: { id: true, address: true, phone: true, latitude: true, longitude: true, label: true },
       });
       if (!address) throw new BadRequestException('Dia chi khong hop le');
       addressSnapshot = {
@@ -131,6 +132,7 @@ export class BookingsService {
         latitude: Number(address.latitude),
         longitude: Number(address.longitude),
         label: address.label,
+        phone: address.phone,
       };
     }
     const subtotal = services.reduce((sum, item) => sum.plus(item.price), new Prisma.Decimal(0)).toNumber();
@@ -557,7 +559,7 @@ export class BookingsService {
       if (!dto.addressId) throw new BadRequestException('Dat tai nha can chon dia chi');
       const address = await this.prisma.address.findFirst({
         where: { id: dto.addressId, userId, deletedAt: null },
-        select: { id: true, address: true, latitude: true, longitude: true, label: true },
+        select: { id: true, address: true, phone: true, latitude: true, longitude: true, label: true },
       });
       if (!address) throw new BadRequestException('Dia chi khong hop le');
       addressSnapshot = {
@@ -567,6 +569,7 @@ export class BookingsService {
         latitude: Number(address.latitude),
         longitude: Number(address.longitude),
         label: address.label,
+        phone: address.phone,
         city: dto.city,
         district: dto.district ?? null,
       };
@@ -1182,6 +1185,7 @@ export class BookingsService {
         customerId: true,
         status: true,
         assignmentMode: true,
+        addressSnapshot: true,
         technician: { select: { id: true, userId: true } },
         customer: { select: { displayName: true } },
       },
@@ -1196,12 +1200,17 @@ export class BookingsService {
       });
       if (!selected) throw new ForbiddenException('KTV chua duoc chon cho don nay');
     }
+    // The number entered with the booking's address comes first (the customer may book for someone else); otherwise
+    // the account's verified phone.
+    const addressPhone = (booking.addressSnapshot as { phone?: unknown } | null)?.phone;
+    if (typeof addressPhone === 'string' && addressPhone)
+      return { bookingId: id, displayName: booking.customer.displayName, phoneNumber: addressPhone, source: 'ADDRESS' as const };
     const phone = await this.prisma.userIdentity.findFirst({
       where: { userId: booking.customerId, provider: 'PHONE', phoneNumber: { not: null } },
       select: { phoneNumber: true },
     });
     if (!phone?.phoneNumber) throw new NotFoundException('Khach chua co so dien thoai xac thuc');
-    return { bookingId: id, displayName: booking.customer.displayName, phoneNumber: phone.phoneNumber };
+    return { bookingId: id, displayName: booking.customer.displayName, phoneNumber: phone.phoneNumber, source: 'ACCOUNT' as const };
   }
 
   async acceptTechnicianJob(userId: string, id: string) {

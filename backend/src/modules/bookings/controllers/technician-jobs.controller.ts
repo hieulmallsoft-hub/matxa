@@ -134,7 +134,10 @@ export class TechnicianJobsController {
     return this.bookings.technicianJobDetail(auth.sub, id);
   }
   @Get(':id/contact')
-  @ApiOperation({ summary: 'KTV lay so lien he cua khach sau khi da nhan don' })
+  @ApiOperation({
+    summary: 'KTV lay so lien he cua khach sau khi da nhan don',
+    description: 'Uu tien so dien thoai nhap kem dia chi cua don (source=ADDRESS), khong co thi so cua tai khoan (source=ACCOUNT)',
+  })
   @ApiOkResponse({
     schema: {
       type: 'object',
@@ -142,6 +145,7 @@ export class TechnicianJobsController {
         bookingId: { type: 'string' },
         displayName: { type: 'string', nullable: true },
         phoneNumber: { type: 'string' },
+        source: { type: 'string', enum: ['ADDRESS', 'ACCOUNT'] },
       },
     },
   })

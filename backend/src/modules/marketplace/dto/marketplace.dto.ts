@@ -282,6 +282,16 @@ export class CreateAddressDto {
   @ApiProperty() @Type(() => Number) @IsLatitude() latitude!: number;
   @ApiProperty() @Type(() => Number) @IsLongitude() longitude!: number;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isDefault?: boolean;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    example: '0901234567',
+    description: 'So dien thoai lien he tai dia chi nay (KTV goi so nay). Bo trong/null = dung so cua tai khoan',
+  })
+  @Transform(({ value }) => (typeof value === 'string' ? value.replace(/[\s.\-]/g, '') || null : value))
+  @IsOptional()
+  @Matches(/^\+?[0-9]{8,15}$/, { message: 'So dien thoai khong hop le' })
+  phone?: string | null;
 }
 
 export class UpdateAddressDto extends PartialType(CreateAddressDto) {}

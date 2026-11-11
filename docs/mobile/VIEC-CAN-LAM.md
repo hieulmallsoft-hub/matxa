@@ -414,6 +414,23 @@ App: gặp `OWN_BOOKING` hiện "Bạn không thể đặt lịch cho chính mì
 Link hết hạn sau 24 giờ, nên **không lưu link lâu dài**: mỗi lần mở màn khóa học thì gọi lại API.
 Admin tải ảnh bìa trên web admin; app không cần API tải lên.
 
+## O. Số điện thoại trong địa chỉ của khách (app khách + app KTV)
+
+Địa chỉ giờ có thêm trường **`phone`** (không bắt buộc). Ô "Số điện thoại" trên form địa chỉ gửi vào trường này:
+
+```http
+POST  /api/addresses        { "address": "...", "latitude": 21.02, "longitude": 105.85, "phone": "0912345678" }
+PATCH /api/addresses/{id}   { "phone": "0912345678" }     // gửi "" hoặc null để xóa
+```
+
+- Server bỏ dấu cách, dấu chấm, dấu gạch (`"0912 345.678"` → `"0912345678"`). Không phải số điện thoại thì `400`.
+- `GET /api/addresses` trả kèm `phone` (`null` = chưa nhập), để hiện lại khi sửa.
+- Khi đặt đơn tại nhà, số này được lưu cùng địa chỉ của đơn. Sau này có sửa địa chỉ thì đơn cũ vẫn giữ số lúc đặt.
+
+**App KTV:** `GET /api/technician/jobs/{id}/contact` trả **số nhập ở địa chỉ** nếu có, không có thì trả số của tài khoản
+khách. Có thêm `source`: `"ADDRESS"` hoặc `"ACCOUNT"`. Không phải sửa gì, vẫn gọi số trong `phoneNumber`.
+Trong chi tiết đơn (sau khi KTV được chọn), `address.phone` cũng có số này.
+
 ## Cách tự kiểm tra trên Swagger
 
 1. `PATCH /api/technician/application` với `idCardQr` = chuỗi app quét được → response có `idCardInfo` đúng tên trên thẻ.
