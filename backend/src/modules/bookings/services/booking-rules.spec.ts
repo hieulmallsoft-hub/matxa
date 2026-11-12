@@ -11,7 +11,8 @@ describe('booking rules from admin settings', () => {
   const near = { latitude: 21.0695, longitude: 105.8575 };
   const far = { latitude: 21.2493, longitude: 105.8575 };
 
-  const subject = (rules: { minAdvanceHours?: number; maxDispatchRadiusKm?: number }, prisma: any = {}) => {
+  // The customer has no unfinished booking (checked first when creating one).
+  const subject = (rules: { minAdvanceHours?: number; maxDispatchRadiusKm?: number }, prisma: any = { booking: { findFirst: jest.fn().mockResolvedValue(null) } }) => {
     const settings = {
       getBookingRules: jest.fn().mockResolvedValue({ minAdvanceHours: 0, maxDispatchRadiusKm: 0, ...rules }),
     };

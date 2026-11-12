@@ -534,6 +534,31 @@ và hồ sơ KTV hiện **giá riêng của KTV** (ví dụ Luna 450.000đ, đơ
 App vẫn gửi `items[]` gồm `catalogServiceId` + `priceOptionId` của **giá chung** như hiện tại. Kiểm tra: số tiền
 `/quote` trả về phải bằng `subtotal` của đơn vừa tạo.
 
+## T. KTV vừa rảnh vẫn mở và được báo đơn mở (app KTV, 12/11, app không phải sửa)
+
+Trước đây KTV đang bận lúc đơn mở được tạo thì không được báo. Khi rảnh lại (vài giây sau), đơn vẫn hiện trong
+`GET /api/technician/jobs` với `canApply: true`, nhưng mở chi tiết `GET /api/technician/jobs/{id}` bị **403**
+"Ban khong co quyen xem lich dat". Đã sửa:
+
+- Đơn đang `OPEN` thì KTV nào cũng mở được chi tiết. Không đủ điều kiện thì trả `displayStatus: "UNAVAILABLE"` kèm
+  `unavailableReason`, không còn 403.
+- KTV vừa **hoàn thành** hoặc **bị hủy / tự hủy** đơn đang làm sẽ nhận thông báo cho các đơn mở còn hạn mà họ đủ điều
+  kiện và chưa được báo. Loại thông báo giống lúc tạo đơn (`OPEN_BOOKING_AVAILABLE` "Yêu cầu mới", hoặc
+  `OPEN_BOOKING_REQUESTED` "Khách đặt bạn"), mỗi đơn chỉ báo 1 lần.
+
+App xử lý các thông báo này như hiện tại, không cần sửa.
+
+## U. Dịch vụ admin đã ẩn không còn hiện ở KTV; id gói giá không đổi khi admin sửa (12/11, app không phải sửa)
+
+**Dịch vụ đã ẩn:** khi admin ẩn một dịch vụ trong danh mục chung, mọi API giờ đều bỏ dịch vụ đó của KTV:
+hồ sơ KTV `GET /api/marketplace/technicians/{id}` (`services[]`), danh sách và trang chủ (giá "từ …", "Sớm nhất"),
+`/availability`, `/bookings/quote`. Trước đây hồ sơ, giờ trống và báo giá vẫn có, đến lúc đặt mới báo 400.
+Admin bật lại dịch vụ thì dịch vụ của các KTV tự hiện lại; dịch vụ KTV tự tắt vẫn giữ tắt.
+
+**id gói giá giữ nguyên:** trước đây mỗi lần admin sửa một dịch vụ chung, các gói 60/90/120 phút bị tạo lại với `id`
+mới, nên app đang giữ `priceOptionId` cũ sẽ đặt lỗi ("Dịch vụ hoặc gói thời gian đã thay đổi"). Giờ gói được cập
+nhật tại chỗ theo `code` nên `id` không đổi. Vẫn nên lấy lại `GET /api/service-catalog` khi mở màn đặt.
+
 ## Cách tự kiểm tra trên Swagger
 
 1. `PATCH /api/technician/application` với `idCardQr` = chuỗi app quét được → response có `idCardInfo` đúng tên trên thẻ.

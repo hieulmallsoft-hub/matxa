@@ -61,6 +61,14 @@ describe('TechnicianBookingCancellationService', () => {
     });
   });
 
+  it('tells the now-free technician about open jobs announced while they were busy', async () => {
+    const { service } = createSubject();
+    const bookings = { announceOpenJobsToFreedTechnician: jest.fn().mockResolvedValue(undefined) };
+    (service as any).bookings = bookings;
+    await service.cancel('tech-user-1', 'booking-1', otherReason);
+    expect(bookings.announceOpenJobsToFreedTechnician).toHaveBeenCalledWith('tech-user-1');
+  });
+
   it('gives the customer their voucher back when the technician cancels', async () => {
     const { service, tx } = createSubject();
     await service.cancel('tech-user-1', 'booking-1', otherReason);

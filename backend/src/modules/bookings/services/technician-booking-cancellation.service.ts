@@ -4,7 +4,9 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { BookingsService } from './bookings.service';
 import { PrismaService } from '../../../database/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { TechnicianCancelBookingDto } from '../dto/booking.dto';
@@ -20,6 +22,7 @@ export class TechnicianBookingCancellationService {
     private readonly prisma: PrismaService,
     private readonly storage: BookingCancellationStorageService,
     private readonly notifications: NotificationsService,
+    @Optional() private readonly bookings?: BookingsService,
   ) {}
 
   async uploadUrl(userId: string, bookingId: string, dto: { contentType: string; size: number }) {
@@ -116,6 +119,8 @@ export class TechnicianBookingCancellationService {
       throw error;
     }
     void this.notifyCancelled(bookingId, userId).catch(() => undefined);
+    // Free again: tell them about open jobs announced while they were busy.
+    void this.bookings?.announceOpenJobsToFreedTechnician(userId);
     return result;
   }
 

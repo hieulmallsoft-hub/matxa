@@ -7,7 +7,7 @@ describe('Technician publication policy', () => {
       isActive: true,
       isVerified: true,
       user: { status: 'ACTIVE', technicianApplication: { is: { status: 'APPROVED' } } },
-      services: { some: { isActive: true, category: { isActive: true } } },
+      services: { some: { isActive: true, category: { isActive: true }, NOT: { catalogService: { is: { isActive: false } } } } },
     });
   });
 
@@ -22,6 +22,7 @@ describe('Technician publication policy', () => {
         technicianId: 'profile-id',
         isActive: true,
         category: { isActive: true },
+        NOT: { catalogService: { is: { isActive: false } } },
         technician: {
           isActive: true,
           isVerified: true,

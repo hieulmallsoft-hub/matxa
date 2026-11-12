@@ -541,8 +541,8 @@ export class BookingsService {
    * BOOKING_ALREADY_WAITING. Runs in the creating transaction behind a per-customer lock so two taps at once cannot
    * both get through.
    */
-  private async assertNoWaitingBooking(tx: Prisma.TransactionClient, customerId: string) {
-    await tx.$queryRaw(Prisma.sql`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext(${customerId}))) AS locked`);
+  private async assertNoWaitingBooking(tx: Prisma.TransactionClient, customerId: string, lock = true) {
+    if (lock) await tx.$queryRaw(Prisma.sql`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext(${customerId}))) AS locked`);
     const waiting = await tx.booking.findFirst({
       where: {
         customerId,
@@ -587,6 +587,9 @@ export class BookingsService {
     requestedPrices?: Array<{ serviceId: string; priceOptionId: string | null }>,
   ) {
     await this.assertCustomer(userId);
+    // Checked first so the customer gets BOOKING_ALREADY_WAITING (with the booking to open) rather than another
+    // refusal, e.g. "technician busy" when rebooking the same technician. Checked again under the lock below.
+    await this.assertNoWaitingBooking(this.prisma, userId, false);
     await this.assertModeEnabled(dto.mode);
     const start = new Date(dto.scheduledStart);
     if (!Number.isFinite(start.getTime()) || start <= new Date())
@@ -1108,9 +1111,14 @@ export class BookingsService {
         (booking.requestedTechnicianId !== null &&
           (await this.prisma.technicianProfile.findUnique({ where: { userId }, select: { id: true } }))?.id ===
             booking.requestedTechnicianId));
+    // An OPEN job is listed to every technician eligible for it now (listTechnicianJobs), including one who became
+    // eligible after it was announced (e.g. finished or cancelled another job), so any technician may open it;
+    // technicianJobDetail then shows Apply or UNAVAILABLE with the reason. Past states need an announcement or
+    // involvement, as before.
     const canViewMarketplaceJob =
       marketplaceTechnician &&
-      ((['OPEN', 'EXPIRED', 'CANCELLED', 'CONFIRMED', 'COMPLETED'].includes(booking.status) && Boolean(marketplaceNotification)) ||
+      (booking.status === 'OPEN' ||
+        (['EXPIRED', 'CANCELLED', 'CONFIRMED', 'COMPLETED'].includes(booking.status) && Boolean(marketplaceNotification)) ||
         involvedInMarketplaceJob);
     if (booking.customerId !== userId && booking.technician?.userId !== userId && actor?.role !== 'ADMIN' && !canViewMarketplaceJob)
       throw new ForbiddenException('Ban khong co quyen xem lich dat');
@@ -1400,8 +1408,10 @@ export class BookingsService {
     return this.cancel(userId, id, dto);
   }
 
-  completeTechnicianJob(userId: string, id: string) {
-    return this.updateStatus(userId, id, { status: 'COMPLETED' });
+  async completeTechnicianJob(userId: string, id: string) {
+    const completed = await this.updateStatus(userId, id, { status: 'COMPLETED' });
+    void this.announceOpenJobsToFreedTechnician(userId);
+    return completed;
   }
 
   async cancel(userId: string, id: string, dto: CancelBookingDto) {
@@ -1463,6 +1473,8 @@ export class BookingsService {
         );
     }
     const technicianUserId = booking.technician?.userId;
+    // Their taken job is gone, so they can take another one now.
+    if (booking.status === 'CONFIRMED') void this.announceOpenJobsToFreedTechnician(technicianUserId);
     const recipients =
       actor?.role === 'ADMIN'
         ? ([booking.customerId, technicianUserId].filter(Boolean) as string[])
@@ -2479,21 +2491,7 @@ export class BookingsService {
           await this.assertOpenEligibility(this.prisma, booking, candidate.id);
           // Broadcast to every eligible technician at once. An application
           // is created only when that technician explicitly taps Apply.
-          // The technician the customer picked gets "Khách đặt bạn"; the rest get "Yêu cầu mới".
-          const requested = Boolean(booking.requestedTechnicianId) && booking.requestedTechnicianId === candidate.id;
-          await this.notifyStatus(
-            candidate.userId,
-            booking.id,
-            requested ? 'OPEN_BOOKING_REQUESTED' : 'OPEN_BOOKING_AVAILABLE',
-            requested ? 'Khách đặt bạn' : 'Yêu cầu mới',
-            requested
-              ? 'Khách hàng đã chọn bạn cho đơn dịch vụ mới. Hãy mở đơn để ứng tuyển hoặc từ chối.'
-              : 'Có đơn dịch vụ mới phù hợp. Hãy mở tab Nhận việc để xem và ứng tuyển.',
-            {
-              requestType: requested ? 'CUSTOMER_REQUEST' : 'MARKETPLACE',
-              requestLabel: requested ? 'Khách đặt bạn' : 'Yêu cầu mới',
-            },
-          );
+          await this.announceOpenBooking(booking, candidate);
         } catch (error) {
           // One ineligible technician must not block other notifications, but
           // keep the reason visible in server logs for operations debugging.
@@ -2506,6 +2504,72 @@ export class BookingsService {
       // Notification delivery must not affect successful booking creation.
       this.logger.warn(
         `Khong the quet KTV phu hop cho booking mo ${booking.id}: ${error instanceof Error ? error.message : 'khong ro ly do'}`,
+      );
+    }
+  }
+
+  /** "Khách đặt bạn" for the technician the customer picked, "Yêu cầu mới" for the rest. */
+  private announceOpenBooking(booking: any, candidate: { id: string; userId: string }) {
+    const requested = Boolean(booking.requestedTechnicianId) && booking.requestedTechnicianId === candidate.id;
+    return this.notifyStatus(
+      candidate.userId,
+      booking.id,
+      requested ? 'OPEN_BOOKING_REQUESTED' : 'OPEN_BOOKING_AVAILABLE',
+      requested ? 'Khách đặt bạn' : 'Yêu cầu mới',
+      requested
+        ? 'Khách hàng đã chọn bạn cho đơn dịch vụ mới. Hãy mở đơn để ứng tuyển hoặc từ chối.'
+        : 'Có đơn dịch vụ mới phù hợp. Hãy mở tab Nhận việc để xem và ứng tuyển.',
+      {
+        requestType: requested ? 'CUSTOMER_REQUEST' : 'MARKETPLACE',
+        requestLabel: requested ? 'Khách đặt bạn' : 'Yêu cầu mới',
+      },
+    );
+  }
+
+  /**
+   * A technician just became free (their taken job was completed or cancelled). Open jobs created while they were busy
+   * were not announced to them, so announce the ones still open that they can take now and were not told about.
+   * Best effort: never throws, never fails the action that freed them.
+   */
+  async announceOpenJobsToFreedTechnician(technicianUserId: string | null | undefined) {
+    if (!technicianUserId) return;
+    try {
+      const profile = await this.prisma.technicianProfile.findUnique({ where: { userId: technicianUserId }, select: { id: true, userId: true } });
+      if (!profile) return;
+      const now = new Date();
+      const open = await this.prisma.booking.findMany({
+        where: {
+          assignmentMode: 'OPEN_MARKETPLACE',
+          status: 'OPEN',
+          OR: [{ applicationDeadlineAt: null }, { applicationDeadlineAt: { gt: now } }],
+          applications: { none: { technicianProfileId: profile.id } },
+        },
+        include: { items: { include: { catalogService: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      });
+      if (!open.length) return;
+      const told = await this.prisma.notification.findMany({
+        where: {
+          userId: technicianUserId,
+          type: { in: ['OPEN_BOOKING_AVAILABLE', 'OPEN_BOOKING_REQUESTED'] },
+          actionUrl: { in: open.map((booking) => `matxa://bookings/${booking.id}`) },
+        },
+        select: { actionUrl: true },
+      });
+      const toldIds = new Set(told.map((item) => item.actionUrl?.replace('matxa://bookings/', '')));
+      for (const booking of open) {
+        if (toldIds.has(booking.id)) continue;
+        try {
+          await this.assertOpenEligibility(this.prisma, booking, profile.id);
+          await this.announceOpenBooking(booking, profile);
+        } catch {
+          // Not eligible for this one (area, mode, own booking…): skip it.
+        }
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Khong the bao don mo cho KTV vua ranh ${technicianUserId}: ${error instanceof Error ? error.message : 'khong ro ly do'}`,
       );
     }
   }

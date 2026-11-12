@@ -2,12 +2,23 @@ import { BadRequestException } from '@nestjs/common';
 import { Prisma, ServiceMode } from '../../../generated/prisma/client';
 
 // Publication rules shared by detail, favorites and bookable service selection.
+/**
+ * A technician's service is on offer only while it, its category and its catalog service are active. Hiding a catalog
+ * service hides every technician's offer of it, and showing it again brings them back; the technician's own on/off is
+ * kept. Services without a catalog entry (older ones) are unaffected.
+ */
+export const offeredServiceWhere = {
+  isActive: true,
+  category: { isActive: true },
+  NOT: { catalogService: { is: { isActive: false } } },
+} satisfies Prisma.TechnicianServiceWhereInput;
+
 // Only admin-verified profiles may be published or accept new bookings.
 export const publicTechnicianWhere = {
   isActive: true,
   isVerified: true,
   user: { status: 'ACTIVE' as const, technicianApplication: { is: { status: 'APPROVED' } } },
-  services: { some: { isActive: true, category: { isActive: true } } },
+  services: { some: offeredServiceWhere },
 } satisfies Prisma.TechnicianProfileWhereInput;
 
 export async function loadBookableServices(
@@ -22,8 +33,7 @@ export async function loadBookableServices(
     where: {
       id: { in: ids },
       technicianId,
-      isActive: true,
-      category: { isActive: true },
+      ...offeredServiceWhere,
       technician: {
         isActive: true,
         isVerified: true,

@@ -18,7 +18,7 @@ import {
 } from '../dto/marketplace.dto';
 import { resolveLocationCodes } from './location-code';
 import { readEnabledServiceModes } from '../../settings/settings.service';
-import { applyPriceOptions, loadBookableServices, publicTechnicianWhere } from './technician-selection';
+import { applyPriceOptions, loadBookableServices, offeredServiceWhere, publicTechnicianWhere } from './technician-selection';
 import { availabilityRange, BOOKING_TIMEZONE, buildAvailableSlots } from './availability-slots';
 import { MarketplaceRealtimeService } from './marketplace-realtime.service';
 
@@ -148,6 +148,8 @@ export class MarketplaceService {
       Prisma.sql`s.technician_id = p.id`,
       Prisma.sql`s.is_active = true`,
       Prisma.sql`c.is_active = true`,
+      // Same as offeredServiceWhere: not while its catalog service is hidden.
+      Prisma.sql`NOT EXISTS (SELECT 1 FROM service_catalog_items ci WHERE ci.id = s.catalog_service_id AND ci.is_active = false)`,
     ];
     if (query.categoryId) serviceConditions.push(Prisma.sql`s.category_id = ${query.categoryId}::uuid`);
     if (query.serviceId) serviceConditions.push(Prisma.sql`s.id = ${query.serviceId}::uuid`);
@@ -223,8 +225,7 @@ export class MarketplaceService {
             user: { select: { id: true, displayName: true, avatarUrl: true } },
             services: {
               where: {
-                isActive: true,
-                category: { isActive: true },
+                ...offeredServiceWhere,
                 ...(query.categoryId ? { categoryId: query.categoryId } : {}),
                 ...(query.serviceId ? { id: query.serviceId } : {}),
                 ...(query.mode ? { modes: { has: query.mode } } : {}),
@@ -269,8 +270,7 @@ export class MarketplaceService {
       db.technicianService.findMany({
         where: {
           technicianId: { in: ids },
-          isActive: true,
-          category: { isActive: true },
+          ...offeredServiceWhere,
           ...(query.categoryId ? { categoryId: query.categoryId } : {}),
           ...(query.serviceId ? { id: query.serviceId } : {}),
           ...(query.mode ? { modes: { has: query.mode } } : {}),
@@ -346,7 +346,7 @@ export class MarketplaceService {
         updatedAt: true,
         user: { select: { id: true, displayName: true, avatarUrl: true } },
         services: {
-          where: { isActive: true, category: { isActive: true } },
+          where: offeredServiceWhere,
           include: {
             category: true,
             priceOptions: { where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }] },
@@ -477,7 +477,7 @@ export class MarketplaceService {
           include: {
             user: { select: { id: true, displayName: true, avatarUrl: true } },
             services: {
-              where: { isActive: true, category: { isActive: true } },
+              where: offeredServiceWhere,
               select: { price: true, modes: true },
               orderBy: { price: 'asc' },
             },

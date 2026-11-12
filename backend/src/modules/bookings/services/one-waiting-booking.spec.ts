@@ -27,6 +27,17 @@ describe('one waiting booking per customer', () => {
     });
   });
 
+  it('is checked before anything else, so rebooking a busy technician still answers BOOKING_ALREADY_WAITING', async () => {
+    const prisma: any = { booking: { findFirst: jest.fn().mockResolvedValue({ id: 'booking-1', status: 'CONFIRMED' }) } };
+    const service = new BookingsService(prisma, { get: (_k: string, f: unknown) => f } as any, {} as any, {} as any);
+    jest.spyOn(service as any, 'assertCustomer').mockResolvedValue(undefined);
+    const eligibility = jest.spyOn(service as any, 'assertOpenEligibility');
+    await expect(service.createOpen('customer-1', { mode: 'HOME' } as any, 'busy-technician')).rejects.toMatchObject({
+      response: { code: 'BOOKING_ALREADY_WAITING', bookingId: 'booking-1' },
+    });
+    expect(eligibility).not.toHaveBeenCalled();
+  });
+
   it('allows it when nothing is waiting', async () => {
     await expect(subject(null).check()).resolves.toBeUndefined();
   });

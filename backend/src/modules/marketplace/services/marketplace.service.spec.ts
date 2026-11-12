@@ -227,6 +227,14 @@ describe('MarketplaceService', () => {
     );
   });
 
+  it('does not count a service whose catalog service the admin hid', async () => {
+    $queryRaw.mockResolvedValue([{ total: 0n, ranked: [] }]);
+    await service.searchTechnicians({ page: 1, limit: 10 });
+    expect($queryRaw.mock.calls[0][0].text).toContain(
+      'NOT EXISTS (SELECT 1 FROM service_catalog_items ci WHERE ci.id = s.catalog_service_id AND ci.is_active = false)',
+    );
+  });
+
   it('never lists the signed-in technician their own profile', async () => {
     $queryRaw.mockResolvedValue([{ total: 0n, ranked: [] }]);
     await service.searchTechnicians({ page: 1, limit: 10 }, '20000000-0000-4000-8000-000000000001');

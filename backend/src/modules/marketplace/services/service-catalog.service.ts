@@ -167,7 +167,24 @@ export class ServiceCatalogService {
     this.validateTemplate(dto.pricingTemplate ?? current.pricingTemplate, options);
     const primary = options[0];
     return this.prisma.$transaction(async (tx) => {
-      await tx.serviceCatalogPriceOption.deleteMany({ where: { catalogServiceId: id } });
+      // Packages are matched by code and updated in place, so their ids stay the same across edits: apps holding a
+      // priceOptionId keep working and past bookings keep pointing at the package they booked. A package left out is
+      // switched off if a booking used it, deleted otherwise.
+      const kept = new Map(options.map((item) => [item.code.trim().toUpperCase(), item]));
+      for (const existing of current.priceOptions) {
+        const next = kept.get(existing.code);
+        if (next) {
+          await tx.serviceCatalogPriceOption.update({
+            where: { id: existing.id },
+            data: { durationMinutes: next.durationMinutes, price: next.price, sortOrder: next.sortOrder ?? 0, isActive: next.isActive ?? true },
+          });
+          kept.delete(existing.code);
+        } else if (await tx.bookingItem.count({ where: { catalogPriceOptionId: existing.id } })) {
+          await tx.serviceCatalogPriceOption.update({ where: { id: existing.id }, data: { isActive: false } });
+        } else {
+          await tx.serviceCatalogPriceOption.delete({ where: { id: existing.id } });
+        }
+      }
       return tx.serviceCatalogItem.update({
         where: { id },
         data: {
@@ -182,8 +199,8 @@ export class ServiceCatalogService {
           durationMinutes: primary.durationMinutes,
           price: primary.price,
           priceOptions: {
-            create: options.map((item) => ({
-              code: item.code.trim().toUpperCase(),
+            create: [...kept].map(([code, item]) => ({
+              code,
               durationMinutes: item.durationMinutes,
               price: item.price,
               sortOrder: item.sortOrder ?? 0,
@@ -219,13 +236,14 @@ export class ServiceCatalogService {
     if (!category) throw new BadRequestException('Category khong ton tai');
     return category;
   }
-  private validateTemplate(template: string, options: Array<{ durationMinutes: number }>) {
+  // Only packages on sale count: a switched-off one kept for past bookings must not block later edits.
+  private validateTemplate(template: string, options: Array<{ durationMinutes: number; isActive?: boolean }>) {
     const expected: Record<string, number[]> = {
       STANDARD_60_90_120: [60, 90, 120],
       FIXED_60: [60],
       DATE_2_4_6_HOURS: [120, 240, 360],
     };
-    const actual = options.map((item) => item.durationMinutes).sort((a, b) => a - b);
+    const actual = options.filter((item) => item.isActive !== false).map((item) => item.durationMinutes).sort((a, b) => a - b);
     if (
       actual.length !== expected[template].length ||
       actual.some((value, index) => value !== expected[template][index])
