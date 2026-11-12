@@ -497,24 +497,28 @@ Server cũng tự chặn:
 
 Đơn đã đặt trước khi tắt vẫn làm bình thường.
 
-## R. Mỗi khách chỉ có 1 đơn đang chờ KTV (app khách, 12/11)
+## R. Mỗi khách chỉ có 1 đơn chưa xong (app khách, 12/11)
 
-Khi khách đang có một đơn **chờ KTV nhận** (đơn `OPEN` còn trong hạn chờ), `POST /api/bookings` trả **409**:
+Khách đang có một đơn **chưa xong** thì `POST /api/bookings` trả **409**. Đơn chưa xong gồm:
+- đơn đang chờ KTV nhận (`OPEN` còn trong hạn chờ);
+- đơn đã có KTV nhận nhưng chưa hoàn thành (`CONFIRMED`).
 
 ```json
 { "code": "BOOKING_ALREADY_WAITING",
-  "message": "Ban dang co don cho KTV nhan. Vui long doi hoac huy don do truoc khi dat don moi",
-  "bookingId": "<id đơn đang chờ>" }
+  "message": "Ban dang co don chua hoan thanh. Vui long hoan thanh hoac huy don do truoc khi dat don moi",
+  "bookingId": "<id đơn đang có>",
+  "bookingStatus": "CONFIRMED" }
 ```
 
-App cần:
-- Bắt lỗi `BOOKING_ALREADY_WAITING` và hiện thông báo: *"Bạn đang có đơn chờ KTV nhận. Vui lòng đợi hoặc hủy đơn đó
-  trước khi đặt đơn mới."* Kèm 2 nút: **Xem đơn** (mở chi tiết theo `bookingId`) và **Đóng**.
-- Nên kiểm tra sớm: trước khi khách vào luồng đặt, nếu `GET /api/bookings` có đơn `OPEN` thì hiện luôn thông báo trên,
-  để khách không phải chọn dịch vụ xong mới bị chặn.
+`bookingStatus` là `OPEN` (đang chờ KTV) hoặc `CONFIRMED` (KTV đã nhận). App cần:
+- Bắt lỗi `BOOKING_ALREADY_WAITING` và hiện thông báo theo `bookingStatus`:
+  - `OPEN`: *"Bạn đang có đơn chờ KTV nhận. Vui lòng đợi hoặc hủy đơn đó trước khi đặt đơn mới."*
+  - `CONFIRMED`: *"Bạn đang có đơn chưa hoàn thành. Vui lòng hoàn thành hoặc hủy đơn đó trước khi đặt đơn mới."*
+  Kèm 2 nút: **Xem đơn** (mở chi tiết theo `bookingId`) và **Đóng**.
+- Nên kiểm tra sớm: trước khi khách vào luồng đặt, nếu `GET /api/bookings` có đơn `OPEN` hoặc `CONFIRMED` thì hiện luôn
+  thông báo trên, để khách không phải chọn dịch vụ xong mới bị chặn.
 
-Đặt lại được ngay khi đơn đang chờ: được khách chọn KTV (thành `CONFIRMED`), bị hủy, hoặc hết hạn chờ. Đơn đã có KTV
-nhận (`CONFIRMED`) **không** chặn đặt đơn mới.
+Đặt lại được ngay khi đơn đó **hoàn thành**, **bị hủy**, hoặc (với đơn đang chờ) **hết hạn chờ**.
 
 ## S. Đơn có chọn KTV tính đúng giá của KTV đó (12/11, app không phải sửa)
 

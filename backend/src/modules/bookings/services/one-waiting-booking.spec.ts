@@ -1,7 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 
-// A customer may only have one booking waiting for a technician at a time.
+// A customer may only have one booking in progress at a time: waiting for a technician, or taken and not finished.
 describe('one waiting booking per customer', () => {
   const subject = (waiting: { id: string } | null) => {
     const calls: string[] = [];
@@ -14,22 +14,36 @@ describe('one waiting booking per customer', () => {
   };
 
   it('refuses a new booking while one is still waiting, and says which one', async () => {
-    const { check } = subject({ id: 'booking-1' });
+    const { check } = subject({ id: 'booking-1', status: 'OPEN' } as any);
     await expect(check()).rejects.toBeInstanceOf(ConflictException);
-    await expect(check()).rejects.toMatchObject({ response: { code: 'BOOKING_ALREADY_WAITING', bookingId: 'booking-1' } });
+    await expect(check()).rejects.toMatchObject({
+      response: { code: 'BOOKING_ALREADY_WAITING', bookingId: 'booking-1', bookingStatus: 'OPEN' },
+    });
+  });
+
+  it('also refuses while a technician has taken a booking that is not finished yet', async () => {
+    await expect(subject({ id: 'booking-2', status: 'CONFIRMED' } as any).check()).rejects.toMatchObject({
+      response: { code: 'BOOKING_ALREADY_WAITING', bookingId: 'booking-2', bookingStatus: 'CONFIRMED' },
+    });
   });
 
   it('allows it when nothing is waiting', async () => {
     await expect(subject(null).check()).resolves.toBeUndefined();
   });
 
-  it('locks per customer before looking, and only counts waiting bookings still within their deadline', async () => {
+  it('locks per customer before looking; counts taken bookings, and waiting ones still within their deadline', async () => {
     const { tx, calls, check } = subject(null);
     await check();
     expect(calls).toEqual(['lock', 'find']);
     expect(tx.$queryRaw.mock.calls[0][0].values).toEqual(['customer-1']);
     const where = tx.booking.findFirst.mock.calls[0][0].where;
-    expect(where).toMatchObject({ customerId: 'customer-1', status: { in: ['OPEN', 'PENDING'] } });
-    expect(where.OR).toEqual([{ applicationDeadlineAt: null }, { applicationDeadlineAt: { gt: expect.any(Date) } }]);
+    expect(where.customerId).toBe('customer-1');
+    expect(where.OR).toEqual([
+      { status: 'CONFIRMED' },
+      {
+        status: { in: ['OPEN', 'PENDING'] },
+        OR: [{ applicationDeadlineAt: null }, { applicationDeadlineAt: { gt: expect.any(Date) } }],
+      },
+    ]);
   });
 });

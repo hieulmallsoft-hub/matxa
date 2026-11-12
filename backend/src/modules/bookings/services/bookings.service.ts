@@ -536,26 +536,36 @@ export class BookingsService {
   }
 
   /**
-   * A customer waits on one booking at a time: while one is still waiting for a technician (OPEN, or a legacy direct
-   * PENDING, before its deadline) a new one is refused with 409 BOOKING_ALREADY_WAITING. Runs in the creating
-   * transaction behind a per-customer lock so two taps at once cannot both get through.
+   * A customer has one booking in progress at a time: while one is waiting for a technician (OPEN, or a legacy direct
+   * PENDING, before its deadline) or taken but not finished (CONFIRMED), a new one is refused with 409
+   * BOOKING_ALREADY_WAITING. Runs in the creating transaction behind a per-customer lock so two taps at once cannot
+   * both get through.
    */
   private async assertNoWaitingBooking(tx: Prisma.TransactionClient, customerId: string) {
     await tx.$queryRaw(Prisma.sql`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext(${customerId}))) AS locked`);
     const waiting = await tx.booking.findFirst({
       where: {
         customerId,
-        status: { in: ['OPEN', 'PENDING'] },
-        OR: [{ applicationDeadlineAt: null }, { applicationDeadlineAt: { gt: new Date() } }],
+        OR: [
+          { status: 'CONFIRMED' },
+          {
+            status: { in: ['OPEN', 'PENDING'] },
+            OR: [{ applicationDeadlineAt: null }, { applicationDeadlineAt: { gt: new Date() } }],
+          },
+        ],
       },
-      select: { id: true },
+      select: { id: true, status: true },
       orderBy: { createdAt: 'desc' },
     });
     if (waiting)
       throw new ConflictException({
         code: 'BOOKING_ALREADY_WAITING',
-        message: 'Ban dang co don cho KTV nhan. Vui long doi hoac huy don do truoc khi dat don moi',
+        message:
+          waiting.status === 'CONFIRMED'
+            ? 'Ban dang co don chua hoan thanh. Vui long hoan thanh hoac huy don do truoc khi dat don moi'
+            : 'Ban dang co don cho KTV nhan. Vui long doi hoac huy don do truoc khi dat don moi',
         bookingId: waiting.id,
+        bookingStatus: waiting.status,
       });
   }
 
