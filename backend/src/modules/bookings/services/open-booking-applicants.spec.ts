@@ -1,4 +1,6 @@
 import { BookingsService } from './bookings.service';
+// Area codes are covered by location-code.spec; here the city/ward pass through unchanged.
+jest.mock('../../marketplace/services/location-code', () => ({ resolveLocationCodes: jest.fn(async (_db: unknown, city: unknown, district: unknown) => ({ city, district })) }));
 jest.mock('./booking-promotion-release', () => ({ releaseBookingPromotion: jest.fn().mockResolvedValue(false) }));
 // These cover other rules; the customer-only check has its own spec.
 beforeEach(() => jest.spyOn(BookingsService.prototype as any, 'assertCustomer').mockResolvedValue(undefined));

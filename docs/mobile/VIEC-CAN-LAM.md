@@ -639,6 +639,24 @@ chỉnh được các con số này, hoặc tắt hẳn.
 4. **Nên làm thêm:** khi vào luồng đặt đơn (khách) hoặc tab nhận đơn (KTV), gọi `GET /api/bookings/cancel-limit`. Nếu
    `lockedUntil` khác `null` thì hiện luôn thông báo ở bước 3.
 
+## W. Khu vực khi đặt đơn, đơn trực tuyến, dịch vụ kiểu cũ (12/11)
+
+**Thành phố/phường phải hợp lệ (app khách):** `POST /api/bookings` và `POST /api/bookings/matching-technicians`
+giờ kiểm tra `city`/`district` giống `PATCH /api/technician/profile`.
+- Gửi **mã** lấy từ `GET /api/locations/cities` và `…/districts` (ví dụ `HN`, `HN-PHUONG-HOAN-KIEM`). Tên như "Hà Nội"
+  vẫn được nhận và tự đổi sang mã.
+- Giá trị không hợp lệ trả `400 { "code": "INVALID_CITY" }` hoặc `{ "code": "INVALID_DISTRICT" }`. Trước đây backend
+  vẫn tạo đơn nhưng không KTV nào khớp, khách chờ đến hết hạn.
+- App bắt 2 mã này và yêu cầu khách chọn lại tỉnh/phường từ danh sách.
+
+**Đơn trực tuyến (`mode = "ONLINE"`):** không còn lọc KTV theo thành phố, phường hay bán kính. KTV ở bất kỳ đâu có
+dịch vụ trực tuyến phù hợp đều được báo đơn và được gợi ý. App vẫn gửi `city` như cũ (bắt buộc, phải hợp lệ). App
+không phải sửa gì.
+
+**Dịch vụ kiểu cũ:** dịch vụ KTV tạo trước khi có danh mục chung (không có `catalogServiceId`) không đặt được, nên giờ
+không còn hiện trong hồ sơ KTV, danh sách KTV và giá "từ …". App không phải sửa gì. KTV muốn bán lại thì thêm dịch vụ
+từ danh mục chung.
+
 ## Cách tự kiểm tra trên Swagger
 
 1. `PATCH /api/technician/application` với `idCardQr` = chuỗi app quét được → response có `idCardInfo` đúng tên trên thẻ.

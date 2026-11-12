@@ -148,7 +148,8 @@ export class MarketplaceService {
       Prisma.sql`s.technician_id = p.id`,
       Prisma.sql`s.is_active = true`,
       Prisma.sql`c.is_active = true`,
-      // Same as offeredServiceWhere: not while its catalog service is hidden.
+      // Same as offeredServiceWhere: from the catalog, and not while its catalog service is hidden.
+      Prisma.sql`s.catalog_service_id IS NOT NULL`,
       Prisma.sql`NOT EXISTS (SELECT 1 FROM service_catalog_items ci WHERE ci.id = s.catalog_service_id AND ci.is_active = false)`,
     ];
     if (query.categoryId) serviceConditions.push(Prisma.sql`s.category_id = ${query.categoryId}::uuid`);

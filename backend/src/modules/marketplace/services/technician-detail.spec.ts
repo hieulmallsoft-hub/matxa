@@ -66,11 +66,11 @@ describe('Public technician detail contract', () => {
         isActive: true,
         isVerified: true,
         user: { status: 'ACTIVE' },
-        services: { some: { isActive: true, category: { isActive: true }, NOT: { catalogService: { is: { isActive: false } } } } },
+        services: { some: { isActive: true, category: { isActive: true }, catalogServiceId: { not: null }, NOT: { catalogService: { is: { isActive: false } } } } },
       });
       const active = row.services.filter((s: any) => s.isActive && s.category.isActive);
       if (!row.isActive || !row.isVerified || row.user.status !== 'ACTIVE' || !active.length) return null;
-      expect(select.services.where).toEqual({ isActive: true, category: { isActive: true }, NOT: { catalogService: { is: { isActive: false } } } });
+      expect(select.services.where).toEqual({ isActive: true, category: { isActive: true }, catalogServiceId: { not: null }, NOT: { catalogService: { is: { isActive: false } } } });
       expect(select.reviews).toMatchObject({ take: 20, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] });
       const publicUser = (user: any, selection: any) =>
         Object.fromEntries(Object.keys(selection).map((k) => [k, user[k]]));

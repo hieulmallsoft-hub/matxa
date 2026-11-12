@@ -1,4 +1,6 @@
 import { BookingsService } from './bookings.service';
+// Area codes are covered by location-code.spec; here the city/ward pass through unchanged.
+jest.mock('../../marketplace/services/location-code', () => ({ resolveLocationCodes: jest.fn(async (_db: unknown, city: unknown, district: unknown) => ({ city, district })) }));
 
 // A customer who books a chosen technician pays that technician's own price (what /quote showed), not the catalog's.
 describe('booking with a chosen technician uses their price', () => {

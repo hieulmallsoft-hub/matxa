@@ -5,11 +5,13 @@ import { Prisma, ServiceMode } from '../../../generated/prisma/client';
 /**
  * A technician's service is on offer only while it, its category and its catalog service are active. Hiding a catalog
  * service hides every technician's offer of it, and showing it again brings them back; the technician's own on/off is
- * kept. Services without a catalog entry (older ones) are unaffected.
+ * kept. Older services without a catalog entry cannot be booked (bookings go through the catalog), so they are not
+ * shown either.
  */
 export const offeredServiceWhere = {
   isActive: true,
   category: { isActive: true },
+  catalogServiceId: { not: null },
   NOT: { catalogService: { is: { isActive: false } } },
 } satisfies Prisma.TechnicianServiceWhereInput;
 

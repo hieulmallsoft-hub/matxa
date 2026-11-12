@@ -24,6 +24,7 @@ import { activityPeriods } from './technician-activity';
 import { releaseBookingPromotion } from './booking-promotion-release';
 import { creditBookingPromotion } from './booking-promotion-credit';
 import { assertNotCancelLocked, cancelLimitStatus, isPenalizedCancel } from './cancel-limit';
+import { resolveLocationCodes } from '../../marketplace/services/location-code';
 import { COMPLAINT_STATUS_LABEL, complaintStatusEvent, ensureComplaintConversation } from './complaint-conversation';
 import {
   BookingHistoryQueryDto,
@@ -458,6 +459,9 @@ export class BookingsService {
     await this.assertLeadTime(start);
     const rules = await this.bookingRules();
     const { maxDispatchRadiusKm } = rules;
+    // Online work does not depend on where either side is; elsewhere the area must be a known city/ward code.
+    const online = dto.mode === 'ONLINE';
+    const place = online ? { city: undefined, district: undefined } : await resolveLocationCodes(this.prisma, dto.city, dto.district);
     const serviceIds: string[] = [...new Set((dto.items ?? []).map((item: any) => String(item.catalogServiceId)))] as string[];
     const optionIds: string[] = [...new Set((dto.items ?? []).map((item: any) => String(item.priceOptionId)))] as string[];
     if (!serviceIds.length || serviceIds.length !== (dto.items ?? []).length) throw new BadRequestException('Danh sach dich vu khong hop le');
@@ -472,8 +476,8 @@ export class BookingsService {
       where: {
         isActive: true,
         isVerified: true,
-        city: dto.city,
-        ...(dto.district ? { district: dto.district } : {}),
+        city: place.city ?? undefined,
+        ...(place.district ? { district: place.district } : {}),
         serviceModes: { has: dto.mode },
         // At a facility the customer must know where to go: technicians without one are not suggested.
         ...(dto.mode === 'ONSITE' ? { AND: [{ OR: [{ facility: { not: null } }, { address: { not: null } }] }] } : {}),
@@ -501,7 +505,7 @@ export class BookingsService {
       const hasAllServices = services.every((service: any) => matchingServices.some((item: any) => item.catalogServiceId === service.id && item.categoryId === service.categoryId));
       if (!slot || conflict || !hasAllServices) continue;
       const distance = distanceKm(candidate.latitude, candidate.longitude);
-      if (maxDispatchRadiusKm > 0 && distance !== null && distance > maxDispatchRadiusKm) continue;
+      if (!online && maxDispatchRadiusKm > 0 && distance !== null && distance > maxDispatchRadiusKm) continue;
        eligible.push({ technicianId: candidate.id, displayName: candidate.user.displayName, avatarUrl: candidate.user.avatarUrl, city: candidate.city, district: candidate.district, distanceKm: distance, travelFee: travelFeeFor(dto.mode, distance, rules), rating: Number(candidate.averageRating), reviewCount: candidate.reviewCount });
     }
     eligible.sort((a, b) => {
@@ -606,6 +610,10 @@ export class BookingsService {
       throw new BadRequestException('Thoi gian dat lich phai o tuong lai');
     await this.assertLeadTime(start);
     if (dto.mode !== 'HOME' && dto.addressId) throw new BadRequestException('Chi gui addressId khi dat tai nha');
+    // Store codes, as technician profiles do: a name ("Ha Noi") or an unknown value would match no technician and the
+    // customer would wait for nothing. 400 INVALID_CITY / INVALID_DISTRICT instead.
+    const place = await resolveLocationCodes(this.prisma, dto.city, dto.district);
+    dto = { ...dto, city: place.city ?? dto.city, district: place.district ?? undefined };
     const now = new Date();
     const deadline = confirmationDeadline(
       now,
@@ -1981,15 +1989,18 @@ export class BookingsService {
       throw new ForbiddenException({ statusCode: 403, code: 'OWN_BOOKING', message: 'Khong the nhan don do chinh minh dat' });
     const snapshot =
       booking.addressSnapshot && typeof booking.addressSnapshot === 'object' ? (booking.addressSnapshot as any) : null;
-    // Only home bookings carry coordinates; technicians without a location are not filtered out.
-    const { maxDispatchRadiusKm } = await this.bookingRules();
-    const distance = kmBetween(snapshot, profile);
-    if (maxDispatchRadiusKm > 0 && distance !== null && distance > maxDispatchRadiusKm)
-      throw new ForbiddenException('KTV ngoai ban kinh phuc vu cua don');
-    if (snapshot?.city && profile.city && snapshot.city !== profile.city)
-      throw new ForbiddenException('KTV khong phu hop khu vuc cua don');
-    if (snapshot?.district && profile.district && snapshot.district !== profile.district)
-      throw new ForbiddenException('KTV khong phu hop quan huyen cua don');
+    // Online work can be done from anywhere: no radius or area filter.
+    if (booking.mode !== 'ONLINE') {
+      // Only home bookings carry coordinates; technicians without a location are not filtered out.
+      const { maxDispatchRadiusKm } = await this.bookingRules();
+      const distance = kmBetween(snapshot, profile);
+      if (maxDispatchRadiusKm > 0 && distance !== null && distance > maxDispatchRadiusKm)
+        throw new ForbiddenException('KTV ngoai ban kinh phuc vu cua don');
+      if (snapshot?.city && profile.city && snapshot.city !== profile.city)
+        throw new ForbiddenException('KTV khong phu hop khu vuc cua don');
+      if (snapshot?.district && profile.district && snapshot.district !== profile.district)
+        throw new ForbiddenException('KTV khong phu hop quan huyen cua don');
+    }
     if (!profile.serviceModes.includes(booking.mode))
       throw new ForbiddenException('KTV khong ho tro hinh thuc dich vu nay');
     // The customer comes to the technician's facility, so one without an address cannot take it.
