@@ -71,6 +71,9 @@ describe('customer cancels a waiting open booking', () => {
       walletLedgerEntry: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     prisma.$transaction = jest.fn((callback: any) => callback(prisma));
+    // One waiting booking per customer: lock, then no other waiting booking found.
+    prisma.$queryRaw = jest.fn().mockResolvedValue([]);
+    prisma.booking.findFirst ??= jest.fn().mockResolvedValue(null);
     const notifications = { getTemplate: jest.fn().mockResolvedValue(null), create: jest.fn(), sendPush: jest.fn() };
     const service = new BookingsService(prisma, { get: (_key: string, fallback: unknown) => fallback } as any, notifications as any, {} as any);
     const result: any = await service.cancel('customer-1', 'booking-1', { reasonCode: 'NO_LONGER_NEEDED' });
@@ -147,6 +150,9 @@ describe('creating a booking for a chosen technician', () => {
       booking: { create: jest.fn().mockResolvedValue({ id: 'booking-1', items: [] }) },
     };
     prisma.$transaction = jest.fn((callback: any) => callback(prisma));
+    // One waiting booking per customer: lock, then no other waiting booking found.
+    prisma.$queryRaw = jest.fn().mockResolvedValue([]);
+    prisma.booking.findFirst ??= jest.fn().mockResolvedValue(null);
     const service = new BookingsService(prisma, { get: (_key: string, fallback: unknown) => fallback } as any, {} as any, {} as any);
     jest.spyOn(service as any, 'notifyEligibleTechniciansForOpenBooking').mockResolvedValue(undefined);
     const dto: any = {

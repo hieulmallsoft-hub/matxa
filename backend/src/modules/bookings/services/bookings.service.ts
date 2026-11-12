@@ -516,21 +516,66 @@ export class BookingsService {
     const catalogOptions = await this.prisma.serviceCatalogPriceOption.findMany({ where: { id: { in: dto.items.map((item: any) => item.priceOptionId) }, isActive: true } });
     const selected = await this.prisma.technicianService.findMany({ where: { technicianId: dto.technicianId, catalogServiceId: { in: serviceIds }, isActive: true }, include: { priceOptions: { where: { isActive: true } } } });
     if (selected.length !== serviceIds.length) throw new BadRequestException('KTV khong co dich vu phu hop');
-    dto.items.forEach((item: any) => {
+    // The chosen technician's own package of the same length: the one /quote priced and the customer saw.
+    const technicianPrices = dto.items.map((item: any) => {
       const service = selected.find((candidate: any) => candidate.catalogServiceId === item.catalogServiceId)!;
       const catalogOption = catalogOptions.find((candidate: any) => candidate.id === item.priceOptionId);
-      const option = service.priceOptions.find((candidate: any) => candidate.durationMinutes === catalogOption?.durationMinutes) ?? service.priceOptions[0];
-      if (!option) throw new BadRequestException('KTV chua co goi gia');
+      if (!catalogOption) throw new BadRequestException('Goi gia catalog khong hop le hoac da ngung hoat dong');
+      const option = service.priceOptions.find((candidate: any) => candidate.durationMinutes === catalogOption.durationMinutes);
+      // A technician without packages sells the service at its own base length and price.
+      if (!option && (service.priceOptions.length || service.durationMinutes !== catalogOption.durationMinutes))
+        throw new BadRequestException(`KTV khong co goi ${catalogOption.durationMinutes} phut cho dich vu nay`);
+      return { serviceId: service.id as string, priceOptionId: (option?.id ?? null) as string | null };
     });
     // A technician selected in the first screen is the customer's preferred
     // technician, not a final assignment. Keep the booking open so every
     // other eligible technician receives the same opportunity to apply. The
     // customer finalizes the assignment later through select-technician.
     const { technicianId, ...openDto } = dto;
-    return this.createOpen(userId, openDto as CreateOpenBookingDto, technicianId);
+    return this.createOpen(userId, openDto as CreateOpenBookingDto, technicianId, technicianPrices);
   }
 
-  async createOpen(userId: string, dto: CreateOpenBookingDto, requestedTechnicianId?: string) {
+  /**
+   * A customer waits on one booking at a time: while one is still waiting for a technician (OPEN, or a legacy direct
+   * PENDING, before its deadline) a new one is refused with 409 BOOKING_ALREADY_WAITING. Runs in the creating
+   * transaction behind a per-customer lock so two taps at once cannot both get through.
+   */
+  private async assertNoWaitingBooking(tx: Prisma.TransactionClient, customerId: string) {
+    await tx.$queryRaw(Prisma.sql`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext(${customerId}))) AS locked`);
+    const waiting = await tx.booking.findFirst({
+      where: {
+        customerId,
+        status: { in: ['OPEN', 'PENDING'] },
+        OR: [{ applicationDeadlineAt: null }, { applicationDeadlineAt: { gt: new Date() } }],
+      },
+      select: { id: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (waiting)
+      throw new ConflictException({
+        code: 'BOOKING_ALREADY_WAITING',
+        message: 'Ban dang co don cho KTV nhan. Vui long doi hoac huy don do truoc khi dat don moi',
+        bookingId: waiting.id,
+      });
+  }
+
+  /** The chosen technician's prices for these services, computed exactly as /quote does. */
+  private async technicianPrices(technicianId: string, mode: any, picks: Array<{ serviceId: string; priceOptionId: string | null }>) {
+    const services = await loadBookableServices(this.prisma, technicianId, picks.map((pick) => pick.serviceId), mode);
+    return Promise.all(
+      services.map(async (service, index) => {
+        const [priced] = await applyPriceOptions(this.prisma, [service], picks[index].priceOptionId ? [picks[index].priceOptionId!] : undefined);
+        return priced;
+      }),
+    );
+  }
+
+  async createOpen(
+    userId: string,
+    dto: CreateOpenBookingDto,
+    requestedTechnicianId?: string,
+    requestedPrices?: Array<{ serviceId: string; priceOptionId: string | null }>,
+  ) {
     await this.assertCustomer(userId);
     await this.assertModeEnabled(dto.mode);
     const start = new Date(dto.scheduledStart);
@@ -583,9 +628,15 @@ export class BookingsService {
       if (!option) throw new BadRequestException('Goi gia catalog khong hop le hoac da ngung hoat dong');
       return { service, option };
     });
+    // Booked with a chosen technician: that technician's own prices (what /quote showed), locked for whoever takes
+    // the booking. Without one, the catalog price.
+    const chosen = requestedTechnicianId && requestedPrices
+      ? await this.technicianPrices(requestedTechnicianId, dto.mode, requestedPrices)
+      : null;
+    const lines = ordered.map((item, index) => ({ ...item, chosen: chosen?.[index] ?? null, price: Number(chosen?.[index]?.price ?? item.option.price) }));
     const durationMinutes = ordered.reduce((sum, item) => sum + item.option.durationMinutes, 0);
     const serviceFee = dto.mode === 'HOME' ? (await this.bookingRules()).homeServiceFee : 0;
-    const subtotal = ordered.reduce((sum, item) => sum + Number(item.option.price), 0);
+    const subtotal = lines.reduce((sum, item) => sum + item.price, 0);
     const financials = this.feePolicy.calculate({
       assignmentMode: 'OPEN_MARKETPLACE',
       grossServiceAmount: subtotal,
@@ -615,6 +666,7 @@ export class BookingsService {
         requestedTechnicianId,
       );
     const created = await this.prisma.$transaction(async (tx) => {
+      await this.assertNoWaitingBooking(tx, userId);
       if (promotion) await this.reservePromotion(tx, promotion.id, promotion.usageLimit);
       return tx.booking.create({
       data: {
@@ -640,14 +692,17 @@ export class BookingsService {
         feePolicyVersion: financials.feePolicyVersion,
         note: dto.note,
         items: {
-          create: ordered.map(({ service, option }) => ({
+          create: lines.map(({ service, option, chosen, price }) => ({
             catalogServiceId: service.id,
             catalogPriceOptionId: option.id,
+            serviceId: chosen?.id ?? null,
+            priceOptionId: chosen?.priceOptionId ?? null,
+            priceOptionCode: chosen?.priceOptionCode ?? null,
             categoryId: service.categoryId,
             categoryName: service.category.name,
             serviceName: service.name,
             durationMinutes: option.durationMinutes,
-            unitPrice: option.price,
+            unitPrice: price,
           })),
         },
         payment: { create: { method: dto.paymentMethod, status: 'UNPAID', amount: customerPayableAmount } },

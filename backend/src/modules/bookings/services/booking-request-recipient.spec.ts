@@ -37,7 +37,7 @@ describe('booking request recipient', () => {
     const create = jest.spyOn(service, 'createOpen').mockResolvedValue({ bookingId: booking.id } as any);
     const dto = { technicianId: 'preferred-profile', items: [{ catalogServiceId: 'catalog', priceOptionId: 'option' }] };
     await service.createSelectedFromCatalog('customer-1', dto);
-    expect(create).toHaveBeenCalledWith('customer-1', { items: dto.items }, 'preferred-profile');
+    expect(create).toHaveBeenCalledWith('customer-1', { items: dto.items }, 'preferred-profile', expect.any(Array));
   });
 
   it('stores the request separately without assigning the booking', async () => {
@@ -48,6 +48,9 @@ describe('booking request recipient', () => {
     ]) };
     prisma.booking.create = jest.fn().mockResolvedValue(booking);
     prisma.$transaction = jest.fn((callback: any) => callback(prisma));
+    // One waiting booking per customer: lock, then no other waiting booking found.
+    prisma.$queryRaw = jest.fn().mockResolvedValue([]);
+    prisma.booking.findFirst ??= jest.fn().mockResolvedValue(null);
     jest.spyOn(service as any, 'notifyEligibleTechniciansForOpenBooking').mockResolvedValue(undefined);
     const response = await service.createOpen('customer-1', {
       items: [{ catalogServiceId: 'catalog', priceOptionId: 'option' }],

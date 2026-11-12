@@ -497,6 +497,39 @@ Server cũng tự chặn:
 
 Đơn đã đặt trước khi tắt vẫn làm bình thường.
 
+## R. Mỗi khách chỉ có 1 đơn đang chờ KTV (app khách, 12/11)
+
+Khi khách đang có một đơn **chờ KTV nhận** (đơn `OPEN` còn trong hạn chờ), `POST /api/bookings` trả **409**:
+
+```json
+{ "code": "BOOKING_ALREADY_WAITING",
+  "message": "Ban dang co don cho KTV nhan. Vui long doi hoac huy don do truoc khi dat don moi",
+  "bookingId": "<id đơn đang chờ>" }
+```
+
+App cần:
+- Bắt lỗi `BOOKING_ALREADY_WAITING` và hiện thông báo: *"Bạn đang có đơn chờ KTV nhận. Vui lòng đợi hoặc hủy đơn đó
+  trước khi đặt đơn mới."* Kèm 2 nút: **Xem đơn** (mở chi tiết theo `bookingId`) và **Đóng**.
+- Nên kiểm tra sớm: trước khi khách vào luồng đặt, nếu `GET /api/bookings` có đơn `OPEN` thì hiện luôn thông báo trên,
+  để khách không phải chọn dịch vụ xong mới bị chặn.
+
+Đặt lại được ngay khi đơn đang chờ: được khách chọn KTV (thành `CONFIRMED`), bị hủy, hoặc hết hạn chờ. Đơn đã có KTV
+nhận (`CONFIRMED`) **không** chặn đặt đơn mới.
+
+## S. Đơn có chọn KTV tính đúng giá của KTV đó (12/11, app không phải sửa)
+
+Trước đây `POST /api/bookings` có `technicianId` vẫn lưu theo **giá chung** của catalog, trong khi `/bookings/quote`
+và hồ sơ KTV hiện **giá riêng của KTV** (ví dụ Luna 450.000đ, đơn lại lưu 500.000đ). Đã sửa:
+
+- Có `technicianId`: mỗi dịch vụ lấy gói **cùng thời lượng** của KTV đó, tính giá bằng đúng cách `/quote` tính. Đơn
+  lưu thêm `technicianServiceId` và `priceOptionId` của KTV trong `items[]`.
+- KTV khác ứng tuyển đơn này cũng làm theo giá đó (họ thấy giá trước khi ứng tuyển).
+- KTV không bán gói thời lượng khách chọn → `400 "KTV khong co goi 90 phut cho dich vu nay"` (trước đây lặng lẽ lấy giá khác).
+- Không có `technicianId` (đơn mở thường): vẫn theo giá chung như cũ.
+
+App vẫn gửi `items[]` gồm `catalogServiceId` + `priceOptionId` của **giá chung** như hiện tại. Kiểm tra: số tiền
+`/quote` trả về phải bằng `subtotal` của đơn vừa tạo.
+
 ## Cách tự kiểm tra trên Swagger
 
 1. `PATCH /api/technician/application` với `idCardQr` = chuỗi app quét được → response có `idCardInfo` đúng tên trên thẻ.

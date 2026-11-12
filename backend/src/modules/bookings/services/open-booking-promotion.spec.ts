@@ -17,6 +17,9 @@ describe('promotion code on an open booking', () => {
       booking: { create: jest.fn(async ({ data }: any) => ({ id: 'booking-1', items: [], ...data })) },
     };
     prisma.$transaction = jest.fn((callback: any) => callback(prisma));
+    // One waiting booking per customer: lock, then no other waiting booking found.
+    prisma.$queryRaw = jest.fn().mockResolvedValue([]);
+    prisma.booking.findFirst ??= jest.fn().mockResolvedValue(null);
     const service = new BookingsService(prisma, { get: (_key: string, fallback: unknown) => fallback } as any, {} as any, {} as any);
     jest.spyOn(service as any, 'notifyEligibleTechniciansForOpenBooking').mockResolvedValue(undefined);
     jest.spyOn(service as any, 'openBookingResponse').mockReturnValue({});
