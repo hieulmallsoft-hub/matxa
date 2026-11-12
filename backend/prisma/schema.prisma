@@ -437,6 +437,8 @@ model ServiceCategory {
   slug      String              @unique
   iconUrl   String?             @map("icon_url")
   isActive  Boolean             @default(true) @map("is_active")
+  /// On: cancelling a taken booking of this category counts toward the cancel limit (temporary lock).
+  countsCancellations Boolean   @default(true) @map("counts_cancellations")
   sortOrder Int                 @default(0) @map("sort_order")
   createdAt DateTime            @default(now()) @map("created_at")
   updatedAt DateTime            @updatedAt @map("updated_at")
@@ -668,6 +670,8 @@ model Booking {
   cancellationReasonText String? @map("cancellation_reason_text")
   cancelledByUserId String? @map("cancelled_by_user_id") @db.Uuid
   cancelledByRole UserRole? @map("cancelled_by_role")
+  /// The cancel counts toward the canceller's cancel limit (a taken booking, cancelled by the customer or technician).
+  cancelPenalized Boolean   @default(false) @map("cancel_penalized")
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
   customer        User              @relation("BookingCustomer", fields: [customerId], references: [id])
@@ -688,6 +692,7 @@ model Booking {
   @@index([technicianId, scheduledStart])
   @@index([assignmentMode, status, scheduledStart])
   @@index([assignmentMode, status, applicationDeadlineAt])
+  @@index([cancelledByUserId, cancelledAt])
   @@map("bookings")
 }
 

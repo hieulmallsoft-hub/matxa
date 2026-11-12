@@ -125,6 +125,31 @@ export class BookingsController {
     return this.bookings.listMine(auth.sub, query);
   }
 
+  @Get('cancel-limit')
+  @ApiOperation({
+    summary: 'Tinh trang gioi han huy don cua toi (khach va KTV)',
+    description:
+      'Chi tinh don da co KTV nhan ma khach/KTV huy. remainingBeforeLock = 1 thi app nen canh bao truoc khi huy. ' +
+      'lockedUntil khac null = dang bi khoa dat don (khach) / nhan don (KTV) den thoi diem do, loi 409 CANCEL_LIMIT_LOCKED.',
+  })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        enabled: { type: 'boolean' },
+        limit: { type: 'number', example: 3 },
+        windowHours: { type: 'number', example: 24 },
+        lockHours: { type: 'number', example: 3 },
+        recentCancellations: { type: 'number', example: 2 },
+        remainingBeforeLock: { type: 'number', nullable: true, example: 1 },
+        lockedUntil: { type: 'string', format: 'date-time', nullable: true },
+      },
+    },
+  })
+  cancelLimit(@CurrentAuth() auth: AccessTokenPayload) {
+    return this.bookings.cancelLimit(auth.sub);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Chi tiet lich dat' })
   @ApiOkResponse({
@@ -154,6 +179,7 @@ export class BookingsController {
         id: { type: 'string' },
         status: { type: 'string', example: 'CANCELLED' },
         cancellation: { type: 'object', nullable: true },
+        cancelLimit: { type: 'object', description: 'Giong GET /bookings/cancel-limit, sau lan huy nay' },
       },
     },
   })

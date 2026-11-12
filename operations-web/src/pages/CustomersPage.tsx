@@ -6,6 +6,7 @@ import { useToast } from '../components/ui/ToastContainer';
 import { PageHeader } from '../components/common/PageHeader';
 import { DetailDrawer } from '../components/common/DetailDrawer';
 import { useConfirm } from '../components/ui/useConfirm';
+import { CancelOffendersCard } from '../components/CancelOffendersCard';
 import { AnimatedNumber, Badge, Button, Card, Empty, Reveal, RevealItem, SearchBox, SkeletonRows, Tabs } from '../components/ui/kit';
 
 type UserStatus = 'ACTIVE' | 'BLOCKED' | 'DELETED';
@@ -134,6 +135,22 @@ export const CustomersPage: React.FC = () => {
     }
   };
 
+  // From the "Hủy đơn nhiều" list, which also holds technicians.
+  const blockOffender = async (userId: string, name: string) => {
+    if (!(await confirm({ title: 'Khóa tài khoản?', message: `${name} sẽ không đăng nhập, đặt lịch hay nhận đơn được cho tới khi mở khóa.`, confirmText: 'Khóa tài khoản' })))
+      return false;
+    try {
+      await request(`/admin/marketplace/users/${userId}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'BLOCKED' }) });
+      addToast({ title: 'Đã khóa tài khoản', message: name, type: 'success' });
+      void load();
+      void loadTotals();
+      return true;
+    } catch (statusError) {
+      addToast({ title: 'Không đổi được trạng thái', message: errorText(statusError), type: 'error' });
+      return false;
+    }
+  };
+
   const copyId = (id: string) => {
     void navigator.clipboard?.writeText(id);
     addToast({ title: 'Đã sao chép User ID', message: id, type: 'success' });
@@ -172,6 +189,8 @@ export const CustomersPage: React.FC = () => {
           </RevealItem>
         ))}
       </Reveal>
+
+      <CancelOffendersCard onBlock={blockOffender} />
 
       <Card bodyClassName="p-0">
         <div className="p-4 flex flex-wrap items-center gap-3 border-b border-surface-borderSubtle">

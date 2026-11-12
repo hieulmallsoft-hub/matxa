@@ -280,13 +280,25 @@ export class AdminMarketplaceService {
     optionId: string,
     dto: UpdateAdminTechnicianPriceOptionDto,
   ) {
-    const updated = await this.prisma.technicianServicePriceOption.updateMany({
-      where: { id: optionId, technicianServiceId: serviceId, technicianService: { technicianId } },
-      data: { price: dto.price },
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.technicianServicePriceOption.updateMany({
+        where: { id: optionId, technicianServiceId: serviceId, technicianService: { technicianId } },
+        data: { price: dto.price },
+      });
+      if (!updated.count) throw new NotFoundException('Khong tim thay goi gia cua ky thuat vien');
+      // Keep the service's starting price aligned with its first active option, as the technician's own edit does.
+      const primary = await tx.technicianServicePriceOption.findFirst({
+        where: { technicianServiceId: serviceId, isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }],
+      });
+      if (primary)
+        await tx.technicianService.update({
+          where: { id: serviceId },
+          data: { durationMinutes: primary.durationMinutes, price: primary.price },
+        });
+      const option = await tx.technicianServicePriceOption.findUnique({ where: { id: optionId } });
+      return option && { ...option, price: number(option.price) };
     });
-    if (!updated.count) throw new NotFoundException('Khong tim thay goi gia cua ky thuat vien');
-    const option = await this.prisma.technicianServicePriceOption.findUnique({ where: { id: optionId } });
-    return option && { ...option, price: number(option.price) };
   }
 
   categories() {
@@ -294,6 +306,29 @@ export class AdminMarketplaceService {
       orderBy: [{ isActive: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
     });
   }
+  /** People who cancelled taken bookings (counted toward the cancel limit) at least `minCancellations` times lately. */
+  async cancelOffenders(days = 7, minCancellations = 3) {
+    const since = new Date(Date.now() - days * 86_400_000);
+    const groups = await this.prisma.booking.groupBy({
+      by: ['cancelledByUserId'],
+      where: { cancelPenalized: true, cancelledAt: { gte: since }, cancelledByUserId: { not: null } },
+      _count: { _all: true },
+      _max: { cancelledAt: true },
+    });
+    const offenders = groups.filter((group) => group._count._all >= minCancellations);
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: offenders.map((group) => group.cancelledByUserId!) } },
+      select: { id: true, displayName: true, role: true, status: true },
+    });
+    return offenders
+      .map((group) => ({
+        user: users.find((user) => user.id === group.cancelledByUserId) ?? null,
+        cancellations: group._count._all,
+        lastCancelledAt: group._max.cancelledAt,
+      }))
+      .sort((a, b) => b.cancellations - a.cancellations);
+  }
+
   createCategory(_adminId: string, dto: CreateCategoryDto) {
     return this.prisma.serviceCategory.create({ data: dto });
   }

@@ -23,6 +23,7 @@ import { addressPreview, confirmationDeadline, kmBetween, roundVnd, technicianBa
 import { activityPeriods } from './technician-activity';
 import { releaseBookingPromotion } from './booking-promotion-release';
 import { creditBookingPromotion } from './booking-promotion-credit';
+import { assertNotCancelLocked, cancelLimitStatus, isPenalizedCancel } from './cancel-limit';
 import { COMPLAINT_STATUS_LABEL, complaintStatusEvent, ensureComplaintConversation } from './complaint-conversation';
 import {
   BookingHistoryQueryDto,
@@ -590,6 +591,7 @@ export class BookingsService {
     // Checked first so the customer gets BOOKING_ALREADY_WAITING (with the booking to open) rather than another
     // refusal, e.g. "technician busy" when rebooking the same technician. Checked again under the lock below.
     await this.assertNoWaitingBooking(this.prisma, userId, false);
+    await assertNotCancelLocked(this.prisma, userId, await this.bookingRules());
     await this.assertModeEnabled(dto.mode);
     const start = new Date(dto.scheduledStart);
     if (!Number.isFinite(start.getTime()) || start <= new Date())
@@ -738,6 +740,7 @@ export class BookingsService {
   async applyToOpenJob(userId: string, bookingId: string) {
     const profile = await this.requireActiveTechnician(userId);
     await this.requireTechnicianPhone(userId);
+    await assertNotCancelLocked(this.prisma, userId, await this.bookingRules(), true);
     const booking = await this.openJobForTechnician(bookingId, profile.id, true);
     const existing = await this.prisma.bookingTechnicianApplication.findUnique({
       where: { bookingId_technicianProfileId: { bookingId, technicianProfileId: profile.id } },
@@ -1291,6 +1294,7 @@ export class BookingsService {
 
   async acceptTechnicianJob(userId: string, id: string) {
     await this.requireTechnicianPhone(userId);
+    await assertNotCancelLocked(this.prisma, userId, await this.bookingRules(), true);
     return this.updateStatus(userId, id, { status: 'CONFIRMED' });
   }
 
@@ -1315,6 +1319,9 @@ export class BookingsService {
         dailyDiscountThreshold: 0,
         dailyDiscountFeePercent: 20,
         enabledServiceModes: ['HOME', 'ONLINE', 'ONSITE'] as Array<'HOME' | 'ONLINE' | 'ONSITE'>,
+        cancelLimitCount: 0,
+        cancelLimitWindowHours: 24,
+        cancelLockHours: 3,
       }
     );
   }
@@ -1434,6 +1441,7 @@ export class BookingsService {
           cancellationReasonText: dto.reasonText,
           cancelledByUserId: userId,
           cancelledByRole: actor?.role,
+          cancelPenalized: await isPenalizedCancel(tx, id, booking.status, actor?.role, dto.reasonCode),
         },
         tx,
       );
@@ -1481,7 +1489,12 @@ export class BookingsService {
         : ([booking.customerId === userId ? technicianUserId : booking.customerId].filter(Boolean) as string[]);
     for (const recipient of recipients)
       void this.notifyStatus(recipient, id, 'BOOKING_CANCELLED', 'Lịch hẹn đã hủy', 'Một lịch hẹn đã được hủy.');
-    return updated;
+    return { ...updated, cancelLimit: await this.cancelLimit(userId) };
+  }
+
+  /** The caller's standing against the cancel limit, shown before and after cancelling. */
+  async cancelLimit(userId: string) {
+    return cancelLimitStatus(this.prisma, userId, await this.bookingRules());
   }
 
   /** Idempotent DB-conditional terminal transition. Safe when invoked by many app instances. */
@@ -1885,6 +1898,7 @@ export class BookingsService {
       cancellationReasonText?: string;
       cancelledByUserId?: string;
       cancelledByRole?: 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN';
+      cancelPenalized?: boolean;
     },
     db: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {

@@ -18,6 +18,7 @@ describe('BookingsService', () => {
   const walletLedgerEntry = { findUnique: jest.fn() };
   const tx = {
     walletLedgerEntry,
+    bookingItem: { count: jest.fn().mockResolvedValue(1) },
     booking,
     technicianProfile,
     review,
@@ -116,7 +117,7 @@ describe('BookingsService', () => {
     booking.update.mockResolvedValue({ id: 'b1', status: 'CANCELLED' });
     await expect(
       service.cancel('customer', 'b1', { reasonCode: 'OTHER', reasonText: 'Đổi lịch cá nhân' }),
-    ).resolves.toEqual({ id: 'b1', status: 'CANCELLED' });
+    ).resolves.toMatchObject({ id: 'b1', status: 'CANCELLED', cancelLimit: { enabled: false, lockedUntil: null } });
     expect(booking.update).toHaveBeenCalledWith({
       where: { id: 'b1', status: 'PENDING' },
       data: expect.objectContaining({

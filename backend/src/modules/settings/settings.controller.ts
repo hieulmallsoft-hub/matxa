@@ -75,6 +75,18 @@ class UpdateBookingRulesDto {
   })
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayUnique() @IsIn(SERVICE_MODES, { each: true })
   enabledServiceModes?: ServiceModeName[];
+
+  @ApiPropertyOptional({ example: 3, description: 'Huy du so don da co KTV nhan nay trong cancelLimitWindowHours thi bi tam khoa dat/nhan don. 0 = tat.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(50)
+  cancelLimitCount?: number;
+
+  @ApiPropertyOptional({ example: 24, description: 'Khoang thoi gian (gio) dem so lan huy.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(720)
+  cancelLimitWindowHours?: number;
+
+  @ApiPropertyOptional({ example: 3, description: 'Thoi gian tam khoa (gio) tinh tu lan huy cham moc.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(720)
+  cancelLockHours?: number;
 }
 
 @ApiTags('Admin Settings')

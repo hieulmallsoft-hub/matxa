@@ -24,6 +24,11 @@ export type BookingRules = {
   dailyDiscountFeePercent: number;
   /** "Nơi phục vụ" the admin has switched on. The apps hide the others; bookings and new KTV choices are refused. */
   enabledServiceModes: ServiceModeName[];
+  /** Cancelling this many taken bookings within `cancelLimitWindowHours` locks the person out of new bookings
+   *  (customer: booking, technician: taking jobs) for `cancelLockHours`. 0 = off. */
+  cancelLimitCount: number;
+  cancelLimitWindowHours: number;
+  cancelLockHours: number;
 };
 export const SERVICE_MODES = ['HOME', 'ONLINE', 'ONSITE'] as const;
 export type ServiceModeName = (typeof SERVICE_MODES)[number];
@@ -45,6 +50,9 @@ const BOOKING_KEYS: Record<keyof BookingRules, string> = {
   dailyDiscountThreshold: 'BOOKING_DAILY_DISCOUNT_THRESHOLD',
   dailyDiscountFeePercent: 'BOOKING_DAILY_DISCOUNT_FEE_PERCENT',
   enabledServiceModes: 'BOOKING_ENABLED_SERVICE_MODES',
+  cancelLimitCount: 'BOOKING_CANCEL_LIMIT_COUNT',
+  cancelLimitWindowHours: 'BOOKING_CANCEL_LIMIT_WINDOW_HOURS',
+  cancelLockHours: 'BOOKING_CANCEL_LOCK_HOURS',
 };
 
 @Injectable()
@@ -96,6 +104,9 @@ export class SettingsService {
       dailyDiscountThreshold: Number(stored.get(BOOKING_KEYS.dailyDiscountThreshold) ?? 0),
       dailyDiscountFeePercent: Number(stored.get(BOOKING_KEYS.dailyDiscountFeePercent) ?? 20),
       enabledServiceModes: parseModes(stored.get(BOOKING_KEYS.enabledServiceModes)),
+      cancelLimitCount: Number(stored.get(BOOKING_KEYS.cancelLimitCount) ?? 3),
+      cancelLimitWindowHours: Number(stored.get(BOOKING_KEYS.cancelLimitWindowHours) ?? 24),
+      cancelLockHours: Number(stored.get(BOOKING_KEYS.cancelLockHours) ?? 3),
     };
   }
 

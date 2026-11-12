@@ -18,7 +18,7 @@ describe('SettingsService platform info and booking rules', () => {
   it('falls back to defaults until the admin saves anything', async () => {
     const { service } = subject();
     await expect(service.getPlatformInfo()).resolves.toEqual({ brandName: 'Psyocore', hotline: '', supportEmail: '' });
-    await expect(service.getBookingRules()).resolves.toEqual({ minAdvanceHours: 0, maxDispatchRadiusKm: 0, travelFeeThresholdKm: 10, travelFeeAmount: 0, confirmationWaitMinutes: 10, requireTechnicianPhone: false, homeServiceFee: 100000, dailyDiscountThreshold: 0, dailyDiscountFeePercent: 20, enabledServiceModes: ['HOME', 'ONLINE', 'ONSITE'] });
+    await expect(service.getBookingRules()).resolves.toEqual({ minAdvanceHours: 0, maxDispatchRadiusKm: 0, travelFeeThresholdKm: 10, travelFeeAmount: 0, confirmationWaitMinutes: 10, requireTechnicianPhone: false, homeServiceFee: 100000, dailyDiscountThreshold: 0, dailyDiscountFeePercent: 20, enabledServiceModes: ['HOME', 'ONLINE', 'ONSITE'], cancelLimitCount: 3, cancelLimitWindowHours: 24, cancelLockHours: 3 });
   });
 
   it('saves only the fields that were sent and returns the stored values', async () => {
@@ -39,6 +39,9 @@ describe('SettingsService platform info and booking rules', () => {
       dailyDiscountThreshold: 0,
       dailyDiscountFeePercent: 20,
       enabledServiceModes: ['HOME', 'ONLINE', 'ONSITE'],
+      cancelLimitCount: 3,
+      cancelLimitWindowHours: 24,
+      cancelLockHours: 3,
     });
     expect([...rows.keys()].sort()).toEqual(['BOOKING_MAX_DISPATCH_RADIUS_KM', 'BOOKING_MIN_ADVANCE_HOURS', 'PLATFORM_HOTLINE']);
   });
@@ -60,6 +63,9 @@ describe('SettingsService platform info and booking rules', () => {
       dailyDiscountThreshold: 0,
       dailyDiscountFeePercent: 20,
       enabledServiceModes: ['HOME', 'ONLINE', 'ONSITE'],
+      cancelLimitCount: 3,
+      cancelLimitWindowHours: 24,
+      cancelLockHours: 3,
     });
   });
 

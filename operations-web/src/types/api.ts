@@ -18,6 +18,8 @@ export interface Category {
   id: string;
   name: string;
   slug: string;
+  /** Cancelling a taken booking of this category counts toward the cancel limit. */
+  countsCancellations?: boolean;
 }
 export interface ApiError {
   statusCode?: number;

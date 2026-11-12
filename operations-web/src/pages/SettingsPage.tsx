@@ -76,6 +76,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
   const [techCommissionRate, setTechCommissionRate] = useState('75');
   const [dailyDiscountThreshold, setDailyDiscountThreshold] = useState('0');
   const [dailyDiscountFeePercent, setDailyDiscountFeePercent] = useState('20');
+  const [cancelLimitCount, setCancelLimitCount] = useState('3');
+  const [cancelLimitWindowHours, setCancelLimitWindowHours] = useState('24');
+  const [cancelLockHours, setCancelLockHours] = useState('3');
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
 
   React.useEffect(() => {
@@ -96,7 +99,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         setSupportEmail(value.supportEmail);
       })
       .catch(() => undefined);
-    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number; confirmationWaitMinutes: number; requireTechnicianPhone: boolean; homeServiceFee: number; dailyDiscountThreshold: number; dailyDiscountFeePercent: number; enabledServiceModes?: string[] }>('/admin/settings/booking')
+    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number; confirmationWaitMinutes: number; requireTechnicianPhone: boolean; homeServiceFee: number; dailyDiscountThreshold: number; dailyDiscountFeePercent: number; enabledServiceModes?: string[]; cancelLimitCount?: number; cancelLimitWindowHours?: number; cancelLockHours?: number }>('/admin/settings/booking')
       .then((value) => {
         setMinAdvanceHours(String(value.minAdvanceHours));
         setMaxTravelDistanceKm(String(value.maxDispatchRadiusKm));
@@ -108,6 +111,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         setHomeServiceFee(String(value.homeServiceFee ?? 100000));
         setDailyDiscountThreshold(String(value.dailyDiscountThreshold ?? 0));
         setDailyDiscountFeePercent(String(value.dailyDiscountFeePercent ?? 20));
+        setCancelLimitCount(String(value.cancelLimitCount ?? 3));
+        setCancelLimitWindowHours(String(value.cancelLimitWindowHours ?? 24));
+        setCancelLockHours(String(value.cancelLockHours ?? 3));
       })
       .catch(() => undefined);
   }, []);
@@ -162,9 +168,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         const wait = Number(confirmationWaitMinutes);
         if (!Number.isInteger(wait) || wait < 1 || wait > 60) throw new Error('Thời gian chờ KTV xác nhận phải từ 1 đến 60 phút');
         if (!enabledServiceModes.length) throw new Error('Phải bật ít nhất 1 nơi phục vụ');
+        const limitCount = Number(cancelLimitCount);
+        const limitWindow = Number(cancelLimitWindowHours);
+        const lockHours = Number(cancelLockHours);
+        if (!Number.isInteger(limitCount) || limitCount < 0 || limitCount > 50) throw new Error('Số lần hủy phải là số nguyên từ 0 đến 50');
+        if (!Number.isInteger(limitWindow) || limitWindow < 1 || limitWindow > 720) throw new Error('Khoảng thời gian đếm phải từ 1 đến 720 giờ');
+        if (!Number.isInteger(lockHours) || lockHours < 1 || lockHours > 720) throw new Error('Thời gian khóa phải từ 1 đến 720 giờ');
         await request('/admin/settings/booking', {
           method: 'PATCH',
-          body: JSON.stringify({ minAdvanceHours: hours, maxDispatchRadiusKm: radius, confirmationWaitMinutes: wait, requireTechnicianPhone, enabledServiceModes }),
+          body: JSON.stringify({
+            minAdvanceHours: hours, maxDispatchRadiusKm: radius, confirmationWaitMinutes: wait, requireTechnicianPhone, enabledServiceModes,
+            cancelLimitCount: limitCount, cancelLimitWindowHours: limitWindow, cancelLockHours: lockHours,
+          }),
         });
         addToast({ title: 'Đã lưu quy định đặt lịch', message: 'Áp dụng cho các đơn đặt sau khi lưu.', type: 'success' });
       }
@@ -416,6 +431,27 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                   />
                   <span className="text-[11px] text-[#66756B]">
                     Đơn tại nhà chỉ gợi ý và gửi cho KTV trong bán kính này tính từ địa chỉ khách. KTV chưa cập nhật vị trí vẫn nhận được. Nhập 0 để không giới hạn.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[#1C2B20]">Hủy quá (số đơn)</label>
+                    <input type="number" min="0" max="50" value={cancelLimitCount} onChange={(e) => setCancelLimitCount(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[#1C2B20]">Trong vòng (giờ)</label>
+                    <input type="number" min="1" max="720" value={cancelLimitWindowHours} onChange={(e) => setCancelLimitWindowHours(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[#1C2B20]">Thì khóa (giờ)</label>
+                    <input type="number" min="1" max="720" value={cancelLockHours} onChange={(e) => setCancelLockHours(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]" />
+                  </div>
+                  <span className="sm:col-span-3 text-[11px] text-[#66756B]">
+                    {Number(cancelLimitCount) > 0
+                      ? `Khách hoặc KTV hủy ${cancelLimitCount} đơn đã có KTV nhận trong ${cancelLimitWindowHours} giờ thì bị khóa ${cancelLockHours} giờ: khách không đặt được đơn mới, KTV không nhận được đơn mới (vẫn làm tiếp đơn đang có). App cảnh báo khi còn 1 lần. `
+                      : 'Nhập 0 để tắt giới hạn hủy. '}
+                    Không tính: hủy đơn chưa có KTV nhận, đơn tự hết hạn, admin hủy, KTV hủy có ảnh bằng chứng (khách vắng mặt, không an toàn…), danh mục đã tắt "Tính phạt khi hủy".
                   </span>
                 </div>
               </div>

@@ -38,7 +38,7 @@ function priceError(raw: string | undefined) {
   return null;
 }
 
-type Category = { id: string; name: string };
+type Category = { id: string; name: string; countsCancellations?: boolean };
 type PriceOption = { id: string; code: string; durationMinutes: number; price: number; isActive: boolean };
 type CatalogItem = {
   id: string;
@@ -94,6 +94,21 @@ export function ServiceCatalogPanel({
   const [activeOnly, setActiveOnly] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // Local copy of each category's "Tính phạt khi hủy" switch, so a toggle shows at once.
+  const [countsCancellations, setCountsCancellations] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    setCountsCancellations(Object.fromEntries(categories.map((c) => [c.id, c.countsCancellations !== false])));
+  }, [categories]);
+  const toggleCountsCancellations = async (categoryId: string, value: boolean) => {
+    setCountsCancellations((current) => ({ ...current, [categoryId]: value }));
+    try {
+      await request(`/admin/marketplace/categories/${categoryId}`, { method: 'PATCH', body: JSON.stringify({ countsCancellations: value }) });
+      notify(value ? 'Đã bật tính phạt khi hủy cho danh mục' : 'Đã tắt tính phạt khi hủy cho danh mục');
+    } catch (error) {
+      setCountsCancellations((current) => ({ ...current, [categoryId]: !value }));
+      notify(error instanceof Error ? error.message : 'Không lưu được', true);
+    }
+  };
 
   const [editor, setEditor] = useState<CatalogItem | null>(null);
   const [creating, setCreating] = useState(false);
@@ -383,6 +398,20 @@ export function ServiceCatalogPanel({
               );
             })}
           </div>
+          {selectedCategory !== 'ALL' && (
+            <label
+              className="inline-flex items-center gap-2 text-xs font-semibold text-[#66756B] select-none cursor-pointer px-3 py-1.5 rounded-xl border border-[#E5EBE5] bg-white hover:bg-[#F6F8F4] transition-colors self-start"
+              title="Bật: khách/KTV hủy đơn đã có KTV nhận của danh mục này bị tính vào giới hạn hủy (Cài đặt > Quy định đặt lịch)."
+            >
+              <input
+                type="checkbox"
+                checked={countsCancellations[selectedCategory] ?? true}
+                onChange={(e) => void toggleCountsCancellations(selectedCategory, e.target.checked)}
+                className="w-4 h-4 rounded accent-[#2E7D4A] cursor-pointer"
+              />
+              <span>Tính phạt khi hủy đơn thuộc danh mục này</span>
+            </label>
+          )}
         </div>
 
         {/* 4. Items grouped by category */}

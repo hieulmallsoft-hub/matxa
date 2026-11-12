@@ -22,6 +22,7 @@ function createSubject(booking = assignedBooking()) {
     },
     technicianProfile: { findFirst: jest.fn().mockResolvedValue({ id: 'tech-profile-1' }) },
     bookingCancellation: { create: jest.fn().mockResolvedValue({ id: 'cancellation-1' }) },
+    bookingItem: { count: jest.fn().mockResolvedValue(1) },
     walletLedgerEntry: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn() },
     wallet: { update: jest.fn() },
   };
@@ -63,10 +64,24 @@ describe('TechnicianBookingCancellationService', () => {
 
   it('tells the now-free technician about open jobs announced while they were busy', async () => {
     const { service } = createSubject();
-    const bookings = { announceOpenJobsToFreedTechnician: jest.fn().mockResolvedValue(undefined) };
+    const bookings = {
+      announceOpenJobsToFreedTechnician: jest.fn().mockResolvedValue(undefined),
+      cancelLimit: jest.fn().mockResolvedValue({ remainingBeforeLock: 1, lockedUntil: null }),
+    };
     (service as any).bookings = bookings;
     await service.cancel('tech-user-1', 'booking-1', otherReason);
     expect(bookings.announceOpenJobsToFreedTechnician).toHaveBeenCalledWith('tech-user-1');
+  });
+
+  it('counts the cancel of a taken booking and returns the cancel-limit standing', async () => {
+    const { service, tx } = createSubject();
+    (service as any).bookings = {
+      announceOpenJobsToFreedTechnician: jest.fn(),
+      cancelLimit: jest.fn().mockResolvedValue({ remainingBeforeLock: 1, lockedUntil: null }),
+    };
+    const result: any = await service.cancel('tech-user-1', 'booking-1', otherReason);
+    expect(tx.booking.updateMany.mock.calls[0][0].data.cancelPenalized).toBe(true);
+    expect(result.cancelLimit).toEqual({ remainingBeforeLock: 1, lockedUntil: null });
   });
 
   it('gives the customer their voucher back when the technician cancels', async () => {

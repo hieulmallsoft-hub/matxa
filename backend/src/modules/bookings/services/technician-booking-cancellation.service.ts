@@ -13,8 +13,7 @@ import { TechnicianCancelBookingDto } from '../dto/booking.dto';
 import { BookingCancellationStorageService } from './booking-cancellation-storage.service';
 import { refundBookingCommission } from './booking-commission-refund';
 import { releaseBookingPromotion } from './booking-promotion-release';
-
-const EVIDENCE_REQUIRED = new Set(['CUSTOMER_NO_SHOW', 'UNSAFE_SITUATION', 'INAPPROPRIATE_REQUEST']);
+import { EVIDENCE_REQUIRED_REASONS as EVIDENCE_REQUIRED, isPenalizedCancel } from './cancel-limit';
 
 @Injectable()
 export class TechnicianBookingCancellationService {
@@ -97,6 +96,7 @@ export class TechnicianBookingCancellationService {
             cancellationReasonText: dto.reasonText?.trim() || null,
             cancelledByUserId: userId,
             cancelledByRole: 'TECHNICIAN',
+            cancelPenalized: await isPenalizedCancel(tx, bookingId, booking!.status, 'TECHNICIAN', dto.reasonCode),
           },
         });
         if (!update.count) throw new ConflictException('Trang thai lich dat da thay doi, vui long tai lai');
@@ -121,7 +121,8 @@ export class TechnicianBookingCancellationService {
     void this.notifyCancelled(bookingId, userId).catch(() => undefined);
     // Free again: tell them about open jobs announced while they were busy.
     void this.bookings?.announceOpenJobsToFreedTechnician(userId);
-    return result;
+    const cancelLimit = await this.bookings?.cancelLimit(userId);
+    return cancelLimit ? { ...result, cancelLimit } : result;
   }
 
   private validateReason(dto: TechnicianCancelBookingDto, keys: string[]) {

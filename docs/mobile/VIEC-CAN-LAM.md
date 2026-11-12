@@ -559,6 +559,53 @@ Admin bật lại dịch vụ thì dịch vụ của các KTV tự hiện lại;
 mới, nên app đang giữ `priceOptionId` cũ sẽ đặt lỗi ("Dịch vụ hoặc gói thời gian đã thay đổi"). Giờ gói được cập
 nhật tại chỗ theo `code` nên `id` không đổi. Vẫn nên lấy lại `GET /api/service-catalog` khi mở màn đặt.
 
+## V. Giới hạn hủy đơn: cảnh báo và tạm khóa (app khách + app KTV, 12/11)
+
+Hủy nhiều đơn **đã có KTV nhận** sẽ bị khóa tạm. Mặc định: hủy **3 đơn trong 24 giờ** thì bị khóa **3 giờ**. Admin
+chỉnh được các con số này, hoặc tắt hẳn.
+- Khách bị khóa: không đặt được đơn mới.
+- KTV bị khóa: không ứng tuyển hoặc nhận được đơn mới.
+- Trong lúc bị khóa vẫn làm tiếp đơn đang có, vẫn chat và xem lịch sử bình thường.
+
+**Lần hủy có bị tính:** đơn đang `CONFIRMED` (đã có KTV nhận), do khách hoặc KTV hủy.
+
+**Lần hủy không bị tính:**
+- hủy đơn chưa có KTV nhận;
+- đơn tự hết hạn;
+- admin hủy;
+- KTV hủy với lý do có ảnh bằng chứng (`CUSTOMER_NO_SHOW`, `UNSAFE_SITUATION`, `INAPPROPRIATE_REQUEST`);
+- đơn thuộc danh mục admin đã tắt "Tính phạt khi hủy".
+
+**API mới: `GET /api/bookings/cancel-limit`** (dùng chung cho khách và KTV)
+
+```json
+{ "enabled": true, "limit": 3, "windowHours": 24, "lockHours": 3,
+  "recentCancellations": 2, "remainingBeforeLock": 1, "lockedUntil": null }
+```
+
+**App cần làm:**
+
+1. **Cảnh báo trước khi hủy:** lúc người dùng bấm hủy một đơn `CONFIRMED`, gọi API trên. Nếu `remainingBeforeLock` là
+   `1`, hiện trong hộp xác nhận: *"Nếu hủy đơn này, bạn sẽ bị tạm khóa đặt đơn (KTV: nhận đơn) {lockHours} giờ."*
+2. **Sau khi hủy:** response hủy có thêm trường `cancelLimit`, cùng dạng với API trên:
+   - `PATCH /api/bookings/{id}/cancel`;
+   - `POST /api/technician/jobs/{id}/cancel`.
+
+   Nếu `lockedUntil` khác `null`, báo: *"Bạn đã hủy quá nhiều đơn, tạm khóa đến {giờ}."*
+3. **Khi bị chặn:** các API sau trả **409**:
+   - `POST /api/bookings` (khách);
+   - `POST /api/technician/jobs/{id}/apply` và `.../accept` (KTV).
+
+   ```json
+   { "code": "CANCEL_LIMIT_LOCKED", "message": "Ban da huy qua nhieu don, tam thoi chua the dat don moi",
+     "lockedUntil": "2026-11-12T12:00:00.000Z" }
+   ```
+
+   App bắt `code` này và hiện: *"Bạn đã hủy quá nhiều đơn. Bạn có thể đặt đơn (KTV: nhận đơn) lại sau {giờ địa
+   phương của lockedUntil}."*
+4. **Nên làm thêm:** khi vào luồng đặt đơn (khách) hoặc tab nhận đơn (KTV), gọi `GET /api/bookings/cancel-limit`. Nếu
+   `lockedUntil` khác `null` thì hiện luôn thông báo ở bước 3.
+
 ## Cách tự kiểm tra trên Swagger
 
 1. `PATCH /api/technician/application` với `idCardQr` = chuỗi app quét được → response có `idCardInfo` đúng tên trên thẻ.

@@ -51,6 +51,7 @@ import {
   UpdateAdminTechnicianPriceOptionDto,
   UpdateBannerDto,
   UpdateCategoryDto,
+  CancelOffendersQueryDto,
   UpdatePromotionDto,
   UpdateUserStatusDto,
 } from '../dto/marketplace.dto';
@@ -155,6 +156,14 @@ export class AdminMarketplaceController {
   @ApiOkResponse({ type: AdminUserListResponseDto })
   users(@Query() query: AdminUsersQueryDto) {
     return this.admin.users(query);
+  }
+  @Get('cancel-offenders')
+  @ApiOperation({
+    summary: 'Nguoi huy nhieu don da co KTV nhan (de admin xem xet khoa tai khoan)',
+    description: 'Chi tinh lan huy bi tinh vao gioi han huy. Khoa tai khoan bang PATCH users/:id/status.',
+  })
+  cancelOffenders(@Query() query: CancelOffendersQueryDto) {
+    return this.admin.cancelOffenders(query.days, query.minCancellations);
   }
   @Patch('users/:id/status')
   @ApiOperation({ summary: 'Khoa hoac mo khoa user' })

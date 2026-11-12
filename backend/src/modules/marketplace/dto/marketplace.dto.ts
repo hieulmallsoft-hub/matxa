@@ -307,6 +307,14 @@ export class CreateCategoryDto {
   @ApiProperty() @IsString() @MaxLength(100) slug!: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) iconUrl?: string;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(0) sortOrder?: number;
+  @ApiPropertyOptional({ description: 'Bat = huy don da co KTV nhan cua danh muc nay bi tinh vao gioi han huy (mac dinh bat).' })
+  @IsOptional() @IsBoolean() countsCancellations?: boolean;
+}
+
+/** Who cancelled many taken bookings lately, for the admin to review. */
+export class CancelOffendersQueryDto {
+  @ApiPropertyOptional({ example: 7, description: 'So ngay gan nhat' }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(90) days?: number;
+  @ApiPropertyOptional({ example: 3, description: 'Chi lay nguoi huy tu so lan nay tro len' }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) minCancellations?: number;
 }
 
 export class CreateBannerDto {
