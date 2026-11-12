@@ -22,7 +22,7 @@ describe('open marketplace selection', () => {
       booking: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findUniqueOrThrow: jest.fn().mockResolvedValue(booking),
-        findFirst: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue({ grossServiceAmount: 0 }),
+        findFirst: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue({ grossServiceAmount: 0 }),
         update: jest.fn().mockResolvedValue({
           ...booking,
           technicianId: 'tech-profile-1',

@@ -474,6 +474,24 @@ Trong chi tiết đơn (sau khi KTV được chọn), `address.phone` cũng có 
   `latitude`/`longitude` có thể `null` riêng: khi đó chỉ hiện địa chỉ, ẩn bản đồ.
 - Đơn mở tại cơ sở: mỗi KTV ứng tuyển trong `applications[]` cũng có `facility`, để khách so sánh trước khi chọn.
 
+**App KTV (sửa 12/11):** trước đây thẻ đơn mở tại cơ sở phía KTV không có địa chỉ nào để hiện (`addressText: null`).
+Giờ `GET /api/technician/jobs` và `GET /api/technician/jobs/{id}` có thêm `facility`, cùng dạng như trên.
+- Đây là cơ sở của **chính KTV đang xem**, tức là nơi khách sẽ đến.
+- Có giá trị khi đơn còn mở hoặc KTV đó đã nhận đơn.
+- `null` khi đơn đặt tại nhà, hoặc khi KTV khác đã nhận đơn.
+
+App KTV hiện `facility.name` và `facility.address` trên thẻ và trong chi tiết đơn, thay cho địa chỉ khách (đơn tại cơ
+sở không có địa chỉ khách).
+
+**KTV chưa nhập địa chỉ cơ sở** (hồ sơ không có `facility` hay `address`) thì không nhận được đơn tại cơ sở:
+- không được báo đơn mới;
+- không hiện trong danh sách gợi ý KTV cho khách;
+- ứng tuyển hoặc nhận đơn bị chặn.
+
+Lỗi trả về là `409 { "code": "FACILITY_REQUIRED", "message": "Vui long cap nhat dia chi co so truoc khi nhan don tai co so" }`.
+App bắt `code` này và mở màn sửa hồ sơ để KTV nhập cơ sở. Trong chi tiết đơn, lỗi này hiện thành
+`displayStatus: "UNAVAILABLE"` kèm `unavailableReason`.
+
 ## Q. Admin bật/tắt "Nơi phục vụ" (app khách + app KTV)
 
 Admin chọn nơi phục vụ nào đang mở (Tận nơi `HOME`, `ONLINE`, Cơ sở `ONSITE`). `GET /api/settings/public`
@@ -519,6 +537,21 @@ Khách đang có một đơn **chưa xong** thì `POST /api/bookings` trả **40
   thông báo trên, để khách không phải chọn dịch vụ xong mới bị chặn.
 
 Đặt lại được ngay khi đơn đó **hoàn thành**, **bị hủy**, hoặc (với đơn đang chờ) **hết hạn chờ**.
+
+**Tài khoản KTV (sửa 12/11):** mỗi tài khoản chỉ có **1 việc chưa xong**, dù là khách hay KTV. Response có thêm
+**`bookingRole`**:
+
+- KTV đang có **việc đã nhận** (`CONFIRMED`) thì không đặt đơn với tư cách khách được. Lỗi vẫn là
+  `409 BOOKING_ALREADY_WAITING`, kèm `"bookingRole": "TECHNICIAN"` và thông báo *"Ban dang co viec KTV chua hoan thanh…"*.
+  Khi đó nút **Xem đơn** mở **việc KTV** qua `GET /api/technician/jobs/{bookingId}`, không mở đơn khách.
+- `"bookingRole": "CUSTOMER"`: giữ như cũ, nút Xem đơn mở `GET /api/bookings/{bookingId}`.
+- Chiều ngược lại: KTV đang có đơn **đặt với tư cách khách** chưa xong (đang chờ hoặc đã có người nhận) thì:
+  - không được báo đơn mới;
+  - không hiện trong gợi ý KTV;
+  - không ứng tuyển được. Chi tiết đơn trả `UNAVAILABLE` với lý do *"KTV dang co don dat voi tu cach khach chua xong…"*.
+
+  KTV đã ứng tuyển từ trước mà sau đó tự đặt đơn với tư cách khách thì khách bên kia sẽ không chọn được KTV này.
+- KTV mới **ứng tuyển** (chưa được chọn) thì vẫn đặt đơn với tư cách khách được.
 
 ## S. Đơn có chọn KTV tính đúng giá của KTV đó (12/11, app không phải sửa)
 

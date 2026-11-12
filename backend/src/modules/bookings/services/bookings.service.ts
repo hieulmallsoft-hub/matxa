@@ -475,6 +475,8 @@ export class BookingsService {
         city: dto.city,
         ...(dto.district ? { district: dto.district } : {}),
         serviceModes: { has: dto.mode },
+        // At a facility the customer must know where to go: technicians without one are not suggested.
+        ...(dto.mode === 'ONSITE' ? { AND: [{ OR: [{ facility: { not: null } }, { address: { not: null } }] }] } : {}),
         // A technician booking for themselves never sees their own profile among the candidates.
         user: { id: { not: userId }, status: 'ACTIVE', role: 'TECHNICIAN', ...(dto.search ? { displayName: { contains: dto.search, mode: 'insensitive' } } : {}), technicianApplication: { is: { status: 'APPROVED' } } },
         services: { some: { isActive: true, catalogServiceId: { in: serviceIds }, modes: { has: dto.mode } } },
@@ -493,7 +495,7 @@ export class BookingsService {
         this.prisma.availabilitySlot.findFirst({ where: { technicianId: candidate.id, isAvailable: true, startAt: { lte: start }, endAt: { gte: end } } }),
         // One unfinished confirmed booking at a time (same rule as assertOpenEligibility), whatever its hour.
         // …and not while they are being served themselves as a customer.
-        this.prisma.booking.findFirst({ where: { status: 'CONFIRMED', OR: [{ technicianId: candidate.id }, { customerId: candidate.userId }] }, select: { id: true } }),
+        this.prisma.booking.findFirst({ where: { OR: [{ status: 'CONFIRMED', technicianId: candidate.id }, unfinishedAsCustomer(candidate.userId)] }, select: { id: true } }),
         this.prisma.technicianService.findMany({ where: { technicianId: candidate.id, isActive: true, catalogServiceId: { in: serviceIds }, modes: { has: dto.mode } }, select: { catalogServiceId: true, categoryId: true } }),
       ]);
       const hasAllServices = services.every((service: any) => matchingServices.some((item: any) => item.catalogServiceId === service.id && item.categoryId === service.categoryId));
@@ -545,16 +547,7 @@ export class BookingsService {
   private async assertNoWaitingBooking(tx: Prisma.TransactionClient, customerId: string, lock = true) {
     if (lock) await tx.$queryRaw(Prisma.sql`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext(${customerId}))) AS locked`);
     const waiting = await tx.booking.findFirst({
-      where: {
-        customerId,
-        OR: [
-          { status: 'CONFIRMED' },
-          {
-            status: { in: ['OPEN', 'PENDING'] },
-            OR: [{ applicationDeadlineAt: null }, { applicationDeadlineAt: { gt: new Date() } }],
-          },
-        ],
-      },
+      where: unfinishedAsCustomer(customerId),
       select: { id: true, status: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -567,6 +560,21 @@ export class BookingsService {
             : 'Ban dang co don cho KTV nhan. Vui long doi hoac huy don do truoc khi dat don moi',
         bookingId: waiting.id,
         bookingStatus: waiting.status,
+        bookingRole: 'CUSTOMER',
+      });
+    // A technician account booking as a customer: one unfinished thing at a time, so not while a job it took is open.
+    const job = await tx.booking.findFirst({
+      where: { status: 'CONFIRMED', technician: { is: { userId: customerId } } },
+      select: { id: true, status: true },
+      orderBy: { scheduledStart: 'asc' },
+    });
+    if (job)
+      throw new ConflictException({
+        code: 'BOOKING_ALREADY_WAITING',
+        message: 'Ban dang co viec KTV chua hoan thanh. Vui long hoan thanh viec do truoc khi dat don moi',
+        bookingId: job.id,
+        bookingStatus: job.status,
+        bookingRole: 'TECHNICIAN',
       });
   }
 
@@ -1927,7 +1935,8 @@ export class BookingsService {
   private async requireActiveTechnician(userId: string) {
     const profile = await this.prisma.technicianProfile.findFirst({
       where: { userId, isActive: true, isVerified: true, user: { status: 'ACTIVE' } },
-      select: { id: true, latitude: true, longitude: true },
+      // Location for distances; facility fields for ONSITE job cards.
+      select: { id: true, latitude: true, longitude: true, facility: true, address: true, city: true, district: true },
     });
     if (!profile) throw new ForbiddenException('Tai khoan KTV chua du dieu kien nhan don');
     return profile;
@@ -1963,7 +1972,7 @@ export class BookingsService {
         isVerified: true,
         user: { status: 'ACTIVE', role: 'TECHNICIAN', technicianApplication: { is: { status: 'APPROVED' } } },
       },
-      select: { id: true, userId: true, city: true, district: true, serviceModes: true, latitude: true, longitude: true },
+      select: { id: true, userId: true, city: true, district: true, serviceModes: true, latitude: true, longitude: true, facility: true, address: true },
     });
     if (!profile) throw new ForbiddenException('Tai khoan KTV chua du dieu kien nhan don');
     // An account that booked as a customer (before becoming a technician) must not serve its own booking:
@@ -1983,6 +1992,9 @@ export class BookingsService {
       throw new ForbiddenException('KTV khong phu hop quan huyen cua don');
     if (!profile.serviceModes.includes(booking.mode))
       throw new ForbiddenException('KTV khong ho tro hinh thuc dich vu nay');
+    // The customer comes to the technician's facility, so one without an address cannot take it.
+    if (booking.mode === 'ONSITE' && !profile.facility?.trim() && !profile.address?.trim())
+      throw new ConflictException({ statusCode: 409, code: 'FACILITY_REQUIRED', message: 'Vui long cap nhat dia chi co so truoc khi nhan don tai co so' });
     const unfinished = await db.booking.findFirst({
       where: {
         technicianId: profile.id,
@@ -1992,6 +2004,12 @@ export class BookingsService {
       select: { id: true },
     });
     if (unfinished) throw new ConflictException('KTV phai hoan thanh don hien tai truoc khi nhan don moi');
+    // Nor while the account has its own booking (as a customer) waiting or not finished.
+    const ownBooking = await db.booking.findFirst({
+      where: { ...unfinishedAsCustomer(profile.userId), id: { not: booking.id } },
+      select: { id: true },
+    });
+    if (ownBooking) throw new ConflictException('KTV dang co don dat voi tu cach khach chua xong, chua the nhan don moi');
     const catalogItems = (booking.items ?? []).map((item: any) => item.catalogService).filter(Boolean);
     if (!catalogItems.length || catalogItems.length !== (booking.items ?? []).length)
       throw new BadRequestException('Du lieu dich vu OPEN khong hop le');
@@ -2092,6 +2110,16 @@ export class BookingsService {
       // Full street address as text so the technician can judge the trip; coordinates (`address`) stay hidden until selected.
       addressText: booking.mode === 'HOME' ? (booking.addressSnapshot?.address ?? booking.addressSnapshot?.addressText ?? null) : null,
       addressPreview: booking.mode === 'HOME' ? addressPreview(booking.addressSnapshot) : null,
+      // ONSITE: the facility the customer goes to. For a technician that is their own (open or theirs; null once
+      // another took it); for the customer, the assigned technician's.
+      facility:
+        booking.mode === 'ONSITE'
+          ? facilityLocation(
+              viewerTechnicianId
+                ? !booking.technicianId || booking.technicianId === viewerTechnicianId ? viewerLocation : null
+                : booking.technician,
+            )
+          : null,
       city: booking.addressSnapshot?.city ?? null,
       district: booking.addressSnapshot?.district ?? null,
       distanceKm: kmBetween(booking.addressSnapshot, viewerLocation),
@@ -2619,6 +2647,17 @@ export class BookingsService {
       this.logger.warn(`Khong gui duoc push ${type}: ${error instanceof Error ? error.message : 'khong ro ly do'}`);
     }
   }
+}
+
+/** Bookings a user made as a customer that are not finished: waiting for a technician (before the deadline) or taken. */
+function unfinishedAsCustomer(customerId: string): Prisma.BookingWhereInput {
+  return {
+    customerId,
+    OR: [
+      { status: 'CONFIRMED' },
+      { status: { in: ['OPEN', 'PENDING'] }, OR: [{ applicationDeadlineAt: null }, { applicationDeadlineAt: { gt: new Date() } }] },
+    ],
+  };
 }
 
 /** Public location of a technician's facility for an ONSITE booking; null when the profile has none. */

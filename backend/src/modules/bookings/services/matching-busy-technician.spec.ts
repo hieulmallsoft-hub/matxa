@@ -18,8 +18,8 @@ describe('matching technicians', () => {
       // "busy" is doing a confirmed booking (any hour); "served" booked another technician as a customer and it was taken.
       booking: {
         findFirst: jest.fn(async ({ where }: any) =>
-          where.status === 'CONFIRMED' && !where.scheduledStart &&
-          (where.OR ?? []).some((c: any) => c.technicianId === 'busy' || c.customerId === 'served-user') ? { id: 'other' } : null),
+          !where.scheduledStart &&
+          (where.OR ?? []).some((c: any) => (c.status === 'CONFIRMED' && c.technicianId === 'busy') || c.customerId === 'served-user') ? { id: 'other' } : null),
       },
       technicianService: { findMany: jest.fn().mockResolvedValue([{ catalogServiceId: 'catalog-1', categoryId: 'category-1' }]) },
     };

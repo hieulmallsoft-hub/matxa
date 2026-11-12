@@ -39,7 +39,7 @@ describe('travel fee when the customer picks a technician', () => {
       booking: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findUniqueOrThrow: jest.fn().mockResolvedValue(booking),
-        findFirst: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue({ grossServiceAmount: 0 }),
+        findFirst: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue({ grossServiceAmount: 0 }),
         update: jest.fn(async ({ data }: any) => ({ ...booking, ...data, payment: { method: 'CASH' } })),
       },
       bookingTechnicianApplication: {
