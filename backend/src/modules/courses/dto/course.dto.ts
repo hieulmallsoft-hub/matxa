@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
 
 export enum CourseAccessDto { FREE = 'FREE', VIP = 'VIP' }
@@ -12,7 +12,8 @@ export class CreateCourseDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isPublished?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) sortOrder?: number;
 }
-export class UpdateCourseDto extends CreateCourseDto {}
+/** Only the fields sent are changed. */
+export class UpdateCourseDto extends PartialType(CreateCourseDto) {}
 export class CreateLessonDto {
   @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(180) title!: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(3000) description?: string;
@@ -20,7 +21,12 @@ export class CreateLessonDto {
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) durationSeconds?: number;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) sortOrder?: number;
 }
-export class UpdateLessonDto extends CreateLessonDto {}
+/** Only the fields sent are changed (renaming is not required to change the rest). */
+export class UpdateLessonDto extends PartialType(CreateLessonDto) {}
+export class UpdateMediaDto {
+  @ApiPropertyOptional({ example: 'Video huong dan phan 1' }) @IsOptional() @IsString() @IsNotEmpty() @MaxLength(180) title?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) sortOrder?: number;
+}
 export class CreateMediaUploadUrlDto {
   @ApiProperty({ enum: CourseMediaTypeDto }) @IsEnum(CourseMediaTypeDto) type!: CourseMediaTypeDto;
   @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(180) fileName!: string;

@@ -657,6 +657,49 @@ không phải sửa gì.
 không còn hiện trong hồ sơ KTV, danh sách KTV và giá "từ …". App không phải sửa gì. KTV muốn bán lại thì thêm dịch vụ
 từ danh mục chung.
 
+## X. Tài khoản bị khóa / hồ sơ KTV bị ẩn (app khách + app KTV, 13/11)
+
+**Tài khoản bị khóa:** admin khóa tài khoản thì người dùng bị **đăng xuất khỏi mọi thiết bị**.
+
+Trước đây app chỉ nhận `401 "Access token khong hop le hoac da het han"`, giống hết phiên đăng nhập. Đăng nhập lại bằng
+email thì báo "Email hoac mat khau khong dung". Giờ mọi API và mọi kiểu đăng nhập (email đúng mật khẩu, Google,
+Apple, số điện thoại, `/auth/refresh`) đều trả:
+
+```json
+403 { "code": "ACCOUNT_BLOCKED", "message": "Tai khoan da bi khoa",
+      "reason": "Huy don lien tuc, nghi gian lan", "blockedAt": "2026-11-13T03:00:00.000Z" }
+```
+
+App cần:
+- bắt `code = "ACCOUNT_BLOCKED"` ở **mọi** response, kể cả màn đăng nhập;
+- **không** coi lỗi này là hết phiên đăng nhập, **không** tự gọi refresh;
+- xóa token đã lưu, rồi hiện màn: *"Tài khoản của bạn đã bị khóa. Lý do: {reason}. Liên hệ hotline {hotline} để được
+  hỗ trợ."* Lấy `hotline` từ `GET /api/settings/public`.
+
+**Hồ sơ KTV bị ẩn (app KTV):** khác với khóa tài khoản, KTV vẫn đăng nhập được, nhưng:
+- khách không thấy hồ sơ;
+- KTV không nhận được đơn mới.
+
+KTV nhận thông báo `TECHNICIAN_PROFILE_HIDDEN` "Hồ sơ của bạn đang tạm ẩn", kèm lý do. Khi hiện lại thì nhận
+`TECHNICIAN_PROFILE_SHOWN`. Cả hai đều có `actionUrl: matxa://technician/profile`.
+
+Các API của KTV (`/api/technician/jobs`…) trả:
+
+```json
+403 { "code": "PROFILE_HIDDEN", "message": "Ho so KTV dang tam an", "reason": "Anh dai dien khong phu hop" }
+```
+
+App KTV hiện banner trên tab nhận đơn: *"Hồ sơ đang tạm ẩn: {reason}. Liên hệ CSKH."*, thay cho lỗi chung chung.
+
+## Y. Khóa học: ảnh minh họa bài học, tên file tiếng Việt (app khách + app KTV, 13/11)
+
+- `GET /api/courses` và `GET /api/courses/{id}`: mỗi bài học trong `lessons[]` có thêm:
+  - **`thumbnailUrl`**: ảnh minh họa, link có chữ ký, dùng được 24 giờ. `null` nếu bài chưa có ảnh;
+  - `description` (trước đây danh sách khóa học không trả mô tả bài).
+- App hiện `thumbnailUrl` ở thẻ bài học. Nếu `null` thì dùng ảnh bìa khóa học (`coverUrl`) hoặc ảnh mặc định.
+- Tên file tiếng Việt trước đây bị lỗi font (ví dụ "YÃªu cáº§u…") đã được sửa lại thành "Yêu cầu…". File tải lên từ nay
+  giữ đúng tên. App không phải sửa gì.
+
 ## Cách tự kiểm tra trên Swagger
 
 1. `PATCH /api/technician/application` với `idCardQr` = chuỗi app quét được → response có `idCardInfo` đúng tên trên thẻ.

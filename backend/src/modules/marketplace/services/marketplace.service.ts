@@ -787,12 +787,13 @@ export class MarketplaceService {
   }
 
   private technicianCard(
-    profile: Prisma.TechnicianProfileGetPayload<{
+    // The admin's hidden reason is never part of a public card.
+    profile: Omit<Prisma.TechnicianProfileGetPayload<{
       include: {
         user: { select: { id: true; displayName: true; avatarUrl: true } };
         services: { select: { price: true; modes: true } };
       };
-    }>,
+    }>, 'hiddenReason'>,
     isFavorite: boolean,
     distanceKm: number | null = null,
   ) {

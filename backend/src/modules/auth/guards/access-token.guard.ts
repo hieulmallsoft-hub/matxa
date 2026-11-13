@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../../database/prisma.service';
 import { AccessTokenPayload } from '../entities/access-token-payload.entity';
 import { AuthenticatedRequest } from '../entities/auth-request.entity';
+import { accountBlocked } from '../account-blocked';
 
 @Injectable()
 export class AccessTokenGuard implements CanActivate {
@@ -19,28 +20,33 @@ export class AccessTokenGuard implements CanActivate {
       throw new UnauthorizedException('Thieu access token');
     }
 
+    let payload: AccessTokenPayload;
     try {
-      const payload = await this.jwtService.verifyAsync<AccessTokenPayload>(token);
-      const session = await this.prisma.session.findFirst({
-        where: {
-          id: payload.sid,
-          userId: payload.sub,
-          revokedAt: null,
-          expiresAt: { gt: new Date() },
-          user: { status: 'ACTIVE' },
-        },
-        select: { id: true },
-      });
-
-      if (!session) {
-        throw new UnauthorizedException();
-      }
-
-      request.auth = payload;
-      return true;
+      payload = await this.jwtService.verifyAsync<AccessTokenPayload>(token);
     } catch {
       throw new UnauthorizedException('Access token khong hop le hoac da het han');
     }
+    const session = await this.prisma.session.findFirst({
+      where: {
+        id: payload.sid,
+        userId: payload.sub,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+        user: { status: 'ACTIVE' },
+      },
+      select: { id: true },
+    });
+    if (!session) {
+      // A blocked account gets its reason, not "token expired" (blocking also signs every device out).
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: { status: true, blockedReason: true, blockedAt: true },
+      });
+      if (user?.status === 'BLOCKED') throw accountBlocked(user);
+      throw new UnauthorizedException('Access token khong hop le hoac da het han');
+    }
+    request.auth = payload;
+    return true;
   }
 
   private extractBearerToken(header?: string): string | undefined {

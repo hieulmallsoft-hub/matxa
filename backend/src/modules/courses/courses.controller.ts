@@ -4,7 +4,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AccessTokenGuard } from '../auth/guards/access-token.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { CreateCourseDto, CreateCoverUploadUrlDto, CreateLessonDto, CreateMediaDto, CreateMediaUploadUrlDto, UpdateCourseDto, UpdateLessonDto } from './dto/course.dto';
+import { CreateCourseDto, CreateCoverUploadUrlDto, CreateLessonDto, CreateMediaDto, CreateMediaUploadUrlDto, UpdateCourseDto, UpdateLessonDto, UpdateMediaDto } from './dto/course.dto';
 import { CoursesService } from './courses.service';
 
 @ApiTags('Courses')
@@ -41,5 +41,10 @@ export class AdminCoursesController {
   @UseInterceptors(FileInterceptor('file'))
   uploadMedia(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: any, @Body('type') type: string) { return this.courses.uploadMedia(id, file, type); }
   @Delete('media/:id') removeMedia(@Param('id', ParseUUIDPipe) id: string) { return this.courses.removeMedia(id); }
+  @Patch('media/:id') updateMedia(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateMediaDto) { return this.courses.updateMedia(id, dto); }
+  @Post('lessons/:id/thumbnail-upload')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  uploadLessonThumbnail(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: any) { return this.courses.uploadLessonThumbnail(id, file); }
+  @Delete('lessons/:id/thumbnail') removeLessonThumbnail(@Param('id', ParseUUIDPipe) id: string) { return this.courses.removeLessonThumbnail(id); }
   @Post('lessons/:id/media') createMedia(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateMediaDto) { return this.courses.createMedia(id, dto); }
 }

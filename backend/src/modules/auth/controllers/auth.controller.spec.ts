@@ -59,7 +59,7 @@ describe('Auth HTTP contracts (mocked business service, real validation and guar
         AccessTokenGuard,
         { provide: AuthService, useValue: service },
         { provide: JwtService, useValue: jwt },
-        { provide: PrismaService, useValue: { session } },
+        { provide: PrismaService, useValue: { session, user: { findUnique: jest.fn().mockResolvedValue({ status: 'ACTIVE' }) } } },
       ],
     }).compile();
     app = module.createNestApplication();
@@ -126,5 +126,15 @@ describe('Auth HTTP contracts (mocked business service, real validation and guar
     expect(service[serviceMethod]).toHaveBeenCalledTimes(1);
     session.findFirst.mockResolvedValueOnce(null);
     expect((await fetch(`${base}/${path}`, { method, headers })).status).toBe(401);
+  });
+
+  it('tells a blocked account why instead of "token expired"', async () => {
+    const prisma = app.get(PrismaService) as any;
+    session.findFirst.mockResolvedValueOnce(null);
+    prisma.user.findUnique.mockResolvedValueOnce({ status: 'BLOCKED', blockedReason: 'Huy don lien tuc', blockedAt: new Date() });
+    const token = jwt.sign({ sub: 'user', sid: 'session' });
+    const response = await fetch(`${base}/me`, { headers: { Authorization: `Bearer ${token}` } });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: 'ACCOUNT_BLOCKED', reason: 'Huy don lien tuc' });
   });
 });

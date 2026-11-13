@@ -16,6 +16,7 @@ import {
   ChevronRight,
   GraduationCap,
   Globe,
+  Pencil,
 } from 'lucide-react';
 
 type Media = { id: string; type: string; title?: string | null; contentType: string };
@@ -25,6 +26,7 @@ type Lesson = {
   description?: string | null;
   durationSeconds?: number | null;
   access: 'FREE' | 'VIP';
+  thumbnailUrl?: string | null;
   media: Media[];
 };
 type Course = {
@@ -80,7 +82,8 @@ const mediaIcon = (type: string) => {
 };
 
 export function CourseManagementPanel({ notify }: { notify: (message: string, error?: boolean) => void }) {
-  const { confirm, dialog } = useConfirm();
+  const { confirm, prompt, dialog } = useConfirm();
+  const [editingLesson, setEditingLesson] = useState<string | null>(null);
   const [courses, setCourses] = useState<Course[]>(FALLBACK_COURSES);
   const [selected, setSelected] = useState<Course | null>(FALLBACK_COURSES[0]);
   const [editing, setEditing] = useState(false);
@@ -222,6 +225,78 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
       const result = await request<{ mediaUrl: string }>(`/courses/media/${media.id}/url`);
       window.open(result.mediaUrl, '_blank', 'noopener,noreferrer');
     } catch (err) { notify(err instanceof Error ? err.message : 'Không mở được media', true); }
+  }
+
+  async function refreshSelected() {
+    if (!selected) return;
+    setSelected(await request<Course>(`/admin/courses/${selected.id}`));
+    await load();
+  }
+
+  async function saveLesson(e: FormEvent<HTMLFormElement>, lesson: Lesson) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setBusy(true);
+    try {
+      await request(`/admin/courses/lessons/${lesson.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          title: String(f.get('title') ?? '').trim(),
+          description: String(f.get('description') ?? '').trim(),
+          durationSeconds: Number(f.get('durationMinutes') || 0) * 60,
+          access: f.get('access'),
+        }),
+      });
+      const image = f.get('thumbnail');
+      if (image instanceof File && image.size) {
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(image.type)) throw new Error('Ảnh minh họa phải là JPG, PNG hoặc WEBP');
+        if (image.size > 5 * 1024 * 1024) throw new Error('Ảnh minh họa tối đa 5MB');
+        // Through the API: the S3 bucket does not accept direct browser uploads (no CORS).
+        const body = new FormData();
+        body.append('file', image);
+        await request(`/admin/courses/lessons/${lesson.id}/thumbnail-upload`, { method: 'POST', body });
+      }
+      notify('Đã cập nhật bài học');
+      setEditingLesson(null);
+      await refreshSelected();
+    } catch (err) { notify(err instanceof Error ? err.message : 'Không cập nhật được bài học', true); }
+    finally { setBusy(false); }
+  }
+
+  async function removeLessonThumbnail(lesson: Lesson) {
+    try {
+      await request(`/admin/courses/lessons/${lesson.id}/thumbnail`, { method: 'DELETE' });
+      notify('Đã gỡ ảnh minh họa');
+      await refreshSelected();
+    } catch (err) { notify(err instanceof Error ? err.message : 'Không gỡ được ảnh', true); }
+  }
+
+  async function removeLesson(lesson: Lesson) {
+    if (!(await confirm({ title: 'Xóa bài học?', message: `"${lesson.title}" cùng toàn bộ file của bài sẽ bị xóa.`, confirmText: 'Xóa bài học' }))) return;
+    try {
+      await request(`/admin/courses/lessons/${lesson.id}`, { method: 'DELETE' });
+      notify('Đã xóa bài học');
+      await refreshSelected();
+    } catch (err) { notify(err instanceof Error ? err.message : 'Không xóa được bài học', true); }
+  }
+
+  async function renameMedia(media: Media) {
+    const title = await prompt({
+      title: 'Đổi tên file',
+      message: 'Tên này hiện trong bài học trên app.',
+      defaultValue: media.title ?? '',
+      placeholder: 'Tên file',
+      confirmText: 'Lưu tên',
+      tone: 'primary',
+      required: true,
+      minLength: 1,
+    });
+    if (!title || title === media.title) return;
+    try {
+      await request(`/admin/courses/media/${media.id}`, { method: 'PATCH', body: JSON.stringify({ title }) });
+      notify('Đã đổi tên file');
+      await refreshSelected();
+    } catch (err) { notify(err instanceof Error ? err.message : 'Không đổi được tên', true); }
   }
 
   async function removeMedia(media: Media) {
@@ -522,6 +597,13 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
                         <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-[#EAF5EC] text-[#2E7D4A] text-xs font-bold flex items-center justify-center">
                           {idx + 1}
                         </div>
+                        {lesson.thumbnailUrl ? (
+                          <img src={lesson.thumbnailUrl} alt="" className="flex-shrink-0 w-16 h-12 rounded-lg object-cover border border-[#E5EBE5]" />
+                        ) : (
+                          <div className="flex-shrink-0 w-16 h-12 rounded-lg border border-dashed border-[#D5DED6] bg-white flex items-center justify-center" title="Chưa có ảnh minh họa">
+                            <ImageIcon className="w-4 h-4 text-[#C4D2C6]" />
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm text-[#1C2B20] leading-snug">{lesson.title}</p>
                           {lesson.description && <p className="text-xs text-[#66756B] mt-0.5">{lesson.description}</p>}
@@ -540,8 +622,51 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
                             )}
                           </div>
                         </div>
-                        <ChevronRight className="w-4 h-4 text-[#C4D2C6] flex-shrink-0 mt-0.5" />
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setEditingLesson(editingLesson === lesson.id ? null : lesson.id)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-[#2E7D4A] hover:bg-[#EAF5EC] transition-colors"
+                          >
+                            <Pencil className="w-3 h-3" /> Sửa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void removeLesson(lesson)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-[#E05B55] hover:bg-[#FDF0EF] transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" /> Xóa
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Edit lesson */}
+                      {editingLesson === lesson.id && (
+                        <form onSubmit={(e) => void saveLesson(e, lesson)} className="px-4 py-3 border-t border-[#F1F5EF] bg-white space-y-2.5">
+                          <input name="title" required defaultValue={lesson.title} placeholder="Tên bài học *" className="w-full px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-sm focus:outline-none focus:border-[#2E7D4A]" />
+                          <textarea name="description" rows={2} defaultValue={lesson.description ?? ''} placeholder="Mô tả ngắn" className="w-full px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-sm focus:outline-none focus:border-[#2E7D4A]" />
+                          <div className="grid grid-cols-2 gap-2">
+                            <input name="durationMinutes" type="number" min="0" defaultValue={lesson.durationSeconds ? Math.ceil(lesson.durationSeconds / 60) : ''} placeholder="Thời lượng (phút)" className="px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-sm focus:outline-none focus:border-[#2E7D4A]" />
+                            <select name="access" defaultValue={lesson.access} className="px-3 py-2 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-sm focus:outline-none focus:border-[#2E7D4A]">
+                              <option value="FREE">Miễn phí</option>
+                              <option value="VIP">Platinum</option>
+                            </select>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[11px] font-semibold text-[#1C2B20]">Ảnh minh họa (JPG/PNG/WEBP, tối đa 5MB):</span>
+                            <input name="thumbnail" type="file" accept="image/jpeg,image/png,image/webp" className="text-[11px] text-[#66756B] min-w-0" />
+                            {lesson.thumbnailUrl && (
+                              <button type="button" onClick={() => void removeLessonThumbnail(lesson)} className="text-[11px] font-semibold text-[#E05B55] hover:underline">
+                                Gỡ ảnh hiện tại
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button type="submit" disabled={busy} className="flex-1 py-2 rounded-xl bg-[#2E7D4A] text-white text-xs font-semibold hover:bg-[#256A3E] disabled:opacity-60 transition-colors">{busy ? 'Đang lưu…' : 'Lưu bài học'}</button>
+                            <button type="button" onClick={() => setEditingLesson(null)} className="px-4 py-2 rounded-xl border border-[#E5EBE5] text-[#66756B] text-xs font-semibold hover:bg-[#F6F8F4] transition-colors">Hủy</button>
+                          </div>
+                        </form>
+                      )}
 
                       {/* Media list */}
                       {lesson.media.length > 0 && (
@@ -555,6 +680,7 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
                               {mediaIcon(m.type)}
                               <span className="max-w-[120px] truncate">{m.title || (m.type === 'VIDEO' ? 'Video' : m.type === 'PDF' ? 'PDF' : 'Ảnh')}</span>
                               <Eye className="w-3 h-3 opacity-50" />
+                              <span role="button" tabIndex={0} onClick={(event) => { event.stopPropagation(); void renameMedia(m); }} className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-[#EAF5EC] px-1.5 text-[#2E7D4A] hover:bg-[#DDF0E1]" title="Đổi tên file" aria-label="Đổi tên file"><Pencil className="w-3 h-3" /></span>
                               <button type="button" onClick={(event) => { event.stopPropagation(); void removeMedia(m); }} className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-red-50 px-1.5 text-sm font-bold leading-none text-red-500 hover:bg-red-100 hover:text-red-700" title="Gỡ media" aria-label="Gỡ media">×</button>
                             </button>
                           ))}

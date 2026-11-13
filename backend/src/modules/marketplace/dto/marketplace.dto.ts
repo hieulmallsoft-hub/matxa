@@ -20,6 +20,7 @@ import {
   Min,
   MinLength,
   Matches,
+  ValidateIf,
 } from 'class-validator';
 import { ServicePriceRange } from './service-price';
 
@@ -402,10 +403,19 @@ export class RevenueReportQueryDto {
 
 export class UpdateUserStatusDto {
   @ApiProperty({ enum: ['ACTIVE', 'BLOCKED'] }) @IsIn(['ACTIVE', 'BLOCKED']) status!: 'ACTIVE' | 'BLOCKED';
+  @ApiPropertyOptional({ example: 'Huy don lien tuc, nghi gian lan', description: 'Bat buoc khi khoa (BLOCKED). Nguoi dung thay ly do nay.' })
+  @ValidateIf((dto) => dto.status === 'BLOCKED')
+  @IsString({ message: 'Vui long nhap ly do khoa tai khoan' })
+  @MinLength(3, { message: 'Vui long nhap ly do khoa tai khoan' })
+  @MaxLength(500)
+  reason?: string;
 }
 
 export class UpdateAdminTechnicianDto extends PartialType(UpsertTechnicianProfileDto) {
-  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+  @ApiPropertyOptional({ description: 'false = an ho so (khach khong thay, KTV khong nhan duoc don; van dang nhap duoc).' })
+  @IsOptional() @IsBoolean() isActive?: boolean;
+  @ApiPropertyOptional({ example: 'Anh dai dien khong phu hop', description: 'Ly do an ho so, KTV duoc thong bao.' })
+  @IsOptional() @IsString() @MaxLength(500) hiddenReason?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isVerified?: boolean;
 }
 

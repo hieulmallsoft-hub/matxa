@@ -12,6 +12,9 @@ export interface ConfirmDialogProps {
   cancelText?: string;
   tone?: 'danger' | 'warning' | 'primary';
   isLoading?: boolean;
+  /** Extra content under the message, e.g. a reason field. */
+  children?: React.ReactNode;
+  confirmDisabled?: boolean;
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -24,6 +27,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   cancelText = 'Hủy bỏ',
   tone = 'danger',
   isLoading = false,
+  children,
+  confirmDisabled = false,
 }) => {
   if (!isOpen) return null;
 
@@ -85,6 +90,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               <p className="text-xs text-[#66756B] mt-1 leading-relaxed">{message}</p>
             </div>
           </div>
+          {children}
 
           <div className="pt-2 flex items-center justify-end gap-2.5">
             <button
@@ -98,7 +104,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             <button
               type="button"
               onClick={onConfirm}
-              disabled={isLoading}
+              disabled={isLoading || confirmDisabled}
               className={`px-4 py-2 rounded-xl text-xs font-semibold shadow-md transition-all flex items-center gap-2 cursor-pointer ${current.btnBg}`}
             >
               {isLoading && (

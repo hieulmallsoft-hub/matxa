@@ -55,7 +55,7 @@ function useDebounced<T>(value: T, delay = 350) {
 
 export const CustomersPage: React.FC = () => {
   const { addToast } = useToast();
-  const { confirm, dialog } = useConfirm();
+  const { prompt, dialog } = useConfirm();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'ALL' | UserStatus>('ALL');
   const [page, setPage] = useState(1);
@@ -98,19 +98,21 @@ export const CustomersPage: React.FC = () => {
   // A new search or filter starts from the first page.
   useEffect(() => setPage(1), [query, status]);
 
+  const askBlockReason = (name: string) =>
+    prompt({
+      title: `Khóa tài khoản ${name}?`,
+      message: 'Tài khoản bị đăng xuất khỏi mọi thiết bị, không đăng nhập và đặt lịch được cho tới khi mở khóa. Người dùng thấy lý do bên dưới.',
+      placeholder: 'Lý do khóa (bắt buộc, người dùng sẽ thấy)',
+      confirmText: 'Khóa tài khoản',
+      required: true,
+    });
+
   const setUserStatus = async (customer: Customer, next: 'ACTIVE' | 'BLOCKED') => {
-    if (
-      next === 'BLOCKED' &&
-      !(await confirm({
-        title: 'Khóa tài khoản?',
-        message: `${customer.displayName || 'Khách hàng'} sẽ không đăng nhập và đặt lịch được cho tới khi mở khóa.`,
-        confirmText: 'Khóa tài khoản',
-      }))
-    )
-      return;
+    const reason = next === 'BLOCKED' ? await askBlockReason(customer.displayName || 'Khách hàng') : null;
+    if (next === 'BLOCKED' && !reason) return;
     setBusy(customer.id);
     try {
-      await request(`/admin/marketplace/users/${customer.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: next }) });
+      await request(`/admin/marketplace/users/${customer.id}/status`, { method: 'PATCH', body: JSON.stringify(next === 'BLOCKED' ? { status: next, reason } : { status: next }) });
       const updated = { ...customer, status: next };
       setData((current) => current && { ...current, items: current.items.map((item) => (item.id === customer.id ? updated : item)) });
       setSelected((current) => (current?.id === customer.id ? updated : current));
@@ -137,10 +139,10 @@ export const CustomersPage: React.FC = () => {
 
   // From the "Hủy đơn nhiều" list, which also holds technicians.
   const blockOffender = async (userId: string, name: string) => {
-    if (!(await confirm({ title: 'Khóa tài khoản?', message: `${name} sẽ không đăng nhập, đặt lịch hay nhận đơn được cho tới khi mở khóa.`, confirmText: 'Khóa tài khoản' })))
-      return false;
+    const reason = await askBlockReason(name);
+    if (!reason) return false;
     try {
-      await request(`/admin/marketplace/users/${userId}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'BLOCKED' }) });
+      await request(`/admin/marketplace/users/${userId}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'BLOCKED', reason }) });
       addToast({ title: 'Đã khóa tài khoản', message: name, type: 'success' });
       void load();
       void loadTotals();

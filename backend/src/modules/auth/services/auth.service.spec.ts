@@ -279,9 +279,9 @@ describe('AuthService', () => {
   it('does not issue a session for a blocked Apple user', async () => {
     appleTokenVerifier.verify.mockResolvedValue({ subject: 'apple-user', emailVerified: false });
     transaction.user.update.mockResolvedValueOnce({ id: 'user-id', status: 'BLOCKED', identities: [] });
-    await expect(service.loginWithApple('token', 'nonce', undefined, {})).rejects.toThrow(
-      'Tai khoan khong con hoat dong',
-    );
+    await expect(service.loginWithApple('token', 'nonce', undefined, {})).rejects.toMatchObject({
+      response: { code: 'ACCOUNT_BLOCKED' },
+    });
     expect(prisma.session.create).not.toHaveBeenCalled();
   });
 

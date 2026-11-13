@@ -1,5 +1,6 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
+import { NotificationsService } from '../../notifications/services/notifications.service';
 import {
   AdminBookingsQueryDto,
   AdminPageDto,
@@ -27,7 +28,10 @@ const duplicatePromotionCode = (error: unknown): never => {
 
 @Injectable()
 export class AdminMarketplaceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly notifications?: NotificationsService,
+  ) {}
 
   async revenueReport(period: RevenuePeriod = 'month', now = new Date()) {
     const months = monthRanges(now);
@@ -152,11 +156,17 @@ export class AdminMarketplaceService {
   async updateUserStatus(adminId: string, userId: string, dto: UpdateUserStatusDto) {
     if (adminId === userId && dto.status !== 'ACTIVE')
       throw new BadRequestException('Khong the khoa tai khoan admin dang dang nhap');
-    const updated = await this.prisma.user.updateMany({ where: { id: userId }, data: { status: dto.status } });
+    const blocking = dto.status === 'BLOCKED';
+    const updated = await this.prisma.user.updateMany({
+      where: { id: userId },
+      data: { status: dto.status, blockedReason: blocking ? dto.reason!.trim() : null, blockedAt: blocking ? new Date() : null },
+    });
     if (!updated.count) throw new NotFoundException('Khong tim thay nguoi dung');
+    // Signed out everywhere at once; the apps then get 403 ACCOUNT_BLOCKED with the reason.
+    if (blocking) await this.prisma.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
     return this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, displayName: true, avatarUrl: true, role: true, status: true, updatedAt: true },
+      select: { id: true, displayName: true, avatarUrl: true, role: true, status: true, blockedReason: true, blockedAt: true, updatedAt: true },
     });
   }
 
@@ -228,7 +238,7 @@ export class AdminMarketplaceService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          user: { select: { id: true, displayName: true, avatarUrl: true, status: true } },
+          user: { select: { id: true, displayName: true, avatarUrl: true, status: true, blockedReason: true } },
           _count: { select: { services: { where: { isActive: true } } } },
         },
       }),
@@ -243,9 +253,33 @@ export class AdminMarketplaceService {
   }
 
   async updateTechnician(id: string, dto: UpdateAdminTechnicianDto) {
-    const updated = await this.prisma.technicianProfile.updateMany({ where: { id }, data: dto });
-    if (!updated.count) throw new NotFoundException('Khong tim thay ky thuat vien');
+    const before = await this.prisma.technicianProfile.findUnique({ where: { id }, select: { userId: true, isActive: true } });
+    if (!before) throw new NotFoundException('Khong tim thay ky thuat vien');
+    const { hiddenReason, ...data } = dto;
+    const hiding = dto.isActive === false;
+    const showing = dto.isActive === true;
+    await this.prisma.technicianProfile.update({
+      where: { id },
+      data: { ...data, ...(hiding ? { hiddenReason: hiddenReason?.trim() || null } : showing ? { hiddenReason: null } : {}) },
+    });
+    // Tell the technician why they stopped getting jobs, and when they are back.
+    if (hiding && before.isActive)
+      await this.notifyTechnician(before.userId, 'TECHNICIAN_PROFILE_HIDDEN', 'Hồ sơ của bạn đang tạm ẩn',
+        hiddenReason?.trim() ? `Lý do: ${hiddenReason.trim()}. Liên hệ CSKH nếu cần hỗ trợ.` : 'Khách tạm thời không thấy hồ sơ và bạn chưa nhận được đơn mới. Liên hệ CSKH nếu cần hỗ trợ.');
+    if (showing && !before.isActive)
+      await this.notifyTechnician(before.userId, 'TECHNICIAN_PROFILE_SHOWN', 'Hồ sơ của bạn đã hiển thị lại', 'Bạn có thể nhận đơn như bình thường.');
     return this.prisma.technicianProfile.findUnique({ where: { id } });
+  }
+
+  private async notifyTechnician(userId: string, type: string, title: string, body: string) {
+    if (!this.notifications) return;
+    const actionUrl = 'matxa://technician/profile';
+    try {
+      await this.notifications.create(userId, type, title, body, actionUrl);
+      await this.notifications.sendPush(userId, title, body, { type, actionUrl });
+    } catch {
+      // The change is saved; a failed notification must not undo it.
+    }
   }
 
   async technicianServices(id: string) {

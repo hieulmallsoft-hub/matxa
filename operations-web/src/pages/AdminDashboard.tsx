@@ -33,6 +33,7 @@ import { PageHeader } from '../components/common/PageHeader';
 import { StatCard } from '../components/common/StatCard';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { SectionCard } from '../components/common/SectionCard';
+import { useConfirm } from '../components/ui/useConfirm';
 
 type TabKey =
   | 'overview'
@@ -75,8 +76,9 @@ type User = {
 };
 type Technician = {
   id: string;
-  user: { id: string; displayName: string | null; status: string; phoneNumber?: string | null };
+  user: { id: string; displayName: string | null; status: string; phoneNumber?: string | null; blockedReason?: string | null };
   isActive: boolean;
+  hiddenReason?: string | null;
   isVerified: boolean;
   isAvailable: boolean;
   averageRating: number;
@@ -137,6 +139,7 @@ const promotionState = (promo: { isActive: boolean; startsAt: string; endsAt: st
 };
 
 export function AdminDashboard({ notify, refreshCategories, tab, setTab, refreshKey }: Props) {
+  const { confirm, prompt, dialog } = useConfirm();
   const [categories, setCategories] = useState<Category[]>([]);
   const [technicians, setTechnicians] = useState<Page<Technician> | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -317,8 +320,40 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
     normalizeSearch(`${tech.user.displayName ?? ''} ${tech.user.phoneNumber ?? ''} ${tech.city ?? ''}`).includes(normalizeSearch(technicianQuery)),
   );
 
+  // Hiding a profile: customers stop seeing it and it takes no jobs, but the technician can still sign in.
+  async function toggleHidden(id: string, name: string, isActive: boolean) {
+    if (!isActive) return patch(`/admin/marketplace/technicians/${id}`, { isActive: true });
+    const reason = await prompt({
+      title: `Ẩn hồ sơ ${name}?`,
+      message: 'Khách không thấy hồ sơ, KTV không nhận được đơn mới nhưng vẫn đăng nhập được. KTV nhận thông báo kèm lý do.',
+      placeholder: 'Lý do (KTV sẽ thấy), không bắt buộc',
+      confirmText: 'Ẩn hồ sơ',
+      tone: 'warning',
+    });
+    if (reason === null) return;
+    return patch(`/admin/marketplace/technicians/${id}`, { isActive: false, ...(reason ? { hiddenReason: reason } : {}) });
+  }
+
+  // Blocking the account: signed out on every device, cannot sign in, sees the reason.
+  async function toggleBlocked(userId: string, name: string, status: string) {
+    if (status === 'BLOCKED') {
+      if (!(await confirm({ title: `Mở khóa ${name}?`, message: 'Tài khoản đăng nhập và dùng app lại được.', confirmText: 'Mở khóa', tone: 'primary' }))) return;
+      return patch(`/admin/marketplace/users/${userId}/status`, { status: 'ACTIVE' });
+    }
+    const reason = await prompt({
+      title: `Khóa tài khoản ${name}?`,
+      message: 'Tài khoản bị đăng xuất khỏi mọi thiết bị và không đăng nhập được cho tới khi mở khóa. Người dùng thấy lý do bên dưới.',
+      placeholder: 'Lý do khóa (bắt buộc, người dùng sẽ thấy)',
+      confirmText: 'Khóa tài khoản',
+      required: true,
+    });
+    if (!reason) return;
+    return patch(`/admin/marketplace/users/${userId}/status`, { status: 'BLOCKED', reason });
+  }
+
   return (
     <div className="space-y-6">
+      {dialog}
       {/* Page Header */}
       <PageHeader
         title={getPageTitle()}
@@ -419,9 +454,14 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                       </td>
                       <td className="py-3 px-4">
                         <StatusBadge
-                          status={tech.isActive ? (tech.isAvailable ? 'ACTIVE' : 'PROCESSING') : 'INACTIVE'}
-                          customLabel={tech.isActive ? (tech.isAvailable ? 'Sẵn sàng' : 'Đang bận') : 'Tạm ẩn'}
+                          status={tech.user.status === 'BLOCKED' ? 'INACTIVE' : tech.isActive ? (tech.isAvailable ? 'ACTIVE' : 'PROCESSING') : 'INACTIVE'}
+                          customLabel={tech.user.status === 'BLOCKED' ? 'Đã khóa TK' : tech.isActive ? (tech.isAvailable ? 'Sẵn sàng' : 'Đang bận') : 'Tạm ẩn'}
                         />
+                        {(tech.user.status === 'BLOCKED' ? tech.user.blockedReason : !tech.isActive ? tech.hiddenReason : null) && (
+                          <div className="mt-1 text-[11px] text-[#94A399] max-w-[180px] truncate" title={(tech.user.status === 'BLOCKED' ? tech.user.blockedReason : tech.hiddenReason) ?? ''}>
+                            {tech.user.status === 'BLOCKED' ? tech.user.blockedReason : tech.hiddenReason}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -438,16 +478,20 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                             Bảng giá
                           </button>
                           <button
-                            onClick={() =>
-                              void patch(`/admin/marketplace/technicians/${tech.id}`, { isActive: !tech.isActive })
-                            }
+                            onClick={() => void toggleHidden(tech.id, tech.user.displayName || 'KTV', tech.isActive)}
                             className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                              tech.isActive
-                                ? 'text-[#E05B55] hover:bg-[#FDF0EF]'
-                                : 'text-[#2E7D4A] hover:bg-[#EAF5EC]'
+                              tech.isActive ? 'text-[#A86A0C] hover:bg-[#FEF6E9]' : 'text-[#2E7D4A] hover:bg-[#EAF5EC]'
                             }`}
                           >
-                            {tech.isActive ? 'Khóa/Ẩn' : 'Kích hoạt'}
+                            {tech.isActive ? 'Ẩn hồ sơ' : 'Hiện hồ sơ'}
+                          </button>
+                          <button
+                            onClick={() => void toggleBlocked(tech.user.id, tech.user.displayName || 'KTV', tech.user.status)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                              tech.user.status === 'BLOCKED' ? 'text-[#2E7D4A] hover:bg-[#EAF5EC]' : 'text-[#E05B55] hover:bg-[#FDF0EF]'
+                            }`}
+                          >
+                            {tech.user.status === 'BLOCKED' ? 'Mở khóa TK' : 'Khóa TK'}
                           </button>
                         </div>
                       </td>
@@ -1068,10 +1112,10 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
               </span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => void patch(`/admin/marketplace/technicians/${technicianDetail.id}`, { isActive: !technicianDetail.isActive })}
+                  onClick={() => void toggleHidden(technicianDetail.id, technicianDetail.displayName || 'KTV', technicianDetail.isActive !== false)}
                   className="px-4 py-2 rounded-xl border border-[#F8D2D0] bg-[#FDF0EF] hover:bg-[#FCE3E1] text-[#D04A44] text-xs font-semibold transition-colors"
                 >
-                  {technicianDetail.isActive ? 'Khóa tài khoản' : 'Kích hoạt lại'}
+                  {technicianDetail.isActive !== false ? 'Ẩn hồ sơ' : 'Hiện hồ sơ'}
                 </button>
                 <button
                   onClick={() => setTechnicianDetail(null)}

@@ -1946,7 +1946,13 @@ export class BookingsService {
       // Location for distances; facility fields for ONSITE job cards.
       select: { id: true, latitude: true, longitude: true, facility: true, address: true, city: true, district: true },
     });
-    if (!profile) throw new ForbiddenException('Tai khoan KTV chua du dieu kien nhan don');
+    if (!profile) {
+      // Hidden by an admin: say so, with the reason, instead of the generic refusal.
+      const hidden = await this.prisma.technicianProfile.findFirst({ where: { userId, isActive: false }, select: { hiddenReason: true } });
+      if (hidden)
+        throw new ForbiddenException({ statusCode: 403, code: 'PROFILE_HIDDEN', message: 'Ho so KTV dang tam an', reason: hidden.hiddenReason ?? null });
+      throw new ForbiddenException('Tai khoan KTV chua du dieu kien nhan don');
+    }
     return profile;
   }
 

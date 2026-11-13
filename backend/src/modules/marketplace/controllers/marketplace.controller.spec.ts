@@ -24,7 +24,7 @@ describe('Marketplace HTTP validation and optional authentication', () => {
       providers: [
         OptionalAccessTokenGuard,
         { provide: JwtService, useValue: jwt },
-        { provide: PrismaService, useValue: { session } },
+        { provide: PrismaService, useValue: { session, user: { findUnique: jest.fn().mockResolvedValue({ status: 'ACTIVE' }) } } },
         { provide: MarketplaceService, useValue: service },
       ],
     }).compile();

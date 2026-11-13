@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { accountBlocked } from '../account-blocked';
 import { JwtService } from '@nestjs/jwt';
 import { createHmac, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
@@ -78,6 +79,7 @@ export class AuthService {
   ): Promise<AuthResponse> {
     const identity = await this.appleTokenVerifier.verify(idToken, nonce);
     const user = await this.upsertAppleUser(identity, fullName);
+    if (user.status === 'BLOCKED') throw accountBlocked(user);
     if (user.status !== 'ACTIVE') {
       throw new UnauthorizedException('Tai khoan khong con hoat dong');
     }
@@ -109,9 +111,12 @@ export class AuthService {
       where: { provider_providerSubject: { provider: DbAuthProvider.EMAIL, providerSubject: email } },
       include: { user: { include: { identities: true } } },
     });
+    const passwordOk = Boolean(identity?.passwordHash) && (await this.verifyPassword(password, identity!.passwordHash!));
+    // Only someone who knows the password learns the account is blocked (and why).
+    if (passwordOk && identity!.user.status === 'BLOCKED') throw accountBlocked(identity!.user);
     if (
       !identity?.passwordHash ||
-      !(await this.verifyPassword(password, identity.passwordHash)) ||
+      !passwordOk ||
       identity.user.status !== 'ACTIVE'
     ) {
       throw new UnauthorizedException('Email hoac mat khau khong dung');
@@ -264,6 +269,9 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token khong hop le');
     }
 
+    // Blocking signs every device out; say so rather than "refresh token reused".
+    if (session.user.status === 'BLOCKED') throw accountBlocked(session.user);
+
     if (session.revokedAt) {
       await this.prisma.session.updateMany({
         where: { userId: session.userId, revokedAt: null },
@@ -408,6 +416,8 @@ export class AuthService {
     metadata: ClientMetadata,
     preferredProvider: AuthProvider,
   ): Promise<AuthResponse> {
+    // Every sign-in (Google, Apple, phone, email, register) ends here: no new session for a blocked account.
+    if (user.status === 'BLOCKED') throw accountBlocked(user);
     const sessionId = randomUUID();
     const secret = randomBytes(32).toString('base64url');
 
