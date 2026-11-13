@@ -23,7 +23,7 @@ import { addressPreview, confirmationDeadline, kmBetween, roundVnd, technicianBa
 import { activityPeriods } from './technician-activity';
 import { releaseBookingPromotion } from './booking-promotion-release';
 import { creditBookingPromotion } from './booking-promotion-credit';
-import { assertNotCancelLocked, cancelLimitStatus, isPenalizedCancel } from './cancel-limit';
+import { activeSuspension, applyCancelLimit, assertNotSuspended, cancelLimitStatus, isPenalizedCancel } from './cancel-limit';
 import { resolveLocationCodes } from '../../marketplace/services/location-code';
 import { COMPLAINT_STATUS_LABEL, complaintStatusEvent, ensureComplaintConversation } from './complaint-conversation';
 import {
@@ -499,7 +499,8 @@ export class BookingsService {
         this.prisma.availabilitySlot.findFirst({ where: { technicianId: candidate.id, isAvailable: true, startAt: { lte: start }, endAt: { gte: end } } }),
         // One unfinished confirmed booking at a time (same rule as assertOpenEligibility), whatever its hour.
         // …and not while they are being served themselves as a customer.
-        this.prisma.booking.findFirst({ where: { OR: [{ status: 'CONFIRMED', technicianId: candidate.id }, unfinishedAsCustomer(candidate.userId)] }, select: { id: true } }),
+        this.prisma.booking.findFirst({ where: { OR: [{ status: 'CONFIRMED', technicianId: candidate.id }, unfinishedAsCustomer(candidate.userId)] }, select: { id: true } })
+          .then(async (busy) => busy ?? (await activeSuspension(this.prisma, candidate.userId))),
         this.prisma.technicianService.findMany({ where: { technicianId: candidate.id, isActive: true, catalogServiceId: { in: serviceIds }, modes: { has: dto.mode } }, select: { catalogServiceId: true, categoryId: true } }),
       ]);
       const hasAllServices = services.every((service: any) => matchingServices.some((item: any) => item.catalogServiceId === service.id && item.categoryId === service.categoryId));
@@ -603,7 +604,7 @@ export class BookingsService {
     // Checked first so the customer gets BOOKING_ALREADY_WAITING (with the booking to open) rather than another
     // refusal, e.g. "technician busy" when rebooking the same technician. Checked again under the lock below.
     await this.assertNoWaitingBooking(this.prisma, userId, false);
-    await assertNotCancelLocked(this.prisma, userId, await this.bookingRules());
+    await assertNotSuspended(this.prisma, userId);
     await this.assertModeEnabled(dto.mode);
     const start = new Date(dto.scheduledStart);
     if (!Number.isFinite(start.getTime()) || start <= new Date())
@@ -756,7 +757,7 @@ export class BookingsService {
   async applyToOpenJob(userId: string, bookingId: string) {
     const profile = await this.requireActiveTechnician(userId);
     await this.requireTechnicianPhone(userId);
-    await assertNotCancelLocked(this.prisma, userId, await this.bookingRules(), true);
+    await assertNotSuspended(this.prisma, userId, true);
     const booking = await this.openJobForTechnician(bookingId, profile.id, true);
     const existing = await this.prisma.bookingTechnicianApplication.findUnique({
       where: { bookingId_technicianProfileId: { bookingId, technicianProfileId: profile.id } },
@@ -1310,7 +1311,7 @@ export class BookingsService {
 
   async acceptTechnicianJob(userId: string, id: string) {
     await this.requireTechnicianPhone(userId);
-    await assertNotCancelLocked(this.prisma, userId, await this.bookingRules(), true);
+    await assertNotSuspended(this.prisma, userId, true);
     return this.updateStatus(userId, id, { status: 'CONFIRMED' });
   }
 
@@ -1337,7 +1338,8 @@ export class BookingsService {
         enabledServiceModes: ['HOME', 'ONLINE', 'ONSITE'] as Array<'HOME' | 'ONLINE' | 'ONSITE'>,
         cancelLimitCount: 0,
         cancelLimitWindowHours: 24,
-        cancelLockHours: 3,
+        suspensionHours: [3, 24, 168],
+        suspensionResetDays: 30,
       }
     );
   }
@@ -1505,12 +1507,28 @@ export class BookingsService {
         : ([booking.customerId === userId ? technicianUserId : booking.customerId].filter(Boolean) as string[]);
     for (const recipient of recipients)
       void this.notifyStatus(recipient, id, 'BOOKING_CANCELLED', 'Lịch hẹn đã hủy', 'Một lịch hẹn đã được hủy.');
-    return { ...updated, cancelLimit: await this.cancelLimit(userId) };
+    return { ...updated, cancelLimit: await this.applyCancelLimit(userId) };
   }
 
-  /** The caller's standing against the cancel limit, shown before and after cancelling. */
+  /** The caller's standing against the cancel limit and any suspension, shown before cancelling. */
   async cancelLimit(userId: string) {
     return cancelLimitStatus(this.prisma, userId, await this.bookingRules());
+  }
+
+  /** After a cancel: suspends the canceller at their next level once they reach the limit. */
+  async applyCancelLimit(userId: string) {
+    const before = await activeSuspension(this.prisma, userId);
+    const status = await applyCancelLimit(this.prisma, userId, await this.bookingRules());
+    // Just suspended by this cancel: tell them why and until when.
+    if (!before && status.suspension) {
+      const title = 'Tài khoản của bạn đang tạm khóa';
+      const body = `Bạn đã hủy quá nhiều đơn. Chưa thể đặt/nhận đơn mới đến ${status.suspension.endsAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}.`;
+      void Promise.resolve()
+        .then(() => this.notifications.create(userId, 'ACCOUNT_SUSPENDED', title, body, 'matxa://notifications'))
+        .then(() => this.notifications.sendPush(userId, title, body, { type: 'ACCOUNT_SUSPENDED' }))
+        .catch(() => undefined);
+    }
+    return status;
   }
 
   /** Idempotent DB-conditional terminal transition. Safe when invoked by many app instances. */
@@ -2021,6 +2039,8 @@ export class BookingsService {
       select: { id: true },
     });
     if (unfinished) throw new ConflictException('KTV phai hoan thanh don hien tai truoc khi nhan don moi');
+    // A suspended technician is neither announced, nor can apply or be selected.
+    if (await activeSuspension(db, profile.userId)) throw new ConflictException('KTV dang bi tam khoa, chua the nhan don moi');
     // Nor while the account has its own booking (as a customer) waiting or not finished.
     const ownBooking = await db.booking.findFirst({
       where: { ...unfinishedAsCustomer(profile.userId), id: { not: booking.id } },

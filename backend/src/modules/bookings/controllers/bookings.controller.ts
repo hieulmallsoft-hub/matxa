@@ -127,10 +127,11 @@ export class BookingsController {
 
   @Get('cancel-limit')
   @ApiOperation({
-    summary: 'Tinh trang gioi han huy don cua toi (khach va KTV)',
+    summary: 'Tinh trang gioi han huy don va tam khoa cua toi (khach va KTV)',
     description:
-      'Chi tinh don da co KTV nhan ma khach/KTV huy. remainingBeforeLock = 1 thi app nen canh bao truoc khi huy. ' +
-      'lockedUntil khac null = dang bi khoa dat don (khach) / nhan don (KTV) den thoi diem do, loi 409 CANCEL_LIMIT_LOCKED.',
+      'Chi tinh don da co KTV nhan ma khach/KTV huy. remainingBeforeLock = 1 thi app nen canh bao truoc khi huy ' +
+      '(lan toi bi tam khoa nextLockHours gio). lockedUntil khac null = dang tam khoa: van dang nhap duoc nhung dat don (khach) / ' +
+      'nhan don (KTV) tra 409 ACCOUNT_SUSPENDED den thoi diem do.',
   })
   @ApiOkResponse({
     schema: {
@@ -139,10 +140,16 @@ export class BookingsController {
         enabled: { type: 'boolean' },
         limit: { type: 'number', example: 3 },
         windowHours: { type: 'number', example: 24 },
-        lockHours: { type: 'number', example: 3 },
         recentCancellations: { type: 'number', example: 2 },
         remainingBeforeLock: { type: 'number', nullable: true, example: 1 },
         lockedUntil: { type: 'string', format: 'date-time', nullable: true },
+        suspension: {
+          type: 'object',
+          nullable: true,
+          properties: { level: { type: 'number' }, reason: { type: 'string' }, source: { type: 'string', enum: ['CANCEL_LIMIT', 'ADMIN'] }, endsAt: { type: 'string', format: 'date-time' } },
+        },
+        nextLevel: { type: 'number', example: 2, description: 'Lan tam khoa tiep theo la lan thu may' },
+        nextLockHours: { type: 'number', example: 24, description: 'Lan tam khoa tiep theo keo dai bao nhieu gio' },
       },
     },
   })

@@ -1,4 +1,11 @@
 import { BookingsService } from './bookings.service';
+// Suspensions are covered by cancel-limit.spec; here nobody is suspended.
+jest.mock('./cancel-limit', () => ({
+  ...jest.requireActual('./cancel-limit'),
+  activeSuspension: jest.fn().mockResolvedValue(null),
+  assertNotSuspended: jest.fn().mockResolvedValue(undefined),
+  applyCancelLimit: jest.fn().mockResolvedValue({ enabled: false, lockedUntil: null }),
+}));
 
 describe('open marketplace selection', () => {
   it('selects one applicant, marks the remaining applicants NOT_SELECTED and assigns the booking', async () => {

@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
+import { activeSuspension, suspend, SuspensionRules } from '../../bookings/services/cancel-limit';
+import { parseHours } from '../../settings/settings.service';
 import {
   AdminBookingsQueryDto,
   AdminPageDto,
@@ -255,9 +257,23 @@ export class AdminMarketplaceService {
     };
   }
 
+  /** Cancel-limit and suspension rules from the admin settings (same defaults as SettingsService). */
+  private async suspensionRules(): Promise<SuspensionRules> {
+    const rows = await this.prisma.systemSetting.findMany({
+      where: { key: { in: ['BOOKING_CANCEL_LIMIT_COUNT', 'BOOKING_CANCEL_LIMIT_WINDOW_HOURS', 'SUSPENSION_HOURS', 'SUSPENSION_RESET_DAYS'] } },
+    });
+    const stored = new Map(rows.map((row) => [row.key, row.value]));
+    return {
+      cancelLimitCount: Number(stored.get('BOOKING_CANCEL_LIMIT_COUNT') ?? 3),
+      cancelLimitWindowHours: Number(stored.get('BOOKING_CANCEL_LIMIT_WINDOW_HOURS') ?? 24),
+      suspensionHours: parseHours(stored.get('SUSPENSION_HOURS')),
+      suspensionResetDays: Number(stored.get('SUSPENSION_RESET_DAYS') ?? 30),
+    };
+  }
+
   /**
    * Taken bookings each person cancelled (the ones counted toward the cancel limit): today and this month in Viet Nam
-   * time, the last 7 days, and until when they are locked out by the cancel limit (null = not locked).
+   * time and the last 7 days; the suspension in force; and the level/length the next suspension would have.
    */
   private async cancelStats(userIds: string[], now = new Date()) {
     const vnOffset = 7 * 3_600_000;
@@ -265,37 +281,65 @@ export class AdminMarketplaceService {
     const today = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate()) - vnOffset);
     const month = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), 1) - vnOffset);
     const week = new Date(now.getTime() - 7 * 86_400_000);
-    const settings = new Map(
-      (await this.prisma.systemSetting.findMany({
-        where: { key: { in: ['BOOKING_CANCEL_LIMIT_COUNT', 'BOOKING_CANCEL_LIMIT_WINDOW_HOURS', 'BOOKING_CANCEL_LOCK_HOURS'] } },
-      })).map((row) => [row.key, Number(row.value)]),
-    );
-    const limit = settings.get('BOOKING_CANCEL_LIMIT_COUNT') ?? 3;
-    const windowStart = new Date(now.getTime() - (settings.get('BOOKING_CANCEL_LIMIT_WINDOW_HOURS') ?? 24) * 3_600_000);
-    const lockMs = (settings.get('BOOKING_CANCEL_LOCK_HOURS') ?? 3) * 3_600_000;
-    const since = new Date(Math.min(month.getTime(), week.getTime(), windowStart.getTime()));
-    const rows = userIds.length
-      ? await this.prisma.booking.findMany({
-          where: { cancelledByUserId: { in: userIds }, cancelPenalized: true, cancelledAt: { gte: since } },
-          select: { cancelledByUserId: true, cancelledAt: true },
-        })
-      : [];
+    if (!userIds.length) return new Map();
+    const rules = await this.suspensionRules();
+    const [rows, suspensions] = await Promise.all([
+      this.prisma.booking.findMany({
+        where: { cancelledByUserId: { in: userIds }, cancelPenalized: true, cancelledAt: { gte: new Date(Math.min(month.getTime(), week.getTime())) } },
+        select: { cancelledByUserId: true, cancelledAt: true },
+      }),
+      this.prisma.userSuspension.findMany({
+        where: { userId: { in: userIds }, createdAt: { gte: new Date(now.getTime() - rules.suspensionResetDays * 86_400_000) } },
+        orderBy: { createdAt: 'desc' },
+        select: { userId: true, level: true, reason: true, source: true, endsAt: true, liftedAt: true },
+      }),
+    ]);
+    const levels = rules.suspensionHours;
     return new Map(
       userIds.map((userId) => {
         const times = rows.filter((row) => row.cancelledByUserId === userId).map((row) => row.cancelledAt!.getTime());
-        const recent = times.filter((time) => time >= windowStart.getTime());
-        const unlock = limit > 0 && recent.length >= limit ? Math.max(...recent) + lockMs : 0;
+        const own = suspensions.filter((row) => row.userId === userId);
+        const current = own.find((row) => !row.liftedAt && row.endsAt > now) ?? null;
+        const nextLevel = (own[0]?.level ?? 0) + 1;
         return [
           userId,
           {
             today: times.filter((time) => time >= today.getTime()).length,
             week: times.filter((time) => time >= week.getTime()).length,
             month: times.filter((time) => time >= month.getTime()).length,
-            lockedUntil: unlock > now.getTime() ? new Date(unlock) : null,
+            lockedUntil: current?.endsAt ?? null,
+            suspension: current && { level: current.level, reason: current.reason, source: current.source, endsAt: current.endsAt },
+            nextLevel,
+            nextHours: levels[Math.min(nextLevel, levels.length) - 1],
+            needsReview: nextLevel > levels.length,
           },
         ];
       }),
     );
+  }
+
+  /** Admin suspends someone for a while (default: their next level's length). They can still sign in. */
+  async suspendUser(adminId: string, userId: string, dto: { reason: string; hours?: number }) {
+    if (adminId === userId) throw new BadRequestException('Khong the tam khoa tai khoan admin dang dang nhap');
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!user) throw new NotFoundException('Khong tim thay nguoi dung');
+    const rules = await this.suspensionRules();
+    if (await activeSuspension(this.prisma, userId)) throw new ConflictException('Nguoi dung dang bi tam khoa');
+    const suspension = await suspend(this.prisma, userId, rules, { reason: dto.reason.trim(), source: 'ADMIN', createdById: adminId, hours: dto.hours });
+    await this.notifyUser(userId, 'ACCOUNT_SUSPENDED', 'Tài khoản của bạn đang tạm khóa',
+      `Lý do: ${suspension.reason}. Bạn chưa thể đặt/nhận đơn mới đến ${suspension.endsAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}.`);
+    return suspension;
+  }
+
+  /** Ends the suspension in force now ("Mở sớm"). It still counts as a past level for repeats. */
+  async liftSuspension(userId: string) {
+    const lifted = await this.prisma.userSuspension.updateMany({
+      where: { userId, liftedAt: null, endsAt: { gt: new Date() } },
+      data: { liftedAt: new Date() },
+    });
+    if (!lifted.count) throw new NotFoundException('Nguoi dung khong bi tam khoa');
+    await this.notifyUser(userId, 'ACCOUNT_SUSPENSION_LIFTED', 'Tài khoản đã được mở lại', 'Bạn có thể đặt/nhận đơn như bình thường.');
+    return { lifted: true };
   }
 
   /** Every booking this person cancelled lately, for the admin to judge before blocking. */
@@ -341,8 +385,11 @@ export class AdminMarketplaceService {
   }
 
   private async notifyTechnician(userId: string, type: string, title: string, body: string) {
+    return this.notifyUser(userId, type, title, body, 'matxa://technician/profile');
+  }
+
+  private async notifyUser(userId: string, type: string, title: string, body: string, actionUrl = 'matxa://notifications') {
     if (!this.notifications) return;
-    const actionUrl = 'matxa://technician/profile';
     try {
       await this.notifications.create(userId, type, title, body, actionUrl);
       await this.notifications.sendPush(userId, title, body, { type, actionUrl });

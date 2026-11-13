@@ -34,7 +34,7 @@ import { StatCard } from '../components/common/StatCard';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { SectionCard } from '../components/common/SectionCard';
 import { useConfirm } from '../components/ui/useConfirm';
-import { CancelCount, CancelPeriodSelect, CancellationsModal, type CancelPeriod, type CancelStats } from '../components/CancellationStats';
+import { CancelCount, CancelPeriodSelect, CancellationsModal, suspendPromptOptions, type CancelPeriod, type CancelStats } from '../components/CancellationStats';
 
 type TabKey =
   | 'overview'
@@ -143,7 +143,7 @@ const promotionState = (promo: { isActive: boolean; startsAt: string; endsAt: st
 export function AdminDashboard({ notify, refreshCategories, tab, setTab, refreshKey }: Props) {
   const { confirm, prompt, dialog } = useConfirm();
   const [cancelPeriod, setCancelPeriod] = useState<CancelPeriod>('week');
-  const [cancellationsOf, setCancellationsOf] = useState<{ id: string; name: string; blocked: boolean } | null>(null);
+  const [cancellationsOf, setCancellationsOf] = useState<{ id: string; name: string; blocked: boolean; stats?: CancelStats } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [technicians, setTechnicians] = useState<Page<Technician> | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -345,14 +345,38 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
       return patch(`/admin/marketplace/users/${userId}/status`, { status: 'ACTIVE' });
     }
     const reason = await prompt({
-      title: `Khóa tài khoản ${name}?`,
-      message: 'Tài khoản bị đăng xuất khỏi mọi thiết bị và không đăng nhập được cho tới khi mở khóa. Người dùng thấy lý do bên dưới.',
+      title: `Khóa vĩnh viễn ${name}?`,
+      message: 'Dành cho vi phạm nặng. Tài khoản bị đăng xuất khỏi mọi thiết bị và không đăng nhập được cho tới khi admin mở khóa. Người dùng thấy lý do bên dưới.',
       placeholder: 'Lý do khóa (bắt buộc, người dùng sẽ thấy)',
-      confirmText: 'Khóa tài khoản',
+      confirmText: 'Khóa vĩnh viễn',
       required: true,
     });
     if (!reason) return;
     return patch(`/admin/marketplace/users/${userId}/status`, { status: 'BLOCKED', reason });
+  }
+
+  // Time-limited lock at the person's next level (3h -> 24h -> 7 days by default); they can still sign in.
+  async function suspendUser(userId: string, name: string, stats?: CancelStats) {
+    const reason = await prompt(suspendPromptOptions(name, stats));
+    if (!reason) return;
+    try {
+      await request(`/admin/marketplace/users/${userId}/suspend`, { method: 'POST', body: JSON.stringify({ reason }) });
+      notify(`Đã tạm khóa ${name}`);
+      await load();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Không tạm khóa được', true);
+    }
+  }
+
+  async function liftSuspension(userId: string, name: string) {
+    if (!(await confirm({ title: `Mở sớm cho ${name}?`, message: 'Người này đặt/nhận đơn lại được ngay. Lần tạm khóa này vẫn được tính khi tái phạm.', confirmText: 'Mở sớm', tone: 'primary' }))) return;
+    try {
+      await request(`/admin/marketplace/users/${userId}/suspension/lift`, { method: 'POST' });
+      notify(`Đã mở lại cho ${name}`);
+      await load();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Không mở được', true);
+    }
   }
 
   return (
@@ -366,6 +390,16 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
             const target = cancellationsOf;
             setCancellationsOf(null);
             void toggleBlocked(target.id, target.name, 'ACTIVE');
+          }}
+          onSuspend={() => {
+            const target = cancellationsOf;
+            setCancellationsOf(null);
+            void suspendUser(target.id, target.name, target.stats);
+          }}
+          onLift={() => {
+            const target = cancellationsOf;
+            setCancellationsOf(null);
+            void liftSuspension(target.id, target.name);
           }}
         />
       )}
@@ -474,13 +508,13 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                         <CancelCount
                           stats={tech.cancellations}
                           period={cancelPeriod}
-                          onOpen={() => setCancellationsOf({ id: tech.user.id, name: tech.user.displayName || 'KTV', blocked: tech.user.status === 'BLOCKED' })}
+                          onOpen={() => setCancellationsOf({ id: tech.user.id, name: tech.user.displayName || 'KTV', blocked: tech.user.status === 'BLOCKED', stats: tech.cancellations })}
                         />
                       </td>
                       <td className="py-3 px-4">
                         <StatusBadge
-                          status={tech.user.status === 'BLOCKED' ? 'INACTIVE' : tech.isActive ? (tech.isAvailable ? 'ACTIVE' : 'PROCESSING') : 'INACTIVE'}
-                          customLabel={tech.user.status === 'BLOCKED' ? 'Đã khóa TK' : tech.isActive ? (tech.isAvailable ? 'Sẵn sàng' : 'Đang bận') : 'Tạm ẩn'}
+                          status={tech.user.status === 'BLOCKED' || tech.cancellations?.suspension ? 'INACTIVE' : tech.isActive ? (tech.isAvailable ? 'ACTIVE' : 'PROCESSING') : 'INACTIVE'}
+                          customLabel={tech.user.status === 'BLOCKED' ? 'Khóa vĩnh viễn' : tech.cancellations?.suspension ? `Tạm khóa (lần ${tech.cancellations.suspension.level})` : tech.isActive ? (tech.isAvailable ? 'Sẵn sàng' : 'Đang bận') : 'Tạm ẩn'}
                         />
                         {(tech.user.status === 'BLOCKED' ? tech.user.blockedReason : !tech.isActive ? tech.hiddenReason : null) && (
                           <div className="mt-1 text-[11px] text-[#94A399] max-w-[180px] truncate" title={(tech.user.status === 'BLOCKED' ? tech.user.blockedReason : tech.hiddenReason) ?? ''}>
@@ -510,13 +544,27 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                           >
                             {tech.isActive ? 'Ẩn hồ sơ' : 'Hiện hồ sơ'}
                           </button>
+                          {tech.user.status !== 'BLOCKED' && (
+                            <button
+                              onClick={() =>
+                                void (tech.cancellations?.suspension
+                                  ? liftSuspension(tech.user.id, tech.user.displayName || 'KTV')
+                                  : suspendUser(tech.user.id, tech.user.displayName || 'KTV', tech.cancellations))
+                              }
+                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                                tech.cancellations?.suspension ? 'text-[#2E7D4A] hover:bg-[#EAF5EC]' : 'text-[#A86A0C] hover:bg-[#FEF6E9]'
+                              }`}
+                            >
+                              {tech.cancellations?.suspension ? 'Mở sớm' : 'Tạm khóa'}
+                            </button>
+                          )}
                           <button
                             onClick={() => void toggleBlocked(tech.user.id, tech.user.displayName || 'KTV', tech.user.status)}
                             className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
                               tech.user.status === 'BLOCKED' ? 'text-[#2E7D4A] hover:bg-[#EAF5EC]' : 'text-[#E05B55] hover:bg-[#FDF0EF]'
                             }`}
                           >
-                            {tech.user.status === 'BLOCKED' ? 'Mở khóa TK' : 'Khóa TK'}
+                            {tech.user.status === 'BLOCKED' ? 'Mở khóa' : 'Khóa vĩnh viễn'}
                           </button>
                         </div>
                       </td>

@@ -35,6 +35,13 @@ export class AuthUser {
 
   @ApiProperty({ description: 'Da hoan tat dang ky tai khoan' })
   onboardingCompleted!: boolean;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Chi co o GET /auth/me. Dang tam khoa: van dang nhap duoc nhung khong dat don (khach) / nhan don (KTV) den endsAt.',
+    example: { level: 2, reason: 'Huy 3 don da co KTV nhan trong 24 gio', endsAt: '2026-11-14T03:00:00.000Z' },
+  })
+  suspension?: { level: number; reason: string; endsAt: Date } | null;
 }
 
 export class AuthResponse {

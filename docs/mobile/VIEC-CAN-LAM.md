@@ -592,13 +592,22 @@ Admin bật lại dịch vụ thì dịch vụ của các KTV tự hiện lại;
 mới, nên app đang giữ `priceOptionId` cũ sẽ đặt lỗi ("Dịch vụ hoặc gói thời gian đã thay đổi"). Giờ gói được cập
 nhật tại chỗ theo `code` nên `id` không đổi. Vẫn nên lấy lại `GET /api/service-catalog` khi mở màn đặt.
 
-## V. Giới hạn hủy đơn: cảnh báo và tạm khóa (app khách + app KTV, 12/11)
+## V. Tạm khóa có thời hạn, tăng dần khi tái phạm (app khách + app KTV, sửa 13/11)
 
-Hủy nhiều đơn **đã có KTV nhận** sẽ bị khóa tạm. Mặc định: hủy **3 đơn trong 24 giờ** thì bị khóa **3 giờ**. Admin
-chỉnh được các con số này, hoặc tắt hẳn.
-- Khách bị khóa: không đặt được đơn mới.
-- KTV bị khóa: không ứng tuyển hoặc nhận được đơn mới.
-- Trong lúc bị khóa vẫn làm tiếp đơn đang có, vẫn chat và xem lịch sử bình thường.
+**Tạm khóa** khác với khóa vĩnh viễn (mục X):
+- Người bị tạm khóa **vẫn đăng nhập** và dùng app bình thường: xem lịch sử, chat, ví, rút tiền, làm tiếp đơn đang có.
+- Chỉ **không đặt được đơn mới** (khách) hoặc **không ứng tuyển / nhận được đơn mới** (KTV).
+- Hết giờ thì **tự mở**.
+
+**Thời gian khóa tăng dần khi tái phạm** (mặc định, admin chỉnh được):
+- lần 1: **3 giờ**;
+- lần 2: **24 giờ**;
+- lần 3 trở đi: **7 ngày**, kèm báo admin xem xét khóa vĩnh viễn;
+- **30 ngày** không bị tạm khóa thì lần sau tính lại từ lần 1.
+
+**Bị tạm khóa khi nào:**
+- **Tự động:** hủy **3 đơn đã có KTV nhận trong 24 giờ**.
+- **Admin bấm tay** "Tạm khóa" kèm lý do. Admin cũng có thể **Mở sớm**.
 
 **Lần hủy có bị tính:** đơn đang `CONFIRMED` (đã có KTV nhận), do khách hoặc KTV hủy.
 
@@ -609,35 +618,51 @@ chỉnh được các con số này, hoặc tắt hẳn.
 - KTV hủy với lý do có ảnh bằng chứng (`CUSTOMER_NO_SHOW`, `UNSAFE_SITUATION`, `INAPPROPRIATE_REQUEST`);
 - đơn thuộc danh mục admin đã tắt "Tính phạt khi hủy".
 
-**API mới: `GET /api/bookings/cancel-limit`** (dùng chung cho khách và KTV)
+Các lần hủy đã dẫn tới một lần tạm khóa thì không bị đếm lại.
+
+**`GET /api/bookings/cancel-limit`** (dùng chung cho khách và KTV):
 
 ```json
-{ "enabled": true, "limit": 3, "windowHours": 24, "lockHours": 3,
-  "recentCancellations": 2, "remainingBeforeLock": 1, "lockedUntil": null }
+{ "enabled": true, "limit": 3, "windowHours": 24,
+  "recentCancellations": 2, "remainingBeforeLock": 1,
+  "lockedUntil": null, "suspension": null,
+  "nextLevel": 2, "nextLockHours": 24 }
 ```
+
+Đang tạm khóa thì `lockedUntil` là thời điểm mở, và có thêm
+`"suspension": { "level": 2, "reason": "Huy 3 don da co KTV nhan trong 24 gio", "source": "CANCEL_LIMIT", "endsAt": "…" }`.
+`source` là `CANCEL_LIMIT` khi hệ thống tự khóa, `ADMIN` khi admin khóa tay.
+
+**`GET /api/auth/me`** có thêm `suspension` (`null` hoặc `{ level, reason, endsAt }`), để app biết ngay lúc mở app.
 
 **App cần làm:**
 
-1. **Cảnh báo trước khi hủy:** lúc người dùng bấm hủy một đơn `CONFIRMED`, gọi API trên. Nếu `remainingBeforeLock` là
-   `1`, hiện trong hộp xác nhận: *"Nếu hủy đơn này, bạn sẽ bị tạm khóa đặt đơn (KTV: nhận đơn) {lockHours} giờ."*
-2. **Sau khi hủy:** response hủy có thêm trường `cancelLimit`, cùng dạng với API trên:
+1. **Banner khi đang tạm khóa:** khi mở app, nếu `GET /api/auth/me` có `suspension`, hiện banner ở trang chủ (khách) /
+   tab nhận đơn (KTV): *"Tài khoản tạm khóa đến {giờ địa phương của endsAt}. Lý do: {reason}."*, kèm đếm ngược. Hết
+   giờ thì ẩn banner và gọi lại `/auth/me`.
+2. **Cảnh báo trước khi hủy:** lúc người dùng bấm hủy một đơn `CONFIRMED`, gọi `GET /api/bookings/cancel-limit`.
+   Nếu `remainingBeforeLock` là `1`, hộp xác nhận hiện thêm:
+   *"Nếu hủy đơn này, bạn sẽ bị tạm khóa đặt đơn (KTV: nhận đơn) {nextLockHours} giờ."*
+   (từ 24 giờ trở lên thì đổi sang ngày cho dễ đọc).
+3. **Sau khi hủy:** response hủy có thêm trường `cancelLimit`, cùng dạng với API trên:
    - `PATCH /api/bookings/{id}/cancel`;
    - `POST /api/technician/jobs/{id}/cancel`.
 
    Nếu `lockedUntil` khác `null`, báo: *"Bạn đã hủy quá nhiều đơn, tạm khóa đến {giờ}."*
-3. **Khi bị chặn:** các API sau trả **409**:
+4. **Khi bị chặn:** các API sau trả **409**:
    - `POST /api/bookings` (khách);
    - `POST /api/technician/jobs/{id}/apply` và `.../accept` (KTV).
 
    ```json
-   { "code": "CANCEL_LIMIT_LOCKED", "message": "Ban da huy qua nhieu don, tam thoi chua the dat don moi",
-     "lockedUntil": "2026-11-12T12:00:00.000Z" }
+   { "code": "ACCOUNT_SUSPENDED", "message": "Tai khoan dang tam khoa, chua the dat don moi",
+     "lockedUntil": "2026-11-14T03:00:00.000Z", "reason": "Huy 3 don da co KTV nhan trong 24 gio", "level": 2 }
    ```
 
-   App bắt `code` này và hiện: *"Bạn đã hủy quá nhiều đơn. Bạn có thể đặt đơn (KTV: nhận đơn) lại sau {giờ địa
-   phương của lockedUntil}."*
-4. **Nên làm thêm:** khi vào luồng đặt đơn (khách) hoặc tab nhận đơn (KTV), gọi `GET /api/bookings/cancel-limit`. Nếu
-   `lockedUntil` khác `null` thì hiện luôn thông báo ở bước 3.
+   Mã cũ `CANCEL_LIMIT_LOCKED` **không còn dùng**, đã thay bằng `ACCOUNT_SUSPENDED`. App hiện:
+   *"Tài khoản tạm khóa đến {giờ}. Lý do: {reason}."*
+5. **Thông báo:** khi bị tạm khóa, người dùng nhận thông báo `ACCOUNT_SUSPENDED` "Tài khoản của bạn đang tạm khóa", kèm
+   lý do và giờ mở. Khi admin mở sớm thì nhận `ACCOUNT_SUSPENSION_LIFTED`. Khi nhận được 2 loại này, app gọi lại
+   `/auth/me` để cập nhật banner.
 
 ## W. Khu vực khi đặt đơn, đơn trực tuyến, dịch vụ kiểu cũ (12/11)
 

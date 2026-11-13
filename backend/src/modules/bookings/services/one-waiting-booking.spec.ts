@@ -1,5 +1,12 @@
 import { ConflictException } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
+// Suspensions are covered by cancel-limit.spec; here nobody is suspended.
+jest.mock('./cancel-limit', () => ({
+  ...jest.requireActual('./cancel-limit'),
+  activeSuspension: jest.fn().mockResolvedValue(null),
+  assertNotSuspended: jest.fn().mockResolvedValue(undefined),
+  applyCancelLimit: jest.fn().mockResolvedValue({ enabled: false, lockedUntil: null }),
+}));
 
 // A customer may only have one booking in progress at a time: waiting for a technician, or taken and not finished.
 describe('one waiting booking per customer', () => {

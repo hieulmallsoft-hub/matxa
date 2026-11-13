@@ -1,5 +1,12 @@
 import { BookingsService } from './bookings.service';
 import { travelFeeFor } from './distance';
+// Suspensions are covered by cancel-limit.spec; here nobody is suspended.
+jest.mock('./cancel-limit', () => ({
+  ...jest.requireActual('./cancel-limit'),
+  activeSuspension: jest.fn().mockResolvedValue(null),
+  assertNotSuspended: jest.fn().mockResolvedValue(undefined),
+  applyCancelLimit: jest.fn().mockResolvedValue({ enabled: false, lockedUntil: null }),
+}));
 
 const rules = { minAdvanceHours: 0, maxDispatchRadiusKm: 0, travelFeeThresholdKm: 10, travelFeeAmount: 50_000 };
 

@@ -2,6 +2,13 @@ import { BookingsService } from './bookings.service';
 // Area codes are covered by location-code.spec; here the city/ward pass through unchanged.
 jest.mock('../../marketplace/services/location-code', () => ({ resolveLocationCodes: jest.fn(async (_db: unknown, city: unknown, district: unknown) => ({ city, district })) }));
 // These cover other rules; the customer-only check has its own spec.
+// Suspensions are covered by cancel-limit.spec; here nobody is suspended.
+jest.mock('./cancel-limit', () => ({
+  ...jest.requireActual('./cancel-limit'),
+  activeSuspension: jest.fn().mockResolvedValue(null),
+  assertNotSuspended: jest.fn().mockResolvedValue(undefined),
+  applyCancelLimit: jest.fn().mockResolvedValue({ enabled: false, lockedUntil: null }),
+}));
 beforeEach(() => jest.spyOn(BookingsService.prototype as any, 'assertCustomer').mockResolvedValue(undefined));
 
 describe('booking request recipient', () => {

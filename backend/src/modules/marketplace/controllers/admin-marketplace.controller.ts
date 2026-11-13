@@ -51,6 +51,7 @@ import {
   UpdateAdminTechnicianPriceOptionDto,
   UpdateBannerDto,
   UpdateCategoryDto,
+  SuspendUserDto,
   CancelOffendersQueryDto,
   UpdatePromotionDto,
   UpdateUserStatusDto,
@@ -164,6 +165,19 @@ export class AdminMarketplaceController {
   })
   cancelOffenders(@Query() query: CancelOffendersQueryDto) {
     return this.admin.cancelOffenders(query.days, query.minCancellations);
+  }
+  @Post('users/:id/suspend')
+  @ApiOperation({
+    summary: 'Tam khoa nguoi dung co thoi han (van dang nhap duoc, khong dat/nhan don moi)',
+    description: 'Bo trong hours = theo muc tiep theo cua nguoi nay (mac dinh 3 gio -> 24 gio -> 7 ngay, ve lai muc 1 sau 30 ngay).',
+  })
+  suspendUser(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SuspendUserDto) {
+    return this.admin.suspendUser(auth.sub, id, dto);
+  }
+  @Post('users/:id/suspension/lift')
+  @ApiOperation({ summary: 'Mo som lan tam khoa dang co hieu luc' })
+  liftSuspension(@Param('id', ParseUUIDPipe) id: string) {
+    return this.admin.liftSuspension(id);
   }
   @Get('users/:id/cancellations')
   @ApiOperation({

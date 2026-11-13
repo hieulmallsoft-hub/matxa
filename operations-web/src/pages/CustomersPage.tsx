@@ -7,7 +7,7 @@ import { PageHeader } from '../components/common/PageHeader';
 import { DetailDrawer } from '../components/common/DetailDrawer';
 import { useConfirm } from '../components/ui/useConfirm';
 import { CancelOffendersCard } from '../components/CancelOffendersCard';
-import { CancelCount, CancelPeriodSelect, CancellationsModal, type CancelPeriod, type CancelStats } from '../components/CancellationStats';
+import { CancelCount, CancelPeriodSelect, CancellationsModal, suspendPromptOptions, type CancelPeriod, type CancelStats } from '../components/CancellationStats';
 import { AnimatedNumber, Badge, Button, Card, Empty, Reveal, RevealItem, SearchBox, SkeletonRows, Tabs } from '../components/ui/kit';
 
 type UserStatus = 'ACTIVE' | 'BLOCKED' | 'DELETED';
@@ -68,7 +68,7 @@ export const CustomersPage: React.FC = () => {
   const [selected, setSelected] = useState<Customer | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [cancelPeriod, setCancelPeriod] = useState<CancelPeriod>('week');
-  const [cancellationsOf, setCancellationsOf] = useState<{ id: string; name: string; blocked: boolean } | null>(null);
+  const [cancellationsOf, setCancellationsOf] = useState<{ id: string; name: string; blocked: boolean; stats?: CancelStats } | null>(null);
   const query = useDebounced(search.trim());
 
   const load = useCallback(async () => {
@@ -104,7 +104,7 @@ export const CustomersPage: React.FC = () => {
 
   const askBlockReason = (name: string) =>
     prompt({
-      title: `Khóa tài khoản ${name}?`,
+      title: `Khóa vĩnh viễn ${name}?`,
       message: 'Tài khoản bị đăng xuất khỏi mọi thiết bị, không đăng nhập và đặt lịch được cho tới khi mở khóa. Người dùng thấy lý do bên dưới.',
       placeholder: 'Lý do khóa (bắt buộc, người dùng sẽ thấy)',
       confirmText: 'Khóa tài khoản',
@@ -157,6 +157,29 @@ export const CustomersPage: React.FC = () => {
     }
   };
 
+  // Time-limited lock at the person's next level; they can still sign in.
+  const suspendUser = async (userId: string, name: string, stats?: CancelStats) => {
+    const reason = await prompt(suspendPromptOptions(name, stats));
+    if (!reason) return;
+    try {
+      await request(`/admin/marketplace/users/${userId}/suspend`, { method: 'POST', body: JSON.stringify({ reason }) });
+      addToast({ title: 'Đã tạm khóa', message: name, type: 'success' });
+      void load();
+    } catch (suspendError) {
+      addToast({ title: 'Không tạm khóa được', message: errorText(suspendError), type: 'error' });
+    }
+  };
+
+  const liftSuspension = async (userId: string, name: string) => {
+    try {
+      await request(`/admin/marketplace/users/${userId}/suspension/lift`, { method: 'POST' });
+      addToast({ title: 'Đã mở lại', message: name, type: 'success' });
+      void load();
+    } catch (liftError) {
+      addToast({ title: 'Không mở được', message: errorText(liftError), type: 'error' });
+    }
+  };
+
   const copyId = (id: string) => {
     void navigator.clipboard?.writeText(id);
     addToast({ title: 'Đã sao chép User ID', message: id, type: 'success' });
@@ -176,6 +199,16 @@ export const CustomersPage: React.FC = () => {
             const target = cancellationsOf;
             setCancellationsOf(null);
             void blockOffender(target.id, target.name);
+          }}
+          onSuspend={() => {
+            const target = cancellationsOf;
+            setCancellationsOf(null);
+            void suspendUser(target.id, target.name, target.stats);
+          }}
+          onLift={() => {
+            const target = cancellationsOf;
+            setCancellationsOf(null);
+            void liftSuspension(target.id, target.name);
           }}
         />
       )}
@@ -292,10 +325,16 @@ export const CustomersPage: React.FC = () => {
                           <CancelCount
                             stats={customer.cancellations}
                             period={cancelPeriod}
-                            onOpen={() => setCancellationsOf({ id: customer.id, name, blocked: customer.status === 'BLOCKED' })}
+                            onOpen={() => setCancellationsOf({ id: customer.id, name, blocked: customer.status === 'BLOCKED', stats: customer.cancellations })}
                           />
                         </td>
-                        <td className="py-3 px-4"><Badge tone={badge.tone} dot>{badge.label}</Badge></td>
+                        <td className="py-3 px-4">
+                          {customer.status === 'ACTIVE' && customer.cancellations?.suspension ? (
+                            <Badge tone="amber" dot>Tạm khóa (lần {customer.cancellations.suspension.level})</Badge>
+                          ) : (
+                            <Badge tone={badge.tone} dot>{badge.label}</Badge>
+                          )}
+                        </td>
                         <td className="py-3 px-4 text-right">
                           <ChevronRight className="w-4 h-4 text-content-tertiary inline" />
                         </td>

@@ -1,5 +1,12 @@
 import { ConflictException } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
+// Suspensions are covered by cancel-limit.spec; here nobody is suspended.
+jest.mock('./cancel-limit', () => ({
+  ...jest.requireActual('./cancel-limit'),
+  activeSuspension: jest.fn().mockResolvedValue(null),
+  assertNotSuspended: jest.fn().mockResolvedValue(undefined),
+  applyCancelLimit: jest.fn().mockResolvedValue({ enabled: false, lockedUntil: null }),
+}));
 
 describe('technician applies to an open booking', () => {
   // 400.000đ of services at the default 25% platform fee = 100.000đ commission on selection.

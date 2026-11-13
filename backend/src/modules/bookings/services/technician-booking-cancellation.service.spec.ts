@@ -66,7 +66,7 @@ describe('TechnicianBookingCancellationService', () => {
     const { service } = createSubject();
     const bookings = {
       announceOpenJobsToFreedTechnician: jest.fn().mockResolvedValue(undefined),
-      cancelLimit: jest.fn().mockResolvedValue({ remainingBeforeLock: 1, lockedUntil: null }),
+      applyCancelLimit: jest.fn().mockResolvedValue({ remainingBeforeLock: 1, lockedUntil: null }),
     };
     (service as any).bookings = bookings;
     await service.cancel('tech-user-1', 'booking-1', otherReason);
@@ -77,7 +77,7 @@ describe('TechnicianBookingCancellationService', () => {
     const { service, tx } = createSubject();
     (service as any).bookings = {
       announceOpenJobsToFreedTechnician: jest.fn(),
-      cancelLimit: jest.fn().mockResolvedValue({ remainingBeforeLock: 1, lockedUntil: null }),
+      applyCancelLimit: jest.fn().mockResolvedValue({ remainingBeforeLock: 1, lockedUntil: null }),
     };
     const result: any = await service.cancel('tech-user-1', 'booking-1', otherReason);
     expect(tx.booking.updateMany.mock.calls[0][0].data.cancelPenalized).toBe(true);

@@ -78,7 +78,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
   const [dailyDiscountFeePercent, setDailyDiscountFeePercent] = useState('20');
   const [cancelLimitCount, setCancelLimitCount] = useState('3');
   const [cancelLimitWindowHours, setCancelLimitWindowHours] = useState('24');
-  const [cancelLockHours, setCancelLockHours] = useState('3');
+  const [suspensionHours, setSuspensionHours] = useState<string[]>(['3', '24', '168']);
+  const [suspensionResetDays, setSuspensionResetDays] = useState('30');
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
 
   React.useEffect(() => {
@@ -99,7 +100,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         setSupportEmail(value.supportEmail);
       })
       .catch(() => undefined);
-    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number; confirmationWaitMinutes: number; requireTechnicianPhone: boolean; homeServiceFee: number; dailyDiscountThreshold: number; dailyDiscountFeePercent: number; enabledServiceModes?: string[]; cancelLimitCount?: number; cancelLimitWindowHours?: number; cancelLockHours?: number }>('/admin/settings/booking')
+    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number; confirmationWaitMinutes: number; requireTechnicianPhone: boolean; homeServiceFee: number; dailyDiscountThreshold: number; dailyDiscountFeePercent: number; enabledServiceModes?: string[]; cancelLimitCount?: number; cancelLimitWindowHours?: number; suspensionHours?: number[]; suspensionResetDays?: number }>('/admin/settings/booking')
       .then((value) => {
         setMinAdvanceHours(String(value.minAdvanceHours));
         setMaxTravelDistanceKm(String(value.maxDispatchRadiusKm));
@@ -113,7 +114,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         setDailyDiscountFeePercent(String(value.dailyDiscountFeePercent ?? 20));
         setCancelLimitCount(String(value.cancelLimitCount ?? 3));
         setCancelLimitWindowHours(String(value.cancelLimitWindowHours ?? 24));
-        setCancelLockHours(String(value.cancelLockHours ?? 3));
+        // Always three levels on screen (1st, 2nd, 3rd and later).
+        const levels = value.suspensionHours?.length ? value.suspensionHours : [3, 24, 168];
+        setSuspensionHours([0, 1, 2].map((i) => String(levels[Math.min(i, levels.length - 1)])));
+        setSuspensionResetDays(String(value.suspensionResetDays ?? 30));
       })
       .catch(() => undefined);
   }, []);
@@ -170,15 +174,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         if (!enabledServiceModes.length) throw new Error('Phải bật ít nhất 1 nơi phục vụ');
         const limitCount = Number(cancelLimitCount);
         const limitWindow = Number(cancelLimitWindowHours);
-        const lockHours = Number(cancelLockHours);
+        const levels = suspensionHours.map(Number);
+        const resetDays = Number(suspensionResetDays);
         if (!Number.isInteger(limitCount) || limitCount < 0 || limitCount > 50) throw new Error('Số lần hủy phải là số nguyên từ 0 đến 50');
         if (!Number.isInteger(limitWindow) || limitWindow < 1 || limitWindow > 720) throw new Error('Khoảng thời gian đếm phải từ 1 đến 720 giờ');
-        if (!Number.isInteger(lockHours) || lockHours < 1 || lockHours > 720) throw new Error('Thời gian khóa phải từ 1 đến 720 giờ');
+        if (levels.some((level) => !Number.isInteger(level) || level < 1 || level > 8760)) throw new Error('Thời gian tạm khóa mỗi lần phải từ 1 đến 8760 giờ');
+        if (!Number.isInteger(resetDays) || resetDays < 1 || resetDays > 365) throw new Error('Số ngày tính lại từ lần 1 phải từ 1 đến 365');
         await request('/admin/settings/booking', {
           method: 'PATCH',
           body: JSON.stringify({
             minAdvanceHours: hours, maxDispatchRadiusKm: radius, confirmationWaitMinutes: wait, requireTechnicianPhone, enabledServiceModes,
-            cancelLimitCount: limitCount, cancelLimitWindowHours: limitWindow, cancelLockHours: lockHours,
+            cancelLimitCount: limitCount, cancelLimitWindowHours: limitWindow, suspensionHours: levels, suspensionResetDays: resetDays,
           }),
         });
         addToast({ title: 'Đã lưu quy định đặt lịch', message: 'Áp dụng cho các đơn đặt sau khi lưu.', type: 'success' });
@@ -434,7 +440,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-[#1C2B20]">Hủy quá (số đơn)</label>
                     <input type="number" min="0" max="50" value={cancelLimitCount} onChange={(e) => setCancelLimitCount(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]" />
@@ -443,14 +449,28 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                     <label className="text-xs font-bold text-[#1C2B20]">Trong vòng (giờ)</label>
                     <input type="number" min="1" max="720" value={cancelLimitWindowHours} onChange={(e) => setCancelLimitWindowHours(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]" />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {suspensionHours.map((value, index) => (
+                    <div key={index} className="space-y-1">
+                      <label className="text-xs font-bold text-[#1C2B20]">Tạm khóa lần {index + 1} (giờ)</label>
+                      <input
+                        type="number" min="1" max="8760" value={value}
+                        onChange={(e) => setSuspensionHours((current) => current.map((item, i) => (i === index ? e.target.value : item)))}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]"
+                      />
+                    </div>
+                  ))}
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-[#1C2B20]">Thì khóa (giờ)</label>
-                    <input type="number" min="1" max="720" value={cancelLockHours} onChange={(e) => setCancelLockHours(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]" />
+                    <label className="text-xs font-bold text-[#1C2B20]">Về lại lần 1 sau (ngày)</label>
+                    <input type="number" min="1" max="365" value={suspensionResetDays} onChange={(e) => setSuspensionResetDays(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]" />
                   </div>
-                  <span className="sm:col-span-3 text-[11px] text-[#66756B]">
+                  <span className="col-span-2 sm:col-span-4 text-[11px] text-[#66756B]">
                     {Number(cancelLimitCount) > 0
-                      ? `Khách hoặc KTV hủy ${cancelLimitCount} đơn đã có KTV nhận trong ${cancelLimitWindowHours} giờ thì bị khóa ${cancelLockHours} giờ: khách không đặt được đơn mới, KTV không nhận được đơn mới (vẫn làm tiếp đơn đang có). App cảnh báo khi còn 1 lần. `
-                      : 'Nhập 0 để tắt giới hạn hủy. '}
+                      ? `Khách hoặc KTV hủy ${cancelLimitCount} đơn đã có KTV nhận trong ${cancelLimitWindowHours} giờ thì tự bị tạm khóa: lần 1 ${suspensionHours[0]} giờ, tái phạm lần 2 ${suspensionHours[1]} giờ, lần 3 trở đi ${suspensionHours[2]} giờ (và hiện "cần xem xét" để admin cân nhắc khóa vĩnh viễn). ${suspensionResetDays} ngày không bị tạm khóa thì tính lại từ lần 1. `
+                      : 'Nhập 0 để tắt tự tạm khóa khi hủy nhiều (admin vẫn tạm khóa tay được theo các mức trên). '}
+                    Tạm khóa: vẫn đăng nhập, xem lịch sử, chat, rút ví; không đặt đơn mới (khách) / nhận đơn mới (KTV); hết giờ tự mở. App cảnh báo khi còn 1 lần hủy.
                     Không tính: hủy đơn chưa có KTV nhận, đơn tự hết hạn, admin hủy, KTV hủy có ảnh bằng chứng (khách vắng mặt, không an toàn…), danh mục đã tắt "Tính phạt khi hủy".
                   </span>
                 </div>

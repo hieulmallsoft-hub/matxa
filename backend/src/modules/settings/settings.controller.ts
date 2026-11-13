@@ -84,9 +84,13 @@ class UpdateBookingRulesDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(720)
   cancelLimitWindowHours?: number;
 
-  @ApiPropertyOptional({ example: 3, description: 'Thoi gian tam khoa (gio) tinh tu lan huy cham moc.' })
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(720)
-  cancelLockHours?: number;
+  @ApiPropertyOptional({ example: [3, 24, 168], description: 'So gio tam khoa theo tung lan: lan 1, lan 2 (tai pham)… Qua lan cuoi thi dung muc cuoi va bao admin xem xet.' })
+  @IsOptional() @IsArray() @ArrayMinSize(1) @Type(() => Number) @IsInt({ each: true }) @Min(1, { each: true }) @Max(8760, { each: true })
+  suspensionHours?: number[];
+
+  @ApiPropertyOptional({ example: 30, description: 'Khong bi tam khoa trong so ngay nay thi lan sau tinh lai tu lan 1.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(365)
+  suspensionResetDays?: number;
 }
 
 @ApiTags('Admin Settings')

@@ -29,6 +29,7 @@ describe('AuthService', () => {
     deviceToken: { deleteMany: jest.fn() },
     userIdentity: { findUnique: jest.fn() },
     user: { findUnique: jest.fn() },
+    userSuspension: { findFirst: jest.fn().mockResolvedValue(null) },
   };
   const jwt = { signAsync: jest.fn().mockResolvedValue('access-token') };
   const phoneOtp = {
@@ -163,7 +164,7 @@ describe('AuthService', () => {
 
   it('loads active users and scopes logout to the authenticated user', async () => {
     prisma.user.findUnique.mockResolvedValue(refreshSession().user);
-    await expect(service.getCurrentUser('user-id')).resolves.toMatchObject({ id: 'user-id', status: 'ACTIVE' });
+    await expect(service.getCurrentUser('user-id')).resolves.toMatchObject({ id: 'user-id', status: 'ACTIVE', suspension: null });
     prisma.user.findUnique.mockResolvedValue(null);
     await expect(service.getCurrentUser('missing')).rejects.toThrow();
     prisma.session.findFirst.mockResolvedValue({ deviceId: 'device-1' });

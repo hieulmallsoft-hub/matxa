@@ -3,7 +3,19 @@ import { X } from 'lucide-react';
 import { request } from '../api/client';
 
 export type CancelPeriod = 'today' | 'week' | 'month';
-export type CancelStats = { today: number; week: number; month: number; lockedUntil: string | null };
+export type CancelStats = {
+  today: number;
+  week: number;
+  month: number;
+  lockedUntil: string | null;
+  suspension?: { level: number; reason: string; source: string; endsAt: string } | null;
+  /** Level and length the next suspension would have; needsReview = past the last level. */
+  nextLevel?: number;
+  nextHours?: number;
+  needsReview?: boolean;
+};
+
+const hoursLabel = (hours?: number) => (!hours ? '' : hours % 24 === 0 ? `${hours / 24} ngày` : `${hours} giờ`);
 
 export const CANCEL_PERIODS: Array<{ value: CancelPeriod; label: string }> = [
   { value: 'today', label: 'Hôm nay' },
@@ -37,7 +49,12 @@ export function CancelCount({ stats, period, onOpen }: { stats?: CancelStats; pe
   return (
     <button type="button" onClick={onOpen} className="text-left" title="Xem các lần hủy">
       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${tone}`}>{count} đơn</span>
-      {stats?.lockedUntil && <span className="block mt-1 text-[10px] font-semibold text-[#D04A44]">Tạm khóa đến {time(stats.lockedUntil)}</span>}
+      {stats?.lockedUntil && (
+        <span className="block mt-1 text-[10px] font-semibold text-[#D04A44]">
+          Tạm khóa đến {time(stats.lockedUntil)}{stats.suspension ? ` (lần ${stats.suspension.level})` : ''}
+        </span>
+      )}
+      {!stats?.lockedUntil && stats?.needsReview && <span className="block mt-1 text-[10px] font-semibold text-[#A86A0C]">Cần xem xét</span>}
     </button>
   );
 }
@@ -63,11 +80,16 @@ export function CancellationsModal({
   user,
   onClose,
   onBlock,
+  onSuspend,
+  onLift,
 }: {
-  user: { id: string; name: string; blocked: boolean };
+  user: { id: string; name: string; blocked: boolean; stats?: CancelStats };
   onClose: () => void;
   onBlock: () => void;
+  onSuspend: () => void;
+  onLift: () => void;
 }) {
+  const stats = user.stats;
   const [items, setItems] = useState<Cancellation[] | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -87,6 +109,11 @@ export function CancellationsModal({
             <p className="text-xs text-[#66756B] mt-0.5">
               30 ngày gần nhất{items ? ` · ${items.length} lần hủy, ${counted} lần bị tính phạt` : ''}
             </p>
+            {stats?.suspension && (
+              <p className="text-xs font-semibold text-[#D04A44] mt-1">
+                Đang tạm khóa lần {stats.suspension.level} đến {time(stats.suspension.endsAt)} · {stats.suspension.reason}
+              </p>
+            )}
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-[#66756B] hover:bg-[#F6F8F4]" aria-label="Đóng"><X className="w-4 h-4" /></button>
         </div>
@@ -124,11 +151,31 @@ export function CancellationsModal({
         </div>
         <div className="px-5 py-3 border-t border-[#E5EBE5] bg-[#F6F8F4] flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 rounded-xl border border-[#E5EBE5] bg-white text-xs font-semibold text-[#66756B]">Đóng</button>
+          {!user.blocked && (stats?.suspension ? (
+            <button onClick={onLift} className="px-4 py-2 rounded-xl border border-[#C8EED7] bg-[#EAF5EC] text-[#2E7D4A] text-xs font-semibold">Mở sớm</button>
+          ) : (
+            <button onClick={onSuspend} className="px-4 py-2 rounded-xl bg-[#F2A93B] hover:bg-[#E0982A] text-white text-xs font-semibold">
+              Tạm khóa{stats?.nextHours ? ` lần ${stats.nextLevel} · ${hoursLabel(stats.nextHours)}` : ''}
+            </button>
+          ))}
           {!user.blocked && (
-            <button onClick={onBlock} className="px-4 py-2 rounded-xl bg-[#E05B55] hover:bg-[#D04A44] text-white text-xs font-semibold">Khóa tài khoản</button>
+            <button onClick={onBlock} className="px-4 py-2 rounded-xl bg-[#E05B55] hover:bg-[#D04A44] text-white text-xs font-semibold">Khóa vĩnh viễn</button>
           )}
         </div>
       </div>
     </div>
   );
+}
+
+/** "Tạm khóa" dialog text for the person's next level. */
+export function suspendPromptOptions(name: string, stats?: CancelStats) {
+  const length = hoursLabel(stats?.nextHours) || 'theo mức tiếp theo';
+  return {
+    title: `Tạm khóa ${name}${stats?.nextLevel ? ` (lần ${stats.nextLevel})` : ''}?`,
+    message: `Khóa ${length}: vẫn đăng nhập được nhưng không đặt/nhận đơn mới, hết giờ tự mở. Tái phạm sẽ bị khóa lâu hơn.${stats?.needsReview ? ' Người này đã vượt mức cuối, nên cân nhắc khóa vĩnh viễn.' : ''} Người dùng thấy lý do bên dưới.`,
+    placeholder: 'Lý do tạm khóa (bắt buộc, người dùng sẽ thấy)',
+    confirmText: 'Tạm khóa',
+    tone: 'warning' as const,
+    required: true,
+  };
 }

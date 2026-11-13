@@ -327,7 +327,13 @@ export class AuthService {
       throw new UnauthorizedException('Tai khoan khong con hoat dong');
     }
 
-    return this.toAuthUser(user);
+    // A suspended account still signs in; the apps show until when it cannot book or take jobs.
+    const suspension = await this.prisma.userSuspension.findFirst({
+      where: { userId, liftedAt: null, endsAt: { gt: new Date() } },
+      orderBy: { endsAt: 'desc' },
+      select: { level: true, reason: true, endsAt: true },
+    });
+    return { ...this.toAuthUser(user), suspension };
   }
 
   /**

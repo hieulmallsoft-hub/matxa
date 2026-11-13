@@ -121,7 +121,7 @@ export class TechnicianBookingCancellationService {
     void this.notifyCancelled(bookingId, userId).catch(() => undefined);
     // Free again: tell them about open jobs announced while they were busy.
     void this.bookings?.announceOpenJobsToFreedTechnician(userId);
-    const cancelLimit = await this.bookings?.cancelLimit(userId);
+    const cancelLimit = await this.bookings?.applyCancelLimit(userId);
     return cancelLimit ? { ...result, cancelLimit } : result;
   }
 

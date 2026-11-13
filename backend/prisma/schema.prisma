@@ -225,8 +225,29 @@ model User {
   wallets               Wallet[]
   topUpTransactions     TopUpTransaction[]
   bookingCancellations  BookingCancellation[] @relation("BookingCancellationActor")
+  suspensions UserSuspension[] @relation("SuspendedUser")
 
   @@map("users")
+}
+
+/// A time-limited lock: the person can sign in and use the app but cannot book (customer) or take jobs (technician)
+/// until `endsAt`. Repeats within the reset period get longer (level 1, 2, 3…). Lifting early sets `liftedAt`.
+model UserSuspension {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  level       Int
+  reason      String
+  /// CANCEL_LIMIT (automatic, too many cancels) or ADMIN.
+  source      String
+  createdById String?   @map("created_by_id") @db.Uuid
+  startsAt    DateTime  @default(now()) @map("starts_at")
+  endsAt      DateTime  @map("ends_at")
+  liftedAt    DateTime? @map("lifted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  user        User      @relation("SuspendedUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("user_suspensions")
 }
 
 model Course {

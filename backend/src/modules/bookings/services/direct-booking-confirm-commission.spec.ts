@@ -2,6 +2,13 @@ import { ConflictException } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { creditBookingPromotion } from './booking-promotion-credit';
 jest.mock('./booking-promotion-credit', () => ({ creditBookingPromotion: jest.fn().mockResolvedValue(0) }));
+// Suspensions are covered by cancel-limit.spec; here nobody is suspended.
+jest.mock('./cancel-limit', () => ({
+  ...jest.requireActual('./cancel-limit'),
+  activeSuspension: jest.fn().mockResolvedValue(null),
+  assertNotSuspended: jest.fn().mockResolvedValue(undefined),
+  applyCancelLimit: jest.fn().mockResolvedValue({ enabled: false, lockedUntil: null }),
+}));
 
 describe('technician confirms a direct booking', () => {
   const pending = {

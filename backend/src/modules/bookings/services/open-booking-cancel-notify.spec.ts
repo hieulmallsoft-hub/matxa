@@ -1,6 +1,13 @@
 import { BookingsService } from './bookings.service';
 import { releaseBookingPromotion } from './booking-promotion-release';
 jest.mock('./booking-promotion-release', () => ({ releaseBookingPromotion: jest.fn().mockResolvedValue(false) }));
+// Suspensions are covered by cancel-limit.spec; here nobody is suspended.
+jest.mock('./cancel-limit', () => ({
+  ...jest.requireActual('./cancel-limit'),
+  activeSuspension: jest.fn().mockResolvedValue(null),
+  assertNotSuspended: jest.fn().mockResolvedValue(undefined),
+  applyCancelLimit: jest.fn().mockResolvedValue({ enabled: false, lockedUntil: null }),
+}));
 
 describe('customer cancels an open booking', () => {
   const booking: any = {

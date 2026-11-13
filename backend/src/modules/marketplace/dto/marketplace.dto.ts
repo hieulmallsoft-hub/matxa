@@ -312,6 +312,16 @@ export class CreateCategoryDto {
   @IsOptional() @IsBoolean() countsCancellations?: boolean;
 }
 
+/** Time-limited lock: still signs in, cannot book / take jobs until it ends. */
+export class SuspendUserDto {
+  @ApiProperty({ example: 'Huy don lien tuc', description: 'Nguoi dung thay ly do nay.' })
+  @IsString() @MinLength(3, { message: 'Vui long nhap ly do tam khoa' }) @MaxLength(500)
+  reason!: string;
+  @ApiPropertyOptional({ example: 24, description: 'So gio. Bo trong = theo muc tiep theo (3 gio -> 24 gio -> 7 ngay).' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(8760)
+  hours?: number;
+}
+
 /** Who cancelled many taken bookings lately, for the admin to review. */
 export class CancelOffendersQueryDto {
   @ApiPropertyOptional({ example: 7, description: 'So ngay gan nhat' }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(90) days?: number;
