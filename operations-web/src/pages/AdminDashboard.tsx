@@ -536,14 +536,15 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                           >
                             Bảng giá
                           </button>
-                          <button
-                            onClick={() => void toggleHidden(tech.id, tech.user.displayName || 'KTV', tech.isActive)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                              tech.isActive ? 'text-[#A86A0C] hover:bg-[#FEF6E9]' : 'text-[#2E7D4A] hover:bg-[#EAF5EC]'
-                            }`}
-                          >
-                            {tech.isActive ? 'Ẩn hồ sơ' : 'Hiện hồ sơ'}
-                          </button>
+                          {/* Hiding a profile is no longer offered; only a profile hidden earlier can be shown again. */}
+                          {!tech.isActive && (
+                            <button
+                              onClick={() => void toggleHidden(tech.id, tech.user.displayName || 'KTV', tech.isActive)}
+                              className="px-2.5 py-1 rounded-lg text-xs font-semibold text-[#2E7D4A] hover:bg-[#EAF5EC] transition-colors"
+                            >
+                              Hiện hồ sơ
+                            </button>
+                          )}
                           {tech.user.status !== 'BLOCKED' && (
                             <button
                               onClick={() =>
@@ -1184,12 +1185,14 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                 ID: <span className="font-mono font-semibold text-[#66756B]">{technicianDetail.id}</span>
               </span>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => void toggleHidden(technicianDetail.id, technicianDetail.displayName || 'KTV', technicianDetail.isActive !== false)}
-                  className="px-4 py-2 rounded-xl border border-[#F8D2D0] bg-[#FDF0EF] hover:bg-[#FCE3E1] text-[#D04A44] text-xs font-semibold transition-colors"
-                >
-                  {technicianDetail.isActive !== false ? 'Ẩn hồ sơ' : 'Hiện hồ sơ'}
-                </button>
+                {technicianDetail.isActive === false && (
+                  <button
+                    onClick={() => void toggleHidden(technicianDetail.id, technicianDetail.displayName || 'KTV', false)}
+                    className="px-4 py-2 rounded-xl border border-[#C8EED7] bg-[#EAF5EC] hover:bg-[#DDF0E1] text-[#2E7D4A] text-xs font-semibold transition-colors"
+                  >
+                    Hiện hồ sơ
+                  </button>
+                )}
                 <button
                   onClick={() => setTechnicianDetail(null)}
                   className="px-4 py-2 rounded-xl bg-[#1C2B20] hover:bg-[#2E7D4A] text-white text-xs font-semibold transition-colors"
