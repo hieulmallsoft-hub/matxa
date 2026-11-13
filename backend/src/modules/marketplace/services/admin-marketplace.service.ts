@@ -140,12 +140,14 @@ export class AdminMarketplaceService {
       }),
       this.prisma.user.count({ where }),
     ]);
+    const stats = await this.cancelStats(items.map((user) => user.id));
     return {
       items: items.map(({ identities, ...user }) => ({
         ...user,
         email: identities.find((identity) => identity.email)?.email ?? null,
         phoneNumber: identities.find((identity) => identity.phoneNumber)?.phoneNumber ?? null,
         providers: identities.map((identity) => identity.provider),
+        cancellations: stats.get(user.id),
       })),
       total,
       page,
@@ -244,12 +246,79 @@ export class AdminMarketplaceService {
       }),
       this.prisma.technicianProfile.count(),
     ]);
+    const stats = await this.cancelStats(items.map((profile) => profile.userId));
     return {
-      items: items.map((profile) => ({ ...profile, averageRating: number(profile.averageRating) })),
+      items: items.map((profile) => ({ ...profile, averageRating: number(profile.averageRating), cancellations: stats.get(profile.userId) })),
       total,
       page,
       limit,
     };
+  }
+
+  /**
+   * Taken bookings each person cancelled (the ones counted toward the cancel limit): today and this month in Viet Nam
+   * time, the last 7 days, and until when they are locked out by the cancel limit (null = not locked).
+   */
+  private async cancelStats(userIds: string[], now = new Date()) {
+    const vnOffset = 7 * 3_600_000;
+    const vn = new Date(now.getTime() + vnOffset);
+    const today = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate()) - vnOffset);
+    const month = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), 1) - vnOffset);
+    const week = new Date(now.getTime() - 7 * 86_400_000);
+    const settings = new Map(
+      (await this.prisma.systemSetting.findMany({
+        where: { key: { in: ['BOOKING_CANCEL_LIMIT_COUNT', 'BOOKING_CANCEL_LIMIT_WINDOW_HOURS', 'BOOKING_CANCEL_LOCK_HOURS'] } },
+      })).map((row) => [row.key, Number(row.value)]),
+    );
+    const limit = settings.get('BOOKING_CANCEL_LIMIT_COUNT') ?? 3;
+    const windowStart = new Date(now.getTime() - (settings.get('BOOKING_CANCEL_LIMIT_WINDOW_HOURS') ?? 24) * 3_600_000);
+    const lockMs = (settings.get('BOOKING_CANCEL_LOCK_HOURS') ?? 3) * 3_600_000;
+    const since = new Date(Math.min(month.getTime(), week.getTime(), windowStart.getTime()));
+    const rows = userIds.length
+      ? await this.prisma.booking.findMany({
+          where: { cancelledByUserId: { in: userIds }, cancelPenalized: true, cancelledAt: { gte: since } },
+          select: { cancelledByUserId: true, cancelledAt: true },
+        })
+      : [];
+    return new Map(
+      userIds.map((userId) => {
+        const times = rows.filter((row) => row.cancelledByUserId === userId).map((row) => row.cancelledAt!.getTime());
+        const recent = times.filter((time) => time >= windowStart.getTime());
+        const unlock = limit > 0 && recent.length >= limit ? Math.max(...recent) + lockMs : 0;
+        return [
+          userId,
+          {
+            today: times.filter((time) => time >= today.getTime()).length,
+            week: times.filter((time) => time >= week.getTime()).length,
+            month: times.filter((time) => time >= month.getTime()).length,
+            lockedUntil: unlock > now.getTime() ? new Date(unlock) : null,
+          },
+        ];
+      }),
+    );
+  }
+
+  /** Every booking this person cancelled lately, for the admin to judge before blocking. */
+  async userCancellations(userId: string, days = 30) {
+    const bookings = await this.prisma.booking.findMany({
+      where: { cancelledByUserId: userId, cancelledAt: { gte: new Date(Date.now() - days * 86_400_000) } },
+      orderBy: { cancelledAt: 'desc' },
+      take: 100,
+      select: {
+        id: true, mode: true, scheduledStart: true, cancelledAt: true, cancelledByRole: true, cancelPenalized: true,
+        cancellationReasonCode: true, cancellationReasonText: true, totalAmount: true,
+        customer: { select: { id: true, displayName: true } },
+        technician: { select: { id: true, user: { select: { id: true, displayName: true } } } },
+        cancellation: { select: { _count: { select: { evidence: true } } } },
+        items: { select: { serviceName: true } },
+      },
+    });
+    return bookings.map(({ cancellation, items, totalAmount, ...booking }) => ({
+      ...booking,
+      totalAmount: number(totalAmount),
+      services: items.map((item) => item.serviceName),
+      evidenceCount: cancellation?._count.evidence ?? 0,
+    }));
   }
 
   async updateTechnician(id: string, dto: UpdateAdminTechnicianDto) {

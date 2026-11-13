@@ -22,6 +22,7 @@ describe('AdminMarketplaceService', () => {
       deleteMany: jest.fn(),
     },
     promotion: { findMany: jest.fn(), create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    systemSetting: { findMany: jest.fn() },
     $transaction: jest.fn(),
   };
   const service = new AdminMarketplaceService(db as never);
@@ -32,6 +33,8 @@ describe('AdminMarketplaceService', () => {
     db.booking.aggregate.mockResolvedValue({ _sum: { platformFee: 1250000 }, _count: { id: 3 } });
     db.technicianProfile.count.mockResolvedValue(2);
     db.review.aggregate.mockResolvedValue({ _avg: { rating: 4.5 }, _count: { rating: 10 } });
+    db.systemSetting.findMany.mockResolvedValue([]);
+    db.booking.findMany.mockResolvedValue([]);
   });
 
   it('returns dashboard aggregates from database values', async () => {

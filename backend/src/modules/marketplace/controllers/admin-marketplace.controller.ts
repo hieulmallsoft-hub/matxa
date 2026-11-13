@@ -165,6 +165,14 @@ export class AdminMarketplaceController {
   cancelOffenders(@Query() query: CancelOffendersQueryDto) {
     return this.admin.cancelOffenders(query.days, query.minCancellations);
   }
+  @Get('users/:id/cancellations')
+  @ApiOperation({
+    summary: 'Cac don nguoi nay da huy (30 ngay gan nhat)',
+    description: 'cancelPenalized = true: lan huy bi tinh vao gioi han huy (don da co KTV nhan, khong co bang chung).',
+  })
+  userCancellations(@Param('id', ParseUUIDPipe) id: string) {
+    return this.admin.userCancellations(id);
+  }
   @Patch('users/:id/status')
   @ApiOperation({ summary: 'Khoa hoac mo khoa user' })
   @ApiOkResponse({ type: AdminUserListResponseDto })

@@ -34,6 +34,7 @@ import { StatCard } from '../components/common/StatCard';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { SectionCard } from '../components/common/SectionCard';
 import { useConfirm } from '../components/ui/useConfirm';
+import { CancelCount, CancelPeriodSelect, CancellationsModal, type CancelPeriod, type CancelStats } from '../components/CancellationStats';
 
 type TabKey =
   | 'overview'
@@ -79,6 +80,7 @@ type Technician = {
   user: { id: string; displayName: string | null; status: string; phoneNumber?: string | null; blockedReason?: string | null };
   isActive: boolean;
   hiddenReason?: string | null;
+  cancellations?: CancelStats;
   isVerified: boolean;
   isAvailable: boolean;
   averageRating: number;
@@ -140,6 +142,8 @@ const promotionState = (promo: { isActive: boolean; startsAt: string; endsAt: st
 
 export function AdminDashboard({ notify, refreshCategories, tab, setTab, refreshKey }: Props) {
   const { confirm, prompt, dialog } = useConfirm();
+  const [cancelPeriod, setCancelPeriod] = useState<CancelPeriod>('week');
+  const [cancellationsOf, setCancellationsOf] = useState<{ id: string; name: string; blocked: boolean } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [technicians, setTechnicians] = useState<Page<Technician> | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -354,6 +358,17 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
   return (
     <div className="space-y-6">
       {dialog}
+      {cancellationsOf && (
+        <CancellationsModal
+          user={cancellationsOf}
+          onClose={() => setCancellationsOf(null)}
+          onBlock={() => {
+            const target = cancellationsOf;
+            setCancellationsOf(null);
+            void toggleBlocked(target.id, target.name, 'ACTIVE');
+          }}
+        />
+      )}
       {/* Page Header */}
       <PageHeader
         title={getPageTitle()}
@@ -418,6 +433,9 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                     <th className="py-3 px-4">Khu vực</th>
                     <th className="py-3 px-4">Số dịch vụ</th>
                     <th className="py-3 px-4">Đánh giá</th>
+                    <th className="py-3 px-4 whitespace-nowrap">
+                      Đã hủy <CancelPeriodSelect value={cancelPeriod} onChange={setCancelPeriod} />
+                    </th>
                     <th className="py-3 px-4">Trạng thái</th>
                     <th className="py-3 px-4 text-right">Thao tác</th>
                   </tr>
@@ -451,6 +469,13 @@ export function AdminDashboard({ notify, refreshCategories, tab, setTab, refresh
                           <span>{tech.averageRating.toFixed(2)}</span>
                           <span className="text-[#94A399] font-normal">({tech.reviewCount})</span>
                         </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <CancelCount
+                          stats={tech.cancellations}
+                          period={cancelPeriod}
+                          onOpen={() => setCancellationsOf({ id: tech.user.id, name: tech.user.displayName || 'KTV', blocked: tech.user.status === 'BLOCKED' })}
+                        />
                       </td>
                       <td className="py-3 px-4">
                         <StatusBadge

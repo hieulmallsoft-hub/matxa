@@ -7,6 +7,7 @@ import { PageHeader } from '../components/common/PageHeader';
 import { DetailDrawer } from '../components/common/DetailDrawer';
 import { useConfirm } from '../components/ui/useConfirm';
 import { CancelOffendersCard } from '../components/CancelOffendersCard';
+import { CancelCount, CancelPeriodSelect, CancellationsModal, type CancelPeriod, type CancelStats } from '../components/CancellationStats';
 import { AnimatedNumber, Badge, Button, Card, Empty, Reveal, RevealItem, SearchBox, SkeletonRows, Tabs } from '../components/ui/kit';
 
 type UserStatus = 'ACTIVE' | 'BLOCKED' | 'DELETED';
@@ -19,6 +20,7 @@ type Customer = {
   providers: string[];
   status: UserStatus;
   createdAt: string;
+  cancellations?: CancelStats;
 };
 type Page = { items: Customer[]; total: number; page: number; limit: number };
 
@@ -65,6 +67,8 @@ export const CustomersPage: React.FC = () => {
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<Customer | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [cancelPeriod, setCancelPeriod] = useState<CancelPeriod>('week');
+  const [cancellationsOf, setCancellationsOf] = useState<{ id: string; name: string; blocked: boolean } | null>(null);
   const query = useDebounced(search.trim());
 
   const load = useCallback(async () => {
@@ -164,6 +168,17 @@ export const CustomersPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {dialog}
+      {cancellationsOf && (
+        <CancellationsModal
+          user={cancellationsOf}
+          onClose={() => setCancellationsOf(null)}
+          onBlock={() => {
+            const target = cancellationsOf;
+            setCancellationsOf(null);
+            void blockOffender(target.id, target.name);
+          }}
+        />
+      )}
       <PageHeader
         title="Khách hàng"
         subtitle="Tìm theo tên, email, số điện thoại hoặc dán User ID"
@@ -223,6 +238,9 @@ export const CustomersPage: React.FC = () => {
                   <th className="py-3 px-4 font-semibold">Liên hệ</th>
                   <th className="py-3 px-4 font-semibold">Đăng nhập bằng</th>
                   <th className="py-3 px-4 font-semibold">Tham gia</th>
+                  <th className="py-3 px-4 font-semibold whitespace-nowrap">
+                    Đã hủy <CancelPeriodSelect value={cancelPeriod} onChange={setCancelPeriod} />
+                  </th>
                   <th className="py-3 px-4 font-semibold">Trạng thái</th>
                   <th className="py-3 px-4" />
                 </tr>
@@ -270,6 +288,13 @@ export const CustomersPage: React.FC = () => {
                           </div>
                         </td>
                         <td className="py-3 px-4 text-xs text-content-secondary whitespace-nowrap">{new Date(customer.createdAt).toLocaleDateString('vi-VN')}</td>
+                        <td className="py-3 px-4" onClick={(event) => event.stopPropagation()}>
+                          <CancelCount
+                            stats={customer.cancellations}
+                            period={cancelPeriod}
+                            onOpen={() => setCancellationsOf({ id: customer.id, name, blocked: customer.status === 'BLOCKED' })}
+                          />
+                        </td>
                         <td className="py-3 px-4"><Badge tone={badge.tone} dot>{badge.label}</Badge></td>
                         <td className="py-3 px-4 text-right">
                           <ChevronRight className="w-4 h-4 text-content-tertiary inline" />
