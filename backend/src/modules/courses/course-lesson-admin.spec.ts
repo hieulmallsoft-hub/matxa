@@ -12,6 +12,10 @@ jest.mock('@aws-sdk/client-s3', () => ({
   GetObjectCommand: jest.fn((input) => ({ get: input })),
 }));
 jest.mock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: jest.fn(async (_c, command) => `https://signed/${command.get.Key}`) }));
+jest.mock('../../common/image-compress', () => ({
+  ...jest.requireActual('../../common/image-compress'),
+  compressImage: jest.fn(async () => ({ buffer: Buffer.from('webp'), contentType: 'image/webp', ext: 'webp' })),
+}));
 const config = { get: (key: string) => ({ S3_BUCKET: 'b', S3_REGION: 'r', S3_ACCESS_KEY_ID: 'k', S3_SECRET_ACCESS_KEY: 's' })[key] };
 
 beforeEach(() => jest.clearAllMocks());
@@ -47,7 +51,7 @@ describe('lesson files and illustration', () => {
   it('uploads a lesson illustration, replaces the old one and returns a signed thumbnailUrl', async () => {
     const course: any = await service.uploadLessonThumbnail('l1', image);
     const key = prisma.courseLesson.update.mock.calls[0][0].data.thumbnailKey;
-    expect(key).toMatch(/^courses\/c1\/l1\/thumbnail\/.+\.png$/);
+    expect(key).toMatch(/^courses\/c1\/l1\/thumbnail\/.+\.webp$/);
     expect(send).toHaveBeenCalledWith({ del: { Bucket: 'b', Key: 'courses/c1/l1/thumbnail/old.png' } });
     expect(course.lessons[0].thumbnailUrl).toBe('https://signed/courses/c1/l1/thumbnail/new.png');
   });
@@ -62,4 +66,17 @@ describe('lesson files and illustration', () => {
     expect(send).toHaveBeenCalledWith({ del: { Bucket: 'b', Key: 'courses/c1/l1/a.mp4' } });
     expect(send).toHaveBeenCalledWith({ del: { Bucket: 'b', Key: 'courses/c1/l1/thumbnail/old.png' } });
   });
+});
+
+it('stores lesson illustrations compressed, with a long cache, and signs the same URL all day', async () => {
+  const { getSignedUrl } = jest.requireMock('@aws-sdk/s3-request-presigner');
+  const prisma: any = {
+    courseLesson: { findUnique: jest.fn().mockResolvedValue({ id: 'l1', courseId: 'c1', thumbnailKey: null }), update: jest.fn() },
+    course: { findUnique: jest.fn().mockResolvedValue({ id: 'c1', coverKey: 'k', lessons: [] }) },
+  };
+  await new CoursesService(prisma, config as any).uploadLessonThumbnail('l1', { buffer: Buffer.from('x'), size: 1, mimetype: 'image/png' });
+  expect(send).toHaveBeenCalledWith({ put: expect.objectContaining({ ContentType: 'image/webp', CacheControl: 'public, max-age=31536000, immutable' }) });
+  const options = getSignedUrl.mock.calls.at(-1)[2];
+  expect(options.signingDate.getUTCHours()).toBe(0);
+  expect(options.expiresIn).toBe(2 * 86_400);
 });

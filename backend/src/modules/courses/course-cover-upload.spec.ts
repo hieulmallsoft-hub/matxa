@@ -9,6 +9,10 @@ jest.mock('@aws-sdk/client-s3', () => ({
   GetObjectCommand: jest.fn((input) => ({ get: input })),
 }));
 jest.mock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: jest.fn(async (_c, command) => `https://signed/${command.get.Key}`) }));
+jest.mock('../../common/image-compress', () => ({
+  ...jest.requireActual('../../common/image-compress'),
+  compressImage: jest.fn(async () => ({ buffer: Buffer.from('webp'), contentType: 'image/webp', ext: 'webp' })),
+}));
 
 const COURSE = '10000000-0000-4000-8000-000000000001';
 const config = { get: (key: string) => ({ S3_BUCKET: 'b', S3_REGION: 'r', S3_ACCESS_KEY_ID: 'k', S3_SECRET_ACCESS_KEY: 's' })[key] };
@@ -32,8 +36,9 @@ describe('course cover upload (through the API, the bucket has no CORS)', () => 
   it('stores the image, points the course at it, drops the old cover and returns a signed coverUrl', async () => {
     const result: any = await service.uploadCover(COURSE, image);
     const put = send.mock.calls.find(([command]) => command.put)![0].put;
-    expect(put).toMatchObject({ Bucket: 'b', ContentType: 'image/png', Body: image.buffer });
-    expect(put.Key).toMatch(new RegExp(`^courses/${COURSE}/cover/[0-9a-f-]+\\.png$`));
+    // Stored compressed for phones, with a long cache.
+    expect(put).toMatchObject({ Bucket: 'b', ContentType: 'image/webp', Body: Buffer.from('webp'), CacheControl: 'public, max-age=31536000, immutable' });
+    expect(put.Key).toMatch(new RegExp(`^courses/${COURSE}/cover/[0-9a-f-]+\\.webp$`));
     expect(prisma.course.update).toHaveBeenCalledWith({ where: { id: COURSE }, data: { coverKey: put.Key } });
     expect(send.mock.calls.some(([command]) => command.del?.Key === `courses/${COURSE}/cover/old.jpg`)).toBe(true);
     expect(result.coverUrl).toBe(`https://signed/${put.Key}`);

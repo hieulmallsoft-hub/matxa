@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PrismaService } from '../../database/prisma.service';
+import { compressImage, COURSE_COVER_WIDTH, IMMUTABLE_CACHE, LESSON_IMAGE_WIDTH, LESSON_THUMBNAIL_WIDTH } from '../../common/image-compress';
 import { CreateCourseDto, CreateCoverUploadUrlDto, CreateLessonDto, CreateMediaDto, CreateMediaUploadUrlDto, UpdateCourseDto, UpdateLessonDto, UpdateMediaDto } from './dto/course.dto';
 
 /** Multipart file names arrive as UTF-8 bytes read as Latin-1 (mojibake); read them back as UTF-8. */
@@ -21,11 +22,15 @@ export class CoursesService {
     if (!lesson) throw new NotFoundException('Không tìm thấy bài học');
     if (!file?.buffer?.length) throw new BadRequestException('Chưa chọn file media');
     if (!['VIDEO', 'IMAGE', 'PDF'].includes(type)) throw new BadRequestException('Loại media không hợp lệ');
-    const ext = file.originalname.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+    // Pictures are shrunk for phones; videos and PDFs are stored as they are.
+    const picture = type === 'IMAGE' && IMAGE_TYPES[file.mimetype as string] ? await compressImage(file.buffer, LESSON_IMAGE_WIDTH) : null;
+    const body: Buffer = picture?.buffer ?? file.buffer;
+    const contentType = picture?.contentType ?? file.mimetype;
+    const ext = picture?.ext ?? (file.originalname.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin');
     const storageKey = `courses/${lesson.courseId}/${lessonId}/${randomUUID()}.${ext}`;
     const { bucket, client } = this.storage();
-    await client.send(new PutObjectCommand({ Bucket: bucket, Key: storageKey, Body: file.buffer, ContentType: file.mimetype }));
-    return this.prisma.courseMedia.create({ data: { lessonId, type: type as any, storageKey, contentType: file.mimetype, title: decodeFileName(file.originalname), fileSize: file.size } });
+    await client.send(new PutObjectCommand({ Bucket: bucket, Key: storageKey, Body: body, ContentType: contentType, CacheControl: IMMUTABLE_CACHE }));
+    return this.prisma.courseMedia.create({ data: { lessonId, type: type as any, storageKey, contentType, title: decodeFileName(file.originalname), fileSize: body.length } });
   }
   /** Rename a file (or move it in the list). */
   async updateMedia(id: string, dto: UpdateMediaDto) {
@@ -41,12 +46,12 @@ export class CoursesService {
     const lesson = await this.prisma.courseLesson.findUnique({ where: { id: lessonId } });
     if (!lesson) throw new NotFoundException('Không tìm thấy bài học');
     if (!file?.buffer?.length) throw new BadRequestException('Chưa chọn ảnh minh họa');
-    const ext = IMAGE_TYPES[file.mimetype as string];
-    if (!ext) throw new BadRequestException('Ảnh minh họa phải là JPG, PNG hoặc WEBP');
-    if (file.size > 5 * 1024 * 1024) throw new BadRequestException('Ảnh minh họa tối đa 5MB');
-    const storageKey = `courses/${lesson.courseId}/${lessonId}/thumbnail/${randomUUID()}.${ext}`;
+    if (!IMAGE_TYPES[file.mimetype as string]) throw new BadRequestException('Ảnh minh họa phải là JPG, PNG hoặc WEBP');
+    if (file.size > 15 * 1024 * 1024) throw new BadRequestException('Ảnh minh họa tối đa 15MB');
+    const picture = await compressImage(file.buffer, LESSON_THUMBNAIL_WIDTH);
+    const storageKey = `courses/${lesson.courseId}/${lessonId}/thumbnail/${randomUUID()}.${picture.ext}`;
     const { bucket, client } = this.storage();
-    await client.send(new PutObjectCommand({ Bucket: bucket, Key: storageKey, Body: file.buffer, ContentType: file.mimetype }));
+    await client.send(new PutObjectCommand({ Bucket: bucket, Key: storageKey, Body: picture.buffer, ContentType: picture.contentType, CacheControl: IMMUTABLE_CACHE }));
     await this.prisma.courseLesson.update({ where: { id: lessonId }, data: { thumbnailKey: storageKey } });
     if (lesson.thumbnailKey) client.send(new DeleteObjectCommand({ Bucket: bucket, Key: lesson.thumbnailKey })).catch(() => undefined);
     return this.get(lesson.courseId);
@@ -79,11 +84,12 @@ export class CoursesService {
     const course = await this.get(courseId);
     if (!file?.buffer?.length) throw new BadRequestException('Chưa chọn ảnh bìa');
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) throw new BadRequestException('Ảnh bìa phải là JPG, PNG hoặc WEBP');
-    if (file.size > 5 * 1024 * 1024) throw new BadRequestException('Ảnh bìa tối đa 5MB');
-    const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[file.mimetype as string];
-    const storageKey = `courses/${courseId}/cover/${randomUUID()}.${ext}`;
+    if (file.size > 15 * 1024 * 1024) throw new BadRequestException('Ảnh bìa tối đa 15MB');
+    // Shrunk for phones: a 2.4 MB 2600px PNG becomes ~150 KB WebP.
+    const picture = await compressImage(file.buffer, COURSE_COVER_WIDTH);
+    const storageKey = `courses/${courseId}/cover/${randomUUID()}.${picture.ext}`;
     const { bucket, client } = this.storage();
-    await client.send(new PutObjectCommand({ Bucket: bucket, Key: storageKey, Body: file.buffer, ContentType: file.mimetype }));
+    await client.send(new PutObjectCommand({ Bucket: bucket, Key: storageKey, Body: picture.buffer, ContentType: picture.contentType, CacheControl: IMMUTABLE_CACHE }));
     await this.prisma.course.update({ where: { id: courseId }, data: { coverKey: storageKey } });
     // The old cover is no longer referenced; removing it is best-effort.
     if (course.coverKey) client.send(new DeleteObjectCommand({ Bucket: bucket, Key: course.coverKey })).catch(() => undefined);
@@ -97,11 +103,17 @@ export class CoursesService {
       : undefined;
     return { ...course, ...(lessons ? { lessons } : {}), coverUrl: await this.signed(course.coverKey) };
   }
+  /**
+   * Signed as of the start of the day (UTC), valid two days: the same picture gets the same URL all day, so the apps'
+   * image cache hits instead of downloading it again on every screen.
+   */
   private async signed(key?: string | null) {
     if (!key) return null;
     try {
       const { bucket, client } = this.storage();
-      return await getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: 86_400 });
+      const now = new Date();
+      const signingDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      return await getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: 2 * 86_400, signingDate });
     } catch {
       return null;
     }

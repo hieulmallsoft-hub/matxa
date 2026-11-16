@@ -13,6 +13,7 @@
     "db:seed-admin": "ts-node --files src/scripts/seed-admin.ts",
     "db:seed-demo": "ts-node --files src/scripts/seed-local-demo.ts",
     "db:seed-service-catalog": "ts-node --files src/scripts/seed-service-catalog.ts",
+    "images:compress-courses": "ts-node --files src/scripts/compress-course-images.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
@@ -49,6 +50,7 @@
     "redis": "^5.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "sharp": "^0.34.5",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {

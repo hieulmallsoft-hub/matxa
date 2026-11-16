@@ -725,6 +725,17 @@ App KTV hiện banner trên tab nhận đơn: *"Hồ sơ đang tạm ẩn: {reas
 - Tên file tiếng Việt trước đây bị lỗi font (ví dụ "YÃªu cáº§u…") đã được sửa lại thành "Yêu cầu…". File tải lên từ nay
   giữ đúng tên. App không phải sửa gì.
 
+**Ảnh khóa học nhẹ hơn (16/11):**
+- Ảnh bìa, ảnh minh họa và ảnh trong bài học giờ được backend nén sang **WebP**:
+  - ảnh bìa rộng tối đa 1280px;
+  - ảnh minh họa 800px;
+  - ảnh trong bài học 1600px.
+- Mỗi ảnh khoảng 30–100 KB, trước đây khoảng 2 MB. 7 ảnh khóa học hiện có giảm từ 13,7 MB xuống khoảng 0,36 MB.
+- `coverUrl` và `thumbnailUrl` giờ **giữ nguyên trong cả ngày**. Trước đây mỗi lần gọi API lại ra link mới, nên app tải
+  lại ảnh mỗi lần mở màn. File ảnh có `Cache-Control` 1 năm.
+- **App cần:** hiện ảnh bằng thư viện có bộ nhớ đệm (Flutter: `cached_network_image`), để ảnh chỉ tải lần đầu, các lần
+  sau lấy từ máy. Ảnh WebP Android/iOS đều hiện được, không phải sửa gì thêm.
+
 ## Cách tự kiểm tra trên Swagger
 
 1. `PATCH /api/technician/application` với `idCardQr` = chuỗi app quét được → response có `idCardInfo` đúng tên trên thẻ.

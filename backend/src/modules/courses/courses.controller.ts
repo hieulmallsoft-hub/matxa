@@ -30,7 +30,7 @@ export class AdminCoursesController {
   @Delete(':id') remove(@Param('id', ParseUUIDPipe) id: string) { return this.courses.remove(id); }
   @Post(':id/cover-upload-url') coverUploadUrl(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateCoverUploadUrlDto) { return this.courses.coverUploadUrl(id, dto); }
   @Post(':id/cover-upload')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 15 * 1024 * 1024 } }))
   uploadCover(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: any) { return this.courses.uploadCover(id, file); }
   @Patch(':id/cover') setCover(@Param('id', ParseUUIDPipe) id: string, @Body('coverKey') coverKey: string) { return this.courses.setCover(id, coverKey); }
   @Post(':id/lessons') lesson(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateLessonDto) { return this.courses.createLesson(id, dto); }
@@ -43,7 +43,7 @@ export class AdminCoursesController {
   @Delete('media/:id') removeMedia(@Param('id', ParseUUIDPipe) id: string) { return this.courses.removeMedia(id); }
   @Patch('media/:id') updateMedia(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateMediaDto) { return this.courses.updateMedia(id, dto); }
   @Post('lessons/:id/thumbnail-upload')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 15 * 1024 * 1024 } }))
   uploadLessonThumbnail(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: any) { return this.courses.uploadLessonThumbnail(id, file); }
   @Delete('lessons/:id/thumbnail') removeLessonThumbnail(@Param('id', ParseUUIDPipe) id: string) { return this.courses.removeLessonThumbnail(id); }
   @Post('lessons/:id/media') createMedia(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateMediaDto) { return this.courses.createMedia(id, dto); }

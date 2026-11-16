@@ -183,7 +183,7 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
     setBusy(true);
     try {
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Ảnh bìa phải là JPG, PNG hoặc WEBP');
-      if (file.size > 5 * 1024 * 1024) throw new Error('Ảnh bìa tối đa 5MB');
+      if (file.size > 15 * 1024 * 1024) throw new Error('Ảnh bìa tối đa 15MB');
       // Uploaded through the API: the S3 bucket does not accept direct browser uploads (no CORS).
       const body = new FormData();
       body.append('file', file);
@@ -250,7 +250,7 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
       const image = f.get('thumbnail');
       if (image instanceof File && image.size) {
         if (!['image/jpeg', 'image/png', 'image/webp'].includes(image.type)) throw new Error('Ảnh minh họa phải là JPG, PNG hoặc WEBP');
-        if (image.size > 5 * 1024 * 1024) throw new Error('Ảnh minh họa tối đa 5MB');
+        if (image.size > 15 * 1024 * 1024) throw new Error('Ảnh minh họa tối đa 15MB');
         // Through the API: the S3 bucket does not accept direct browser uploads (no CORS).
         const body = new FormData();
         body.append('file', image);
@@ -653,7 +653,7 @@ export function CourseManagementPanel({ notify }: { notify: (message: string, er
                             </select>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[11px] font-semibold text-[#1C2B20]">Ảnh minh họa (JPG/PNG/WEBP, tối đa 5MB):</span>
+                            <span className="text-[11px] font-semibold text-[#1C2B20]">Ảnh minh họa (JPG/PNG/WEBP, tối đa 15MB, tự nén cho nhẹ):</span>
                             <input name="thumbnail" type="file" accept="image/jpeg,image/png,image/webp" className="text-[11px] text-[#66756B] min-w-0" />
                             {lesson.thumbnailUrl && (
                               <button type="button" onClick={() => void removeLessonThumbnail(lesson)} className="text-[11px] font-semibold text-[#E05B55] hover:underline">
