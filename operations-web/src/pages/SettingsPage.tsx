@@ -80,6 +80,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
   const [cancelLimitWindowHours, setCancelLimitWindowHours] = useState('24');
   const [suspensionHours, setSuspensionHours] = useState<string[]>(['3', '24', '168']);
   const [suspensionResetDays, setSuspensionResetDays] = useState('30');
+  const [onlinePaymentWaitMinutes, setOnlinePaymentWaitMinutes] = useState('15');
+  const [onlineCancelFeePercent, setOnlineCancelFeePercent] = useState('20');
+  const [payoutMinimumVnd, setPayoutMinimumVnd] = useState('100000');
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
 
   React.useEffect(() => {
@@ -100,7 +103,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         setSupportEmail(value.supportEmail);
       })
       .catch(() => undefined);
-    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number; confirmationWaitMinutes: number; requireTechnicianPhone: boolean; homeServiceFee: number; dailyDiscountThreshold: number; dailyDiscountFeePercent: number; enabledServiceModes?: string[]; cancelLimitCount?: number; cancelLimitWindowHours?: number; suspensionHours?: number[]; suspensionResetDays?: number }>('/admin/settings/booking')
+    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number; confirmationWaitMinutes: number; requireTechnicianPhone: boolean; homeServiceFee: number; dailyDiscountThreshold: number; dailyDiscountFeePercent: number; enabledServiceModes?: string[]; cancelLimitCount?: number; cancelLimitWindowHours?: number; suspensionHours?: number[]; suspensionResetDays?: number; onlinePaymentWaitMinutes?: number; onlineCancelFeePercent?: number; payoutMinimumVnd?: number }>('/admin/settings/booking')
       .then((value) => {
         setMinAdvanceHours(String(value.minAdvanceHours));
         setMaxTravelDistanceKm(String(value.maxDispatchRadiusKm));
@@ -118,6 +121,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         const levels = value.suspensionHours?.length ? value.suspensionHours : [3, 24, 168];
         setSuspensionHours([0, 1, 2].map((i) => String(levels[Math.min(i, levels.length - 1)])));
         setSuspensionResetDays(String(value.suspensionResetDays ?? 30));
+        setOnlinePaymentWaitMinutes(String(value.onlinePaymentWaitMinutes ?? 15));
+        setOnlineCancelFeePercent(String(value.onlineCancelFeePercent ?? 20));
+        setPayoutMinimumVnd(String(value.payoutMinimumVnd ?? 100000));
       })
       .catch(() => undefined);
   }, []);
@@ -180,11 +186,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         if (!Number.isInteger(limitWindow) || limitWindow < 1 || limitWindow > 720) throw new Error('Khoảng thời gian đếm phải từ 1 đến 720 giờ');
         if (levels.some((level) => !Number.isInteger(level) || level < 1 || level > 8760)) throw new Error('Thời gian tạm khóa mỗi lần phải từ 1 đến 8760 giờ');
         if (!Number.isInteger(resetDays) || resetDays < 1 || resetDays > 365) throw new Error('Số ngày tính lại từ lần 1 phải từ 1 đến 365');
+        const payWait = Number(onlinePaymentWaitMinutes);
+        const cancelFee = Number(onlineCancelFeePercent);
+        const payoutMin = Number(payoutMinimumVnd);
+        if (!Number.isInteger(payWait) || payWait < 5 || payWait > 120) throw new Error('Thời gian chờ thanh toán phải từ 5 đến 120 phút');
+        if (!Number.isInteger(cancelFee) || cancelFee < 0 || cancelFee > 100) throw new Error('Phí hủy phải từ 0 đến 100%');
+        if (!Number.isInteger(payoutMin) || payoutMin < 0) throw new Error('Mức chi tối thiểu phải là số nguyên không âm');
         await request('/admin/settings/booking', {
           method: 'PATCH',
           body: JSON.stringify({
             minAdvanceHours: hours, maxDispatchRadiusKm: radius, confirmationWaitMinutes: wait, requireTechnicianPhone, enabledServiceModes,
             cancelLimitCount: limitCount, cancelLimitWindowHours: limitWindow, suspensionHours: levels, suspensionResetDays: resetDays,
+            onlinePaymentWaitMinutes: payWait, onlineCancelFeePercent: cancelFee, payoutMinimumVnd: payoutMin,
           }),
         });
         addToast({ title: 'Đã lưu quy định đặt lịch', message: 'Áp dụng cho các đơn đặt sau khi lưu.', type: 'success' });
@@ -472,6 +485,26 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                       : 'Nhập 0 để tắt tự tạm khóa khi hủy nhiều (admin vẫn tạm khóa tay được theo các mức trên). '}
                     Tạm khóa: vẫn đăng nhập, xem lịch sử, chat, rút ví; không đặt đơn mới (khách) / nhận đơn mới (KTV); hết giờ tự mở. App cảnh báo khi còn 1 lần hủy.
                     Không tính: hủy đơn chưa có KTV nhận, đơn tự hết hạn, admin hủy, KTV hủy có ảnh bằng chứng (khách vắng mặt, không an toàn…), danh mục đã tắt "Tính phạt khi hủy".
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[#1C2B20]">Đơn trực tuyến: chờ thanh toán (phút)</label>
+                    <input type="number" min="5" max="120" value={onlinePaymentWaitMinutes} onChange={(e) => setOnlinePaymentWaitMinutes(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[#1C2B20]">Phí khi khách hủy sau khi đã trả (%)</label>
+                    <input type="number" min="0" max="100" value={onlineCancelFeePercent} onChange={(e) => setOnlineCancelFeePercent(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[#1C2B20]">Chi trả KTV từ (VND)</label>
+                    <input type="number" min="0" step="10000" value={payoutMinimumVnd} onChange={(e) => setPayoutMinimumVnd(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]" />
+                  </div>
+                  <span className="sm:col-span-3 text-[11px] text-[#66756B]">
+                    Đơn tư vấn trực tuyến: khách đặt không phải trả trước; có KTV nhận thì khách có {onlinePaymentWaitMinutes} phút để thanh toán online (chat mở sau khi trả), quá giờ đơn tự hủy và tính 1 lần hủy cho khách.
+                    Tiền vào tài khoản nền tảng; đơn hoàn thành thì phần của KTV (giá trừ hoa hồng) chờ chi ở mục "Chi trả & Hoàn tiền" khi đủ {Number(payoutMinimumVnd).toLocaleString('vi-VN')}đ.
+                    Khách hủy sau khi đã trả được hoàn {100 - Number(onlineCancelFeePercent)}%; KTV hoặc admin hủy thì hoàn 100%.
                   </span>
                 </div>
               </div>

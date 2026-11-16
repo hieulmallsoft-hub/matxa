@@ -16,7 +16,7 @@ export class PayosService {
     );
   }
 
-  async createPaymentLink(input: { orderCode: number; amount: number; description: string; reference: string }) {
+  async createPaymentLink(input: { orderCode: number; amount: number; description: string; reference: string; expiredAt?: number }) {
     const clientId = this.config.get<string>('PAYOS_CLIENT_ID');
     const apiKey = this.config.get<string>('PAYOS_API_KEY');
     const checksumKey = this.config.get<string>('PAYOS_CHECKSUM_KEY');
@@ -31,6 +31,8 @@ export class PayosService {
       description: input.description.slice(0, 25),
       cancelUrl,
       returnUrl,
+      // Unix seconds: the link (and its QR) stops working with the booking's payment window.
+      ...(input.expiredAt ? { expiredAt: input.expiredAt } : {}),
       signature: this.sign(
         {
           amount: Math.round(input.amount),

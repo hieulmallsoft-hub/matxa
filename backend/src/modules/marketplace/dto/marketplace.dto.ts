@@ -217,6 +217,13 @@ export class UpsertTechnicianProfileDto {
   @IsOptional() @IsString() @MaxLength(100) district?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) address?: string;
   @ApiPropertyOptional() @IsOptional() @Type(() => Boolean) @IsBoolean() isAvailable?: boolean;
+  @ApiPropertyOptional({ example: '970436', description: 'Ma BIN ngan hang (6 so, theo danh sach VietQR https://api.vietqr.io/v2/banks) de nhan tien don thanh toan online' })
+  @IsOptional() @Matches(/^\d{6}$/, { message: 'Ma ngan hang phai gom 6 chu so (BIN)' }) bankBin?: string;
+  @ApiPropertyOptional({ example: 'Vietcombank' }) @IsOptional() @IsString() @MaxLength(100) bankName?: string;
+  @ApiPropertyOptional({ example: '0123456789' })
+  @IsOptional() @Matches(/^[0-9A-Za-z]{4,20}$/, { message: 'So tai khoan khong hop le' }) bankAccountNumber?: string;
+  @ApiPropertyOptional({ example: 'NGUYEN VAN A', description: 'Ten chu tai khoan (viet hoa, khong dau)' })
+  @IsOptional() @IsString() @MaxLength(100) bankAccountName?: string;
 }
 
 export class CreateTechnicianServiceDto {

@@ -26,6 +26,7 @@ const WalletTopupsPage = lazy(() => import('./pages/WalletTopupsPage').then((mod
 const TechnicianPhotosPage = lazy(() => import('./pages/TechnicianPhotosPage').then((module) => ({ default: module.TechnicianPhotosPage })));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then((module) => ({ default: module.AdminDashboard })));
 const ComplaintsPage = lazy(() => import('./pages/ComplaintsPage').then((module) => ({ default: module.ComplaintsPage })));
+const PayoutsPage = lazy(() => import('./pages/PayoutsPage').then((module) => ({ default: module.PayoutsPage })));
 import { usePageRoute } from './hooks/usePageRoute';
 import { useAdminCounts } from './hooks/useAdminCounts';
 import type { PageId } from './types/dashboard';
@@ -267,6 +268,8 @@ function AppInner() {
         return <LegalDocumentsPage />;
       case 'walletTopups':
         return <WalletTopupsPage />;
+      case 'payouts':
+        return <PayoutsPage />;
       case 'technicianPhotos':
         return <TechnicianPhotosPage />;
       case 'technicians':

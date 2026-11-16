@@ -33,6 +33,12 @@ export type BookingRules = {
   suspensionHours: number[];
   /** After this many days without a suspension the next one starts again at level 1. */
   suspensionResetDays: number;
+  /** Online (video/chat) bookings are paid online after a technician takes them, within this many minutes. */
+  onlinePaymentWaitMinutes: number;
+  /** A customer cancelling a paid online booking after it was taken gets this % kept as a cancellation fee. */
+  onlineCancelFeePercent: number;
+  /** Technicians are paid out once their unpaid online earnings reach this (VND). */
+  payoutMinimumVnd: number;
 };
 export const SERVICE_MODES = ['HOME', 'ONLINE', 'ONSITE'] as const;
 export type ServiceModeName = (typeof SERVICE_MODES)[number];
@@ -58,6 +64,9 @@ const BOOKING_KEYS: Record<keyof BookingRules, string> = {
   cancelLimitWindowHours: 'BOOKING_CANCEL_LIMIT_WINDOW_HOURS',
   suspensionHours: 'SUSPENSION_HOURS',
   suspensionResetDays: 'SUSPENSION_RESET_DAYS',
+  onlinePaymentWaitMinutes: 'ONLINE_PAYMENT_WAIT_MINUTES',
+  onlineCancelFeePercent: 'ONLINE_CANCEL_FEE_PERCENT',
+  payoutMinimumVnd: 'PAYOUT_MINIMUM_VND',
 };
 
 @Injectable()
@@ -113,6 +122,9 @@ export class SettingsService {
       cancelLimitWindowHours: Number(stored.get(BOOKING_KEYS.cancelLimitWindowHours) ?? 24),
       suspensionHours: parseHours(stored.get(BOOKING_KEYS.suspensionHours)),
       suspensionResetDays: Number(stored.get(BOOKING_KEYS.suspensionResetDays) ?? 30),
+      onlinePaymentWaitMinutes: Number(stored.get(BOOKING_KEYS.onlinePaymentWaitMinutes) ?? 15),
+      onlineCancelFeePercent: Number(stored.get(BOOKING_KEYS.onlineCancelFeePercent) ?? 20),
+      payoutMinimumVnd: Number(stored.get(BOOKING_KEYS.payoutMinimumVnd) ?? 100000),
     };
   }
 

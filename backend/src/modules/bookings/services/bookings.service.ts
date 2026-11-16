@@ -25,6 +25,7 @@ import { releaseBookingPromotion } from './booking-promotion-release';
 import { creditBookingPromotion } from './booking-promotion-credit';
 import { activeSuspension, applyCancelLimit, assertNotSuspended, cancelLimitStatus, isPenalizedCancel } from './cancel-limit';
 import { resolveLocationCodes } from '../../marketplace/services/location-code';
+import { createRefund, isAwaitingPayment, isPrepaid, recordTechnicianEarning } from './online-payment';
 import { COMPLAINT_STATUS_LABEL, complaintStatusEvent, ensureComplaintConversation } from './complaint-conversation';
 import {
   BookingHistoryQueryDto,
@@ -308,7 +309,7 @@ export class BookingsService {
     const ttlMinutes = Number(this.config.get('VNPAY_PAYMENT_TTL_MINUTES', 15));
     if (!Number.isInteger(ttlMinutes) || ttlMinutes < 1 || ttlMinutes > 60)
       throw new BadRequestException('VNPAY_PAYMENT_TTL_MINUTES khong hop le');
-    const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+    const expiresAt = (await this.paymentWindow(bookingId)) ?? new Date(Date.now() + ttlMinutes * 60_000);
     const txnRef = payment.providerRef ?? payment.id.replace(/-/g, '');
     await this.prisma.payment.update({
       where: { id: payment.id },
@@ -335,7 +336,7 @@ export class BookingsService {
     if (!payment) throw new NotFoundException('Thanh toan khong ton tai');
     if (payment.method !== 'ONLINE') throw new BadRequestException('Booking khong dung thanh toan online');
     if (payment.status === 'PAID') return { bookingId, paymentId: payment.id, status: 'PAID', paymentUrl: null };
-    const expiresAt = new Date(Date.now() + Number(this.config.get('PAYOS_PAYMENT_TTL_MINUTES', 15)) * 60_000);
+    const expiresAt = (await this.paymentWindow(bookingId)) ?? new Date(Date.now() + Number(this.config.get('PAYOS_PAYMENT_TTL_MINUTES', 15)) * 60_000);
     const orderCode = Number(
       `${Date.now()}${Math.floor(Math.random() * 1000)
         .toString()
@@ -346,6 +347,7 @@ export class BookingsService {
       amount: Number(payment.amount),
       description: `PSYOCORE ${bookingId.slice(0, 8)}`,
       reference: payment.id,
+      expiredAt: Math.floor(expiresAt.getTime() / 1000),
     });
     await this.prisma.payment.update({
       where: { id: payment.id },
@@ -377,7 +379,8 @@ export class BookingsService {
       throw new BadRequestException('So tien webhook PayOS khong khop');
     const success = String(body.code ?? '') === '00' && body.success === true;
     const status = success ? 'PAID' : 'FAILED';
-    await this.prisma.payment.updateMany({
+    const text = (value: unknown) => (value === undefined || value === null || value === '' ? null : String(value));
+    const updated = await this.prisma.payment.updateMany({
       where: { id: payment.id, status: { in: ['PENDING', 'UNPAID'] } },
       data: {
         status,
@@ -385,8 +388,14 @@ export class BookingsService {
         responseCode: String(body.code ?? ''),
         ipnReceivedAt: new Date(),
         ...(success ? { paidAt: new Date() } : {}),
+        // The account the customer paid from: where a refund would go back to.
+        payerBankBin: text(data.counterAccountBankId),
+        payerBankName: text(data.counterAccountBankName),
+        payerAccountNumber: text(data.counterAccountNumber),
+        payerAccountName: text(data.counterAccountName),
       },
     });
+    if (success && updated.count) await this.afterPaymentPaid(payment.bookingId);
     return { code: '00', desc: 'success' };
   }
 
@@ -425,9 +434,94 @@ export class BookingsService {
         bankTranNo: params.vnp_BankTranNo ?? null,
       },
     });
+    if (updated.count) await this.afterPaymentPaid(payment.bookingId);
     return updated.count
       ? { RspCode: '00', Message: 'Confirm Success' }
       : { RspCode: '02', Message: 'Order already confirmed' };
+  }
+
+  /**
+   * A prepaid online booking can only be paid while a technician holds it (until `paymentDeadlineAt`); the payment link
+   * expires with it. Returns that deadline, or null for other bookings (their own payment window applies).
+   */
+  private async paymentWindow(bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { status: true, mode: true, paymentDeadlineAt: true, payment: { select: { method: true, status: true } } },
+    });
+    if (!booking || !isPrepaid(booking)) return null;
+    if (booking.status === 'OPEN')
+      throw new ConflictException({ statusCode: 409, code: 'PAYMENT_NOT_OPEN', message: 'Chua co KTV nhan don, chua can thanh toan' });
+    if (!isAwaitingPayment(booking) || booking.paymentDeadlineAt! <= new Date())
+      throw new ConflictException({ statusCode: 409, code: 'PAYMENT_NOT_OPEN', message: 'Don da het han thanh toan hoac khong con hieu luc' });
+    return booking.paymentDeadlineAt!;
+  }
+
+  /**
+   * What completing a booking settles, by hand or automatically. Cash booking: the platform pays back the voucher to
+   * the technician's wallet. Paid online booking: the technician's share (price minus commission) is recorded for the
+   * admin to pay out; the platform already holds the money, so no voucher credit.
+   */
+  async settleCompleted(tx: Prisma.TransactionClient, bookingId: string) {
+    const earning = await recordTechnicianEarning(tx, bookingId, (gross, technicianUserId) => this.commissionFor(gross, technicianUserId));
+    if (!earning) await creditBookingPromotion(tx, bookingId);
+  }
+
+  /**
+   * The customer did not pay a prepaid online booking in time: it is cancelled as the customer's cancel (it counts
+   * toward their cancel limit), the technician is freed and told about other open jobs.
+   */
+  async cancelUnpaidBooking(bookingId: string, now = new Date()) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { id: true, customerId: true, status: true, paymentDeadlineAt: true, technician: { select: { userId: true } }, payment: { select: { status: true } } },
+    });
+    if (!booking || booking.status !== 'CONFIRMED' || !booking.paymentDeadlineAt || booking.paymentDeadlineAt > now || booking.payment?.status === 'PAID')
+      return false;
+    const cancelled = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.booking.updateMany({
+        where: { id: bookingId, status: 'CONFIRMED', payment: { is: { status: { not: 'PAID' } } } },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt: now,
+          cancellationReason: 'Khach khong thanh toan dung han',
+          cancellationReasonCode: 'PAYMENT_NOT_RECEIVED',
+          cancelledByUserId: booking.customerId,
+          cancelledByRole: 'CUSTOMER',
+          cancelPenalized: true,
+        },
+      });
+      if (!claimed.count) return false;
+      await refundBookingCommission(tx, bookingId);
+      await releaseBookingPromotion(tx, bookingId);
+      return true;
+    });
+    if (!cancelled) return false;
+    await this.applyCancelLimit(booking.customerId);
+    void this.notifyStatus(booking.customerId, bookingId, 'BOOKING_CANCELLED', 'Đơn đã hủy do chưa thanh toán', 'Bạn chưa thanh toán đúng hạn nên đơn đã tự hủy.');
+    if (booking.technician) {
+      void this.notifyStatus(booking.technician.userId, bookingId, 'BOOKING_CANCELLED', 'Khách không thanh toán', 'Khách không thanh toán đúng hạn nên đơn đã hủy. Bạn có thể nhận đơn khác.');
+      void this.announceOpenJobsToFreedTechnician(booking.technician.userId);
+    }
+    return true;
+  }
+
+  /** Payment received: the technician can start; money that arrived after the booking ended goes back to the customer. */
+  async afterPaymentPaid(bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { id: true, status: true, mode: true, customerId: true, technician: { select: { userId: true } }, payment: { select: { method: true } } },
+    });
+    if (!booking || !isPrepaid(booking)) return;
+    if (booking.status === 'CONFIRMED') {
+      if (booking.technician)
+        void this.notifyStatus(booking.technician.userId, bookingId, 'BOOKING_PAID', 'Khách đã thanh toán', 'Khách đã thanh toán. Bạn có thể nhắn tin và bắt đầu buổi tư vấn.');
+      void this.notifyStatus(booking.customerId, bookingId, 'BOOKING_PAID', 'Thanh toán thành công', 'Đơn đã được xác nhận. Bạn có thể nhắn tin với KTV.');
+      return;
+    }
+    // Paid too late (the booking was cancelled meanwhile): refund in full.
+    if (['CANCELLED', 'EXPIRED'].includes(booking.status))
+      await createRefund(this.prisma, bookingId, { reason: 'Khach thanh toan sau khi don da huy', feePercent: 0 });
   }
 
   async vnpayReturn(params: Record<string, string | undefined>) {
@@ -615,6 +709,8 @@ export class BookingsService {
     // customer would wait for nothing. 400 INVALID_CITY / INVALID_DISTRICT instead.
     const place = await resolveLocationCodes(this.prisma, dto.city, dto.district);
     dto = { ...dto, city: place.city ?? dto.city, district: place.district ?? undefined };
+    // Online sessions cannot be paid in cash: they are paid online once a technician takes them.
+    if (dto.mode === 'ONLINE') dto = { ...dto, paymentMethod: 'ONLINE' };
     const now = new Date();
     const deadline = confirmationDeadline(
       now,
@@ -766,8 +862,9 @@ export class BookingsService {
     if (existing?.status === 'APPLIED')
       return requested ? this.acceptAsRequestedTechnician(userId, booking, existing.id) : { ...existing, idempotent: true };
     if (existing) throw new ConflictException('Trang thai ung tuyen hien tai khong cho phep apply lai');
-    // Selection charges the commission, so a technician who could not pay it must not be selectable.
-    const fee = await this.commissionFor(booking.grossServiceAmount, userId);
+    // Selection charges the commission, so a technician who could not pay it must not be selectable. A prepaid online
+    // booking takes the commission out of the payment instead, so no wallet balance is needed.
+    const fee = isPrepaid(booking) ? 0 : await this.commissionFor(booking.grossServiceAmount, userId);
     if (fee > 0) {
       const wallet = await this.prisma.wallet.findUnique({
         where: { userId_type: { userId, type: 'ADVERTISING_CREDIT' } },
@@ -914,9 +1011,13 @@ export class BookingsService {
           if (!application) throw new BadRequestException('Ung tuyen khong hop le');
           const booking = await tx.booking.findUniqueOrThrow({
             where: { id: bookingId },
-            include: { items: { include: { catalogService: true } } },
+            include: { items: { include: { catalogService: true } }, payment: { select: { method: true } } },
           });
           await this.assertOpenEligibility(tx, booking, application.technicianProfileId);
+          const prepaid = isPrepaid(booking);
+          const paymentDeadlineAt = prepaid
+            ? new Date(now.getTime() + (await this.bookingRules()).onlinePaymentWaitMinutes * 60_000)
+            : null;
           // The travel fee depends on who comes, so it is only known now; the commission stays on the services.
           const travelDistanceKm = booking.mode === 'HOME' ? kmBetween(booking.addressSnapshot as any, application.technicianProfile) : null;
           const travelFee = travelFeeFor(booking.mode, travelDistanceKm, await this.bookingRules());
@@ -936,6 +1037,7 @@ export class BookingsService {
               status: 'CONFIRMED',
               travelFee,
               travelDistanceKm,
+              paymentDeadlineAt,
               ...(feeChange !== 0 && {
                 totalAmount: { increment: feeChange },
                 customerPayableAmount: { increment: feeChange },
@@ -947,7 +1049,8 @@ export class BookingsService {
           });
           // Charged after the assignment: the charge only accepts a booking that belongs to the
           // technician. Same transaction, so an insufficient wallet still rolls everything back.
-          await this.chargeTechnicianCommission(application.technicianProfile.user.id, bookingId, tx);
+          // A prepaid online booking is not charged: the commission comes out of the customer's payment.
+          if (!prepaid) await this.chargeTechnicianCommission(application.technicianProfile.user.id, bookingId, tx);
           const losers = await tx.bookingTechnicianApplication.findMany({
             where: { bookingId, status: 'NOT_SELECTED' },
             include: { technicianProfile: { select: { userId: true } } },
@@ -974,6 +1077,14 @@ export class BookingsService {
     result: { booking: any; winnerUserId: string; loserUserIds: string[] },
   ) {
     this.realtime?.broadcastAvailabilityChanged(result.booking.technicianId);
+    // Prepaid online booking: the customer now has a few minutes to pay; the technician waits for it.
+    if (result.booking.paymentDeadlineAt) {
+      const until = new Date(result.booking.paymentDeadlineAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
+      void this.notifyStatus(result.booking.customerId, bookingId, 'BOOKING_PAYMENT_REQUIRED', 'Đã có KTV nhận, vui lòng thanh toán',
+        `Thanh toán trước ${until} để xác nhận buổi tư vấn. Quá thời gian đơn sẽ tự hủy.`);
+      void this.notifyStatus(result.winnerUserId, bookingId, 'BOOKING_AWAITING_PAYMENT', 'Đang chờ khách thanh toán',
+        `Khách có đến ${until} để thanh toán. Bạn sẽ được báo khi khách trả xong.`);
+    }
     const applicants = new Set(result.loserUserIds);
     let recipients = new Set(applicants);
     try {
@@ -1280,6 +1391,9 @@ export class BookingsService {
       select: {
         customerId: true,
         status: true,
+        mode: true,
+        paymentDeadlineAt: true,
+        payment: { select: { method: true, status: true } },
         assignmentMode: true,
         addressSnapshot: true,
         technician: { select: { id: true, userId: true } },
@@ -1289,6 +1403,9 @@ export class BookingsService {
     if (!booking || booking.technician?.userId !== userId) throw new NotFoundException('Don khong ton tai');
     if (!['CONFIRMED', 'COMPLETED'].includes(booking.status))
       throw new ForbiddenException('Chi hien so lien he sau khi da nhan don');
+    // Not before the customer paid: otherwise the two could agree to skip the payment.
+    if (isAwaitingPayment(booking))
+      throw new ForbiddenException({ statusCode: 403, code: 'PAYMENT_REQUIRED', message: 'Chi hien lien he sau khi khach thanh toan' });
     if (booking.assignmentMode === 'OPEN_MARKETPLACE') {
       const selected = await this.prisma.bookingTechnicianApplication.findFirst({
         where: { bookingId: id, technicianProfileId: booking.technician!.id, status: 'SELECTED' },
@@ -1340,6 +1457,9 @@ export class BookingsService {
         cancelLimitWindowHours: 24,
         suspensionHours: [3, 24, 168],
         suspensionResetDays: 30,
+        onlinePaymentWaitMinutes: 15,
+        onlineCancelFeePercent: 20,
+        payoutMinimumVnd: 100000,
       }
     );
   }
@@ -1466,6 +1586,13 @@ export class BookingsService {
       await refundBookingCommission(tx, id);
       // The customer did not get the service, so the voucher can be used again.
       await releaseBookingPromotion(tx, id);
+      // A paid online booking goes back to the customer (the admin sends it). A customer cancelling after a
+      // technician took it keeps the cancellation fee out; a technician's or admin's cancel is refunded in full.
+      const customerCancelled = booking.customerId === userId && actor?.role !== 'ADMIN';
+      await createRefund(tx, id, {
+        reason: customerCancelled ? 'Khach huy don da thanh toan' : actor?.role === 'ADMIN' ? 'Admin huy don' : 'KTV huy don',
+        feePercent: customerCancelled && booking.status === 'CONFIRMED' ? (await this.bookingRules()).onlineCancelFeePercent : 0,
+      });
       return cancelled;
     });
     if (booking.assignmentMode === 'OPEN_MARKETPLACE' && booking.status === 'OPEN') {
@@ -1681,6 +1808,8 @@ export class BookingsService {
     if (dto.status === 'COMPLETED' && booking.scheduledEnd > new Date()) {
       throw new BadRequestException('Chua den gio ket thuc dich vu');
     }
+    if (dto.status === 'COMPLETED' && isAwaitingPayment(booking))
+      throw new ConflictException({ statusCode: 409, code: 'PAYMENT_REQUIRED', message: 'Khach chua thanh toan don nay' });
     if (dto.status === 'CONFIRMED' && (await this.expireDirectBookingIfDue(id)))
       throw new ConflictException('BOOKING_EXPIRED');
     // Confirming charges the commission; both commit together or not at all.
@@ -1693,8 +1822,7 @@ export class BookingsService {
           })
         : await this.prisma.$transaction(async (tx) => {
             const completed = await this.transition(id, booking.status, { status: dto.status }, tx);
-            // The voucher credit is earned by doing the job, so it lands only now.
-            await creditBookingPromotion(tx, id);
+            await this.settleCompleted(tx, id);
             return completed;
           });
     const title = dto.status === 'CONFIRMED' ? 'Đặt lịch thành công' : 'Dịch vụ đã hoàn thành';
@@ -1977,7 +2105,7 @@ export class BookingsService {
   private async openJobForTechnician(bookingId: string, technicianProfileId: string, requireEligible: boolean) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { items: { include: { catalogService: true } } },
+      include: { items: { include: { catalogService: true } }, payment: { select: { method: true } } },
     });
     if (!booking || booking.assignmentMode !== 'OPEN_MARKETPLACE' || booking.status !== 'OPEN' || booking.technicianId)
       throw new ConflictException('Don khong con mo de ung tuyen');
@@ -2123,6 +2251,7 @@ export class BookingsService {
       scheduledEnd: booking.scheduledEnd,
       mode: booking.mode,
       paymentMethod: booking.payment?.method ?? 'CASH',
+      ...paymentFields(booking),
       durationMinutes: (booking.items ?? []).reduce((sum: number, item: any) => sum + item.durationMinutes, 0),
       subtotal: Number(booking.subtotal),
       serviceFee: Number(booking.serviceFee),
@@ -2163,9 +2292,10 @@ export class BookingsService {
       canApply,
       canDecline: canApply && booking.requestedTechnicianId === viewerTechnicianId,
       canWithdraw: booking.status === 'OPEN' && effectiveApplicationStatus === 'APPLIED',
-      canContact: selected && ['CONFIRMED', 'COMPLETED'].includes(booking.status),
+      // Contact and completion wait for an online booking's payment.
+      canContact: selected && ['CONFIRMED', 'COMPLETED'].includes(booking.status) && !isAwaitingPayment(booking),
       canCancel: selected && booking.status === 'CONFIRMED',
-      canComplete: selected && booking.status === 'CONFIRMED' && new Date(booking.scheduledEnd) <= new Date(),
+      canComplete: selected && booking.status === 'CONFIRMED' && new Date(booking.scheduledEnd) <= new Date() && !isAwaitingPayment(booking),
       customerSelectedAnotherTechnician: takenByAnother,
       ...(viewerTechnicianId && selected
         ? (() => {
@@ -2202,6 +2332,8 @@ export class BookingsService {
   ) {
     if (booking.status === 'CANCELLED') return 'CANCELLED';
     if (selected && booking.status === 'COMPLETED') return 'COMPLETED';
+    // Taken, but the online booking's customer has not paid yet.
+    if (selected && isAwaitingPayment(booking)) return 'AWAITING_PAYMENT';
     if (selected && booking.status === 'CONFIRMED') return 'ACCEPTED';
     if (takenByAnother) return 'NOT_SELECTED';
     if (booking.status === 'EXPIRED' || applicationStatus === 'EXPIRED') return 'EXPIRED';
@@ -2332,6 +2464,7 @@ export class BookingsService {
       total: Number(booking.totalAmount),
       totalAmount: Number(booking.totalAmount),
       paymentMethod: booking.payment?.method ?? null,
+      ...paymentFields(booking),
       canCancel,
       canReview,
       // Each side sees only its own complaint, which is between it and the admins.
@@ -2684,6 +2817,18 @@ export class BookingsService {
       this.logger.warn(`Khong gui duoc push ${type}: ${error instanceof Error ? error.message : 'khong ro ly do'}`);
     }
   }
+}
+
+/**
+ * Payment state for the apps. `awaitingPayment`: a technician took the online booking and the customer must pay before
+ * `paymentDeadlineAt` (else it is cancelled); chat and contact open once paid.
+ */
+function paymentFields(booking: any) {
+  return {
+    paymentStatus: booking.payment?.status ?? null,
+    paymentDeadlineAt: booking.paymentDeadlineAt ?? null,
+    awaitingPayment: isAwaitingPayment(booking),
+  };
 }
 
 /** Bookings a user made as a customer that are not finished: waiting for a technician (before the deadline) or taken. */

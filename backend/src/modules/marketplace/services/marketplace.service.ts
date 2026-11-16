@@ -487,7 +487,9 @@ export class MarketplaceService {
       },
     });
     return rows.map(({ technician }) => {
-      const { services, ...profile } = technician;
+      // Customers never see the admin's hidden reason or the technician's bank account.
+      const { services, hiddenReason, bankBin, bankName, bankAccountNumber, bankAccountName, ...profile } = technician;
+      void services; void hiddenReason; void bankBin; void bankName; void bankAccountNumber; void bankAccountName;
       return { ...profile, ...this.technicianCard(technician, true) };
     });
   }
@@ -787,13 +789,13 @@ export class MarketplaceService {
   }
 
   private technicianCard(
-    // The admin's hidden reason is never part of a public card.
+    // The admin's hidden reason and the technician's bank account are never part of a public card.
     profile: Omit<Prisma.TechnicianProfileGetPayload<{
       include: {
         user: { select: { id: true; displayName: true; avatarUrl: true } };
         services: { select: { price: true; modes: true } };
       };
-    }>, 'hiddenReason'>,
+    }>, 'hiddenReason' | 'bankBin' | 'bankName' | 'bankAccountNumber' | 'bankAccountName'>,
     isFavorite: boolean,
     distanceKm: number | null = null,
   ) {

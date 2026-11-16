@@ -91,6 +91,18 @@ class UpdateBookingRulesDto {
   @ApiPropertyOptional({ example: 30, description: 'Khong bi tam khoa trong so ngay nay thi lan sau tinh lai tu lan 1.' })
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(365)
   suspensionResetDays?: number;
+
+  @ApiPropertyOptional({ example: 15, description: 'Don truc tuyen: sau khi KTV nhan, khach co bay nhieu phut de thanh toan online, qua thi don tu huy.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(5) @Max(120)
+  onlinePaymentWaitMinutes?: number;
+
+  @ApiPropertyOptional({ example: 20, description: 'Khach huy don truc tuyen da thanh toan (sau khi KTV nhan) thi giu lai % nay lam phi huy.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100)
+  onlineCancelFeePercent?: number;
+
+  @ApiPropertyOptional({ example: 100000, description: 'Chi tra cho KTV khi thu nhap chua nhan dat muc nay (VND).' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100_000_000)
+  payoutMinimumVnd?: number;
 }
 
 @ApiTags('Admin Settings')

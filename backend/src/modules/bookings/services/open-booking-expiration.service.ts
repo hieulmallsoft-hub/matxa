@@ -81,6 +81,19 @@ export class OpenBookingExpirationService implements OnModuleInit, OnModuleDestr
         this.logger.log(`Moved direct booking ${booking.id} to marketplace fallback; deadline=${result.deadline.toISOString()}`);
       }
     }
-    return { scanned: due.length + directDue.length, expired };
+    // Online bookings a technician took but the customer did not pay in time.
+    const unpaid = await this.prisma.booking.findMany({
+      where: { status: 'CONFIRMED', paymentDeadlineAt: { lte: now }, payment: { is: { status: { not: 'PAID' } } } },
+      select: { id: true },
+      orderBy: { paymentDeadlineAt: 'asc' },
+      take,
+    });
+    for (const booking of unpaid) {
+      if (await this.bookings.cancelUnpaidBooking(booking.id, now)) {
+        expired++;
+        this.logger.log(`Cancelled unpaid online booking ${booking.id}`);
+      }
+    }
+    return { scanned: due.length + directDue.length + unpaid.length, expired };
   }
 }

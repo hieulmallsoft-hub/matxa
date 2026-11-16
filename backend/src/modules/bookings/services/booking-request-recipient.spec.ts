@@ -119,7 +119,7 @@ describe('booking request recipient', () => {
     prisma.booking.findUnique = jest.fn().mockResolvedValue(withCatalog);
     const response = await service.technicianJobDetail('tech-user', booking.id);
     expect(prisma.booking.findUnique).toHaveBeenCalledWith(expect.objectContaining({
-      include: { items: { include: { catalogService: true } } },
+      include: { items: { include: { catalogService: true } }, payment: { select: { method: true } } },
     }));
     expect((service as any).assertOpenEligibility).toHaveBeenCalledWith(prisma, withCatalog, 'preferred-profile');
     expect(response).toMatchObject({ canApply: true, canDecline: true });

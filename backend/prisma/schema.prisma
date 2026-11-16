@@ -85,6 +85,8 @@ enum CancellationReasonCode {
   INAPPROPRIATE_REQUEST
   SERVICE_LOCATION_UNAVAILABLE
   CUSTOMER_REQUESTED_CANCEL
+  /// The customer did not pay an online booking within the time after a technician took it.
+  PAYMENT_NOT_RECEIVED
   OTHER
 }
 
@@ -248,6 +250,60 @@ model UserSuspension {
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("user_suspensions")
+}
+
+/// What the platform owes a technician for a completed online-paid booking (price minus commission).
+model TechnicianEarning {
+  id               String    @id @default(uuid()) @db.Uuid
+  technicianUserId String    @map("technician_user_id") @db.Uuid
+  bookingId        String    @unique @map("booking_id") @db.Uuid
+  grossAmount      Int       @map("gross_amount")
+  commission       Int
+  amount           Int
+  payoutId         String?   @map("payout_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  payout           TechnicianPayout? @relation(fields: [payoutId], references: [id])
+
+  @@index([technicianUserId, payoutId])
+  @@map("technician_earnings")
+}
+
+/// One bank transfer the admin made to a technician, covering their unpaid earnings up to then.
+model TechnicianPayout {
+  id               String   @id @default(uuid()) @db.Uuid
+  technicianUserId String   @map("technician_user_id") @db.Uuid
+  amount           Int
+  bankBin          String?  @map("bank_bin")
+  bankName         String?  @map("bank_name")
+  accountNumber    String?  @map("account_number")
+  accountName      String?  @map("account_name")
+  transferNote     String   @map("transfer_note")
+  paidById         String   @map("paid_by_id") @db.Uuid
+  paidAt           DateTime @default(now()) @map("paid_at")
+  earnings         TechnicianEarning[]
+
+  @@index([technicianUserId, paidAt(sort: Desc)])
+  @@map("technician_payouts")
+}
+
+/// Money to send back to a customer whose paid online booking was cancelled; the admin transfers it by hand.
+model BookingRefund {
+  id          String    @id @default(uuid()) @db.Uuid
+  bookingId   String    @unique @map("booking_id") @db.Uuid
+  customerId  String    @map("customer_id") @db.Uuid
+  paidAmount  Int       @map("paid_amount")
+  feeAmount   Int       @map("fee_amount")
+  amount      Int
+  reason      String
+  /// PENDING until the admin marks it sent (DONE).
+  status      String    @default("PENDING")
+  doneById    String?   @map("done_by_id") @db.Uuid
+  doneAt      DateTime? @map("done_at")
+  note        String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([status, createdAt])
+  @@map("booking_refunds")
 }
 
 model Course {
@@ -439,6 +495,11 @@ model TechnicianProfile {
   isActive        Boolean             @default(true) @map("is_active")
   /// Why an admin hid the profile (isActive = false); shown to the technician. Cleared when shown again.
   hiddenReason    String?             @map("hidden_reason")
+  /// Where the platform pays the technician's online-booking earnings (VietQR: bank BIN + account number).
+  bankBin           String?           @map("bank_bin")
+  bankName          String?           @map("bank_name")
+  bankAccountNumber String?           @map("bank_account_number")
+  bankAccountName   String?           @map("bank_account_name")
   isAvailable     Boolean             @default(false) @map("is_available")
   averageRating   Decimal             @default(0) @map("average_rating") @db.Decimal(3, 2)
   reviewCount     Int                 @default(0) @map("review_count")
@@ -700,6 +761,8 @@ model Booking {
   cancelledByRole UserRole? @map("cancelled_by_role")
   /// The cancel counts toward the canceller's cancel limit (a taken booking, cancelled by the customer or technician).
   cancelPenalized Boolean   @default(false) @map("cancel_penalized")
+  /// Online booking taken by a technician: the customer must pay before this, or it is cancelled.
+  paymentDeadlineAt DateTime? @map("payment_deadline_at")
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
   customer        User              @relation("BookingCustomer", fields: [customerId], references: [id])
@@ -816,6 +879,11 @@ model Payment {
   refundRef   String?       @map("refund_ref")
   refundedAt  DateTime?     @map("refunded_at")
   paidAt      DateTime?     @map("paid_at")
+  /// The account the customer paid from (PayOS webhook), used to send a refund back.
+  payerBankBin       String?  @map("payer_bank_bin")
+  payerBankName      String?  @map("payer_bank_name")
+  payerAccountNumber String?  @map("payer_account_number")
+  payerAccountName   String?  @map("payer_account_name")
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
   booking     Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)

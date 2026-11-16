@@ -9,6 +9,7 @@ describe('OpenBookingExpirationService', () => {
         findMany: jest
           .fn()
           .mockResolvedValueOnce([{ id: 'due-1' }, { id: 'due-2' }])
+          .mockResolvedValueOnce([])
           .mockResolvedValueOnce([]),
       },
     };

@@ -67,7 +67,8 @@ describe('technician confirms a direct booking', () => {
   it('does not charge when completing a booking', async () => {
     const { service, prisma, charge } = subject();
     (service.detail as jest.Mock).mockResolvedValue({ ...pending, status: 'CONFIRMED', scheduledEnd: new Date(Date.now() - 1000) });
-    prisma.booking = { update: jest.fn().mockResolvedValue({ ...pending, status: 'COMPLETED' }) };
+    // A cash booking (not prepaid online): completing records no online earning.
+    prisma.booking = { update: jest.fn().mockResolvedValue({ ...pending, status: 'COMPLETED' }), findUnique: jest.fn().mockResolvedValue({ mode: 'HOME', payment: { method: 'CASH' } }) };
     prisma.$transaction = jest.fn((callback: any) => callback(prisma));
     await expect(service.updateStatus('tech', 'b1', { status: 'COMPLETED' })).resolves.toMatchObject({ status: 'COMPLETED' });
     expect(charge).not.toHaveBeenCalled();

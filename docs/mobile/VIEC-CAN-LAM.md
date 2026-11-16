@@ -736,6 +736,61 @@ App KTV hiện banner trên tab nhận đơn: *"Hồ sơ đang tạm ẩn: {reas
 - **App cần:** hiện ảnh bằng thư viện có bộ nhớ đệm (Flutter: `cached_network_image`), để ảnh chỉ tải lần đầu, các lần
   sau lấy từ máy. Ảnh WebP Android/iOS đều hiện được, không phải sửa gì thêm.
 
+## Z. Đơn tư vấn trực tuyến: KTV nhận rồi khách mới thanh toán (app khách + app KTV, 16/11)
+
+Đơn trực tuyến (`mode = "ONLINE"`) **bắt buộc thanh toán online**, nhưng **không trả trước lúc đặt**. Khách trả sau khi đã có
+KTV nhận, trong **15 phút** (admin chỉnh được). Đơn tại nhà và tại cơ sở giữ nguyên như cũ.
+
+**Luồng:**
+1. Khách đặt đơn trực tuyến. Backend tự dùng `paymentMethod = "ONLINE"`, app **ẩn lựa chọn tiền mặt** cho đơn trực tuyến.
+2. KTV nhận đơn (hoặc khách chọn KTV). Đơn thành `CONFIRMED`, kèm:
+   - `awaitingPayment: true`;
+   - `paymentDeadlineAt`: hạn thanh toán;
+   - `paymentStatus: "UNPAID"`.
+
+   Có trong `GET /api/bookings/{id}`, `GET /api/bookings` và các API việc của KTV.
+   - Khách nhận thông báo `BOOKING_PAYMENT_REQUIRED` "Đã có KTV nhận, vui lòng thanh toán".
+   - KTV nhận thông báo `BOOKING_AWAITING_PAYMENT`.
+3. Khách thanh toán bằng `POST /api/bookings/{id}/payos-payment`, nhận `paymentUrl` / `qrCode`. Link hết hạn đúng lúc
+   `paymentDeadlineAt`. Gọi khi đơn chưa có KTV nhận, hoặc đã quá hạn, trả `409 PAYMENT_NOT_OPEN`.
+4. Trả xong thì cả hai bên nhận thông báo `BOOKING_PAID`, `awaitingPayment` thành `false`, **chat và thông tin liên hệ mở**.
+5. Quá hạn mà chưa trả:
+   - đơn tự hủy, `cancellationReasonCode: "PAYMENT_NOT_RECEIVED"`;
+   - **tính là 1 lần hủy của khách** (giới hạn hủy, mục V);
+   - KTV được báo và nhận đơn khác được ngay.
+
+**App khách cần làm:**
+- Đơn có `awaitingPayment: true`: hiện khung **"Thanh toán trước {giờ}"**, đếm ngược theo `paymentDeadlineAt`, kèm nút
+  **Thanh toán** (mở `paymentUrl` hoặc hiện `qrCode`). Trong danh sách đơn, hiện nhãn "Chờ thanh toán".
+- Chưa thanh toán thì **ẩn nút chat**. API chat trả `403 { code: "PAYMENT_REQUIRED" }` cho tới khi trả tiền.
+- Khi hủy đơn **đã thanh toán**, hộp xác nhận ghi rõ:
+  - khách hủy sau khi đã có KTV nhận: *"Bạn sẽ được hoàn {100 − onlineCancelFeePercent}% (phí hủy
+    {onlineCancelFeePercent}%)"*. Lấy `onlineCancelFeePercent` từ `GET /api/settings/public`, mặc định 20;
+  - KTV hoặc admin hủy: hoàn 100%.
+
+  Tiền do admin chuyển khoản lại vào tài khoản khách đã dùng để trả. Chuyển xong, khách nhận thông báo `BOOKING_REFUNDED`.
+
+**App KTV cần làm:**
+- Thẻ việc có `displayStatus: "AWAITING_PAYMENT"`: hiện *"Đang chờ khách thanh toán (đến {giờ})"*.
+  `canContact` và `canComplete` là `false` cho tới khi khách trả. `GET /api/technician/jobs/{id}/contact` trả
+  `403 PAYMENT_REQUIRED`.
+- Nhận đơn trực tuyến **không cần số dư ví** và **không bị trừ hoa hồng trong ví**. Hoa hồng trừ thẳng vào tiền công.
+- **Số tài khoản nhận tiền:** `PATCH /api/technician/profile` có thêm:
+  - `bankBin`: 6 số, lấy từ danh sách ngân hàng `https://api.vietqr.io/v2/banks`, trường `bin`;
+  - `bankName`;
+  - `bankAccountNumber`;
+  - `bankAccountName`: viết hoa, không dấu.
+
+  Thêm màn "Tài khoản nhận tiền" trong hồ sơ KTV.
+- **Thu nhập:** `GET /api/technician/earnings` trả
+  `{ unpaidTotal, minimumPayout, bankAccount, unpaid: [...], payouts: [...] }`. Hiện màn "Thu nhập đơn trực tuyến":
+  - số tiền chờ nhận;
+  - danh sách đơn (giá, hoa hồng, thực nhận);
+  - lịch sử đã chi.
+
+  Admin chuyển khoản định kỳ khi đủ `minimumPayout` (mặc định 100.000đ). Chuyển xong, KTV nhận thông báo
+  `TECHNICIAN_PAYOUT_SENT`.
+
 ## Cách tự kiểm tra trên Swagger
 
 1. `PATCH /api/technician/application` với `idCardQr` = chuỗi app quét được → response có `idCardInfo` đúng tên trên thẻ.

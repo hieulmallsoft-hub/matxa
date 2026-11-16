@@ -4,6 +4,7 @@ import { NotificationsService } from '../../notifications/services/notifications
 import { ChatStorageService } from './chat-storage.service';
 import { CreateConversationDto, EditMessageDto, ListMessagesDto, SendMessageDto } from '../dto/chat.dto';
 import { COMPLAINT_CREATED, COMPLAINT_STATUS_LABEL } from '../../bookings/services/complaint-conversation';
+import { isAwaitingPayment } from '../../bookings/services/online-payment';
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000;
 const SUPPORT_REQUESTER_ROLES: string[] = ['CUSTOMER', 'TECHNICIAN'];
@@ -549,12 +550,19 @@ export class ChatService {
         assignmentMode: true,
         status: true,
         technicianId: true,
+        mode: true,
+        paymentDeadlineAt: true,
+        payment: { select: { method: true, status: true } },
         technician: { select: { id: true, userId: true } },
         applications: { where: { status: 'SELECTED' }, select: { technicianProfileId: true } },
       },
     });
     if (!booking?.technician || !booking.technicianId) {
       throw new ForbiddenException('Chi co the chat sau khi don da duoc gan KTV');
+    }
+    // An online booking's chat opens once the customer paid, so the two cannot agree to skip the payment.
+    if (isAwaitingPayment(booking)) {
+      throw new ForbiddenException({ statusCode: 403, code: 'PAYMENT_REQUIRED', message: 'Chat mo sau khi khach thanh toan' });
     }
     const isCustomer = booking.customerId === userId;
     const isAssignedTechnician = booking.technician.userId === userId;

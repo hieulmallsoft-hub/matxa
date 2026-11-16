@@ -13,6 +13,7 @@ import { TechnicianCancelBookingDto } from '../dto/booking.dto';
 import { BookingCancellationStorageService } from './booking-cancellation-storage.service';
 import { refundBookingCommission } from './booking-commission-refund';
 import { releaseBookingPromotion } from './booking-promotion-release';
+import { createRefund } from './online-payment';
 import { EVIDENCE_REQUIRED_REASONS as EVIDENCE_REQUIRED, isPenalizedCancel } from './cancel-limit';
 
 @Injectable()
@@ -103,6 +104,8 @@ export class TechnicianBookingCancellationService {
         await refundBookingCommission(tx, bookingId);
         // A technician cancelling must not cost the customer their voucher.
         await releaseBookingPromotion(tx, bookingId);
+        // Nor their money: a paid online booking is refunded in full (the admin sends it).
+        await createRefund(tx, bookingId, { reason: 'KTV huy don', feePercent: 0 });
         return {
           bookingId,
           status: 'CANCELLED' as const,

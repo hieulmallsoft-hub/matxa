@@ -17,6 +17,8 @@ import { PayosService } from './services/payos.service';
 import { SettingsModule } from '../settings/settings.module';
 import { ComplaintStorageService } from './services/complaint-storage.service';
 import { AdminComplaintsController } from './controllers/admin-complaints.controller';
+import { AdminPayoutsController, TechnicianEarningsController } from './controllers/payouts.controller';
+import { PayoutsService } from './services/payouts.service';
 
 @Module({
   imports: [AuthModule, NotificationsModule, MarketplaceModule, SettingsModule],
@@ -28,6 +30,8 @@ import { AdminComplaintsController } from './controllers/admin-complaints.contro
     PayosWebhookController,
     BookingPayosController,
     AdminComplaintsController,
+    AdminPayoutsController,
+    TechnicianEarningsController,
   ],
   providers: [
     BookingsService,
@@ -39,6 +43,7 @@ import { AdminComplaintsController } from './controllers/admin-complaints.contro
     PlatformFeePolicyService,
     PayosService,
     ComplaintStorageService,
+    PayoutsService,
   ],
   exports: [PayosService],
 })

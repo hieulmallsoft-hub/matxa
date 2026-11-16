@@ -1,8 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../database/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { creditBookingPromotion } from './booking-promotion-credit';
+import { BookingsService } from './bookings.service';
 
 /** Automatically completes confirmed bookings after the post-service grace period. */
 @Injectable()
@@ -14,6 +15,7 @@ export class BookingAutoCompletionService implements OnModuleInit, OnModuleDestr
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly config: ConfigService,
+    @Optional() private readonly bookings?: BookingsService,
   ) {}
 
   onModuleInit() {
@@ -52,8 +54,12 @@ export class BookingAutoCompletionService implements OnModuleInit, OnModuleDestr
           where: { id: booking.id, status: 'CONFIRMED', scheduledEnd: { lte: cutoff } },
           data: { status: 'COMPLETED' },
         });
-        // Completed is completed, by hand or after 24 hours: the technician gets the voucher credit either way.
-        if (claimed.count) await creditBookingPromotion(tx, booking.id);
+        // Completed is completed, by hand or after 24 hours: the same settlement (voucher credit, or the online
+        // booking's earning) either way.
+        if (claimed.count) {
+          if (this.bookings) await this.bookings.settleCompleted(tx, booking.id);
+          else await creditBookingPromotion(tx, booking.id);
+        }
         return claimed;
       });
       if (!updated.count) continue;
