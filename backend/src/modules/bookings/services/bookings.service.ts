@@ -336,6 +336,13 @@ export class BookingsService {
     if (!payment) throw new NotFoundException('Thanh toan khong ton tai');
     if (payment.method !== 'ONLINE') throw new BadRequestException('Booking khong dung thanh toan online');
     if (payment.status === 'PAID') return { bookingId, paymentId: payment.id, status: 'PAID', paymentUrl: null };
+    // A link was opened before: it may already be paid (the webhook got lost). Otherwise close it, so money cannot
+    // arrive on a link nobody is waiting on any more.
+    if (payment.provider === 'PAYOS' && payment.providerRef) {
+      if ((await this.syncPayosPayment(bookingId)) === 'PAID')
+        return { bookingId, paymentId: payment.id, status: 'PAID', paymentUrl: null };
+      await this.payos.cancelPaymentLink(payment.providerRef).catch(() => undefined);
+    }
     const expiresAt = (await this.paymentWindow(bookingId)) ?? new Date(Date.now() + Number(this.config.get('PAYOS_PAYMENT_TTL_MINUTES', 15)) * 60_000);
     const orderCode = Number(
       `${Date.now()}${Math.floor(Math.random() * 1000)
@@ -374,18 +381,29 @@ export class BookingsService {
     });
     const orderCode = String(data.orderCode ?? '');
     const payment = await this.prisma.payment.findFirst({ where: { provider: 'PAYOS', providerRef: orderCode } });
-    if (!payment) throw new NotFoundException('Khong tim thay payment PayOS');
+    // Not a booking payment (a wallet top-up, or PayOS's sample event when the webhook URL is saved): nothing here.
+    if (!payment) return { code: '00', desc: 'success', handled: false };
     if (Number(data.amount) !== Number(payment.amount))
       throw new BadRequestException('So tien webhook PayOS khong khop');
     const success = String(body.code ?? '') === '00' && body.success === true;
-    const status = success ? 'PAID' : 'FAILED';
+    await this.recordPayosResult(payment, success, data, String(body.code ?? ''));
+    return { code: '00', desc: 'success', handled: true };
+  }
+
+  /** Writes what PayOS reported (webhook or a status check) once; a payment counts as paid only once. */
+  private async recordPayosResult(
+    payment: { id: string; bookingId: string },
+    success: boolean,
+    data: Record<string, unknown>,
+    responseCode: string,
+  ) {
     const text = (value: unknown) => (value === undefined || value === null || value === '' ? null : String(value));
     const updated = await this.prisma.payment.updateMany({
       where: { id: payment.id, status: { in: ['PENDING', 'UNPAID'] } },
       data: {
-        status,
-        providerTransactionNo: data.reference ? String(data.reference) : null,
-        responseCode: String(body.code ?? ''),
+        status: success ? 'PAID' : 'FAILED',
+        providerTransactionNo: text(data.reference),
+        responseCode,
         ipnReceivedAt: new Date(),
         ...(success ? { paidAt: new Date() } : {}),
         // The account the customer paid from: where a refund would go back to.
@@ -396,7 +414,47 @@ export class BookingsService {
       },
     });
     if (success && updated.count) await this.afterPaymentPaid(payment.bookingId);
-    return { code: '00', desc: 'success' };
+    return updated.count > 0;
+  }
+
+  /**
+   * Asks PayOS whether a booking's open payment link was paid, for when the webhook never came. Returns the payment
+   * status afterwards ('PAID', 'PENDING', ...) or null when there is nothing to check.
+   */
+  async syncPayosPayment(bookingId: string) {
+    const payment = await this.prisma.payment.findFirst({ where: { bookingId } });
+    if (!payment) return null;
+    if (payment.status === 'PAID' || payment.provider !== 'PAYOS' || !payment.providerRef || !this.payos?.isConfigured())
+      return payment.status;
+    let info: Awaited<ReturnType<PayosService['getPaymentInfo']>> = null;
+    try {
+      info = await this.payos.getPaymentInfo(payment.providerRef);
+    } catch (error) {
+      this.logger.warn(`Khong hoi duoc PayOS cho don ${bookingId}: ${error instanceof Error ? error.message : 'khong ro'}`);
+      return payment.status;
+    }
+    const paid = info?.status === 'PAID' && Number(info.amountPaid ?? info.amount) >= Number(payment.amount);
+    if (!paid) return payment.status;
+    await this.recordPayosResult(payment, true, info?.transactions?.[0] ?? {}, '00');
+    return 'PAID';
+  }
+
+  /** Customer-facing check (the app calls it on return from PayOS, or a "đã thanh toán?" button). */
+  async checkPayosPayment(userId: string, bookingId: string) {
+    const booking = await this.prisma.booking.findFirst({ where: { id: bookingId, customerId: userId }, select: { id: true } });
+    if (!booking) throw new NotFoundException('Booking khong ton tai');
+    return { bookingId, paymentStatus: await this.syncPayosPayment(bookingId) };
+  }
+
+  /** On return from the PayOS page the order code is in the URL: check it right away, never block the redirect. */
+  async syncPayosOrder(orderCode: string | undefined) {
+    if (!orderCode) return;
+    try {
+      const payment = await this.prisma.payment.findFirst({ where: { provider: 'PAYOS', providerRef: orderCode }, select: { bookingId: true } });
+      if (payment) await this.syncPayosPayment(payment.bookingId);
+    } catch {
+      // the redirect matters more; the webhook or a later check still settles it
+    }
   }
 
   payosMobileRedirect(kind: 'return' | 'cancel', query: Record<string, string | undefined>) {
@@ -478,6 +536,8 @@ export class BookingsService {
     });
     if (!booking || booking.status !== 'CONFIRMED' || !booking.paymentDeadlineAt || booking.paymentDeadlineAt > now || booking.payment?.status === 'PAID')
       return false;
+    // The customer may have paid and only the webhook got lost: never cancel a paid booking for non-payment.
+    if ((await this.syncPayosPayment(bookingId)) === 'PAID') return false;
     const cancelled = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.booking.updateMany({
         where: { id: bookingId, status: 'CONFIRMED', payment: { is: { status: { not: 'PAID' } } } },
@@ -1210,7 +1270,7 @@ export class BookingsService {
   }
 
   async detail(userId: string, id: string, internal = false, allowMarketplaceTechnician = false) {
-    const booking = await this.prisma.booking.findUnique({
+    const load = () => this.prisma.booking.findUnique({
       where: { id },
       include: {
         items: true,
@@ -1229,6 +1289,7 @@ export class BookingsService {
         },
       },
     });
+    let booking = await load();
     if (!booking) throw new NotFoundException('Lich dat khong ton tai');
     const actor = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     const marketplaceNotification = allowMarketplaceTechnician && actor?.role === 'TECHNICIAN'
@@ -1261,6 +1322,9 @@ export class BookingsService {
         involvedInMarketplaceJob);
     if (booking.customerId !== userId && booking.technician?.userId !== userId && actor?.role !== 'ADMIN' && !canViewMarketplaceJob)
       throw new ForbiddenException('Ban khong co quyen xem lich dat');
+    // Opening a booking still waiting on PayOS asks PayOS directly, in case its webhook got lost.
+    if (!internal && booking.payment?.status === 'PENDING' && booking.payment.provider === 'PAYOS' && (await this.syncPayosPayment(id)) === 'PAID')
+      booking = (await load()) ?? booking;
     const historical = this.withHistoricalAddress(booking);
     return internal ? historical : this.historyResponse(historical, userId, await this.bookingRules());
   }
@@ -1352,7 +1416,11 @@ export class BookingsService {
     const profile = await this.requireActiveTechnician(userId);
     const commissionPercent = await this.commissionRate(userId);
     const travelRules = await this.bookingRules();
-    const booking = await this.detail(userId, id, true, true);
+    let booking = await this.detail(userId, id, true, true);
+    // The technician waiting on the customer's payment: ask PayOS too, in case its webhook got lost.
+    if (booking.technician?.userId === userId && booking.payment?.status === 'PENDING' && booking.payment.provider === 'PAYOS'
+      && (await this.syncPayosPayment(id)) === 'PAID')
+      booking = await this.detail(userId, id, true, true);
     if (booking.assignmentMode === 'OPEN_MARKETPLACE') {
       if (booking.status === 'OPEN' && booking.applicationDeadlineAt && booking.applicationDeadlineAt <= new Date()) {
         await this.expireOpenBookingIfDue(id);
@@ -1570,9 +1638,12 @@ export class BookingsService {
   }
 
   async cancel(userId: string, id: string, dto: CancelBookingDto) {
-    const booking = await this.detail(userId, id, true);
+    let booking = await this.detail(userId, id, true);
     if (!['OPEN', 'PENDING', 'CONFIRMED'].includes(booking.status))
       throw new BadRequestException('Lich dat khong the huy');
+    // Paid but the webhook not in yet: record the payment first, so the cancel queues the refund it owes.
+    if ((booking as { payment?: { status?: string } | null }).payment?.status === 'PENDING' && (await this.syncPayosPayment(id)) === 'PAID')
+      booking = await this.detail(userId, id, true);
     if (dto.reasonCode === 'OTHER' && !dto.reasonText?.trim())
       throw new BadRequestException('Vui long nhap ly do khac');
     const actor = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });

@@ -754,6 +754,12 @@ KTV nhận, trong **15 phút** (admin chỉnh được). Đơn tại nhà và t�
 3. Khách thanh toán bằng `POST /api/bookings/{id}/payos-payment`, nhận `paymentUrl` / `qrCode`. Link hết hạn đúng lúc
    `paymentDeadlineAt`. Gọi khi đơn chưa có KTV nhận, hoặc đã quá hạn, trả `409 PAYMENT_NOT_OPEN`.
 4. Trả xong thì cả hai bên nhận thông báo `BOOKING_PAID`, `awaitingPayment` thành `false`, **chat và thông tin liên hệ mở**.
+   - **Sửa 17/11** (trước đây trả tiền xong app không nhận gì): khi quay về app từ trang PayOS, app **gọi
+     `POST /api/bookings/{id}/payos-payment/check`** rồi tải lại đơn. API trả `{ bookingId, paymentStatus }`;
+     `"PAID"` là đã nhận tiền.
+   - `GET /api/bookings/{id}` (khách) và chi tiết việc của KTV cũng tự hỏi lại PayOS khi đơn còn chờ. Màn chờ thanh
+     toán nên tải lại đơn mỗi 5–10 giây, hoặc có nút **"Tôi đã thanh toán"** gọi API check ở trên.
+   - Mở lại `payos-payment` cho một đơn đã có link thì link cũ bị đóng, dùng link mới.
 5. Quá hạn mà chưa trả:
    - đơn tự hủy, `cancellationReasonCode: "PAYMENT_NOT_RECEIVED"`;
    - **tính là 1 lần hủy của khách** (giới hạn hủy, mục V);

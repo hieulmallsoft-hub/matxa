@@ -108,15 +108,18 @@ export class WalletService {
     return response;
   }
 
-  async processPayosWebhook(body: Record<string, unknown>) {
+  /**
+   * PayOS allows one webhook URL per channel, so the same events carry wallet top-ups and booking payments: an order
+   * code that is not a top-up goes to `otherwise` (the booking payment handler).
+   */
+  async processPayosWebhook(body: Record<string, unknown>, otherwise?: (body: Record<string, unknown>) => Promise<unknown>) {
     const data: any = this.payos.verifyWebhook(body as any);
     const orderCode = data.orderCode != null ? String(data.orderCode) : null;
     if (!orderCode) throw new BadRequestException('Webhook PayOS thieu orderCode');
     const topUp = await this.prisma.topUpTransaction.findFirst({ where: { providerTransactionId: orderCode, paymentMethod: 'PAYOS' } });
-    // PayOS sends a signed sample event when the webhook URL is verified. The
-    // sample orderCode is not in our database, but it must still receive a 2xx
-    // response so PayOS can finish webhook verification.
-    if (!topUp) return { code: '00', desc: 'success' };
+    // Not a top-up: a booking payment, or the signed sample event PayOS sends when the webhook URL is saved (it is in
+    // neither table and must still get a 2xx so PayOS can finish the verification).
+    if (!topUp) return otherwise ? otherwise(body) : { code: '00', desc: 'success' };
     // PayOS puts the webhook result (`code`, `success`) at the top level;
     // `data` contains the order and amount. Do not credit on a non-success event.
     const success = String(body.code ?? '') === '00' && body.success === true;

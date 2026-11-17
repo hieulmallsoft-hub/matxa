@@ -161,6 +161,33 @@ export const OrdersPage: React.FC = () => {
     addToast({ title: 'Đã xuất file CSV', message: `${rawBookings.length} lịch đặt`, type: 'success' });
   };
 
+  // Asks PayOS directly whether this booking was paid (when its webhook never arrived) and records it.
+  const [checkingPayment, setCheckingPayment] = useState(false);
+  const checkPayment = async () => {
+    if (!selectedRaw) return;
+    setCheckingPayment(true);
+    try {
+      const result = await request<{ paymentStatus: string | null }>(`/admin/bookings/${selectedRaw.id}/payment/check`, { method: 'POST' });
+      if (result.paymentStatus === 'PAID') {
+        addToast({
+          title: 'Khách đã thanh toán',
+          message: selectedRaw.status === 'CANCELLED' || selectedRaw.status === 'EXPIRED'
+            ? 'Đơn đã hủy nên đã tạo yêu cầu hoàn tiền 100% ở trang Chi trả & Hoàn tiền.'
+            : 'Đã cập nhật đơn sang đã thanh toán, khách và KTV đã được báo.',
+          type: 'success',
+        });
+        setSelectedOrder(null);
+        loadBookings();
+      } else {
+        addToast({ title: 'PayOS chưa ghi nhận khoản thanh toán', message: 'Đơn vẫn đang chờ khách thanh toán.', type: 'warning' });
+      }
+    } catch (error) {
+      addToast({ title: 'Không kiểm tra được', message: error instanceof Error ? error.message : 'Vui lòng thử lại', type: 'error' });
+    } finally {
+      setCheckingPayment(false);
+    }
+  };
+
   const [cancelReason, setCancelReason] = useState('');
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -441,6 +468,14 @@ export const OrdersPage: React.FC = () => {
                   {selectedRaw?.payment?.status === 'PAID' ? 'Đã thanh toán đủ' : (selectedRaw?.payment?.status === 'UNPAID' ? 'Chưa thanh toán (Thu tiền mặt)' : 'Chờ xử lý')}
                 </span>
               </div>
+              {selectedRaw?.payment?.method === 'ONLINE' && selectedRaw.payment.status !== 'PAID' && (
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <span className="text-[#66756B]">Khách báo đã chuyển mà đơn chưa nhận?</span>
+                  <Button onClick={checkPayment} disabled={checkingPayment}>
+                    {checkingPayment ? 'Đang hỏi PayOS…' : 'Kiểm tra lại thanh toán'}
+                  </Button>
+                </div>
+              )}
               <div className="pt-2 border-t border-[#E5EBE5] text-[#66756B]">
                 <strong>Ghi chú:</strong> {selectedRaw?.note || 'Không có ghi chú thêm.'}
               </div>

@@ -7,7 +7,8 @@ import {
   WalletTransactionListResponseDto,
   WalletTransactionResponseDto,
 } from './wallet-response.dto';
-import { Body, Controller, Get, Param, ParseIntPipe, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseIntPipe, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { BookingsService } from '../bookings/services/bookings.service';
 import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AccessTokenGuard } from '../auth/guards/access-token.guard';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
@@ -62,14 +63,19 @@ export class WalletController {
   }
 }
 
-@ApiTags('PayOS Wallet')
-@Controller('payments/payos/wallet')
+/**
+ * The one PayOS webhook. PayOS sends every event of the channel to the single URL saved in its dashboard, so both
+ * addresses accept both kinds: a wallet top-up, otherwise a booking payment.
+ */
+@ApiTags('PayOS')
+@Controller('payments/payos')
 export class WalletPayosWebhookController {
-  constructor(private readonly wallet: WalletService) {}
-  @Post('webhook')
-  @ApiOperation({ summary: 'PayOS webhook cho giao dich nap vi' })
+  constructor(private readonly wallet: WalletService, private readonly bookings: BookingsService) {}
+  @Post(['webhook', 'wallet/webhook'])
+  @HttpCode(200)
+  @ApiOperation({ summary: 'PayOS webhook (nap vi va thanh toan don); chi PayOS duoc phep goi' })
   webhook(@Body() body: Record<string, unknown>) {
-    return this.wallet.processPayosWebhook(body);
+    return this.wallet.processPayosWebhook(body, (event) => this.bookings.processPayosWebhook(event));
   }
 }
 

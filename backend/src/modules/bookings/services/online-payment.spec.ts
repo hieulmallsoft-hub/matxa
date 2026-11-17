@@ -82,6 +82,7 @@ describe('BookingsService online payment flow', () => {
       booking: {
         findUnique: jest.fn().mockResolvedValue({ id: 'b1', customerId: 'c1', status: 'CONFIRMED', paymentDeadlineAt: new Date(Date.now() - 1000), technician: { userId: 'tech-1' }, payment: { status: 'UNPAID' } }),
       },
+      payment: { findFirst: jest.fn().mockResolvedValue({ id: 'pay-1', bookingId: 'b1', status: 'UNPAID', provider: null, providerRef: null }) },
       $transaction: jest.fn((run: any) => run(tx)),
     };
     const subject = service(prisma);
@@ -139,6 +140,50 @@ describe('BookingsService online payment flow', () => {
     };
     await expect(createRefund(tx, 'b1', { reason: 'x', feePercent: 20 })).resolves.toBeNull();
     expect(tx.bookingRefund.create).not.toHaveBeenCalled();
+  });
+
+  describe('PayOS webhook lost: ask PayOS', () => {
+    const pending = { id: 'pay-1', bookingId: 'b1', status: 'PENDING', provider: 'PAYOS', providerRef: '123', amount: 2000 };
+    const setup = (info: object | null) => {
+      const prisma: any = {
+        payment: { findFirst: jest.fn().mockResolvedValue(pending), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        booking: { findUnique: jest.fn().mockResolvedValue({ id: 'b1', status: 'CONFIRMED', paymentDeadlineAt: new Date(Date.now() - 1000), payment: { status: 'PENDING' } }) },
+        $transaction: jest.fn(),
+      };
+      const payos = { isConfigured: () => true, getPaymentInfo: jest.fn().mockResolvedValue(info) };
+      const subject = new BookingsService(prisma, { get: (_k: string, f: unknown) => f } as any, { create: jest.fn() } as any, {} as any, undefined, payos as any) as any;
+      const paid = jest.spyOn(subject, 'afterPaymentPaid').mockResolvedValue(undefined);
+      return { prisma, subject, paid };
+    };
+
+    it('records a payment PayOS says is paid, with the payer\'s account', async () => {
+      const { prisma, subject, paid } = setup({ status: 'PAID', amount: 2000, amountPaid: 2000, transactions: [{ reference: 'FT1', counterAccountNumber: '0123', counterAccountName: 'NGUYEN VAN A' }] });
+      await expect(subject.syncPayosPayment('b1')).resolves.toBe('PAID');
+      expect(prisma.payment.updateMany.mock.calls[0][0]).toMatchObject({
+        where: { id: 'pay-1', status: { in: ['PENDING', 'UNPAID'] } },
+        data: { status: 'PAID', providerTransactionNo: 'FT1', payerAccountNumber: '0123', payerAccountName: 'NGUYEN VAN A' },
+      });
+      expect(paid).toHaveBeenCalledWith('b1');
+    });
+
+    it('changes nothing while PayOS has no payment yet', async () => {
+      const { prisma, subject } = setup({ status: 'PENDING', amount: 2000, amountPaid: 0 });
+      await expect(subject.syncPayosPayment('b1')).resolves.toBe('PENDING');
+      expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('does not cancel for non-payment a booking that was in fact paid', async () => {
+      const { prisma, subject } = setup({ status: 'PAID', amount: 2000, amountPaid: 2000, transactions: [] });
+      await expect(subject.cancelUnpaidBooking('b1')).resolves.toBe(false);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  it('a webhook for an order that is not a booking payment is acknowledged, not rejected', async () => {
+    const payos = { verifyWebhook: (body: any) => body.data };
+    const prisma: any = { payment: { findFirst: jest.fn().mockResolvedValue(null) } };
+    const subject = new BookingsService(prisma, {} as any, {} as any, {} as any, undefined, payos as any);
+    await expect(subject.processPayosWebhook({ code: '00', success: true, data: { orderCode: 99, amount: 1000 } })).resolves.toMatchObject({ code: '00', handled: false });
   });
 
   it('money that arrives after the booking was cancelled is queued for a full refund', async () => {

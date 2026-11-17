@@ -12,7 +12,7 @@ import { OpenBookingExpirationService } from './services/open-booking-expiration
 import { BookingAutoCompletionService } from './services/booking-auto-completion.service';
 import { PlatformFeePolicyService } from './services/platform-fee-policy.service';
 import { BookingVnpayController, VnpayController } from './controllers/vnpay.controller';
-import { BookingPayosController, PayosWebhookController } from './controllers/payos.controller';
+import { AdminPayosController, BookingPayosController, PayosWebhookController } from './controllers/payos.controller';
 import { PayosService } from './services/payos.service';
 import { SettingsModule } from '../settings/settings.module';
 import { ComplaintStorageService } from './services/complaint-storage.service';
@@ -29,6 +29,7 @@ import { PayoutsService } from './services/payouts.service';
     BookingVnpayController,
     PayosWebhookController,
     BookingPayosController,
+    AdminPayosController,
     AdminComplaintsController,
     AdminPayoutsController,
     TechnicianEarningsController,
@@ -45,6 +46,6 @@ import { PayoutsService } from './services/payouts.service';
     ComplaintStorageService,
     PayoutsService,
   ],
-  exports: [PayosService],
+  exports: [PayosService, BookingsService],
 })
 export class BookingsModule {}
