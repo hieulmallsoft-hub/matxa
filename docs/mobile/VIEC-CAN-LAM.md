@@ -787,6 +787,12 @@ KTV nhận, trong **15 phút** (admin chỉnh được). Đơn tại nhà và t�
   `canContact` và `canComplete` là `false` cho tới khi khách trả. `GET /api/technician/jobs/{id}/contact` trả
   `403 PAYMENT_REQUIRED`.
 - Nhận đơn trực tuyến **không cần số dư ví** và **không bị trừ hoa hồng trong ví**. Hoa hồng trừ thẳng vào tiền công.
+- Chi tiết việc của đơn trực tuyến (sửa 17/11):
+  - `platformFee` là hoa hồng thật, chốt lúc nhận đơn;
+  - `technicianEarning` = giá − hoa hồng, trùng số ở màn Thu nhập;
+  - `discountAmount` = 0, vì công ty chịu mã giảm giá và không cộng vào ví.
+
+  App **ẩn dòng "Psyocore bù mã giảm giá" khi `discountAmount` = 0**, thay vì hiện "+0đ".
 - **Số tài khoản nhận tiền:** `PATCH /api/technician/profile` có thêm:
   - `bankBin`: 6 số, lấy từ danh sách ngân hàng `https://api.vietqr.io/v2/banks`, trường `bin`;
   - `bankName`;

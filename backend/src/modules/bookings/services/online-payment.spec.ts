@@ -35,6 +35,12 @@ describe('technician earning on completion', () => {
     const earning = await recordTechnicianEarning(tx, 'b1', async (gross) => gross * 0.25);
     expect(earning).toEqual({ technicianUserId: 'tech-1', bookingId: 'b1', grossAmount: 500000, commission: 125000, amount: 375000 });
   });
+  it('uses the commission fixed when the job was taken (what the job showed), not today\'s rate', async () => {
+    const tx = db({ mode: 'ONLINE', grossServiceAmount: 502000, platformFee: 5000, payment: { method: 'ONLINE', status: 'PAID' }, technician: { userId: 'tech-1' } });
+    const today = jest.fn(async () => 99999);
+    await expect(recordTechnicianEarning(tx, 'b1', today)).resolves.toMatchObject({ commission: 5000, amount: 497000 });
+    expect(today).not.toHaveBeenCalled();
+  });
   it('records nothing for a cash booking (the technician collected the money)', async () => {
     const tx = db({ mode: 'HOME', grossServiceAmount: 500000, payment: { method: 'CASH', status: 'UNPAID' }, technician: { userId: 'tech-1' } });
     await expect(recordTechnicianEarning(tx, 'b1', async () => 0)).resolves.toBeNull();
@@ -113,15 +119,25 @@ describe('BookingsService online payment flow', () => {
     jest.spyOn(subject, 'assertOpenEligibility').mockResolvedValue(undefined);
     jest.spyOn(subject, 'bookingRules').mockResolvedValue({ onlinePaymentWaitMinutes: 15 });
     const charge = jest.spyOn(subject, 'chargeTechnicianCommission').mockResolvedValue(undefined);
-    return { tx, run: () => subject.assignOpenBooking('b1', 'a1', 'c1'), charge };
+    const fixCommission = jest.spyOn(subject, 'recordPrepaidCommission').mockResolvedValue(undefined);
+    return { tx, run: () => subject.assignOpenBooking('b1', 'a1', 'c1'), charge, fixCommission };
   };
 
-  it('a technician taking an online booking gives the customer a payment deadline', async () => {
-    const { tx, run, charge } = assign(500000);
+  it('a technician taking an online booking gives the customer a payment deadline and fixes the commission, wallet untouched', async () => {
+    const { tx, run, charge, fixCommission } = assign(500000);
     await run();
     expect(tx.booking.update).toHaveBeenCalledTimes(1);
     expect(tx.booking.update.mock.calls[0][0].data.paymentDeadlineAt).toBeInstanceOf(Date);
     expect(charge).not.toHaveBeenCalled();
+    expect(fixCommission).toHaveBeenCalledWith('tech-1', 'b1', tx);
+  });
+
+  it('the job of a prepaid online booking shows price minus commission, with no voucher credit', () => {
+    const pricing = service({}).technicianPricing({ mode: 'ONLINE', payment: { method: 'ONLINE' }, grossServiceAmount: 502000, platformFee: 5000, technicianEarning: 497000, discountAmount: 500000, totalAmount: 2000 });
+    expect(pricing).toMatchObject({ platformFee: 5000, discountAmount: 0, technicianEarning: 497000, customerPaysAmount: 2000 });
+    // a cash booking keeps the voucher credit to the wallet
+    const cash = service({}).technicianPricing({ mode: 'HOME', payment: { method: 'CASH' }, grossServiceAmount: 502000, platformFee: 125500, technicianEarning: 376500, discountAmount: 500000 });
+    expect(cash.discountAmount).toBe(500000);
   });
 
   it('a booking a voucher brought down to 0đ is paid as soon as it is taken (no payment link to open)', async () => {

@@ -1129,6 +1129,7 @@ export class BookingsService {
           // technician. Same transaction, so an insufficient wallet still rolls everything back.
           // A prepaid online booking is not charged: the commission comes out of the customer's payment.
           if (!prepaid) await this.chargeTechnicianCommission(application.technicianProfile.user.id, bookingId, tx);
+          else await this.recordPrepaidCommission(application.technicianProfile.user.id, bookingId, tx);
           const losers = await tx.bookingTechnicianApplication.findMany({
             where: { bookingId, status: 'NOT_SELECTED' },
             include: { technicianProfile: { select: { userId: true } } },
@@ -1631,6 +1632,29 @@ export class BookingsService {
     };
     if (db === this.prisma) await this.prisma.$transaction(debit);
     else await debit(db);
+  }
+
+  /**
+   * A prepaid online booking: the commission is not taken from the wallet (the platform already holds the customer's
+   * money) but it is fixed now, at the rate the technician has when taking it, so the job shows what they will receive
+   * and the earning recorded on completion is the same amount.
+   */
+  private async recordPrepaidCommission(userId: string, bookingId: string, db: Prisma.TransactionClient) {
+    const booking = await db.booking.findUniqueOrThrow({
+      where: { id: bookingId },
+      select: { grossServiceAmount: true, serviceFee: true, travelFee: true },
+    });
+    const { rate, version } = await this.commissionPolicy(userId, db);
+    const gross = Number(booking.grossServiceAmount ?? 0);
+    const fee = roundVnd((gross * rate) / 100);
+    await db.booking.update({
+      where: { id: bookingId },
+      data: {
+        platformFee: fee,
+        technicianEarning: gross - fee + Number(booking.serviceFee ?? 0) + Number(booking.travelFee ?? 0),
+        feePolicyVersion: version,
+      },
+    });
   }
 
   async declineTechnicianJob(userId: string, id: string, dto: CancelBookingDto) {
@@ -2672,7 +2696,10 @@ export class BookingsService {
    * means the platform pays the technician overall.
    */
   private settlement(booking: any, platformFee: number) {
-    const discountAmount = Math.round(Number(booking.discountAmount ?? 0));
+    // A prepaid online booking: nothing goes through the wallet. The platform holds the customer's money and bears the
+    // voucher itself, so there is no voucher credit; the technician gets the price minus the commission.
+    const prepaid = booking.mode === 'ONLINE' && (booking.payment?.method ?? 'ONLINE') === 'ONLINE';
+    const discountAmount = prepaid ? 0 : Math.round(Number(booking.discountAmount ?? 0));
     return {
       discountAmount,
       customerPaysAmount: Number(booking.totalAmount ?? 0),

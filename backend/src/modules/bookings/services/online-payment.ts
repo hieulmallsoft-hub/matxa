@@ -34,13 +34,17 @@ export async function recordTechnicianEarning(
       mode: true,
       grossServiceAmount: true,
       subtotal: true,
+      platformFee: true,
       payment: { select: { method: true, status: true } },
       technician: { select: { userId: true } },
     },
   });
   if (!booking?.technician || !isPrepaid(booking) || booking.payment?.status !== 'PAID') return null;
   const gross = Math.round(Number(booking.grossServiceAmount ?? booking.subtotal));
-  const commission = await commissionFor(gross, booking.technician.userId);
+  // The commission fixed when the technician took the job (shown to them since); bookings taken before that was
+  // recorded fall back to today's rate.
+  const fixed = Math.round(Number(booking.platformFee ?? 0));
+  const commission = fixed > 0 ? fixed : await commissionFor(gross, booking.technician.userId);
   try {
     return await tx.technicianEarning.create({
       data: { technicianUserId: booking.technician.userId, bookingId, grossAmount: gross, commission, amount: gross - commission },
