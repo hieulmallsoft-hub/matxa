@@ -106,7 +106,7 @@ export async function applyCancelLimit(db: Db, userId: string, rules: Suspension
   const status = await cancelLimitStatus(db, userId, rules, now);
   if (!status.enabled || status.remainingBeforeLock !== 0 || status.lockedUntil) return status;
   await suspend(db, userId, rules, {
-    reason: `Huy ${status.recentCancellations} don da co KTV nhan trong ${rules.cancelLimitWindowHours} gio`,
+    reason: `Hủy ${status.recentCancellations} đơn đã có KTV nhận trong ${rules.cancelLimitWindowHours} giờ`,
     source: 'CANCEL_LIMIT',
   }, now);
   return cancelLimitStatus(db, userId, rules, now);
@@ -119,7 +119,7 @@ export async function assertNotSuspended(db: Pick<Prisma.TransactionClient, 'use
   throw new ConflictException({
     statusCode: 409,
     code: 'ACCOUNT_SUSPENDED',
-    message: technician ? 'Tai khoan dang tam khoa, chua the nhan don moi' : 'Tai khoan dang tam khoa, chua the dat don moi',
+    message: technician ? 'Tài khoản đang tạm khóa, chưa thể nhận đơn mới' : 'Tài khoản đang tạm khóa, chưa thể đặt đơn mới',
     lockedUntil: current.endsAt,
     reason: current.reason,
     level: current.level,

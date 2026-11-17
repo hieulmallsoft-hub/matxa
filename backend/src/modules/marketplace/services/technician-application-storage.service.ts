@@ -39,7 +39,7 @@ export class TechnicianApplicationStorageService {
 
   async createPrivateViewUrl(storageKey: string) {
     if (!storageKey.startsWith('technician-applications/'))
-      throw new ServiceUnavailableException('KYC storage key khong hop le');
+      throw new ServiceUnavailableException('KYC storage key không hợp lệ');
     const bucket = this.config.get<string>('S3_BUCKET');
     const region = this.config.get<string>('S3_REGION');
     const accessKeyId = this.config.get<string>('S3_ACCESS_KEY_ID');

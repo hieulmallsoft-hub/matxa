@@ -54,7 +54,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.data.userId = payload.sub;
       await client.join(`user:${payload.sub}`);
     } catch {
-      client.emit('auth.error', { message: 'Access token khong hop le hoac da het han' });
+      client.emit('auth.error', { message: 'Access token không hợp lệ hoặc đã hết hạn' });
       client.disconnect(true);
     }
   }
@@ -175,7 +175,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private userId(client: AuthSocket) {
-    if (!client.data.userId) throw new WsException('Chua xac thuc');
+    if (!client.data.userId) throw new WsException('Chưa xác thực');
     return client.data.userId;
   }
 }

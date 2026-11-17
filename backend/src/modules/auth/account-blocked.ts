@@ -8,7 +8,7 @@ export function accountBlocked(user: { blockedReason?: string | null; blockedAt?
   return new ForbiddenException({
     statusCode: 403,
     code: 'ACCOUNT_BLOCKED',
-    message: 'Tai khoan da bi khoa',
+    message: 'Tài khoản đã bị khóa',
     reason: user.blockedReason ?? null,
     blockedAt: user.blockedAt ?? null,
   });

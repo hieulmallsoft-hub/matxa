@@ -12,7 +12,7 @@ describe('announce open jobs to a technician who just became free', () => {
     };
     const service = new BookingsService(prisma, { get: (_k: string, f: unknown) => f } as any, {} as any, {} as any);
     jest.spyOn(service as any, 'assertOpenEligibility').mockImplementation(async (_db: any, booking: any) => {
-      if (ineligible.includes(booking.id)) throw new Error('KTV khong phu hop khu vuc cua don');
+      if (ineligible.includes(booking.id)) throw new Error('KTV không phù hợp khu vực của đơn');
     });
     const notify = jest.spyOn(service as any, 'notifyStatus').mockResolvedValue(undefined);
     return { prisma, service, notify };

@@ -18,7 +18,7 @@ export class LocationService {
       where: { code: cityCode, isActive: true },
       select: { code: true },
     });
-    if (!city) throw new NotFoundException('Thanh pho khong ton tai');
+    if (!city) throw new NotFoundException('Thành phố không tồn tại');
     return this.prisma.district.findMany({
       where: { cityCode, isActive: true },
       select: { code: true, name: true, cityCode: true },

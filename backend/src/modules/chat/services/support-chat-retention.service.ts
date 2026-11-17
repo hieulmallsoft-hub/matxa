@@ -56,10 +56,10 @@ export class SupportChatRetentionService implements OnModuleInit, OnModuleDestro
   /** Admin "Kết thúc hỗ trợ". */
   async endByAdmin(adminId: string, conversationId: string) {
     const admin = await this.prisma.user.findUnique({ where: { id: adminId }, select: { role: true, status: true } });
-    if (admin?.role !== 'ADMIN' || admin.status !== 'ACTIVE') throw new ForbiddenException('Chi admin duoc ket thuc ho tro');
+    if (admin?.role !== 'ADMIN' || admin.status !== 'ACTIVE') throw new ForbiddenException('Chỉ admin được kết thúc hỗ trợ');
     const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { type: true } });
-    if (!conversation) throw new NotFoundException('Cuoc tro chuyen khong ton tai');
-    if (conversation.type !== 'SUPPORT') throw new BadRequestException('Chi ket thuc duoc chat ho tro');
+    if (!conversation) throw new NotFoundException('Cuộc trò chuyện không tồn tại');
+    if (conversation.type !== 'SUPPORT') throw new BadRequestException('Chỉ kết thúc được chat hỗ trợ');
     await this.end(conversationId, 'AGENT_ENDED');
     return { conversationId, ended: true };
   }

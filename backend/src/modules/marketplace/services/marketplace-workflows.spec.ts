@@ -105,7 +105,7 @@ describe('Technician detail, favorites, availability and address workflows', () 
     expect(favorite.findUnique).not.toHaveBeenCalled();
     await expect(service.technicianDetail('t1', { latitude: 10 })).rejects.toThrow();
     technicianProfile.findUnique.mockResolvedValue(null);
-    await expect(service.technicianDetail('inactive')).rejects.toThrow('khong ton tai');
+    await expect(service.technicianDetail('inactive')).rejects.toThrow('không tồn tại');
   });
 
   it('returns favorite cards and never touches booking data', async () => {
@@ -237,8 +237,8 @@ describe('Technician detail, favorites, availability and address workflows', () 
 
   it('rejects editing/removing another user address before any mutation', async () => {
     address.findFirst.mockResolvedValue(null);
-    await expect(service.updateAddress('customer', 'foreign', { isDefault: true })).rejects.toThrow('khong ton tai');
-    await expect(service.removeAddress('customer', 'foreign')).rejects.toThrow('khong ton tai');
+    await expect(service.updateAddress('customer', 'foreign', { isDefault: true })).rejects.toThrow('không tồn tại');
+    await expect(service.removeAddress('customer', 'foreign')).rejects.toThrow('không tồn tại');
     expect(address.findFirst).toHaveBeenCalledWith({ where: { id: 'foreign', userId: 'customer', deletedAt: null } });
     expect(address.update).not.toHaveBeenCalled();
     expect(address.updateMany).not.toHaveBeenCalled();

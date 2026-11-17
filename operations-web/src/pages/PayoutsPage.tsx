@@ -47,7 +47,7 @@ const errorText = (error: unknown) => (error instanceof Error ? error.message : 
 function downloadCsv(rows: Pending[]) {
   const escape = (value: string | number | null) => `"${String(value ?? '').replace(/"/g, '""')}"`;
   const lines = [
-    ['Ten KTV', 'Ngan hang', 'So tai khoan', 'Chu tai khoan', 'So tien', 'Noi dung', 'So don'].map(escape).join(','),
+    ['Tên KTV', 'Ngân hàng', 'Số tài khoản', 'Chủ tài khoản', 'Số tiền', 'Nội dung', 'Số đơn'].map(escape).join(','),
     ...rows.map((row) => [row.displayName, row.bankName, row.accountNumber, row.accountName, row.amount, row.transferNote, row.bookingCount].map(escape).join(',')),
   ];
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });

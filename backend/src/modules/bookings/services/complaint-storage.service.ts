@@ -10,7 +10,7 @@ export class ComplaintStorageService {
   async createUploadUrl(bookingId: string, userId: string, contentType: string, size: number) {
     const { bucket, client } = this.connection();
     const ext = ({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' } as Record<string, string>)[contentType];
-    if (!ext || size < 1 || size > 10 * 1024 * 1024) throw new BadRequestException('Anh phai la JPEG, PNG hoac WebP, toi da 10 MB');
+    if (!ext || size < 1 || size > 10 * 1024 * 1024) throw new BadRequestException('Ảnh phải là JPEG, PNG hoặc WebP, tối đa 10 MB');
     const storageKey = `booking-complaint/${bookingId}/${userId}/${randomUUID()}.${ext}`;
     try { return { uploadUrl: await getSignedUrl(client, new PutObjectCommand({ Bucket: bucket, Key: storageKey, ContentType: contentType, ContentLength: size }), { expiresIn: 300 }), storageKey, expiresIn: 300 }; }
     finally { client.destroy(); }

@@ -16,7 +16,7 @@ describe('service price range', () => {
 
   it.each([399999, 1000001])('rejects %d by default with the range in the message', async (price) => {
     const error = await assertServicePrices(db(), [price]).catch((e) => e);
-    expect(error.getResponse()).toMatchObject({ code: 'SERVICE_PRICE_OUT_OF_RANGE', message: 'Gia dich vu phai tu 400.000d den 1.000.000d', min: 400000, max: 1000000 });
+    expect(error.getResponse()).toMatchObject({ code: 'SERVICE_PRICE_OUT_OF_RANGE', message: 'Giá dịch vụ phải từ 400.000đ đến 1.000.000đ', min: 400000, max: 1000000 });
   });
 
   it('follows the admin setting, e.g. 10.000đ for testing payments', async () => {

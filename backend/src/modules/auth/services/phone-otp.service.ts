@@ -70,7 +70,7 @@ export class PhoneOtpService {
       NX: true,
     });
     if (!cooldownCreated) {
-      this.tooManyRequests('Vui long cho truoc khi gui lai ma');
+      this.tooManyRequests('Vui lòng chờ trước khi gửi lại mã');
     }
 
     await Promise.all([
@@ -99,7 +99,7 @@ export class PhoneOtpService {
       await this.smsProvider.sendOtp(phoneNumber, code);
     } catch {
       await this.redis.client.del(challengeKey);
-      throw new HttpException('Khong the gui ma xac minh luc nay', HttpStatus.SERVICE_UNAVAILABLE);
+      throw new HttpException('Không thể gửi mã xác minh lúc này', HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     return {
@@ -114,7 +114,7 @@ export class PhoneOtpService {
     const challengeKey = `otp:challenge:${challengeId}`;
     const rawChallenge = await this.redis.client.get(challengeKey);
     if (!rawChallenge) {
-      throw new UnauthorizedException('Ma xac minh khong hop le hoac da het han');
+      throw new UnauthorizedException('Mã xác minh không hợp lệ hoặc đã hết hạn');
     }
 
     const challenge = JSON.parse(rawChallenge) as OtpChallenge;
@@ -130,7 +130,7 @@ export class PhoneOtpService {
     })) as number;
 
     if (result !== 1) {
-      throw new UnauthorizedException('Ma xac minh khong hop le hoac da het han');
+      throw new UnauthorizedException('Mã xác minh không hợp lệ hoặc đã hết hạn');
     }
 
     return challenge.phoneNumber;
@@ -140,7 +140,7 @@ export class PhoneOtpService {
     const compact = input.replace(/[\s()-]/g, '');
     const phone = parsePhoneNumberFromString(compact, 'VN');
     if (!phone?.isValid()) {
-      throw new BadRequestException('So dien thoai khong hop le');
+      throw new BadRequestException('Số điện thoại không hợp lệ');
     }
     return phone.number;
   }
@@ -151,7 +151,7 @@ export class PhoneOtpService {
       arguments: ['3600'],
     })) as number;
     if (count > limit) {
-      this.tooManyRequests('Da vuot qua gioi han gui ma');
+      this.tooManyRequests('Đã vượt quá giới hạn gửi mã');
     }
   }
 

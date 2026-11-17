@@ -23,7 +23,7 @@ export class PayosService {
     const returnUrl = this.config.get<string>('PAYOS_RETURN_URL');
     const cancelUrl = this.config.get<string>('PAYOS_CANCEL_URL');
     if (!clientId || !apiKey || !checksumKey || !returnUrl || !cancelUrl)
-      throw new BadRequestException('PayOS chua duoc cau hinh');
+      throw new BadRequestException('PayOS chưa được cấu hình');
 
     const body = {
       orderCode: input.orderCode,
@@ -64,7 +64,7 @@ export class PayosService {
       };
     };
     if (!response.ok || payload.code !== '00' || !payload.data?.checkoutUrl)
-      throw new BadRequestException(payload.desc || 'Khong tao duoc lien ket PayOS');
+      throw new BadRequestException(payload.desc || 'Không tạo được liên kết PayOS');
     return payload.data;
   }
 
@@ -94,7 +94,7 @@ export class PayosService {
   private async call(method: 'GET' | 'POST', path: string, body?: object) {
     const clientId = this.config.get<string>('PAYOS_CLIENT_ID');
     const apiKey = this.config.get<string>('PAYOS_API_KEY');
-    if (!clientId || !apiKey) throw new BadRequestException('PayOS chua duoc cau hinh');
+    if (!clientId || !apiKey) throw new BadRequestException('PayOS chưa được cấu hình');
     const base = this.config.get<string>('PAYOS_API_URL', 'https://api-merchant.payos.vn/v2/payment-requests');
     const response = await fetch(`${base}${path}`, {
       method,
@@ -107,23 +107,23 @@ export class PayosService {
   verifyWebhook(payload: { signature?: string; data?: PayosData }) {
     const checksumKey = this.config.get<string>('PAYOS_CHECKSUM_KEY');
     if (!checksumKey || !payload.signature || !payload.data)
-      throw new UnauthorizedException('Webhook PayOS khong hop le');
+      throw new UnauthorizedException('Webhook PayOS không hợp lệ');
     const expected = this.sign(payload.data, checksumKey);
     const actual = Buffer.from(payload.signature, 'utf8');
     const wanted = Buffer.from(expected, 'utf8');
     if (actual.length !== wanted.length || !timingSafeEqual(actual, wanted))
-      throw new UnauthorizedException('Sai chu ky webhook PayOS');
+      throw new UnauthorizedException('Sai chữ ký webhook PayOS');
     return payload.data;
   }
 
   mobileRedirect(kind: 'return' | 'cancel', query: Record<string, string | undefined>) {
     const target = this.config.get<string>(kind === 'return' ? 'PAYOS_APP_RETURN_URL' : 'PAYOS_APP_CANCEL_URL');
-    if (!target) throw new BadRequestException('PayOS mobile redirect chua duoc cau hinh');
+    if (!target) throw new BadRequestException('PayOS mobile redirect chưa được cấu hình');
     let url: URL;
     try {
       url = new URL(target);
     } catch {
-      throw new BadRequestException('PayOS mobile redirect URL khong hop le');
+      throw new BadRequestException('PayOS mobile redirect URL không hợp lệ');
     }
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined) url.searchParams.set(key, value);

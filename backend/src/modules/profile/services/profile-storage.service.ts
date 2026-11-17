@@ -45,7 +45,7 @@ export class ProfileStorageService {
       const types: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
       const extension = types[object.ContentType ?? ''];
       if (!extension || !object.ContentLength || object.ContentLength > 5 * 1024 * 1024) {
-        throw new BadRequestException('Anh phai la JPEG, PNG hoac WebP, toi da 5 MB');
+        throw new BadRequestException('Ảnh phải là JPEG, PNG hoặc WebP, tối đa 5 MB');
       }
       const savedKey = `avatars/${userId}/saved/${randomUUID()}.${extension}`;
       await client.send(
@@ -61,8 +61,8 @@ export class ProfileStorageService {
       if (error instanceof BadRequestException) throw error;
       const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
       if (status === 404 || status === 412)
-        throw new BadRequestException('Anh chua upload hoac da thay doi, vui long upload lai');
-      throw new ServiceUnavailableException('Khong the kiem tra va luu anh tren S3');
+        throw new BadRequestException('Ảnh chưa được tải lên hoặc đã thay đổi, vui lòng tải lại');
+      throw new ServiceUnavailableException('Không thể kiểm tra và lưu ảnh');
     } finally {
       client.destroy();
     }

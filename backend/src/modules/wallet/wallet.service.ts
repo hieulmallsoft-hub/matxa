@@ -30,7 +30,7 @@ export class WalletService {
     const accountName = this.config.get<string>('WALLET_BANK_ACCOUNT_NAME');
     const accountNumber = this.config.get<string>('WALLET_BANK_ACCOUNT_NUMBER');
     if (!bankName || !accountName || !accountNumber)
-      throw new BadRequestException('Thong tin tai khoan nap tien chua duoc cau hinh');
+      throw new BadRequestException('Thông tin tài khoản nạp tiền chưa được cấu hình');
     return { bankName, accountName, accountNumber };
   }
   private async wallet(userId: string) {
@@ -38,7 +38,7 @@ export class WalletService {
       where: { userId, isActive: true, isVerified: true, user: { status: 'ACTIVE', role: 'TECHNICIAN' } },
       select: { id: true },
     });
-    if (!profile) throw new ForbiddenException('Chi KTV da duoc duyet moi dung vi quang cao');
+    if (!profile) throw new ForbiddenException('Chỉ KTV đã được duyệt mới dùng ví quảng cáo');
     return this.prisma.wallet.upsert({
       where: { userId_type: { userId, type: 'ADVERTISING_CREDIT' } },
       create: { userId, type: 'ADVERTISING_CREDIT' },
@@ -51,11 +51,11 @@ export class WalletService {
     return { id: wallet.id, type: wallet.type, balanceVnd: wallet.balanceVnd, currency: wallet.currency };
   }
   async create(userId: string, amount: number, paymentMethod = 'BANK_TRANSFER') {
-    if (!Number.isInteger(amount) || amount <= 0) throw new BadRequestException('So tien phai la so nguyen duong');
+    if (!Number.isInteger(amount) || amount <= 0) throw new BadRequestException('Số tiền phải là số nguyên dương');
     const min = Number(this.config.get('WALLET_TOPUP_MIN_VND', 1000));
     const max = Number(this.config.get('WALLET_TOPUP_MAX_VND', 100000000));
-    if (amount < min || amount > max) throw new BadRequestException(`So tien phai tu ${min} den ${max} VND`);
-    if (!['BANK_TRANSFER', 'PAYOS'].includes(paymentMethod)) throw new BadRequestException('Phuong thuc thanh toan chua ho tro');
+    if (amount < min || amount > max) throw new BadRequestException(`Số tiền phải từ ${min} đến ${max} VND`);
+    if (!['BANK_TRANSFER', 'PAYOS'].includes(paymentMethod)) throw new BadRequestException('Phương thức thanh toán chưa hỗ trợ');
     const wallet = await this.wallet(userId);
     const ttlMinutes = paymentMethod === 'PAYOS'
       ? Number(this.config.get('PAYOS_PAYMENT_TTL_MINUTES', 15))
@@ -82,7 +82,7 @@ export class WalletService {
         if ((error as { code?: string }).code !== 'P2002' || attempt === 4) throw error;
       }
     }
-    if (!topUp) throw new ConflictException('Khong the tao ma giao dich, vui long thu lai');
+    if (!topUp) throw new ConflictException('Không thể tạo mã giao dịch, vui lòng thử lại');
     const response: any = {
       transactionId: topUp.id,
       amount: amount,
@@ -95,7 +95,7 @@ export class WalletService {
       expiresAt: topUp.expiresAt,
     };
     if (paymentMethod === 'PAYOS') {
-      if (!this.payos.isConfigured()) throw new BadRequestException('PayOS chua duoc cau hinh');
+      if (!this.payos.isConfigured()) throw new BadRequestException('PayOS chưa được cấu hình');
       const orderCode = Date.now();
       const data = await this.payos.createPaymentLink({ orderCode, amount, description: `Nap vi ${referenceCode}`, reference: referenceCode });
       await this.prisma.topUpTransaction.update({ where: { id: topUp.id }, data: { providerTransactionId: String(orderCode) } });
@@ -115,7 +115,7 @@ export class WalletService {
   async processPayosWebhook(body: Record<string, unknown>, otherwise?: (body: Record<string, unknown>) => Promise<unknown>) {
     const data: any = this.payos.verifyWebhook(body as any);
     const orderCode = data.orderCode != null ? String(data.orderCode) : null;
-    if (!orderCode) throw new BadRequestException('Webhook PayOS thieu orderCode');
+    if (!orderCode) throw new BadRequestException('Webhook PayOS thiếu orderCode');
     const topUp = await this.prisma.topUpTransaction.findFirst({ where: { providerTransactionId: orderCode, paymentMethod: 'PAYOS' } });
     // Not a top-up: a booking payment, or the signed sample event PayOS sends when the webhook URL is saved (it is in
     // neither table and must still get a 2xx so PayOS can finish the verification).
@@ -125,7 +125,7 @@ export class WalletService {
     const success = String(body.code ?? '') === '00' && body.success === true;
     if (!success) {
       const failureCode = String(body.code ?? 'PAYOS_FAILED');
-      const failureMessage = String(body.desc ?? 'Thanh toan PayOS that bai');
+      const failureMessage = String(body.desc ?? 'Thanh toán PayOS thất bại');
       const failed = await this.prisma.topUpTransaction.updateMany({
         where: { id: topUp.id, status: { in: ['PENDING_PAYMENT', 'PROCESSING'] } },
         data: { status: 'FAILED', failureCode, failureMessage, processedAt: new Date() },
@@ -133,7 +133,7 @@ export class WalletService {
       return { ok: true, status: failed.count ? 'FAILED' : topUp.status };
     }
     if (Number(data.amount) !== topUp.amountVnd)
-      throw new ConflictException('So tien webhook PayOS khong khop giao dich');
+      throw new ConflictException('Số tiền webhook PayOS không khớp giao dịch');
     return this.simulateInternal(topUp.id);
   }
 
@@ -141,7 +141,7 @@ export class WalletService {
     const result = await this.prisma.$transaction(async (tx) => {
       const topUp = await tx.topUpTransaction.findUniqueOrThrow({ where: { id } });
       if (topUp.status === 'SUCCESS') return topUp;
-      if (['FAILED', 'EXPIRED', 'CANCELLED'].includes(topUp.status)) throw new ConflictException('Giao dich khong the cap nhat');
+      if (['FAILED', 'EXPIRED', 'CANCELLED'].includes(topUp.status)) throw new ConflictException('Giao dịch không thể cập nhật');
       const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: topUp.walletId } });
       const updated = await tx.wallet.update({ where: { id: wallet.id }, data: { balanceVnd: { increment: topUp.amountVnd } } });
       await tx.walletLedgerEntry.create({ data: { walletId: wallet.id, topUpId: topUp.id, type: 'TOP_UP', amountVnd: topUp.amountVnd, balanceBeforeVnd: wallet.balanceVnd, balanceAfterVnd: updated.balanceVnd, referenceType: 'TOP_UP', referenceId: topUp.id } });
@@ -164,14 +164,14 @@ export class WalletService {
   }
   async detail(userId: string, id: string) {
     let item = await this.prisma.topUpTransaction.findFirst({ where: { id, userId } });
-    if (!item) throw new NotFoundException('Giao dich khong ton tai');
+    if (!item) throw new NotFoundException('Giao dịch không tồn tại');
     if (item.status === 'PENDING_PAYMENT' && item.expiresAt <= new Date()) {
       const expired = await this.prisma.topUpTransaction.updateMany({
         where: { id: item.id, status: 'PENDING_PAYMENT', expiresAt: { lte: new Date() } },
         data: {
           status: 'EXPIRED',
           failureCode: 'EXPIRED',
-          failureMessage: 'Giao dich het han thanh toan',
+          failureMessage: 'Giao dịch hết hạn thanh toán',
           processedAt: new Date(),
         },
       });
@@ -218,7 +218,7 @@ export class WalletService {
     });
     if (item) return this.transactionResponse(item);
     const topUp = await this.prisma.topUpTransaction.findFirst({ where: { id, walletId: wallet.id } });
-    if (!topUp) throw new NotFoundException('Giao dich khong ton tai');
+    if (!topUp) throw new NotFoundException('Giao dịch không tồn tại');
     return this.pendingTopUpResponse(topUp);
   }
   private transactionResponse(item: any) {
@@ -267,7 +267,7 @@ export class WalletService {
     if (this.config.get('NODE_ENV') === 'production') throw new ForbiddenException('Simulation bi tat tren production');
     const result = await this.prisma.$transaction(async (tx) => {
       const topUp = await tx.topUpTransaction.findUnique({ where: { id } });
-      if (!topUp) throw new NotFoundException('Giao dich khong ton tai');
+      if (!topUp) throw new NotFoundException('Giao dịch không tồn tại');
       if (topUp.status === 'SUCCESS' || topUp.status === 'FAILED' || topUp.status === 'EXPIRED')
         return { topUp, notify: null };
       if (!success)
@@ -277,7 +277,7 @@ export class WalletService {
             data: {
               status: 'FAILED',
               failureCode: 'SIMULATED_FAILURE',
-              failureMessage: reason ?? 'Giao dich that bai',
+              failureMessage: reason ?? 'Giao dịch thất bại',
               processedAt: new Date(),
             },
           }),
@@ -327,7 +327,7 @@ export class WalletService {
       where: { id, status: 'PENDING_PAYMENT' },
       data: { status: 'PROCESSING' },
     });
-    if (!result.count) throw new ConflictException('Giao dich khong o trang thai cho thanh toan');
+    if (!result.count) throw new ConflictException('Giao dịch không ở trạng thái chờ thanh toán');
     return this.prisma.topUpTransaction.findUniqueOrThrow({ where: { id } });
   }
 
@@ -382,7 +382,7 @@ export class WalletService {
       where: { id },
       include: { wallet: true, ledgerEntries: true },
     });
-    if (!item) throw new NotFoundException('Giao dich khong ton tai');
+    if (!item) throw new NotFoundException('Giao dịch không tồn tại');
     return item;
   }
 }

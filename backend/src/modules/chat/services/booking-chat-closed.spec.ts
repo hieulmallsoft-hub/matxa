@@ -29,7 +29,7 @@ describe('chat of a cancelled booking', () => {
   it.each(['CANCELLED', 'EXPIRED'])('refuses new messages once the booking is %s', async (status) => {
     const { service, prisma } = subject(status);
     await expect(service.sendMessage('ff-user', 'conversation-1', { type: 'TEXT', text: 'Chao ban' } as any)).rejects.toThrow(
-      new ForbiddenException('Don da ket thuc, cuoc tro chuyen chi con xem lai'),
+      new ForbiddenException('Đơn đã kết thúc, cuộc trò chuyện chỉ còn xem lại'),
     );
     expect(prisma.message.create).not.toHaveBeenCalled();
   });

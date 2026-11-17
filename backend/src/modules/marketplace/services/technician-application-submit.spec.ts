@@ -25,7 +25,7 @@ describe('submitting a technician application', () => {
       .catch((caught) => caught);
     expect(error).toBeInstanceOf(BadRequestException);
     expect(error.getResponse()).toMatchObject({
-      message: 'Ho so con thieu: anh CCCD mat sau, anh khuon mat',
+      message: 'Hồ sơ còn thiếu: ảnh CCCD mặt sau, ảnh khuôn mặt',
       missingFields: ['idCardBackKey', 'faceImageKey'],
     });
   });
@@ -47,6 +47,6 @@ describe('submitting a technician application', () => {
     const service = subject({});
     (service as any).prisma.userIdentity.findFirst.mockResolvedValue(null);
     const error = await service.submit('user-1').catch((caught) => caught);
-    expect(error.getResponse()).toMatchObject({ message: 'Ho so con thieu: so dien thoai', missingFields: ['phoneNumber'] });
+    expect(error.getResponse()).toMatchObject({ message: 'Hồ sơ còn thiếu: số điện thoại', missingFields: ['phoneNumber'] });
   });
 });

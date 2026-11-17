@@ -42,7 +42,7 @@ describe('user deletes their account', () => {
 
   it('asks an email account for its password', async () => {
     const { service, prisma } = await subject({ password: true });
-    await expect(service.deleteAccount('user-1')).rejects.toThrow(new BadRequestException('Mat khau khong dung'));
+    await expect(service.deleteAccount('user-1')).rejects.toThrow(new BadRequestException('Mật khẩu không đúng'));
     await expect(service.deleteAccount('user-1', 'wrong')).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
     await expect(service.deleteAccount('user-1', 'secret-pass1')).resolves.toEqual({ deleted: true });

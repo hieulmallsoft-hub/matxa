@@ -174,8 +174,8 @@ describe('creating a booking for a chosen technician', () => {
 
   it('rejects the booking when the chosen technician cannot take it, so the customer is not left waiting', async () => {
     const { service, prisma, dto } = setup();
-    jest.spyOn(service as any, 'assertOpenEligibility').mockRejectedValue(new Error('KTV khong ranh trong khung gio nay'));
-    await expect(service.createOpen('customer-1', dto, 'busy-profile')).rejects.toThrow('KTV khong ranh trong khung gio nay');
+    jest.spyOn(service as any, 'assertOpenEligibility').mockRejectedValue(new Error('KTV không rảnh trong khung giờ này'));
+    await expect(service.createOpen('customer-1', dto, 'busy-profile')).rejects.toThrow('KTV không rảnh trong khung giờ này');
     expect(prisma.booking.create).not.toHaveBeenCalled();
   });
 

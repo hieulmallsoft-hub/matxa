@@ -81,7 +81,7 @@ export class AuthService {
     const user = await this.upsertAppleUser(identity, fullName);
     if (user.status === 'BLOCKED') throw accountBlocked(user);
     if (user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Tai khoan khong con hoat dong');
+      throw new UnauthorizedException('Tài khoản không còn hoạt động');
     }
     return this.createSession(user, metadata, 'apple.com');
   }
@@ -119,7 +119,7 @@ export class AuthService {
       !passwordOk ||
       identity.user.status !== 'ACTIVE'
     ) {
-      throw new UnauthorizedException('Email hoac mat khau khong dung');
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
     return this.createSession(identity.user, metadata, 'email');
   }
@@ -168,11 +168,11 @@ export class AuthService {
       where: { userId, provider: DbAuthProvider.EMAIL },
       select: { id: true, passwordHash: true },
     });
-    if (!identity?.passwordHash) throw new BadRequestException('Tai khoan khong dang nhap bang mat khau');
+    if (!identity?.passwordHash) throw new BadRequestException('Tài khoản không đăng nhập bằng mật khẩu');
     // 400 rather than 401: a wrong current password must not look like an expired session.
     if (!(await this.verifyPassword(currentPassword, identity.passwordHash)))
-      throw new BadRequestException('Mat khau hien tai khong dung');
-    if (currentPassword === newPassword) throw new BadRequestException('Mat khau moi phai khac mat khau hien tai');
+      throw new BadRequestException('Mật khẩu hiện tại không đúng');
+    if (currentPassword === newPassword) throw new BadRequestException('Mật khẩu mới phải khác mật khẩu hiện tại');
     const passwordHash = await this.hashPassword(newPassword);
     const others = await this.prisma.session.findMany({
       where: { userId, revokedAt: null, id: { not: sessionId } },
@@ -197,7 +197,7 @@ export class AuthService {
   async loginWithFirebasePhone(idToken: string, metadata: ClientMetadata): Promise<AuthResponse> {
     const token = await this.verifyFirebaseToken(idToken, 'phone');
     if (!token.phone_number) {
-      throw new UnauthorizedException('Firebase token khong chua so dien thoai da xac minh');
+      throw new UnauthorizedException('Firebase token không chứa số điện thoại đã xác minh');
     }
 
     const user = await this.upsertPhoneUser(token.phone_number);
@@ -223,7 +223,7 @@ export class AuthService {
       ]);
 
       if (owner && owner.userId !== userId) {
-        throw new ConflictException('So dien thoai da lien ket voi tai khoan khac');
+        throw new ConflictException('Số điện thoại đã liên kết với tài khoản khác');
       }
       if (!owner && !currentPhone) {
         await transaction.userIdentity.create({
@@ -266,7 +266,7 @@ export class AuthService {
     });
 
     if (!session || !this.matchesRefreshSecret(secret, session.refreshTokenHash)) {
-      throw new UnauthorizedException('Refresh token khong hop le');
+      throw new UnauthorizedException('Refresh token không hợp lệ');
     }
 
     // Blocking signs every device out; say so rather than "refresh token reused".
@@ -277,11 +277,11 @@ export class AuthService {
         where: { userId: session.userId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
-      throw new UnauthorizedException('Phat hien refresh token da duoc su dung lai');
+      throw new UnauthorizedException('Phát hiện refresh token đã được sử dụng lại');
     }
 
     if (session.expiresAt <= new Date() || session.user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Phien dang nhap da het han');
+      throw new UnauthorizedException('Phiên đăng nhập đã hết hạn');
     }
 
     const nextSessionId = randomUUID();
@@ -298,7 +298,7 @@ export class AuthService {
       });
 
       if (revoked.count !== 1) {
-        throw new UnauthorizedException('Refresh token da duoc su dung');
+        throw new UnauthorizedException('Refresh token đã được sử dụng');
       }
 
       await transaction.session.create({
@@ -324,7 +324,7 @@ export class AuthService {
     });
 
     if (!user || user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Tai khoan khong con hoat dong');
+      throw new UnauthorizedException('Tài khoản không còn hoạt động');
     }
 
     // A suspended account still signs in; the apps show until when it cannot book or take jobs.
@@ -367,10 +367,10 @@ export class AuthService {
         wallets: { select: { balanceVnd: true } },
       },
     });
-    if (!user || user.status === 'DELETED') throw new UnauthorizedException('Tai khoan khong con hoat dong');
+    if (!user || user.status === 'DELETED') throw new UnauthorizedException('Tài khoản không còn hoạt động');
     const passwordHash = user.identities.find((item) => item.provider === DbAuthProvider.EMAIL && item.passwordHash)?.passwordHash;
     if (passwordHash && !(password && (await this.verifyPassword(password, passwordHash))))
-      throw new BadRequestException('Mat khau khong dung');
+      throw new BadRequestException('Mật khẩu không đúng');
     const activeBookings = await this.prisma.booking.count({
       where: {
         status: { in: ['OPEN', 'PENDING', 'CONFIRMED'] },
@@ -381,7 +381,7 @@ export class AuthService {
       throw new ConflictException({
         statusCode: 409,
         code: 'ACTIVE_BOOKINGS',
-        message: `Con ${activeBookings} don dang dien ra. Hoan thanh hoac huy truoc khi xoa tai khoan`,
+        message: `Còn ${activeBookings} đơn đang diễn ra. Hoàn thành hoặc hủy trước khi xóa tài khoản`,
         activeBookings,
       });
     const walletBalanceVnd = user.wallets.reduce((sum, wallet) => sum + wallet.balanceVnd, 0);
@@ -389,7 +389,7 @@ export class AuthService {
       throw new ConflictException({
         statusCode: 409,
         code: 'WALLET_NOT_EMPTY',
-        message: `Vi con ${walletBalanceVnd.toLocaleString('vi-VN')}d. Lien he CSKH de xu ly truoc khi xoa tai khoan`,
+        message: `Ví còn ${walletBalanceVnd.toLocaleString('vi-VN')}đ. Liên hệ CSKH để xử lý trước khi xóa tài khoản`,
         walletBalanceVnd,
       });
     const now = new Date();
@@ -447,11 +447,11 @@ export class AuthService {
     try {
       token = await getAuth(this.firebaseApp).verifyIdToken(idToken, true);
     } catch {
-      throw new UnauthorizedException('Firebase ID token khong hop le');
+      throw new UnauthorizedException('Firebase ID token không hợp lệ');
     }
 
     if (token.firebase.sign_in_provider !== expectedProvider) {
-      throw new UnauthorizedException('Phuong thuc dang nhap khong hop le');
+      throw new UnauthorizedException('Phương thức đăng nhập không hợp lệ');
     }
     return token;
   }
@@ -575,7 +575,7 @@ export class AuthService {
       const existing = await transaction.userIdentity.findUnique({
         where: { provider_providerSubject: { provider: DbAuthProvider.EMAIL, providerSubject: email } },
       });
-      if (existing) throw new ConflictException('Email da duoc dang ky');
+      if (existing) throw new ConflictException('Email đã được đăng ký');
       const google = await transaction.userIdentity.findFirst({
         where: { provider: DbAuthProvider.GOOGLE, email, emailVerified: true },
       });
@@ -688,7 +688,7 @@ export class AuthService {
   private parseRefreshToken(token: string): { sessionId: string; secret: string } {
     const separator = token.indexOf('.');
     if (separator < 1 || separator === token.length - 1) {
-      throw new UnauthorizedException('Refresh token khong hop le');
+      throw new UnauthorizedException('Refresh token không hợp lệ');
     }
     return { sessionId: token.slice(0, separator), secret: token.slice(separator + 1) };
   }

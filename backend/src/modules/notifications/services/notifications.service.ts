@@ -141,7 +141,7 @@ export class NotificationsService {
 
   async markRead(userId: string, id: string) {
     const result = await this.prisma.notification.updateMany({ where: { id, userId }, data: { readAt: new Date() } });
-    if (result.count === 0) throw new NotFoundException('Thong bao khong ton tai');
+    if (result.count === 0) throw new NotFoundException('Thông báo không tồn tại');
     return this.prisma.notification.findUniqueOrThrow({ where: { id } });
   }
 
@@ -155,7 +155,7 @@ export class NotificationsService {
 
   async remove(userId: string, id: string): Promise<void> {
     const result = await this.prisma.notification.deleteMany({ where: { id, userId } });
-    if (result.count === 0) throw new NotFoundException('Thong bao khong ton tai');
+    if (result.count === 0) throw new NotFoundException('Thông báo không tồn tại');
   }
 
   async removeAll(userId: string) {

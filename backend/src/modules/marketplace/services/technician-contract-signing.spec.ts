@@ -78,7 +78,7 @@ describe('signing the contract while applying', () => {
 
   it('does not submit when the signature was never uploaded', async () => {
     const { applications, prisma } = await subject({ signatureMissing: true });
-    await expect(applications.submit('user-1', meta)).rejects.toThrow(new BadRequestException('Chua tai anh chu ky len'));
+    await expect(applications.submit('user-1', meta)).rejects.toThrow(new BadRequestException('Chưa tải ảnh chữ ký lên'));
     expect(prisma.technicianApplication.update).not.toHaveBeenCalled();
   });
 
@@ -86,7 +86,7 @@ describe('signing the contract while applying', () => {
     const { applications } = await subject();
     await expect(
       applications.submit('user-1', { ...meta, signatureKey: 'technician-contracts/user-2/signatures/s.png' }),
-    ).rejects.toThrow(new BadRequestException('Chu ky khong hop le'));
+    ).rejects.toThrow(new BadRequestException('Chữ ký không hợp lệ'));
   });
 
   it('only lets an applicant upload a signature while the application can still change', async () => {

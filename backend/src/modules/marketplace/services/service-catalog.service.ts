@@ -42,7 +42,7 @@ export class ServiceCatalogService {
       where: { userId },
       select: { id: true, serviceModes: true },
     });
-    if (!profile) throw new NotFoundException('Tai khoan chua co ho so ky thuat vien');
+    if (!profile) throw new NotFoundException('Tài khoản chưa có hồ sơ kỹ thuật viên');
 
     const items = await this.prisma.serviceCatalogItem.findMany({
       where: { isActive: true, category: { isActive: true } },
@@ -155,7 +155,7 @@ export class ServiceCatalogService {
 
   async update(id: string, dto: UpdateServiceCatalogDto) {
     const current = await this.prisma.serviceCatalogItem.findUnique({ where: { id }, include: { priceOptions: true } });
-    if (!current) throw new NotFoundException('Catalog service khong ton tai');
+    if (!current) throw new NotFoundException('Dịch vụ không tồn tại');
     if (dto.categoryId) await this.category(dto.categoryId);
     const options =
       dto.priceOptions ??
@@ -223,12 +223,12 @@ export class ServiceCatalogService {
    */
   async remove(id: string) {
     const item = await this.prisma.serviceCatalogItem.findUnique({ where: { id }, select: { id: true } });
-    if (!item) throw new NotFoundException('Catalog service khong ton tai');
+    if (!item) throw new NotFoundException('Dịch vụ không tồn tại');
     const booked = await this.prisma.bookingItem.count({
       where: { OR: [{ catalogServiceId: id }, { service: { catalogServiceId: id } }] },
     });
     if (booked)
-      throw new ConflictException(`Dich vu da co trong ${booked} don dat lich nen khong xoa duoc (de giu lich su don). Hay dung "An".`);
+      throw new ConflictException(`Dịch vụ đã có trong ${booked} đơn đặt lịch nên không xóa được (để giữ lịch sử đơn). Hãy dùng "Ẩn".`);
     await this.prisma.$transaction([
       this.prisma.technicianService.deleteMany({ where: { catalogServiceId: id } }),
       this.prisma.serviceCatalogItem.delete({ where: { id } }),
@@ -237,7 +237,7 @@ export class ServiceCatalogService {
 
   private async category(id: string) {
     const category = await this.prisma.serviceCategory.findUnique({ where: { id } });
-    if (!category) throw new BadRequestException('Category khong ton tai');
+    if (!category) throw new BadRequestException('Danh mục không tồn tại');
     return category;
   }
   // Only packages on sale count: a switched-off one kept for past bookings must not block later edits.

@@ -52,7 +52,7 @@ export class ChatService {
     // New customer/KTV conversations must be created through the booking
     // endpoint. Legacy rows remain readable, but this route must not create a
     // private channel before an assignment exists.
-    throw new BadRequestException('Chi ho tro tao chat theo booking');
+    throw new BadRequestException('Chỉ hỗ trợ tạo chat theo đơn');
   }
 
   /** An admin opens the thread of a chosen customer; a customer opens their own. */
@@ -60,16 +60,16 @@ export class ChatService {
     const actor = await this.prisma.user.findUnique({ where: { id: actorId }, select: { role: true, status: true } });
     // Technicians get the same "Hỗ trợ nhanh" thread as customers; the thread is keyed by whoever asks for help.
     if (actor?.status !== 'ACTIVE' || !['ADMIN', ...SUPPORT_REQUESTER_ROLES].includes(actor.role))
-      throw new ForbiddenException('Chi admin, khach hang hoac KTV duoc mo hoi thoai ho tro');
+      throw new ForbiddenException('Chỉ admin, khách hàng hoặc KTV được mở hội thoại hỗ trợ');
     const isAdmin = actor.role === 'ADMIN';
     // A customer can only open their own thread, whatever customerId the body carries.
     const customerId = isAdmin ? requestedCustomerId : actorId;
-    if (!customerId) throw new BadRequestException('Vui long chon khach hang');
+    if (!customerId) throw new BadRequestException('Vui lòng chọn khách hàng');
     const customer = await this.prisma.user.findUnique({
       where: { id: customerId }, select: { id: true, role: true, status: true, displayName: true, avatarUrl: true },
     });
     if (!customer || !SUPPORT_REQUESTER_ROLES.includes(customer.role) || customer.status !== 'ACTIVE')
-      throw new BadRequestException('Vui long chon khach hang hoac KTV dang hoat dong');
+      throw new BadRequestException('Vui lòng chọn khách hàng hoặc KTV đang hoạt động');
     const conversation = await this.prisma.$transaction(async (tx) => {
       // A unique customer key makes reopening and concurrent creation idempotent.
       const thread = await tx.conversation.upsert({
@@ -101,7 +101,7 @@ export class ChatService {
       where: { id: venueId, isActive: true, deletedAt: null },
       select: { name: true, address: true },
     });
-    if (!venue) throw new NotFoundException('Khong tim thay dia diem');
+    if (!venue) throw new NotFoundException('Không tìm thấy địa điểm');
     return `Mình muốn đặt lịch tại ${venue.name} (${venue.address}).`;
   }
 
@@ -302,12 +302,12 @@ export class ChatService {
   async ensureCanWrite(userId: string, conversationId: string) {
     const access = await this.ensureAccess(userId, conversationId);
     if (access.bookingStatus && CLOSED_BOOKING_STATUSES.includes(access.bookingStatus))
-      throw new ForbiddenException('Don da ket thuc, cuoc tro chuyen chi con xem lai');
+      throw new ForbiddenException('Đơn đã kết thúc, cuộc trò chuyện chỉ còn xem lại');
     if (access.conversation.endedAt)
       throw new ForbiddenException({
         statusCode: 403,
         code: 'SUPPORT_ENDED',
-        message: 'Phien ho tro da ket thuc, bam Chat ngay de mo cuoc tro chuyen moi',
+        message: 'Phiên hỗ trợ đã kết thúc, bấm Chat ngay để mở cuộc trò chuyện mới',
       });
     return access;
   }
@@ -373,9 +373,9 @@ export class ChatService {
 
   async editMessage(userId: string, messageId: string, dto: EditMessageDto) {
     const message = await this.ownEditableMessage(userId, messageId);
-    if (message.type !== 'TEXT') throw new BadRequestException('Chi co the sua tin nhan van ban');
+    if (message.type !== 'TEXT') throw new BadRequestException('Chỉ có thể sửa tin nhắn văn bản');
     const text = dto.text.trim();
-    if (!text) throw new BadRequestException('Noi dung tin nhan khong duoc de trong');
+    if (!text) throw new BadRequestException('Nội dung tin nhắn không được để trống');
     return this.prisma.message.update({ where: { id: messageId }, data: { text, editedAt: new Date() } });
   }
 
@@ -459,9 +459,9 @@ export class ChatService {
           create: { conversationId, userId }, update: {},
         });
       }
-      if (threadOwner(conversation) !== userId) throw new ForbiddenException('Ban khong thuoc hoi thoai ho tro nay');
+      if (threadOwner(conversation) !== userId) throw new ForbiddenException('Bạn không thuộc hội thoại hỗ trợ này');
     }
-    if (!member) throw new ForbiddenException('Ban khong thuoc cuoc tro chuyen nay');
+    if (!member) throw new ForbiddenException('Bạn không thuộc cuộc trò chuyện này');
     if (conversation?.bookingId) {
       const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
       if (user?.role !== 'ADMIN') await this.bookingChatContext(userId, conversation.bookingId);
@@ -475,10 +475,10 @@ export class ChatService {
       this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } }),
       this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { id: true, bookingId: true, type: true, supportCustomerId: true, customerId: true, endedAt: true } }),
     ]);
-    if (!conversation) throw new NotFoundException('Cuoc tro chuyen khong ton tai');
-    if (!member && user?.role !== 'ADMIN') throw new ForbiddenException('Ban khong co quyen xem cuoc tro chuyen');
+    if (!conversation) throw new NotFoundException('Cuộc trò chuyện không tồn tại');
+    if (!member && user?.role !== 'ADMIN') throw new ForbiddenException('Bạn không có quyền xem cuộc trò chuyện');
     if (ADMIN_THREAD_TYPES.includes(conversation.type) && user?.role !== 'ADMIN' && threadOwner(conversation) !== userId)
-      throw new ForbiddenException('Ban khong thuoc hoi thoai ho tro nay');
+      throw new ForbiddenException('Bạn không thuộc hội thoại hỗ trợ này');
     const booking =
       member && user?.role !== 'ADMIN' && conversation.bookingId
         ? await this.bookingChatContext(userId, conversation.bookingId)
@@ -491,12 +491,12 @@ export class ChatService {
       throw new BadRequestException('Mobile khong duoc gui system message');
     }
     if (dto.type === 'TEXT' && !dto.text?.trim())
-      throw new BadRequestException('Noi dung tin nhan khong duoc de trong');
+      throw new BadRequestException('Nội dung tin nhắn không được để trống');
     if (dto.type === 'IMAGE' && !dto.mediaKey?.startsWith(`chat/${conversationId}/${userId}/`)) {
-      throw new BadRequestException('Anh khong hop le hoac khong thuoc cuoc tro chuyen');
+      throw new BadRequestException('Ảnh không hợp lệ hoặc không thuộc cuộc trò chuyện');
     }
     if (dto.type === 'LOCATION' && (dto.latitude === undefined || dto.longitude === undefined)) {
-      throw new BadRequestException('Tin vi tri phai co latitude va longitude');
+      throw new BadRequestException('Tin vị trí phải có latitude và longitude');
     }
   }
 
@@ -558,33 +558,33 @@ export class ChatService {
       },
     });
     if (!booking?.technician || !booking.technicianId) {
-      throw new ForbiddenException('Chi co the chat sau khi don da duoc gan KTV');
+      throw new ForbiddenException('Chỉ có thể chat sau khi đơn đã có KTV');
     }
     // An online booking's chat opens once the customer paid, so the two cannot agree to skip the payment.
     if (isAwaitingPayment(booking)) {
-      throw new ForbiddenException({ statusCode: 403, code: 'PAYMENT_REQUIRED', message: 'Chat mo sau khi khach thanh toan' });
+      throw new ForbiddenException({ statusCode: 403, code: 'PAYMENT_REQUIRED', message: 'Chat mở sau khi khách thanh toán' });
     }
     const isCustomer = booking.customerId === userId;
     const isAssignedTechnician = booking.technician.userId === userId;
     if (!isCustomer && !isAssignedTechnician) {
-      throw new ForbiddenException('Ban khong co quyen chat cho don nay');
+      throw new ForbiddenException('Bạn không có quyền chat cho đơn này');
     }
     if (
       booking.assignmentMode === 'OPEN_MARKETPLACE' &&
       !booking.applications.some((item) => item.technicianProfileId === booking.technicianId)
     ) {
-      throw new ForbiddenException('KTV chua duoc chon cho don nay');
+      throw new ForbiddenException('KTV chưa được chọn cho đơn này');
     }
     return booking;
   }
 
   private async ownEditableMessage(userId: string, messageId: string) {
     const message = await this.prisma.message.findUnique({ where: { id: messageId } });
-    if (!message) throw new NotFoundException('Tin nhan khong ton tai');
-    if (message.senderId !== userId) throw new ForbiddenException('Chi nguoi gui moi co the thay doi tin nhan');
-    if (message.recalledAt) throw new BadRequestException('Tin nhan da duoc thu hoi');
+    if (!message) throw new NotFoundException('Tin nhắn không tồn tại');
+    if (message.senderId !== userId) throw new ForbiddenException('Chỉ người gửi mới có thể thay đổi tin nhắn');
+    if (message.recalledAt) throw new BadRequestException('Tin nhắn đã được thu hồi');
     if (Date.now() - message.createdAt.getTime() > EDIT_WINDOW_MS)
-      throw new BadRequestException('Da qua 15 phut de sua hoac thu hoi');
+      throw new BadRequestException('Đã quá 15 phút để sửa hoặc thu hồi');
     return message;
   }
 

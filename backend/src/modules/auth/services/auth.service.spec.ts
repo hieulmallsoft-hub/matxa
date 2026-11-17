@@ -122,7 +122,7 @@ describe('AuthService', () => {
     transaction.userIdentity.findUnique.mockResolvedValue({ id: 'existing' });
     await expect(
       service.completeEmailRegistration('registration', 'password123', { deviceId: 'device' }),
-    ).rejects.toThrow('Email da duoc dang ky');
+    ).rejects.toThrow('Email đã được đăng ký');
     expect(prisma.session.create).not.toHaveBeenCalled();
   });
 
@@ -294,9 +294,9 @@ describe('AuthService', () => {
   });
 
   it('rejects an invalid Google ID token', async () => {
-    googleTokenVerifier.verify.mockRejectedValue(new Error('Google ID token khong hop le'));
+    googleTokenVerifier.verify.mockRejectedValue(new Error('Google ID token không hợp lệ'));
 
-    await expect(service.loginWithGoogle('firebase-token', {})).rejects.toThrow('Google ID token khong hop le');
+    await expect(service.loginWithGoogle('firebase-token', {})).rejects.toThrow('Google ID token không hợp lệ');
   });
 
   it('creates a local session after a valid Firebase Phone login', async () => {
@@ -329,7 +329,7 @@ describe('AuthService', () => {
     });
 
     await expect(service.loginWithFirebasePhone('firebase-token', {})).rejects.toThrow(
-      'Firebase token khong chua so dien thoai da xac minh',
+      'Firebase token không chứa số điện thoại đã xác minh',
     );
   });
 
@@ -359,7 +359,7 @@ describe('AuthService', () => {
     });
 
     await expect(service.linkVerifiedPhone('user-id', 'challenge-id', '123456', 'device-1')).rejects.toThrow(
-      'So dien thoai da lien ket voi tai khoan khac',
+      'Số điện thoại đã liên kết với tài khoản khác',
     );
   });
 

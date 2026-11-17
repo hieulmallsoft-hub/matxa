@@ -33,10 +33,10 @@ const PHOTO_LIMITS = { GALLERY: 6, CERTIFICATE: 2 } as const;
 
 /** What a technician must provide before submitting, with the label shown when it is missing. */
 const REQUIRED_FOR_SUBMIT = [
-  ['displayName', 'ho ten'],
-  ['idCardFrontKey', 'anh CCCD mat truoc'],
-  ['idCardBackKey', 'anh CCCD mat sau'],
-  ['faceImageKey', 'anh khuon mat'],
+  ['displayName', 'họ tên'],
+  ['idCardFrontKey', 'ảnh CCCD mặt trước'],
+  ['idCardBackKey', 'ảnh CCCD mặt sau'],
+  ['faceImageKey', 'ảnh khuôn mặt'],
 ] as const;
 
 @Injectable()
@@ -81,35 +81,35 @@ export class TechnicianApplicationsService {
   }
   async updateMine(userId: string, dto: UpdateTechnicianApplicationDto) {
     if (dto.displayName !== undefined && !dto.displayName.trim())
-      throw new BadRequestException('Ho ten khong duoc de trong');
+      throw new BadRequestException('Họ tên không được để trống');
     const { idCardQr, ...fields } = dto;
     const idCard = idCardQr === undefined ? undefined : parseIdCardQr(idCardQr);
-    if (idCard === null) throw new BadRequestException('Ma QR CCCD khong hop le, vui long quet lai');
+    if (idCard === null) throw new BadRequestException('Mã QR CCCD không hợp lệ, vui lòng quét lại');
     const current = await this.prisma.technicianApplication.upsert({
       where: { userId },
       create: { userId },
       update: {},
     });
     if (current.status === 'SUBMITTED' || current.status === 'UNDER_REVIEW' || current.status === 'APPROVED')
-      throw new ConflictException('Ho so dang cho duyet hoac da duoc duyet');
+      throw new ConflictException('Hồ sơ đang chờ duyệt hoặc đã được duyệt');
     const keys = ['idCardFrontKey', 'idCardBackKey', 'faceImageKey'] as const;
     for (const key of keys)
       if (dto[key] !== undefined && !dto[key]!.startsWith(`technician-applications/${userId}/`))
-        throw new BadRequestException('Document key khong hop le');
+        throw new BadRequestException('Document key không hợp lệ');
     const modes = dto.supportedModes ?? current.supportedModes;
     // A switched-off "nơi phục vụ" cannot be newly chosen; ones the technician already had are kept.
     if (dto.supportedModes) {
       const enabled = await readEnabledServiceModes(this.prisma);
       const added = dto.supportedModes.filter((mode) => !current.supportedModes.includes(mode) && !(enabled as string[]).includes(mode));
       if (added.length)
-        throw new BadRequestException({ code: 'SERVICE_MODE_DISABLED', message: 'Hinh thuc phuc vu nay dang tam dung', modes: added });
+        throw new BadRequestException({ code: 'SERVICE_MODE_DISABLED', message: 'Hình thức phục vụ này đang tạm dừng', modes: added });
     }
     // Stored as codes ("HN"), whether the app sent the code or the name ("Hà Nội"); unknown values are rejected.
     const location = await resolveLocationCodes(this.prisma, dto.city ?? current.city, dto.district ?? current.district);
     if (modes.includes('ONSITE') && !(dto.facility ?? current.facility)?.trim())
-      throw new BadRequestException('Phuc vu tai co so can co thong tin co so');
+      throw new BadRequestException('Phục vụ tại cơ sở cần có thông tin cơ sở');
     if (modes.includes('ONSITE') && !(dto.address ?? current.address)?.trim())
-      throw new BadRequestException('Phuc vu tai co so can co dia chi');
+      throw new BadRequestException('Phục vụ tại cơ sở cần có địa chỉ');
     return this.prisma.technicianApplication.update({
       where: { userId },
       data: {
@@ -142,13 +142,13 @@ export class TechnicianApplicationsService {
    */
   async addGalleryImage(userId: string, storageKey: string, sortOrder = 0, kind: 'GALLERY' | 'CERTIFICATE' = 'GALLERY') {
     if (!storageKey.startsWith(`technician-applications/${userId}/gallery/`))
-      throw new BadRequestException('Gallery key khong hop le');
+      throw new BadRequestException('Gallery key không hợp lệ');
     const app = await this.prisma.technicianApplication.upsert({ where: { userId }, create: { userId }, update: {} });
     const limit = PHOTO_LIMITS[kind];
     const count = await this.prisma.technicianApplicationGalleryImage.count({
       where: { applicationId: app.id, kind, status: { not: 'REJECTED' } },
     });
-    if (count >= limit) throw new BadRequestException(`Toi da ${limit} ${kind === 'CERTIFICATE' ? 'anh chung chi' : 'anh ho so'}`);
+    if (count >= limit) throw new BadRequestException(`Tối đa ${limit} ${kind === 'CERTIFICATE' ? 'ảnh chứng chỉ' : 'ảnh hồ sơ'}`);
     const image = await this.prisma.technicianApplicationGalleryImage.create({
       data: { applicationId: app.id, storageKey, sortOrder, kind, status: 'PENDING' },
     });
@@ -190,12 +190,12 @@ export class TechnicianApplicationsService {
   }
 
   async reviewPhoto(id: string, status: 'APPROVED' | 'REJECTED', reason?: string) {
-    if (status === 'REJECTED' && !reason?.trim()) throw new BadRequestException('Can nhap ly do tu choi anh');
+    if (status === 'REJECTED' && !reason?.trim()) throw new BadRequestException('Cần nhập lý do từ chối ảnh');
     const photo = await this.prisma.technicianApplicationGalleryImage.findUnique({
       where: { id },
       select: { kind: true, application: { select: { userId: true } } },
     });
-    if (!photo) throw new NotFoundException('Anh khong ton tai');
+    if (!photo) throw new NotFoundException('Ảnh không tồn tại');
     const updated = await this.prisma.technicianApplicationGalleryImage.update({
       where: { id },
       data: { status, rejectionReason: status === 'REJECTED' ? reason!.trim() : null, reviewedAt: new Date() },
@@ -231,7 +231,7 @@ export class TechnicianApplicationsService {
     const result = await this.prisma.technicianApplicationGalleryImage.deleteMany({
       where: { id: imageId, application: { userId } },
     });
-    if (!result.count) throw new NotFoundException('Anh gallery khong ton tai');
+    if (!result.count) throw new NotFoundException('Ảnh thư viện không tồn tại');
   }
   /** `signature`: the hand-drawn signature uploaded just before, merged into the contract on submit. */
   async submit(
@@ -239,20 +239,20 @@ export class TechnicianApplicationsService {
     signature?: { signatureKey?: string; ip?: string | null; userAgent?: string | null; device?: string | null },
   ) {
     const app = await this.prisma.technicianApplication.findUnique({ where: { userId } });
-    if (!app) throw new NotFoundException('Chua co ho so dang ky');
+    if (!app) throw new NotFoundException('Chưa có hồ sơ đăng ký');
     // Say exactly what is missing; a generic "incomplete" left technicians guessing.
     const missingFields: Array<readonly [string, string]> = REQUIRED_FOR_SUBMIT.filter(([field]) => !String(app[field] ?? '').trim());
     // Customers call their technician, so an account signed in with Google/Apple/email must add a phone first.
     const phone = await this.prisma.userIdentity.findFirst({ where: { userId, phoneNumber: { not: null } }, select: { id: true } });
-    if (!phone) missingFields.push(['phoneNumber', 'so dien thoai']);
+    if (!phone) missingFields.push(['phoneNumber', 'số điện thoại']);
     if (missingFields.length)
       throw new BadRequestException({
         statusCode: 400,
         error: 'Bad Request',
-        message: `Ho so con thieu: ${missingFields.map(([, label]) => label).join(', ')}`,
+        message: `Hồ sơ còn thiếu: ${missingFields.map(([, label]) => label).join(', ')}`,
         missingFields: missingFields.map(([field]) => field),
       });
-    if (app.status === 'APPROVED') throw new ConflictException('Ho so da duoc duyet');
+    if (app.status === 'APPROVED') throw new ConflictException('Hồ sơ đã được duyệt');
     // Sign before submitting: a broken signature must not leave a submitted application without its contract.
     if (signature?.signatureKey && this.contracts)
       await this.contracts.signApplication(userId, signature.signatureKey, {
@@ -303,7 +303,7 @@ export class TechnicianApplicationsService {
         kyc: { include: { documents: true } },
       },
     });
-    if (!app) throw new NotFoundException('Ho so khong ton tai');
+    if (!app) throw new NotFoundException('Hồ sơ không tồn tại');
     // Older apps stored KYC keys on the application, newer ones as KYC documents; sign both.
     const keys = [
       app.idCardFrontKey,
@@ -321,9 +321,9 @@ export class TechnicianApplicationsService {
     return { ...withContact(app), signedKyc, signedGallery, contract };
   }
   async reviewKyc(adminId: string, id: string, status: 'VERIFIED' | 'REJECTED', reason?: string) {
-    if (status === 'REJECTED' && !reason?.trim()) throw new BadRequestException('Can nhap ly do tu choi KYC');
+    if (status === 'REJECTED' && !reason?.trim()) throw new BadRequestException('Cần nhập lý do từ chối KYC');
     const app = await this.prisma.technicianApplication.findUnique({ where: { id } });
-    if (!app) throw new NotFoundException('Ho so khong ton tai');
+    if (!app) throw new NotFoundException('Hồ sơ không tồn tại');
     const kyc = await this.prisma.technicianKyc.upsert({
       where: { applicationId: id },
       create: {
@@ -361,8 +361,8 @@ export class TechnicianApplicationsService {
   }
   async startReview(adminId: string, id: string) {
     const app = await this.prisma.technicianApplication.findUnique({ where: { id } });
-    if (!app) throw new NotFoundException('Ho so khong ton tai');
-    if (app.status !== 'SUBMITTED') throw new ConflictException('Ho so khong o trang thai da gui');
+    if (!app) throw new NotFoundException('Hồ sơ không tồn tại');
+    if (app.status !== 'SUBMITTED') throw new ConflictException('Hồ sơ không ở trạng thái đã gửi');
     const now = new Date();
     return this.prisma.technicianApplication.update({
       where: { id },
@@ -371,9 +371,9 @@ export class TechnicianApplicationsService {
   }
   async approve(adminId: string, id: string) {
     const app = await this.prisma.technicianApplication.findUnique({ where: { id } });
-    if (!app) throw new NotFoundException('Ho so khong ton tai');
+    if (!app) throw new NotFoundException('Hồ sơ không tồn tại');
     if (app.status !== 'SUBMITTED' && app.status !== 'UNDER_REVIEW')
-      throw new ConflictException('Ho so khong o trang thai cho duyet');
+      throw new ConflictException('Hồ sơ không ở trạng thái chờ duyệt');
     // Applications saved before codes were enforced may still hold a name ("Hà Nội"): publish the code instead.
     const location = await resolveLocationCodes(this.prisma, app.city, app.district).catch(() => ({ city: app.city, district: app.district }));
     const result = await this.prisma.$transaction(async (tx) => {
@@ -434,9 +434,9 @@ export class TechnicianApplicationsService {
   }
   async reject(adminId: string, id: string, reason: string) {
     const app = await this.prisma.technicianApplication.findUnique({ where: { id } });
-    if (!app) throw new NotFoundException('Ho so khong ton tai');
+    if (!app) throw new NotFoundException('Hồ sơ không tồn tại');
     if (app.status !== 'SUBMITTED' && app.status !== 'UNDER_REVIEW')
-      throw new ConflictException('Ho so khong o trang thai cho duyet');
+      throw new ConflictException('Hồ sơ không ở trạng thái chờ duyệt');
     const now = new Date();
     const result = await this.prisma.technicianApplication.update({
       where: { id },

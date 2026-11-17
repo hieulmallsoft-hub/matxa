@@ -99,7 +99,7 @@ describe('AppleTokenVerifierService', () => {
       { get: () => '' } as unknown as ConfigService,
       redis as unknown as RedisService,
     );
-    await expect(service.startLogin()).rejects.toThrow('Apple Sign In chua duoc cau hinh');
-    await expect(service.verify('token', 'nonce')).rejects.toThrow('Apple Sign In chua duoc cau hinh');
+    await expect(service.startLogin()).rejects.toThrow('Apple Sign In chưa được cấu hình');
+    await expect(service.verify('token', 'nonce')).rejects.toThrow('Apple Sign In chưa được cấu hình');
   });
 });

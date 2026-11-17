@@ -24,7 +24,7 @@ const number = (value: unknown) => Number(value ?? 0);
 
 /** Promotion.code is unique; surface a readable 409 instead of a Prisma 500. */
 const duplicatePromotionCode = (error: unknown): never => {
-  if ((error as { code?: string })?.code === 'P2002') throw new ConflictException('Ma khuyen mai da ton tai');
+  if ((error as { code?: string })?.code === 'P2002') throw new ConflictException('Mã khuyến mãi đã tồn tại');
   throw error;
 };
 
@@ -159,13 +159,13 @@ export class AdminMarketplaceService {
 
   async updateUserStatus(adminId: string, userId: string, dto: UpdateUserStatusDto) {
     if (adminId === userId && dto.status !== 'ACTIVE')
-      throw new BadRequestException('Khong the khoa tai khoan admin dang dang nhap');
+      throw new BadRequestException('Không thể khóa tài khoản admin đang đăng nhập');
     const blocking = dto.status === 'BLOCKED';
     const updated = await this.prisma.user.updateMany({
       where: { id: userId },
       data: { status: dto.status, blockedReason: blocking ? dto.reason!.trim() : null, blockedAt: blocking ? new Date() : null },
     });
-    if (!updated.count) throw new NotFoundException('Khong tim thay nguoi dung');
+    if (!updated.count) throw new NotFoundException('Không tìm thấy người dùng');
     // Signed out everywhere at once; the apps then get 403 ACCOUNT_BLOCKED with the reason.
     if (blocking) await this.prisma.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
     return this.prisma.user.findUnique({
@@ -320,11 +320,11 @@ export class AdminMarketplaceService {
 
   /** Admin suspends someone for a while (default: their next level's length). They can still sign in. */
   async suspendUser(adminId: string, userId: string, dto: { reason: string; hours?: number }) {
-    if (adminId === userId) throw new BadRequestException('Khong the tam khoa tai khoan admin dang dang nhap');
+    if (adminId === userId) throw new BadRequestException('Không thể tạm khóa tài khoản admin đang đăng nhập');
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
-    if (!user) throw new NotFoundException('Khong tim thay nguoi dung');
+    if (!user) throw new NotFoundException('Không tìm thấy người dùng');
     const rules = await this.suspensionRules();
-    if (await activeSuspension(this.prisma, userId)) throw new ConflictException('Nguoi dung dang bi tam khoa');
+    if (await activeSuspension(this.prisma, userId)) throw new ConflictException('Người dùng đang bị tạm khóa');
     const suspension = await suspend(this.prisma, userId, rules, { reason: dto.reason.trim(), source: 'ADMIN', createdById: adminId, hours: dto.hours });
     await this.notifyUser(userId, 'ACCOUNT_SUSPENDED', 'Tài khoản của bạn đang tạm khóa',
       `Lý do: ${suspension.reason}. Bạn chưa thể đặt/nhận đơn mới đến ${suspension.endsAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}.`);
@@ -337,7 +337,7 @@ export class AdminMarketplaceService {
       where: { userId, liftedAt: null, endsAt: { gt: new Date() } },
       data: { liftedAt: new Date() },
     });
-    if (!lifted.count) throw new NotFoundException('Nguoi dung khong bi tam khoa');
+    if (!lifted.count) throw new NotFoundException('Người dùng không bị tạm khóa');
     await this.notifyUser(userId, 'ACCOUNT_SUSPENSION_LIFTED', 'Tài khoản đã được mở lại', 'Bạn có thể đặt/nhận đơn như bình thường.');
     return { lifted: true };
   }
@@ -367,7 +367,7 @@ export class AdminMarketplaceService {
 
   async updateTechnician(id: string, dto: UpdateAdminTechnicianDto) {
     const before = await this.prisma.technicianProfile.findUnique({ where: { id }, select: { userId: true, isActive: true } });
-    if (!before) throw new NotFoundException('Khong tim thay ky thuat vien');
+    if (!before) throw new NotFoundException('Không tìm thấy kỹ thuật viên');
     const { hiddenReason, ...data } = dto;
     const hiding = dto.isActive === false;
     const showing = dto.isActive === true;
@@ -413,7 +413,7 @@ export class AdminMarketplaceService {
         },
       },
     });
-    if (!technician) throw new NotFoundException('Khong tim thay ky thuat vien');
+    if (!technician) throw new NotFoundException('Không tìm thấy kỹ thuật viên');
     return {
       ...technician,
       services: technician.services.map((service) => ({
@@ -436,7 +436,7 @@ export class AdminMarketplaceService {
         where: { id: optionId, technicianServiceId: serviceId, technicianService: { technicianId } },
         data: { price: dto.price },
       });
-      if (!updated.count) throw new NotFoundException('Khong tim thay goi gia cua ky thuat vien');
+      if (!updated.count) throw new NotFoundException('Không tìm thấy gói giá của kỹ thuật viên');
       // Keep the service's starting price aligned with its first active option, as the technician's own edit does.
       const primary = await tx.technicianServicePriceOption.findFirst({
         where: { technicianServiceId: serviceId, isActive: true },
@@ -485,18 +485,18 @@ export class AdminMarketplaceService {
   }
   async updateCategory(id: string, dto: UpdateCategoryDto) {
     const updated = await this.prisma.serviceCategory.updateMany({ where: { id }, data: dto });
-    if (!updated.count) throw new NotFoundException('Khong tim thay danh muc');
+    if (!updated.count) throw new NotFoundException('Không tìm thấy danh mục');
     return this.prisma.serviceCategory.findUnique({ where: { id } });
   }
   async deactivateCategory(id: string) {
     const updated = await this.prisma.serviceCategory.updateMany({ where: { id }, data: { isActive: false } });
-    if (!updated.count) throw new NotFoundException('Khong tim thay danh muc');
+    if (!updated.count) throw new NotFoundException('Không tìm thấy danh mục');
   }
 
   createBanner(_adminId: string, dto: CreateBannerDto) {
     const startsAt = dto.startsAt ? new Date(dto.startsAt) : undefined;
     const endsAt = dto.endsAt ? new Date(dto.endsAt) : undefined;
-    this.validateDates(startsAt, endsAt, 'Thoi gian banner khong hop le');
+    this.validateDates(startsAt, endsAt, 'Thời gian banner không hợp lệ');
     return this.prisma.homeBanner.create({ data: { ...dto, startsAt, endsAt } });
   }
   banners() {
@@ -504,15 +504,15 @@ export class AdminMarketplaceService {
   }
   async updateBanner(id: string, dto: UpdateBannerDto) {
     const current = await this.prisma.homeBanner.findUnique({ where: { id } });
-    if (!current) throw new NotFoundException('Khong tim thay banner');
+    if (!current) throw new NotFoundException('Không tìm thấy banner');
     const startsAt = dto.startsAt === undefined ? current.startsAt : new Date(dto.startsAt);
     const endsAt = dto.endsAt === undefined ? current.endsAt : new Date(dto.endsAt);
-    this.validateDates(startsAt, endsAt, 'Thoi gian banner khong hop le');
+    this.validateDates(startsAt, endsAt, 'Thời gian banner không hợp lệ');
     return this.prisma.homeBanner.update({ where: { id }, data: { ...dto, startsAt, endsAt } });
   }
   async removeBanner(id: string) {
     const deleted = await this.prisma.homeBanner.deleteMany({ where: { id } });
-    if (!deleted.count) throw new NotFoundException('Khong tim thay banner');
+    if (!deleted.count) throw new NotFoundException('Không tìm thấy banner');
   }
 
   createPromotion(_adminId: string, dto: CreatePromotionDto) {
@@ -534,7 +534,7 @@ export class AdminMarketplaceService {
   }
   async updatePromotion(id: string, dto: UpdatePromotionDto) {
     const current = await this.prisma.promotion.findUnique({ where: { id } });
-    if (!current) throw new NotFoundException('Khong tim thay khuyen mai');
+    if (!current) throw new NotFoundException('Không tìm thấy khuyến mãi');
     this.validatePromotion({
       ...current,
       ...dto,
@@ -575,8 +575,8 @@ export class AdminMarketplaceService {
   }
   private validatePromotion(dto: { startsAt: Date | string; endsAt: Date | string; type: string; value: number }) {
     if (new Date(dto.endsAt) <= new Date(dto.startsAt))
-      throw new BadRequestException('Thoi gian khuyen mai khong hop le');
+      throw new BadRequestException('Thời gian khuyến mãi không hợp lệ');
     if (dto.type === 'PERCENT' && dto.value > 100)
-      throw new BadRequestException('Phan tram khuyen mai khong duoc qua 100');
+      throw new BadRequestException('Phần trăm khuyến mãi không được quá 100');
   }
 }

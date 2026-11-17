@@ -33,7 +33,7 @@ describe('technician applies to an open booking', () => {
   it('rejects a technician whose wallet cannot cover the commission', async () => {
     const { service, prisma } = subject(99999);
     await expect(service.applyToOpenJob('tech-user-1', 'booking-1')).rejects.toThrow(
-      new ConflictException('So du vi khong du de nhan don'),
+      new ConflictException('Số dư ví không đủ để nhận đơn'),
     );
     expect(prisma.wallet.findUnique).toHaveBeenCalledWith({
       where: { userId_type: { userId: 'tech-user-1', type: 'ADVERTISING_CREDIT' } },
@@ -44,7 +44,7 @@ describe('technician applies to an open booking', () => {
 
   it('rejects a technician without a wallet', async () => {
     const { service } = subject(null);
-    await expect(service.applyToOpenJob('tech-user-1', 'booking-1')).rejects.toThrow('So du vi khong du de nhan don');
+    await expect(service.applyToOpenJob('tech-user-1', 'booking-1')).rejects.toThrow('Số dư ví không đủ để nhận đơn');
   });
 
   it('accepts a technician whose wallet covers the commission exactly', async () => {

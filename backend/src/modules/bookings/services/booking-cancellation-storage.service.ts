@@ -14,7 +14,7 @@ export class BookingCancellationStorageService {
       contentType
     ];
     if (!extension || size < 1 || size > 10 * 1024 * 1024)
-      throw new BadRequestException('Anh phai la JPEG, PNG hoac WebP, toi da 10 MB');
+      throw new BadRequestException('Ảnh phải là JPEG, PNG hoặc WebP, tối đa 10 MB');
     const storageKey = `booking-cancellation/${bookingId}/${userId}/${randomUUID()}.${extension}`;
     try {
       const uploadUrl = await getSignedUrl(

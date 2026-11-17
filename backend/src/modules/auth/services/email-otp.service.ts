@@ -51,11 +51,11 @@ export class EmailOtpService {
     purpose: EmailOtpPurpose = 'registration',
   ): Promise<SendEmailOtpResponse> {
     const email = input.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new BadRequestException('Email khong hop le');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new BadRequestException('Email không hợp lệ');
     const limitKey = `email-otp:limit:${this.hash(email)}`;
     const count = await this.redis.client.incr(limitKey);
     if (count === 1) await this.redis.client.expire(limitKey, 3600);
-    if (count > 5) throw new HttpException('Vuot gioi han gui OTP email', HttpStatus.TOO_MANY_REQUESTS);
+    if (count > 5) throw new HttpException('Vượt giới hạn gửi OTP email', HttpStatus.TOO_MANY_REQUESTS);
 
     const challengeId = randomUUID();
     const code = this.development ? '123456' : randomInt(100000, 1000000).toString();
@@ -75,14 +75,14 @@ export class EmailOtpService {
         await this.transporter!.sendMail({
           from: this.from,
           to: email,
-          subject: 'Ma xac minh tai khoan Psyocore',
-          text: `Ma xac minh Psyocore cua ban la ${code}. Ma co hieu luc trong ${Math.ceil(this.ttl / 60)} phut. Khong chia se ma nay voi nguoi khac.`,
-          html: `<p>Ma xac minh Psyocore cua ban la:</p><p style="font-size:28px;font-weight:bold;letter-spacing:6px">${code}</p><p>Ma co hieu luc trong ${Math.ceil(this.ttl / 60)} phut. Khong chia se ma nay voi nguoi khac.</p>`,
+          subject: 'Mã xác minh tài khoản Psyocore',
+          text: `Mã xác minh Psyocore của bạn là ${code}. Mã có hiệu lực trong ${Math.ceil(this.ttl / 60)} phút. Không chia sẻ mã này với người khác.`,
+          html: `<p>Mã xác minh Psyocore của bạn là:</p><p style="font-size:28px;font-weight:bold;letter-spacing:6px">${code}</p><p>Mã có hiệu lực trong ${Math.ceil(this.ttl / 60)} phút. Không chia sẻ mã này với người khác.</p>`,
         });
       } catch (error) {
         await this.redis.client.del(`email-otp:challenge:${challengeId}`);
         this.logger.error('Khong the gui OTP email', error);
-        throw new Error('Khong the gui email xac minh');
+        throw new Error('Không thể gửi email xác minh');
       }
     }
     return { registrationSessionId: challengeId, expiresIn: this.ttl, ...(this.development ? { debugOtp: code } : {}) };
@@ -91,18 +91,18 @@ export class EmailOtpService {
   async verifyOtp(challengeId: string, code: string, deviceId: string, purpose: EmailOtpPurpose): Promise<string> {
     const key = `email-otp:challenge:${challengeId}`;
     const raw = await this.redis.client.get(key);
-    if (!raw) throw new UnauthorizedException('OTP sai hoac da het han');
+    if (!raw) throw new UnauthorizedException('OTP sai hoặc đã hết hạn');
     const challenge = JSON.parse(raw) as EmailChallenge;
-    if (challenge.deviceId !== deviceId) throw new UnauthorizedException('Thiet bi xac minh khong hop le');
-    if (challenge.purpose !== purpose) throw new UnauthorizedException('Phien OTP khong dung muc dich');
+    if (challenge.deviceId !== deviceId) throw new UnauthorizedException('Thiết bị xác minh không hợp lệ');
+    if (challenge.purpose !== purpose) throw new UnauthorizedException('Phiên OTP không đúng mục đích');
     if (challenge.attempts >= 5) {
       await this.redis.client.del(key);
-      throw new UnauthorizedException('Da vuot so lan nhap OTP');
+      throw new UnauthorizedException('Đã vượt số lần nhập OTP');
     }
     if (challenge.otpHash !== this.hash(`${challengeId}:${code}`)) {
       challenge.attempts += 1;
       await this.redis.client.set(key, JSON.stringify(challenge), { KEEPTTL: true });
-      throw new UnauthorizedException('OTP khong hop le');
+      throw new UnauthorizedException('OTP không hợp lệ');
     }
     await this.redis.client.del(key);
     return challenge.email;
@@ -120,9 +120,9 @@ export class EmailOtpService {
   async consumeVerifiedRegistration(sessionId: string, deviceId: string): Promise<string> {
     const key = `email-registration:verified:${sessionId}`;
     const raw = await this.redis.client.getDel(key);
-    if (!raw) throw new UnauthorizedException('Phien dang ky chua xac minh hoac da het han');
+    if (!raw) throw new UnauthorizedException('Phiên đăng ký chưa xác minh hoặc đã hết hạn');
     const session = JSON.parse(raw) as { email: string; deviceId: string };
-    if (session.deviceId !== deviceId) throw new UnauthorizedException('Thiet bi dang ky khong hop le');
+    if (session.deviceId !== deviceId) throw new UnauthorizedException('Thiết bị đăng ký không hợp lệ');
     return session.email;
   }
 
@@ -137,9 +137,9 @@ export class EmailOtpService {
 
   async consumeVerifiedPasswordReset(sessionId: string, deviceId: string): Promise<string> {
     const raw = await this.redis.client.getDel(`email-password-reset:verified:${sessionId}`);
-    if (!raw) throw new UnauthorizedException('Phien doi mat khau chua xac minh hoac da het han');
+    if (!raw) throw new UnauthorizedException('Phiên đổi mật khẩu chưa xác minh hoặc đã hết hạn');
     const session = JSON.parse(raw) as { email: string; deviceId: string };
-    if (session.deviceId !== deviceId) throw new UnauthorizedException('Thiet bi doi mat khau khong hop le');
+    if (session.deviceId !== deviceId) throw new UnauthorizedException('Thiết bị đổi mật khẩu không hợp lệ');
     return session.email;
   }
 

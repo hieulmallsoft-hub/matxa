@@ -30,7 +30,7 @@ export async function loadBookableServices(
   mode: ServiceMode,
 ) {
   const ids = [...new Set(serviceIds)];
-  if (!ids.length || ids.length > 10) throw new BadRequestException('Can chon tu 1 den 10 dich vu');
+  if (!ids.length || ids.length > 10) throw new BadRequestException('Cần chọn từ 1 đến 10 dịch vụ');
   const services = await db.technicianService.findMany({
     where: {
       id: { in: ids },
@@ -45,11 +45,11 @@ export async function loadBookableServices(
     },
   });
   if (services.length !== ids.length)
-    throw new BadRequestException('Co dich vu khong hop le hoac ky thuat vien khong con hoat dong');
+    throw new BadRequestException('Có dịch vụ không hợp lệ hoặc kỹ thuật viên không còn hoạt động');
   if (services.some((item) => !item.modes.includes(mode)))
-    throw new BadRequestException('Dich vu khong ho tro hinh thuc da chon');
+    throw new BadRequestException('Dịch vụ không hỗ trợ hình thức đã chọn');
   if (services.some((item) => item.durationMinutes <= 0))
-    throw new BadRequestException('Thoi luong dich vu khong hop le');
+    throw new BadRequestException('Thời lượng dịch vụ không hợp lệ');
   return ids.map((id) => services.find((item) => item.id === id)!);
 }
 
@@ -70,11 +70,11 @@ export async function applyPriceOptions(
     where: { id: { in: priceOptionIds }, isActive: true },
   });
   if (options.length !== priceOptionIds.length)
-    throw new BadRequestException('Goi gia khong hop le hoac da ngung hoat dong');
+    throw new BadRequestException('Gói giá không hợp lệ hoặc đã ngừng hoạt động');
   return services.map((service, index) => {
     const option = options.find((item) => item.id === priceOptionIds[index]);
     if (!option || option.technicianServiceId !== service.id)
-      throw new BadRequestException('Goi gia khong thuoc dich vu da chon');
+      throw new BadRequestException('Gói giá không thuộc dịch vụ đã chọn');
     return {
       ...service,
       durationMinutes: option.durationMinutes,

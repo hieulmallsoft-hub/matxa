@@ -17,14 +17,14 @@ export class AccessTokenGuard implements CanActivate {
     const token = this.extractBearerToken(request.headers.authorization);
 
     if (!token) {
-      throw new UnauthorizedException('Thieu access token');
+      throw new UnauthorizedException('Thiếu access token');
     }
 
     let payload: AccessTokenPayload;
     try {
       payload = await this.jwtService.verifyAsync<AccessTokenPayload>(token);
     } catch {
-      throw new UnauthorizedException('Access token khong hop le hoac da het han');
+      throw new UnauthorizedException('Access token không hợp lệ hoặc đã hết hạn');
     }
     const session = await this.prisma.session.findFirst({
       where: {
@@ -43,7 +43,7 @@ export class AccessTokenGuard implements CanActivate {
         select: { status: true, blockedReason: true, blockedAt: true },
       });
       if (user?.status === 'BLOCKED') throw accountBlocked(user);
-      throw new UnauthorizedException('Access token khong hop le hoac da het han');
+      throw new UnauthorizedException('Access token không hợp lệ hoặc đã hết hạn');
     }
     request.auth = payload;
     return true;

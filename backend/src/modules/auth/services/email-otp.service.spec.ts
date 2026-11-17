@@ -75,7 +75,7 @@ describe('Email OTP (in-memory Redis, mocked SMTP)', () => {
   it('limits email sends to five per hour', async () => {
     const service = make();
     for (let i = 0; i < 5; i++) await service.sendOtp('user@example.com', 'device');
-    await expect(service.sendOtp('user@example.com', 'device')).rejects.toThrow('Vuot gioi han');
+    await expect(service.sendOtp('user@example.com', 'device')).rejects.toThrow('Vượt giới hạn');
   });
   it('sends SMTP mail and does not return debugOtp', async () => {
     const sendMail = jest.fn().mockResolvedValue({});
@@ -88,7 +88,7 @@ describe('Email OTP (in-memory Redis, mocked SMTP)', () => {
     jest
       .spyOn(nodemailer, 'createTransport')
       .mockReturnValue({ sendMail: jest.fn().mockRejectedValue(new Error('SMTP unavailable')) } as never);
-    await expect(make('smtp').sendOtp('user@example.com', 'device')).rejects.toThrow('Khong the gui email');
+    await expect(make('smtp').sendOtp('user@example.com', 'device')).rejects.toThrow('Không thể gửi email');
     expect([...values.keys()].some((key) => key.startsWith('email-otp:challenge:'))).toBe(false);
   });
 });

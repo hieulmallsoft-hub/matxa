@@ -92,8 +92,8 @@ export class BookingsService {
     const scheduledStart = new Date(dto.scheduledStart);
     const scheduledEnd = new Date(scheduledStart.getTime() + durationMinutes * 60_000);
     if (!Number.isFinite(scheduledStart.getTime()) || scheduledStart <= new Date())
-      throw new BadRequestException('Thoi gian dat lich phai o tuong lai');
-    if (dto.mode !== 'HOME' && dto.addressId) throw new BadRequestException('Chi gui addressId khi dat tai nha');
+      throw new BadRequestException('Thời gian đặt lịch phải ở tương lai');
+    if (dto.mode !== 'HOME' && dto.addressId) throw new BadRequestException('Chỉ gửi addressId khi đặt tại nhà');
     const slot = await db.availabilitySlot.findFirst({
       where: {
         technicianId: dto.technicianId,
@@ -102,7 +102,7 @@ export class BookingsService {
         endAt: { gte: scheduledEnd },
       },
     });
-    if (!slot) throw new BadRequestException('Ky thuat vien khong ranh trong khung gio nay');
+    if (!slot) throw new BadRequestException('Kỹ thuật viên không rảnh trong khung giờ này');
     const conflict = await db.booking.findFirst({
       where: {
         technicianId: dto.technicianId,
@@ -112,7 +112,7 @@ export class BookingsService {
       },
       select: { id: true },
     });
-    if (conflict) throw new BadRequestException('Khung gio da co nguoi dat');
+    if (conflict) throw new BadRequestException('Khung giờ đã có người đặt');
     let addressSnapshot: {
       id: string;
       addressText: string;
@@ -123,12 +123,12 @@ export class BookingsService {
       phone: string | null;
     } | null = null;
     if (dto.mode === 'HOME') {
-      if (!dto.addressId) throw new BadRequestException('Dat tai nha can chon dia chi');
+      if (!dto.addressId) throw new BadRequestException('Đặt tại nhà cần chọn địa chỉ');
       const address = await db.address.findFirst({
         where: { id: dto.addressId, userId, deletedAt: null },
         select: { id: true, address: true, phone: true, latitude: true, longitude: true, label: true },
       });
-      if (!address) throw new BadRequestException('Dia chi khong hop le');
+      if (!address) throw new BadRequestException('Địa chỉ không hợp lệ');
       addressSnapshot = {
         id: address.id,
         addressText: address.address,
@@ -149,7 +149,7 @@ export class BookingsService {
     const travelDistanceKm = technicianLocation ? kmBetween(addressSnapshot, technicianLocation) : null;
     const travelFee = travelFeeFor(dto.mode, travelDistanceKm, rules);
     if (!Number.isFinite(serviceFee) || serviceFee < 0)
-      throw new BadRequestException('Phi dich vu chua duoc cau hinh hop le');
+      throw new BadRequestException('Phí dịch vụ chưa được cấu hình hợp lệ');
     const promotion = dto.promotionCode ? await this.validPromotion(userId, dto.promotionCode, subtotal, db) : null;
     // A promotion is validated against the service subtotal, but its discount can
     // never make the payable amount negative (including the HOME service fee).
@@ -282,7 +282,7 @@ export class BookingsService {
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       if ((error as { code?: string })?.code === 'P2034')
-        throw new ConflictException('Du lieu dat lich vua thay doi, vui long thu lai');
+        throw new ConflictException('Dữ liệu đặt lịch vừa thay đổi, vui lòng thử lại');
       const databaseError = error as { code?: string; meta?: { constraint?: string }; message?: string };
       if (
         (databaseError.code === 'P2004' && databaseError.meta?.constraint === 'bookings_no_active_overlap') ||
@@ -291,7 +291,7 @@ export class BookingsService {
       ) {
         throw new ConflictException({
           code: 'SLOT_UNAVAILABLE',
-          message: 'Khung gio vua duoc nguoi khac dat, vui long chon gio khac',
+          message: 'Khung giờ vừa được người khác đặt, vui lòng chọn giờ khác',
         });
       }
       throw error;
@@ -303,8 +303,8 @@ export class BookingsService {
       where: { bookingId, booking: { customerId: userId } },
       include: { booking: { select: { id: true } } },
     });
-    if (!payment) throw new NotFoundException('Thanh toan khong ton tai');
-    if (payment.method !== 'ONLINE') throw new BadRequestException('Booking khong dung thanh toan online');
+    if (!payment) throw new NotFoundException('Thanh toán không tồn tại');
+    if (payment.method !== 'ONLINE') throw new BadRequestException('Đơn không dùng thanh toán online');
     if (payment.status === 'PAID') return { bookingId, paymentId: payment.id, status: 'PAID', paymentUrl: null };
     const ttlMinutes = Number(this.config.get('VNPAY_PAYMENT_TTL_MINUTES', 15));
     if (!Number.isInteger(ttlMinutes) || ttlMinutes < 1 || ttlMinutes > 60)
@@ -331,10 +331,10 @@ export class BookingsService {
   }
 
   async createPayosPayment(userId: string, bookingId: string) {
-    if (!this.payos?.isConfigured()) throw new BadRequestException('PayOS chua duoc cau hinh');
+    if (!this.payos?.isConfigured()) throw new BadRequestException('PayOS chưa được cấu hình');
     const payment = await this.prisma.payment.findFirst({ where: { bookingId, booking: { customerId: userId } } });
-    if (!payment) throw new NotFoundException('Thanh toan khong ton tai');
-    if (payment.method !== 'ONLINE') throw new BadRequestException('Booking khong dung thanh toan online');
+    if (!payment) throw new NotFoundException('Thanh toán không tồn tại');
+    if (payment.method !== 'ONLINE') throw new BadRequestException('Đơn không dùng thanh toán online');
     if (payment.status === 'PAID') return { bookingId, paymentId: payment.id, status: 'PAID', paymentUrl: null };
     // A link was opened before: it may already be paid (the webhook got lost). Otherwise close it, so money cannot
     // arrive on a link nobody is waiting on any more.
@@ -374,7 +374,7 @@ export class BookingsService {
   }
 
   async processPayosWebhook(body: Record<string, unknown>) {
-    if (!this.payos) throw new BadRequestException('PayOS chua duoc cau hinh');
+    if (!this.payos) throw new BadRequestException('PayOS chưa được cấu hình');
     const data = this.payos.verifyWebhook({
       signature: body.signature as string | undefined,
       data: body.data as Record<string, string | number | boolean | null | undefined> | undefined,
@@ -384,7 +384,7 @@ export class BookingsService {
     // Not a booking payment (a wallet top-up, or PayOS's sample event when the webhook URL is saved): nothing here.
     if (!payment) return { code: '00', desc: 'success', handled: false };
     if (Number(data.amount) !== Number(payment.amount))
-      throw new BadRequestException('So tien webhook PayOS khong khop');
+      throw new BadRequestException('Số tiền webhook PayOS không khớp');
     const success = String(body.code ?? '') === '00' && body.success === true;
     await this.recordPayosResult(payment, success, data, String(body.code ?? ''));
     return { code: '00', desc: 'success', handled: true };
@@ -452,7 +452,7 @@ export class BookingsService {
   /** Customer-facing check (the app calls it on return from PayOS, or a "đã thanh toán?" button). */
   async checkPayosPayment(userId: string, bookingId: string) {
     const booking = await this.prisma.booking.findFirst({ where: { id: bookingId, customerId: userId }, select: { id: true } });
-    if (!booking) throw new NotFoundException('Booking khong ton tai');
+    if (!booking) throw new NotFoundException('Đơn không tồn tại');
     return { bookingId, paymentStatus: await this.syncPayosPayment(bookingId) };
   }
 
@@ -468,7 +468,7 @@ export class BookingsService {
   }
 
   payosMobileRedirect(kind: 'return' | 'cancel', query: Record<string, string | undefined>) {
-    if (!this.payos) throw new BadRequestException('PayOS chua duoc cau hinh');
+    if (!this.payos) throw new BadRequestException('PayOS chưa được cấu hình');
     return this.payos.mobileRedirect(kind, query);
   }
 
@@ -519,9 +519,9 @@ export class BookingsService {
     });
     if (!booking || !isPrepaid(booking)) return null;
     if (booking.status === 'OPEN')
-      throw new ConflictException({ statusCode: 409, code: 'PAYMENT_NOT_OPEN', message: 'Chua co KTV nhan don, chua can thanh toan' });
+      throw new ConflictException({ statusCode: 409, code: 'PAYMENT_NOT_OPEN', message: 'Chưa có KTV nhận đơn, chưa cần thanh toán' });
     if (!isAwaitingPayment(booking) || booking.paymentDeadlineAt! <= new Date())
-      throw new ConflictException({ statusCode: 409, code: 'PAYMENT_NOT_OPEN', message: 'Don da het han thanh toan hoac khong con hieu luc' });
+      throw new ConflictException({ statusCode: 409, code: 'PAYMENT_NOT_OPEN', message: 'Đơn đã hết hạn thanh toán hoặc không còn hiệu lực' });
     return booking.paymentDeadlineAt!;
   }
 
@@ -554,7 +554,7 @@ export class BookingsService {
         data: {
           status: 'CANCELLED',
           cancelledAt: now,
-          cancellationReason: 'Khach khong thanh toan dung han',
+          cancellationReason: 'Khách không thanh toán đúng hạn',
           cancellationReasonCode: 'PAYMENT_NOT_RECEIVED',
           cancelledByUserId: booking.customerId,
           cancelledByRole: 'CUSTOMER',
@@ -591,7 +591,7 @@ export class BookingsService {
     }
     // Paid too late (the booking was cancelled meanwhile): refund in full.
     if (['CANCELLED', 'EXPIRED'].includes(booking.status))
-      await createRefund(this.prisma, bookingId, { reason: 'Khach thanh toan sau khi don da huy', feePercent: 0 });
+      await createRefund(this.prisma, bookingId, { reason: 'Khách thanh toán sau khi đơn đã hủy', feePercent: 0 });
   }
 
   async vnpayReturn(params: Record<string, string | undefined>) {
@@ -619,7 +619,7 @@ export class BookingsService {
     await this.assertCustomer(userId);
     await this.assertModeEnabled(dto.mode);
     const start = new Date(dto.scheduledStart);
-    if (!Number.isFinite(start.getTime()) || start <= new Date()) throw new BadRequestException('Thoi gian dat lich khong hop le');
+    if (!Number.isFinite(start.getTime()) || start <= new Date()) throw new BadRequestException('Thời gian đặt lịch không hợp lệ');
     await this.assertLeadTime(start);
     const rules = await this.bookingRules();
     const { maxDispatchRadiusKm } = rules;
@@ -628,12 +628,12 @@ export class BookingsService {
     const place = online ? { city: undefined, district: undefined } : await resolveLocationCodes(this.prisma, dto.city, dto.district);
     const serviceIds: string[] = [...new Set((dto.items ?? []).map((item: any) => String(item.catalogServiceId)))] as string[];
     const optionIds: string[] = [...new Set((dto.items ?? []).map((item: any) => String(item.priceOptionId)))] as string[];
-    if (!serviceIds.length || serviceIds.length !== (dto.items ?? []).length) throw new BadRequestException('Danh sach dich vu khong hop le');
+    if (!serviceIds.length || serviceIds.length !== (dto.items ?? []).length) throw new BadRequestException('Danh sách dịch vụ không hợp lệ');
     const [services, options] = await Promise.all([
       this.prisma.serviceCatalogItem.findMany({ where: { id: { in: serviceIds }, isActive: true }, include: { category: true } }),
       this.prisma.serviceCatalogPriceOption.findMany({ where: { id: { in: optionIds }, isActive: true } }),
     ]);
-    if (services.length !== serviceIds.length || options.length !== optionIds.length) throw new BadRequestException('Dich vu hoac goi gia khong hop le');
+    if (services.length !== serviceIds.length || options.length !== optionIds.length) throw new BadRequestException('Dịch vụ hoặc gói giá không hợp lệ');
     const duration = dto.items.reduce((sum: number, item: any) => sum + (options.find((option: any) => option.id === item.priceOptionId)?.durationMinutes ?? 0), 0);
     const end = new Date(start.getTime() + duration * 60_000);
     const candidates: any[] = await this.prisma.technicianProfile.findMany({
@@ -687,16 +687,16 @@ export class BookingsService {
     const serviceIds = dto.items.map((item: any) => item.catalogServiceId);
     const catalogOptions = await this.prisma.serviceCatalogPriceOption.findMany({ where: { id: { in: dto.items.map((item: any) => item.priceOptionId) }, isActive: true } });
     const selected = await this.prisma.technicianService.findMany({ where: { technicianId: dto.technicianId, catalogServiceId: { in: serviceIds }, isActive: true }, include: { priceOptions: { where: { isActive: true } } } });
-    if (selected.length !== serviceIds.length) throw new BadRequestException('KTV khong co dich vu phu hop');
+    if (selected.length !== serviceIds.length) throw new BadRequestException('KTV không có dịch vụ phù hợp');
     // The chosen technician's own package of the same length: the one /quote priced and the customer saw.
     const technicianPrices = dto.items.map((item: any) => {
       const service = selected.find((candidate: any) => candidate.catalogServiceId === item.catalogServiceId)!;
       const catalogOption = catalogOptions.find((candidate: any) => candidate.id === item.priceOptionId);
-      if (!catalogOption) throw new BadRequestException('Goi gia catalog khong hop le hoac da ngung hoat dong');
+      if (!catalogOption) throw new BadRequestException('Gói giá không hợp lệ hoặc đã ngừng hoạt động');
       const option = service.priceOptions.find((candidate: any) => candidate.durationMinutes === catalogOption.durationMinutes);
       // A technician without packages sells the service at its own base length and price.
       if (!option && (service.priceOptions.length || service.durationMinutes !== catalogOption.durationMinutes))
-        throw new BadRequestException(`KTV khong co goi ${catalogOption.durationMinutes} phut cho dich vu nay`);
+        throw new BadRequestException(`KTV không có gói ${catalogOption.durationMinutes} phút cho dịch vụ này`);
       return { serviceId: service.id as string, priceOptionId: (option?.id ?? null) as string | null };
     });
     // A technician selected in the first screen is the customer's preferred
@@ -725,8 +725,8 @@ export class BookingsService {
         code: 'BOOKING_ALREADY_WAITING',
         message:
           waiting.status === 'CONFIRMED'
-            ? 'Ban dang co don chua hoan thanh. Vui long hoan thanh hoac huy don do truoc khi dat don moi'
-            : 'Ban dang co don cho KTV nhan. Vui long doi hoac huy don do truoc khi dat don moi',
+            ? 'Bạn đang có đơn chưa hoàn thành. Vui lòng hoàn thành hoặc hủy đơn đó trước khi đặt đơn mới'
+            : 'Bạn đang có đơn chờ KTV nhận. Vui lòng đợi hoặc hủy đơn đó trước khi đặt đơn mới',
         bookingId: waiting.id,
         bookingStatus: waiting.status,
         bookingRole: 'CUSTOMER',
@@ -740,7 +740,7 @@ export class BookingsService {
     if (job)
       throw new ConflictException({
         code: 'BOOKING_ALREADY_WAITING',
-        message: 'Ban dang co viec KTV chua hoan thanh. Vui long hoan thanh viec do truoc khi dat don moi',
+        message: 'Bạn đang có việc KTV chưa hoàn thành. Vui lòng hoàn thành việc đó trước khi đặt đơn mới',
         bookingId: job.id,
         bookingStatus: job.status,
         bookingRole: 'TECHNICIAN',
@@ -772,9 +772,9 @@ export class BookingsService {
     await this.assertModeEnabled(dto.mode);
     const start = new Date(dto.scheduledStart);
     if (!Number.isFinite(start.getTime()) || start <= new Date())
-      throw new BadRequestException('Thoi gian dat lich phai o tuong lai');
+      throw new BadRequestException('Thời gian đặt lịch phải ở tương lai');
     await this.assertLeadTime(start);
-    if (dto.mode !== 'HOME' && dto.addressId) throw new BadRequestException('Chi gui addressId khi dat tai nha');
+    if (dto.mode !== 'HOME' && dto.addressId) throw new BadRequestException('Chỉ gửi addressId khi đặt tại nhà');
     // Store codes, as technician profiles do: a name ("Ha Noi") or an unknown value would match no technician and the
     // customer would wait for nothing. 400 INVALID_CITY / INVALID_DISTRICT instead.
     const place = await resolveLocationCodes(this.prisma, dto.city, dto.district);
@@ -789,25 +789,25 @@ export class BookingsService {
       (await this.bookingRules()).confirmationWaitMinutes,
     );
     if (!Number.isFinite(deadline.getTime()) || deadline <= now || deadline >= start)
-      throw new BadRequestException('Han ung tuyen phai nam giua hien tai va gio dat lich');
+      throw new BadRequestException('Hạn nhận đơn phải nằm giữa hiện tại và giờ đặt lịch');
     const catalogIds = [...new Set(dto.items.map((item) => item.catalogServiceId))];
-    if (catalogIds.length !== dto.items.length) throw new BadRequestException('Khong duoc trung dich vu catalog');
+    if (catalogIds.length !== dto.items.length) throw new BadRequestException('Không được trùng dịch vụ');
     const catalog = await this.prisma.serviceCatalogItem.findMany({
       where: { id: { in: catalogIds }, isActive: true, category: { isActive: true } },
       include: { category: { select: { name: true } }, priceOptions: { where: { isActive: true } } },
     });
     if (catalog.length !== catalogIds.length)
-      throw new BadRequestException('Dich vu catalog khong hop le hoac da ngung hoat dong');
+      throw new BadRequestException('Dịch vụ không hợp lệ hoặc đã ngừng hoạt động');
     if (catalog.some((item) => !item.modes.includes(dto.mode)))
-      throw new BadRequestException('Dich vu khong ho tro hinh thuc dat nay');
+      throw new BadRequestException('Dịch vụ không hỗ trợ hình thức đặt này');
     let addressSnapshot: Prisma.InputJsonValue | undefined;
     if (dto.mode === 'HOME') {
-      if (!dto.addressId) throw new BadRequestException('Dat tai nha can chon dia chi');
+      if (!dto.addressId) throw new BadRequestException('Đặt tại nhà cần chọn địa chỉ');
       const address = await this.prisma.address.findFirst({
         where: { id: dto.addressId, userId, deletedAt: null },
         select: { id: true, address: true, phone: true, latitude: true, longitude: true, label: true },
       });
-      if (!address) throw new BadRequestException('Dia chi khong hop le');
+      if (!address) throw new BadRequestException('Địa chỉ không hợp lệ');
       addressSnapshot = {
         id: address.id,
         addressText: address.address,
@@ -823,7 +823,7 @@ export class BookingsService {
     const ordered = dto.items.map((item) => {
       const service = catalog.find((value) => value.id === item.catalogServiceId)!;
       const option = service.priceOptions.find((value) => value.id === item.priceOptionId);
-      if (!option) throw new BadRequestException('Goi gia catalog khong hop le hoac da ngung hoat dong');
+      if (!option) throw new BadRequestException('Gói giá không hợp lệ hoặc đã ngừng hoạt động');
       return { service, option };
     });
     // Booked with a chosen technician: that technician's own prices (what /quote showed), locked for whoever takes
@@ -931,7 +931,7 @@ export class BookingsService {
     const requested = booking.requestedTechnicianId === profile.id;
     if (existing?.status === 'APPLIED')
       return requested ? this.acceptAsRequestedTechnician(userId, booking, existing.id) : { ...existing, idempotent: true };
-    if (existing) throw new ConflictException('Trang thai ung tuyen hien tai khong cho phep apply lai');
+    if (existing) throw new ConflictException('Trạng thái hiện tại không cho phép nhận đơn lại');
     // Selection charges the commission, so a technician who could not pay it must not be selectable. A prepaid online
     // booking takes the commission out of the payment instead, so no wallet balance is needed.
     const fee = isPrepaid(booking) ? 0 : await this.commissionFor(booking.grossServiceAmount, userId);
@@ -940,7 +940,7 @@ export class BookingsService {
         where: { userId_type: { userId, type: 'ADVERTISING_CREDIT' } },
         select: { balanceVnd: true },
       });
-      if ((wallet?.balanceVnd ?? 0) < fee) throw new ConflictException('So du vi khong du de nhan don');
+      if ((wallet?.balanceVnd ?? 0) < fee) throw new ConflictException('Số dư ví không đủ để nhận đơn');
     }
     try {
       const application = await this.prisma.$transaction(async (tx) => {
@@ -957,7 +957,7 @@ export class BookingsService {
           },
           data: { status: 'OPEN' },
         });
-        if (!claimed.count) throw new ConflictException('Don khong con mo de ung tuyen');
+        if (!claimed.count) throw new ConflictException('Đơn không còn mở để nhận');
         return tx.bookingTechnicianApplication.create({
           data: { bookingId, technicianProfileId: profile.id, status: 'APPLIED', appliedAt: now },
         });
@@ -1031,7 +1031,7 @@ export class BookingsService {
       },
       data: { status: 'WITHDRAWN', withdrawnAt: new Date() },
     });
-    if (!updated.count) throw new ConflictException('Khong the rut ung tuyen o trang thai hien tai');
+    if (!updated.count) throw new ConflictException('Không thể rút nhận đơn ở trạng thái hiện tại');
     return this.prisma.bookingTechnicianApplication.findUniqueOrThrow({
       where: { bookingId_technicianProfileId: { bookingId, technicianProfileId: profile.id } },
     });
@@ -1040,8 +1040,8 @@ export class BookingsService {
   async selectTechnician(customerId: string, bookingId: string, applicationId: string) {
     const result = await this.assignOpenBooking(bookingId, applicationId, customerId).catch((error) => {
       // The technician's wallet dropped since they applied; that is their business, not the customer's.
-      if (error instanceof ConflictException && error.message === 'So du vi khong du de nhan don')
-        throw new ConflictException('KTV nay hien khong nhan duoc don, vui long chon KTV khac');
+      if (error instanceof ConflictException && error.message === 'Số dư ví không đủ để nhận đơn')
+        throw new ConflictException('KTV này hiện không nhận được đơn, vui lòng chọn KTV khác');
       throw error;
     });
     void this.notifyStatus(
@@ -1073,12 +1073,12 @@ export class BookingsService {
             },
             data: { status: 'OPEN' },
           });
-          if (!claimed.count) throw new ConflictException('Don da duoc chon KTV, huy, hoac khong con mo');
+          if (!claimed.count) throw new ConflictException('Đơn đã có KTV, đã hủy hoặc không còn mở');
           const application = await tx.bookingTechnicianApplication.findFirst({
             where: { id: applicationId, bookingId, status: 'APPLIED' },
             include: { technicianProfile: { include: { user: { select: { id: true } } } } },
           });
-          if (!application) throw new BadRequestException('Ung tuyen khong hop le');
+          if (!application) throw new BadRequestException('Nhận đơn không hợp lệ');
           const booking = await tx.booking.findUniqueOrThrow({
             where: { id: bookingId },
             include: { items: { include: { catalogService: true } }, payment: { select: { method: true } } },
@@ -1143,7 +1143,7 @@ export class BookingsService {
       );
     } catch (error) {
       if ((error as { code?: string }).code === 'P2034')
-        throw new ConflictException('Don dang duoc chon KTV, vui long thu lai');
+        throw new ConflictException('Đơn đang được chọn KTV, vui lòng thử lại');
       throw error;
     }
     return result;
@@ -1300,7 +1300,7 @@ export class BookingsService {
       },
     });
     let booking = await load();
-    if (!booking) throw new NotFoundException('Lich dat khong ton tai');
+    if (!booking) throw new NotFoundException('Lịch đặt không tồn tại');
     const actor = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     const marketplaceNotification = allowMarketplaceTechnician && actor?.role === 'TECHNICIAN'
       ? await this.prisma.notification.findFirst({
@@ -1331,7 +1331,7 @@ export class BookingsService {
         (['EXPIRED', 'CANCELLED', 'CONFIRMED', 'COMPLETED'].includes(booking.status) && Boolean(marketplaceNotification)) ||
         involvedInMarketplaceJob);
     if (booking.customerId !== userId && booking.technician?.userId !== userId && actor?.role !== 'ADMIN' && !canViewMarketplaceJob)
-      throw new ForbiddenException('Ban khong co quyen xem lich dat');
+      throw new ForbiddenException('Bạn không có quyền xem lịch đặt');
     // Opening a booking still waiting on PayOS asks PayOS directly, in case its webhook got lost.
     if (!internal && booking.payment?.status === 'PENDING' && booking.payment.provider === 'PAYOS' && (await this.syncPayosPayment(id)) === 'PAID')
       booking = (await load()) ?? booking;
@@ -1463,10 +1463,10 @@ export class BookingsService {
       }
       // A cancelled or already-taken job reached detail() through an involvement or notification check; just show it.
       else if (!application && booking.requestedTechnicianId !== profile.id && !['CANCELLED', 'CONFIRMED', 'COMPLETED'].includes(booking.status))
-        throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
+        throw new ForbiddenException('Đơn không thuộc kỹ thuật viên này');
       return this.openBookingResponse(booking, application?.status ?? null, application?.status === 'SELECTED', true, profile.id, profile, commissionPercent, travelRules);
     }
-    if (booking.technician?.userId !== userId) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
+    if (booking.technician?.userId !== userId) throw new ForbiddenException('Đơn không thuộc kỹ thuật viên này');
     return this.technicianJobResponse(booking, userId, commissionPercent);
   }
 
@@ -1486,18 +1486,18 @@ export class BookingsService {
         customer: { select: { displayName: true } },
       },
     });
-    if (!booking || booking.technician?.userId !== userId) throw new NotFoundException('Don khong ton tai');
+    if (!booking || booking.technician?.userId !== userId) throw new NotFoundException('Đơn không tồn tại');
     if (!['CONFIRMED', 'COMPLETED'].includes(booking.status))
-      throw new ForbiddenException('Chi hien so lien he sau khi da nhan don');
+      throw new ForbiddenException('Chỉ hiện số liên hệ sau khi đã nhận đơn');
     // Not before the customer paid: otherwise the two could agree to skip the payment.
     if (isAwaitingPayment(booking))
-      throw new ForbiddenException({ statusCode: 403, code: 'PAYMENT_REQUIRED', message: 'Chi hien lien he sau khi khach thanh toan' });
+      throw new ForbiddenException({ statusCode: 403, code: 'PAYMENT_REQUIRED', message: 'Chỉ hiện liên hệ sau khi khách thanh toán' });
     if (booking.assignmentMode === 'OPEN_MARKETPLACE') {
       const selected = await this.prisma.bookingTechnicianApplication.findFirst({
         where: { bookingId: id, technicianProfileId: booking.technician!.id, status: 'SELECTED' },
         select: { id: true },
       });
-      if (!selected) throw new ForbiddenException('KTV chua duoc chon cho don nay');
+      if (!selected) throw new ForbiddenException('KTV chưa được chọn cho đơn này');
     }
     // The number entered with the booking's address comes first (the customer may book for someone else); otherwise
     // the account's verified phone.
@@ -1508,7 +1508,7 @@ export class BookingsService {
       where: { userId: booking.customerId, provider: 'PHONE', phoneNumber: { not: null } },
       select: { phoneNumber: true },
     });
-    if (!phone?.phoneNumber) throw new NotFoundException('Khach chua co so dien thoai xac thuc');
+    if (!phone?.phoneNumber) throw new NotFoundException('Khách chưa có số điện thoại xác thực');
     return { bookingId: id, displayName: booking.customer.displayName, phoneNumber: phone.phoneNumber, source: 'ACCOUNT' as const };
   }
 
@@ -1523,7 +1523,7 @@ export class BookingsService {
   private async assertModeEnabled(mode: string) {
     const enabled = (await this.bookingRules()).enabledServiceModes as string[] | undefined;
     if (mode && enabled && !enabled.includes(mode))
-      throw new ConflictException({ code: 'SERVICE_MODE_DISABLED', message: 'Hinh thuc phuc vu nay dang tam dung' });
+      throw new ConflictException({ code: 'SERVICE_MODE_DISABLED', message: 'Hình thức phục vụ này đang tạm dừng' });
   }
 
   private async bookingRules() {
@@ -1559,19 +1559,19 @@ export class BookingsService {
   private async assertCustomer(userId: string, chosenTechnicianId?: string | null) {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true, status: true } });
     if (!(user?.status === 'ACTIVE' && ['CUSTOMER', 'TECHNICIAN'].includes(user.role)))
-      throw new ForbiddenException({ statusCode: 403, code: 'CUSTOMER_ONLY', message: 'Tai khoan nay khong dat lich duoc' });
+      throw new ForbiddenException({ statusCode: 403, code: 'CUSTOMER_ONLY', message: 'Tài khoản này không đặt lịch được' });
     if (
       chosenTechnicianId &&
       user.role === 'TECHNICIAN' &&
       (await this.prisma.technicianProfile.findFirst({ where: { id: chosenTechnicianId, userId }, select: { id: true } }))
     )
-      throw new ForbiddenException({ statusCode: 403, code: 'OWN_BOOKING', message: 'Khong the dat lich cho chinh minh' });
+      throw new ForbiddenException({ statusCode: 403, code: 'OWN_BOOKING', message: 'Không thể đặt lịch cho chính mình' });
   }
 
   private async assertLeadTime(start: Date) {
     const { minAdvanceHours } = await this.bookingRules();
     if (minAdvanceHours > 0 && start.getTime() < Date.now() + minAdvanceHours * 3_600_000)
-      throw new BadRequestException(`Vui long dat lich truoc it nhat ${minAdvanceHours} gio`);
+      throw new BadRequestException(`Vui lòng đặt lịch trước ít nhất ${minAdvanceHours} giờ`);
   }
 
   private async commissionRate(userId?: string, db: Prisma.TransactionClient | PrismaService = this.prisma) {
@@ -1584,7 +1584,7 @@ export class BookingsService {
    */
   private async commissionPolicy(userId?: string, db: Prisma.TransactionClient | PrismaService = this.prisma) {
     const rate = this.settings ? await this.settings.platformFeePercent() : Number(this.config.get('TECHNICIAN_COMMISSION_RATE_PERCENT', 25));
-    if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new BadRequestException('Ty le chiet khau KTV khong hop le');
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new BadRequestException('Tỷ lệ chiết khấu KTV không hợp lệ');
     const usual = { rate, version: `COMMISSION_${rate}_V1` };
     const { dailyDiscountThreshold: threshold, dailyDiscountFeePercent: discounted } = await this.bookingRules();
     if (!userId || !(threshold > 0) || !(discounted >= 0 && discounted < rate)) return usual;
@@ -1609,7 +1609,7 @@ export class BookingsService {
       where: { id: bookingId, technician: { userId } },
       select: { grossServiceAmount: true, serviceFee: true, travelFee: true },
     });
-    if (!booking) throw new ForbiddenException('Don khong thuoc KTV nay');
+    if (!booking) throw new ForbiddenException('Đơn không thuộc KTV này');
     const { rate, version } = await this.commissionPolicy(userId, db);
     const fee = roundVnd((Number(booking.grossServiceAmount ?? 0) * rate) / 100);
     // The voucher discount is credited back only when the booking completes (creditBookingPromotion), not here.
@@ -1619,7 +1619,7 @@ export class BookingsService {
       const existing = await tx.walletLedgerEntry.findUnique({ where: { referenceType_referenceId: { referenceType: 'BOOKING_COMMISSION', referenceId: bookingId } } });
       if (existing) return;
       const updated = await tx.wallet.updateMany({ where: { id: wallet.id, balanceVnd: { gte: fee } }, data: { balanceVnd: { decrement: fee } } });
-      if (!updated.count) throw new ConflictException('So du vi khong du de nhan don');
+      if (!updated.count) throw new ConflictException('Số dư ví không đủ để nhận đơn');
       const current = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id }, select: { balanceVnd: true } });
       await tx.walletLedgerEntry.create({ data: { walletId: wallet.id, type: 'COMMISSION_DEBIT', amountVnd: -fee, balanceBeforeVnd: current.balanceVnd + fee, balanceAfterVnd: current.balanceVnd, referenceType: 'BOOKING_COMMISSION', referenceId: bookingId } });
       await tx.booking.update({ where: { id: bookingId }, data: {
@@ -1636,8 +1636,8 @@ export class BookingsService {
   async declineTechnicianJob(userId: string, id: string, dto: CancelBookingDto) {
     const booking = await this.detail(userId, id, true, true);
     if (booking.assignmentMode === 'OPEN_MARKETPLACE') return this.declineOpenJob(userId, id);
-    if (booking.technician.userId !== userId) throw new ForbiddenException('Don khong thuoc ky thuat vien nay');
-    if (booking.status !== 'PENDING') throw new BadRequestException('Chi co the tu choi don moi');
+    if (booking.technician.userId !== userId) throw new ForbiddenException('Đơn không thuộc kỹ thuật viên này');
+    if (booking.status !== 'PENDING') throw new BadRequestException('Chỉ có thể từ chối đơn mới');
     return this.cancel(userId, id, dto);
   }
 
@@ -1650,12 +1650,12 @@ export class BookingsService {
   async cancel(userId: string, id: string, dto: CancelBookingDto) {
     let booking = await this.detail(userId, id, true);
     if (!['OPEN', 'PENDING', 'CONFIRMED'].includes(booking.status))
-      throw new BadRequestException('Lich dat khong the huy');
+      throw new BadRequestException('Lịch đặt không thể hủy');
     // Paid but the webhook not in yet: record the payment first, so the cancel queues the refund it owes.
     if ((booking as { payment?: { status?: string } | null }).payment?.status === 'PENDING' && (await this.syncPayosPayment(id)) === 'PAID')
       booking = await this.detail(userId, id, true);
     if (dto.reasonCode === 'OTHER' && !dto.reasonText?.trim())
-      throw new BadRequestException('Vui long nhap ly do khac');
+      throw new BadRequestException('Vui lòng nhập lý do khác');
     const actor = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     // The technician gets back the commission charged when they took the booking.
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -1681,7 +1681,7 @@ export class BookingsService {
       // technician took it keeps the cancellation fee out; a technician's or admin's cancel is refunded in full.
       const customerCancelled = booking.customerId === userId && actor?.role !== 'ADMIN';
       await createRefund(tx, id, {
-        reason: customerCancelled ? 'Khach huy don da thanh toan' : actor?.role === 'ADMIN' ? 'Admin huy don' : 'KTV huy don',
+        reason: customerCancelled ? 'Khách hủy đơn đã thanh toán' : actor?.role === 'ADMIN' ? 'Admin hủy đơn' : 'KTV hủy đơn',
         feePercent: customerCancelled && booking.status === 'CONFIRMED' ? (await this.bookingRules()).onlineCancelFeePercent : 0,
       });
       return cancelled;
@@ -1891,16 +1891,16 @@ export class BookingsService {
   async updateStatus(userId: string, id: string, dto: UpdateBookingStatusDto) {
     const booking = await this.detail(userId, id, true);
     if (booking.technician?.userId !== userId)
-      throw new ForbiddenException('Chi ky thuat vien moi co the cap nhat trang thai');
+      throw new ForbiddenException('Chỉ kỹ thuật viên mới có thể cập nhật trạng thái');
     const allowed =
       (booking.status === 'PENDING' && dto.status === 'CONFIRMED') ||
       (booking.status === 'CONFIRMED' && dto.status === 'COMPLETED');
-    if (!allowed) throw new BadRequestException('Chuyen trang thai khong hop le');
+    if (!allowed) throw new BadRequestException('Chuyển trạng thái không hợp lệ');
     if (dto.status === 'COMPLETED' && booking.scheduledEnd > new Date()) {
-      throw new BadRequestException('Chua den gio ket thuc dich vu');
+      throw new BadRequestException('Chưa đến giờ kết thúc dịch vụ');
     }
     if (dto.status === 'COMPLETED' && isAwaitingPayment(booking))
-      throw new ConflictException({ statusCode: 409, code: 'PAYMENT_REQUIRED', message: 'Khach chua thanh toan don nay' });
+      throw new ConflictException({ statusCode: 409, code: 'PAYMENT_REQUIRED', message: 'Khách chưa thanh toán đơn này' });
     if (dto.status === 'CONFIRMED' && (await this.expireDirectBookingIfDue(id)))
       throw new ConflictException('BOOKING_EXPIRED');
     // Confirming charges the commission; both commit together or not at all.
@@ -1928,14 +1928,14 @@ export class BookingsService {
       where: { id, customerId: userId },
       include: { review: true },
     });
-    if (!booking) throw new NotFoundException('Lich dat khong ton tai');
-    if (booking.status !== 'COMPLETED') throw new BadRequestException('Chi danh gia sau khi hoan thanh dich vu');
-    if (booking.review) throw new BadRequestException('Lich dat da duoc danh gia');
+    if (!booking) throw new NotFoundException('Lịch đặt không tồn tại');
+    if (booking.status !== 'COMPLETED') throw new BadRequestException('Chỉ đánh giá sau khi hoàn thành dịch vụ');
+    if (booking.review) throw new BadRequestException('Lịch đặt đã được đánh giá');
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         return await this.prisma.$transaction(
           async (tx) => {
-            if (!booking.technicianId) throw new BadRequestException('Don chua duoc gan KTV');
+            if (!booking.technicianId) throw new BadRequestException('Đơn chưa có KTV');
             const review = await tx.review.create({
               data: {
                 bookingId: id,
@@ -1972,9 +1972,9 @@ export class BookingsService {
         );
       } catch (error) {
         const code = (error as { code?: string })?.code;
-        if (code === 'P2002') throw new BadRequestException('Lich dat da duoc danh gia');
+        if (code === 'P2002') throw new BadRequestException('Lịch đặt đã được đánh giá');
         if (code !== 'P2034') throw error;
-        if (attempt === 2) throw new ConflictException('Danh gia dang duoc cap nhat, vui long thu lai');
+        if (attempt === 2) throw new ConflictException('Đánh giá đang được cập nhật, vui lòng thử lại');
       }
     }
   }
@@ -1985,13 +1985,13 @@ export class BookingsService {
       where: { id, OR: [{ customerId: userId }, { technician: { userId } }] },
       select: { id: true, status: true, customerId: true, complaints: { select: { reporterRole: true } } },
     });
-    if (!booking) throw new NotFoundException('Lich dat khong ton tai');
+    if (!booking) throw new NotFoundException('Lịch đặt không tồn tại');
     const reporterRole = booking.customerId === userId ? 'CUSTOMER' : 'TECHNICIAN';
     if (!COMPLAINABLE_STATUSES.includes(booking.status))
-      throw new BadRequestException('Chi co the khieu nai don da co KTV nhan, da hoan thanh hoac da huy');
+      throw new BadRequestException('Chỉ có thể khiếu nại đơn đã có KTV nhận, đã hoàn thành hoặc đã hủy');
     if (booking.complaints.some((complaint) => complaint.reporterRole === reporterRole))
-      throw new ConflictException('Lich dat da duoc tao khieu nai');
-    if (!dto.detail.trim()) throw new BadRequestException('Vui long nhap chi tiet khieu nai');
+      throw new ConflictException('Lịch đặt đã được tạo khiếu nại');
+    if (!dto.detail.trim()) throw new BadRequestException('Vui lòng nhập chi tiết khiếu nại');
     const evidence = dto.evidenceStorageKeys ?? [];
     if (evidence.length && this.complaintStorage) await this.complaintStorage.validateKeys(id, userId, evidence);
     try {
@@ -2019,7 +2019,7 @@ export class BookingsService {
       const conversationId = await ensureComplaintConversation(this.prisma, complaint);
       return { ...complaint, conversationId };
     } catch (error) {
-      if ((error as { code?: string })?.code === 'P2002') throw new ConflictException('Lich dat da duoc tao khieu nai');
+      if ((error as { code?: string })?.code === 'P2002') throw new ConflictException('Lịch đặt đã được tạo khiếu nại');
       throw error;
     }
   }
@@ -2030,9 +2030,9 @@ export class BookingsService {
       select: { customerId: true, status: true, technician: { select: { userId: true } } },
     });
     if (!booking || (booking.customerId !== userId && booking.technician?.userId !== userId))
-      throw new ForbiddenException('Ban khong co quyen tao minh chung cho lich dat nay');
+      throw new ForbiddenException('Bạn không có quyền tạo minh chứng cho lịch đặt này');
     if (!COMPLAINABLE_STATUSES.includes(booking.status))
-      throw new BadRequestException('Chi co the gui minh chung cho don da co KTV nhan, da hoan thanh hoac da huy');
+      throw new BadRequestException('Chỉ có thể gửi minh chứng cho đơn đã có KTV nhận, đã hoàn thành hoặc đã hủy');
   }
 
   listComplaints(status?: string) {
@@ -2060,14 +2060,14 @@ export class BookingsService {
       where: { bookingId, customerId },
       include: COMPLAINT_CONTEXT_INCLUDE,
     });
-    if (!complaint) throw new NotFoundException('Don nay chua co khieu nai');
+    if (!complaint) throw new NotFoundException('Đơn này chưa có khiếu nại');
     return this.complaintContext(complaint);
   }
 
   /** Same view for the admin; opening it also creates the chat of an older complaint. */
   async adminComplaint(complaintId: string) {
     const complaint = await this.prisma.complaint.findUnique({ where: { id: complaintId }, include: COMPLAINT_CONTEXT_INCLUDE });
-    if (!complaint) throw new NotFoundException('Khieu nai khong ton tai');
+    if (!complaint) throw new NotFoundException('Khiếu nại không tồn tại');
     return { ...(await this.complaintContext(complaint)), customer: complaint.customer };
   }
 
@@ -2120,7 +2120,7 @@ export class BookingsService {
       where: { id },
       select: { id: true, bookingId: true, customerId: true },
     });
-    if (!complaint) throw new NotFoundException('Khieu nai khong ton tai');
+    if (!complaint) throw new NotFoundException('Khiếu nại không tồn tại');
     const updated = await this.prisma.complaint.update({ where: { id }, data: { status } });
     // The customer follows the case in its chat: post the change there and tell them.
     const conversationId = await ensureComplaintConversation(this.prisma, complaint);
@@ -2159,7 +2159,7 @@ export class BookingsService {
       return await db.booking.update({ where: { id, status: expectedStatus }, data });
     } catch (error) {
       if ((error as { code?: string })?.code === 'P2025') {
-        throw new ConflictException('Trang thai lich dat da thay doi, vui long tai lai');
+        throw new ConflictException('Trạng thái lịch đặt đã thay đổi, vui lòng tải lại');
       }
       throw error;
     }
@@ -2173,7 +2173,7 @@ export class BookingsService {
       throw new ConflictException({
         statusCode: 409,
         code: 'PHONE_REQUIRED',
-        message: 'Vui long cap nhat so dien thoai truoc khi nhan don',
+        message: 'Vui lòng cập nhật số điện thoại trước khi nhận đơn',
       });
   }
 
@@ -2187,8 +2187,8 @@ export class BookingsService {
       // Hidden by an admin: say so, with the reason, instead of the generic refusal.
       const hidden = await this.prisma.technicianProfile.findFirst({ where: { userId, isActive: false }, select: { hiddenReason: true } });
       if (hidden)
-        throw new ForbiddenException({ statusCode: 403, code: 'PROFILE_HIDDEN', message: 'Ho so KTV dang tam an', reason: hidden.hiddenReason ?? null });
-      throw new ForbiddenException('Tai khoan KTV chua du dieu kien nhan don');
+        throw new ForbiddenException({ statusCode: 403, code: 'PROFILE_HIDDEN', message: 'Hồ sơ KTV đang tạm ẩn', reason: hidden.hiddenReason ?? null });
+      throw new ForbiddenException('Tài khoản KTV chưa đủ điều kiện nhận đơn');
     }
     return profile;
   }
@@ -2199,7 +2199,7 @@ export class BookingsService {
       include: { items: { include: { catalogService: true } }, payment: { select: { method: true } } },
     });
     if (!booking || booking.assignmentMode !== 'OPEN_MARKETPLACE' || booking.status !== 'OPEN' || booking.technicianId)
-      throw new ConflictException('Don khong con mo de ung tuyen');
+      throw new ConflictException('Đơn không còn mở để nhận');
     if (booking.applicationDeadlineAt && booking.applicationDeadlineAt <= new Date()) {
       await this.expireOpenBookingIfDue(bookingId);
       throw new ConflictException('BOOKING_EXPIRED');
@@ -2215,7 +2215,7 @@ export class BookingsService {
     technicianProfileId: string,
   ) {
     if (booking.assignmentMode !== 'OPEN_MARKETPLACE' || booking.status !== 'OPEN')
-      throw new ConflictException('Don khong con mo');
+      throw new ConflictException('Đơn không còn mở');
     const profile = await db.technicianProfile.findFirst({
       where: {
         id: technicianProfileId,
@@ -2225,11 +2225,11 @@ export class BookingsService {
       },
       select: { id: true, userId: true, city: true, district: true, serviceModes: true, latitude: true, longitude: true, facility: true, address: true },
     });
-    if (!profile) throw new ForbiddenException('Tai khoan KTV chua du dieu kien nhan don');
+    if (!profile) throw new ForbiddenException('Tài khoản KTV chưa đủ điều kiện nhận đơn');
     // An account that booked as a customer (before becoming a technician) must not serve its own booking:
     // it is neither shown, announced, nor accepted/selected.
     if (booking.customerId && profile.userId === booking.customerId)
-      throw new ForbiddenException({ statusCode: 403, code: 'OWN_BOOKING', message: 'Khong the nhan don do chinh minh dat' });
+      throw new ForbiddenException({ statusCode: 403, code: 'OWN_BOOKING', message: 'Không thể nhận đơn do chính mình đặt' });
     const snapshot =
       booking.addressSnapshot && typeof booking.addressSnapshot === 'object' ? (booking.addressSnapshot as any) : null;
     // Online work can be done from anywhere: no radius or area filter.
@@ -2238,17 +2238,17 @@ export class BookingsService {
       const { maxDispatchRadiusKm } = await this.bookingRules();
       const distance = kmBetween(snapshot, profile);
       if (maxDispatchRadiusKm > 0 && distance !== null && distance > maxDispatchRadiusKm)
-        throw new ForbiddenException('KTV ngoai ban kinh phuc vu cua don');
+        throw new ForbiddenException('KTV ngoài bán kính phục vụ của đơn');
       if (snapshot?.city && profile.city && snapshot.city !== profile.city)
-        throw new ForbiddenException('KTV khong phu hop khu vuc cua don');
+        throw new ForbiddenException('KTV không phù hợp khu vực của đơn');
       if (snapshot?.district && profile.district && snapshot.district !== profile.district)
-        throw new ForbiddenException('KTV khong phu hop quan huyen cua don');
+        throw new ForbiddenException('KTV không phù hợp quận/huyện của đơn');
     }
     if (!profile.serviceModes.includes(booking.mode))
-      throw new ForbiddenException('KTV khong ho tro hinh thuc dich vu nay');
+      throw new ForbiddenException('KTV không hỗ trợ hình thức dịch vụ này');
     // The customer comes to the technician's facility, so one without an address cannot take it.
     if (booking.mode === 'ONSITE' && !profile.facility?.trim() && !profile.address?.trim())
-      throw new ConflictException({ statusCode: 409, code: 'FACILITY_REQUIRED', message: 'Vui long cap nhat dia chi co so truoc khi nhan don tai co so' });
+      throw new ConflictException({ statusCode: 409, code: 'FACILITY_REQUIRED', message: 'Vui lòng cập nhật địa chỉ cơ sở trước khi nhận đơn tại cơ sở' });
     const unfinished = await db.booking.findFirst({
       where: {
         technicianId: profile.id,
@@ -2257,18 +2257,18 @@ export class BookingsService {
       },
       select: { id: true },
     });
-    if (unfinished) throw new ConflictException('KTV phai hoan thanh don hien tai truoc khi nhan don moi');
+    if (unfinished) throw new ConflictException('KTV phải hoàn thành đơn hiện tại trước khi nhận đơn mới');
     // A suspended technician is neither announced, nor can apply or be selected.
-    if (await activeSuspension(db, profile.userId)) throw new ConflictException('KTV dang bi tam khoa, chua the nhan don moi');
+    if (await activeSuspension(db, profile.userId)) throw new ConflictException('KTV đang bị tạm khóa, chưa thể nhận đơn mới');
     // Nor while the account has its own booking (as a customer) waiting or not finished.
     const ownBooking = await db.booking.findFirst({
       where: { ...unfinishedAsCustomer(profile.userId), id: { not: booking.id } },
       select: { id: true },
     });
-    if (ownBooking) throw new ConflictException('KTV dang co don dat voi tu cach khach chua xong, chua the nhan don moi');
+    if (ownBooking) throw new ConflictException('KTV đang có đơn đặt với tư cách khách chưa xong, chưa thể nhận đơn mới');
     const catalogItems = (booking.items ?? []).map((item: any) => item.catalogService).filter(Boolean);
     if (!catalogItems.length || catalogItems.length !== (booking.items ?? []).length)
-      throw new BadRequestException('Du lieu dich vu OPEN khong hop le');
+      throw new BadRequestException('Dữ liệu dịch vụ của đơn mở không hợp lệ');
     for (const catalog of catalogItems) {
       const service = await db.technicianService.findFirst({
         where: {
@@ -2280,7 +2280,7 @@ export class BookingsService {
         },
         select: { id: true },
       });
-      if (!service) throw new ForbiddenException('KTV chua co dich vu phu hop voi don nay');
+      if (!service) throw new ForbiddenException('KTV chưa có dịch vụ phù hợp với đơn này');
     }
     const available = await db.availabilitySlot.findFirst({
       where: {
@@ -2291,7 +2291,7 @@ export class BookingsService {
       },
       select: { id: true },
     });
-    if (!available) throw new ConflictException('KTV khong ranh trong khung gio nay');
+    if (!available) throw new ConflictException('KTV không rảnh trong khung giờ này');
     const conflict = await db.booking.findFirst({
       where: {
         technicianId: profile.id,
@@ -2302,7 +2302,7 @@ export class BookingsService {
       },
       select: { id: true },
     });
-    if (conflict) throw new ConflictException('KTV da co lich trung thoi gian');
+    if (conflict) throw new ConflictException('KTV đã có lịch trùng thời gian');
   }
 
   private openBookingResponse(
@@ -2730,7 +2730,7 @@ export class BookingsService {
       },
       data: { usedCount: { increment: 1 } },
     });
-    if (!reserved.count) throw new BadRequestException('Ma khuyen mai da het luot su dung');
+    if (!reserved.count) throw new BadRequestException('Mã khuyến mãi đã hết lượt sử dụng');
   }
 
   private async validPromotion(userId: string, code: string, subtotal: number, db: Prisma.TransactionClient) {
@@ -2744,15 +2744,15 @@ export class BookingsService {
         OR: [{ recipients: { none: {} } }, { recipients: { some: { userId } } }],
       },
     });
-    if (!promotion) throw new BadRequestException('Ma khuyen mai khong hop le hoac da het han');
+    if (!promotion) throw new BadRequestException('Mã khuyến mãi không hợp lệ hoặc đã hết hạn');
     if (subtotal < Number(promotion.minOrderAmount))
-      throw new BadRequestException('Don hang chua dat gia tri toi thieu');
+      throw new BadRequestException('Đơn hàng chưa đạt giá trị tối thiểu');
     const userUses = await db.promotionUsage.count({ where: { promotionId: promotion.id, userId } });
     if (
       userUses >= promotion.perUserLimit ||
       (promotion.usageLimit !== null && promotion.usedCount >= promotion.usageLimit)
     )
-      throw new BadRequestException('Ma khuyen mai da het luot su dung');
+      throw new BadRequestException('Mã khuyến mãi đã hết lượt sử dụng');
     return promotion;
   }
 

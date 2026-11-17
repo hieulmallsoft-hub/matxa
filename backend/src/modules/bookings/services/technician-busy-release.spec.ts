@@ -82,11 +82,11 @@ describe('technician gets a booking while other open requests are pending', () =
     const service: any = new BookingsService(prisma, config, {} as any, {} as any);
     jest.spyOn(service, 'detail').mockResolvedValue(open);
     jest.spyOn(service, 'openJobForTechnician').mockRejectedValue(
-      new ConflictException('KTV phai hoan thanh don hien tai truoc khi nhan don moi'),
+      new ConflictException('KTV phải hoàn thành đơn hiện tại trước khi nhận đơn mới'),
     );
     await expect(service.technicianJobDetail('duc-user', 'other')).resolves.toMatchObject({
       displayStatus: 'UNAVAILABLE', canApply: false, canDecline: false,
-      unavailableReason: 'KTV phai hoan thanh don hien tai truoc khi nhan don moi',
+      unavailableReason: 'KTV phải hoàn thành đơn hiện tại trước khi nhận đơn mới',
     });
   });
 });

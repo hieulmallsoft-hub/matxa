@@ -62,7 +62,7 @@ describe('booking with a chosen technician uses their price', () => {
 
   it('refuses a length the technician does not sell instead of charging another price', async () => {
     const { prisma, book } = subject(lunaService(lunaOptions));
-    await expect(book('catalog-90')).rejects.toThrow('KTV khong co goi 90 phut cho dich vu nay');
+    await expect(book('catalog-90')).rejects.toThrow('KTV không có gói 90 phút cho dịch vụ này');
     expect(prisma.booking.create).not.toHaveBeenCalled();
   });
 });

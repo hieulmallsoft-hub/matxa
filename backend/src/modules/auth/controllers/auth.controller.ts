@@ -130,7 +130,7 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Gui OTP dang nhap den so dien thoai' })
   @ApiAcceptedResponse({ type: SendPhoneOtpResponse })
-  @ApiBadRequestResponse({ description: 'So dien thoai khong hop le' })
+  @ApiBadRequestResponse({ description: 'Số điện thoại không hợp lệ' })
   @ApiTooManyRequestsResponse({ description: 'Vuot gioi han gui OTP' })
   sendPhoneOtp(@Body() dto: SendPhoneOtpDto, @Req() request: Request): Promise<SendPhoneOtpResponse> {
     return this.authService.sendPhoneOtp(
@@ -201,7 +201,7 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Dang ky hoac dang nhap bang Google ID token' })
   @ApiOkResponse({ type: AuthResponse })
-  @ApiUnauthorizedResponse({ description: 'Google ID token khong hop le' })
+  @ApiUnauthorizedResponse({ description: 'Google ID token không hợp lệ' })
   loginWithGoogle(@Body() dto: FirebaseLoginDto, @Req() request: Request): Promise<AuthResponse> {
     return this.authService.loginWithGoogle(dto.idToken, this.getClientMetadata(request, dto.deviceId));
   }
@@ -244,7 +244,7 @@ export class AuthController {
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({ summary: 'Xoay refresh token va lay cap token moi' })
   @ApiOkResponse({ type: AuthResponse })
-  @ApiUnauthorizedResponse({ description: 'Refresh token khong hop le' })
+  @ApiUnauthorizedResponse({ description: 'Refresh token không hợp lệ' })
   refresh(@Body() dto: RefreshTokenDto, @Req() request: Request): Promise<AuthResponse> {
     return this.authService.refresh(dto.refreshToken, this.getClientMetadata(request));
   }

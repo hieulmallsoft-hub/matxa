@@ -23,9 +23,9 @@ export class RolesGuard implements CanActivate {
     if (!requiredRoles?.length) return true;
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const userId = request.auth?.sub;
-    if (!userId) throw new ForbiddenException('Khong co quyen truy cap');
+    if (!userId) throw new ForbiddenException('Không có quyền truy cập');
     const user = await this.prisma.user.findFirst({ where: { id: userId, status: 'ACTIVE' }, select: { role: true } });
-    if (!user || !requiredRoles.includes(user.role)) throw new ForbiddenException('Chi admin moi co quyen thuc hien');
+    if (!user || !requiredRoles.includes(user.role)) throw new ForbiddenException('Chỉ admin mới có quyền thực hiện');
     return true;
   }
 }

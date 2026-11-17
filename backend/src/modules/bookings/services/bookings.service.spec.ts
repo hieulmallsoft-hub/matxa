@@ -147,12 +147,12 @@ describe('BookingsService', () => {
   it('requires text for the OTHER cancellation reason', async () => {
     booking.findUnique.mockResolvedValue(existing('CONFIRMED'));
     user.findUnique.mockResolvedValue({ role: 'CUSTOMER' });
-    await expect(service.cancel('customer', 'b1', { reasonCode: 'OTHER' })).rejects.toThrow('ly do khac');
+    await expect(service.cancel('customer', 'b1', { reasonCode: 'OTHER' })).rejects.toThrow('lý do khác');
     expect(booking.update).not.toHaveBeenCalled();
   });
 
   it('allows ONLINE to enter the normal booking validation flow', async () => {
-    await expect(service.create('customer', { paymentMethod: 'ONLINE' } as never)).rejects.toThrow('dich vu');
+    await expect(service.create('customer', { paymentMethod: 'ONLINE' } as never)).rejects.toThrow('dịch vụ');
     expect(prisma.$transaction).toHaveBeenCalled();
   });
 
@@ -166,14 +166,14 @@ describe('BookingsService', () => {
       scheduledStart: new Date(Date.now() + 3600000).toISOString(),
       paymentMethod: 'CASH' as const,
     };
-    await expect(service.create('customer', dto)).rejects.toThrow('khong con hoat dong');
+    await expect(service.create('customer', dto)).rejects.toThrow('không còn hoạt động');
     expect(quote).toHaveBeenCalledWith('customer', dto, tx);
     expect(booking.create).not.toHaveBeenCalled();
   });
 
   it('allows a customer without a linked phone to enter normal booking validation', async () => {
     const quote = jest.spyOn(service, 'quote');
-    await expect(service.create('customer', { paymentMethod: 'CASH' } as never)).rejects.toThrow('dich vu');
+    await expect(service.create('customer', { paymentMethod: 'CASH' } as never)).rejects.toThrow('dịch vụ');
     expect(quote).toHaveBeenCalled();
     expect(prisma.$transaction).toHaveBeenCalled();
   });

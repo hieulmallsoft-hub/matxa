@@ -89,11 +89,11 @@ export class MarketplaceService {
 
   async searchTechnicians(query: SearchTechniciansDto, userId?: string): Promise<TechnicianListResponse> {
     if ((query.latitude === undefined) !== (query.longitude === undefined)) {
-      throw new BadRequestException('Can gui ca latitude va longitude');
+      throw new BadRequestException('Cần gửi cả latitude và longitude');
     }
     const hasLocation = query.latitude !== undefined && query.longitude !== undefined;
     if ((query.availableFrom === undefined) !== (query.availableTo === undefined)) {
-      throw new BadRequestException('Can gui ca availableFrom va availableTo');
+      throw new BadRequestException('Cần gửi cả availableFrom và availableTo');
     }
     const requestedFrom = query.availableFrom ? new Date(query.availableFrom) : undefined;
     const requestedTo = query.availableTo ? new Date(query.availableTo) : undefined;
@@ -102,13 +102,13 @@ export class MarketplaceService {
       requestedTo &&
       (!Number.isFinite(+requestedFrom) || !Number.isFinite(+requestedTo) || requestedTo <= requestedFrom)
     ) {
-      throw new BadRequestException('Khoang thoi gian tim KTV khong hop le');
+      throw new BadRequestException('Khoảng thời gian tìm KTV không hợp lệ');
     }
     if ((query.radiusKm !== undefined || requestedFrom) && !hasLocation) {
-      throw new BadRequestException('Can gui latitude va longitude khi loc theo thoi gian/khoang cach');
+      throw new BadRequestException('Cần gửi latitude và longitude khi lọc theo thời gian/khoảng cách');
     }
     if (query.sort === 'distance' && !hasLocation)
-      throw new BadRequestException('Sap xep khoang cach can latitude va longitude');
+      throw new BadRequestException('Sắp xếp khoảng cách cần latitude và longitude');
     if (
       hasLocation &&
       (!Number.isFinite(query.latitude) ||
@@ -116,7 +116,7 @@ export class MarketplaceService {
         Math.abs(query.latitude!) > 90 ||
         Math.abs(query.longitude!) > 180)
     ) {
-      throw new BadRequestException('Toa do khong hop le');
+      throw new BadRequestException('Tọa độ không hợp lệ');
     }
     const keyword = (query.search ?? query.keyword)?.trim();
     const tags = [
@@ -314,7 +314,7 @@ export class MarketplaceService {
 
   async technicianDetail(id: string, location: MarketplaceHomeQueryDto = {}, userId?: string) {
     if ((location.latitude === undefined) !== (location.longitude === undefined))
-      throw new BadRequestException('Can gui ca latitude va longitude');
+      throw new BadRequestException('Cần gửi cả latitude và longitude');
     if (
       location.latitude !== undefined &&
       (!Number.isFinite(location.latitude) ||
@@ -322,7 +322,7 @@ export class MarketplaceService {
         Math.abs(location.latitude) > 90 ||
         Math.abs(location.longitude!) > 180)
     )
-      throw new BadRequestException('Toa do khong hop le');
+      throw new BadRequestException('Tọa độ không hợp lệ');
     const profile = await this.prisma.technicianProfile.findUnique({
       where: { id, ...publicTechnicianWhere },
       select: {
@@ -361,7 +361,7 @@ export class MarketplaceService {
         },
       },
     });
-    if (!profile) throw new NotFoundException('Ky thuat vien khong ton tai');
+    if (!profile) throw new NotFoundException('Kỹ thuật viên không tồn tại');
     const supportedModes = [...new Set(profile.services.flatMap((service) => service.modes))];
     const favorite = userId
       ? await this.prisma.favorite.findUnique({
@@ -413,18 +413,18 @@ export class MarketplaceService {
     const { start, end } = availabilityRange(query);
     await this.requireTechnician(id);
     if (query.serviceIds && query.technicianServiceIds) {
-      throw new BadRequestException('Chi gui serviceIds hoac technicianServiceIds');
+      throw new BadRequestException('Chỉ gửi serviceIds hoặc technicianServiceIds');
     }
     const selectedServiceIds = query.technicianServiceIds ?? query.serviceIds;
     if (!selectedServiceIds) {
-      if (query.mode || query.date) throw new BadRequestException('Can serviceIds va mode de lay slot trong');
+      if (query.mode || query.date) throw new BadRequestException('Cần serviceIds và mode để lấy khung giờ trống');
       // Preserve the existing from/to-only working-schedule contract.
       return this.prisma.availabilitySlot.findMany({
         where: { technicianId: id, isAvailable: true, startAt: { lt: end }, endAt: { gt: start } },
         orderBy: { startAt: 'asc' },
       });
     }
-    if (!query.mode) throw new BadRequestException('Can mode de lay slot trong');
+    if (!query.mode) throw new BadRequestException('Cần mode để lấy khung giờ trống');
     const baseServices = await loadBookableServices(this.prisma, id, selectedServiceIds, query.mode);
     const services = await applyPriceOptions(this.prisma, baseServices, query.priceOptionIds);
     const durationMinutes = services.reduce((sum, service) => sum + service.durationMinutes, 0);
@@ -537,7 +537,7 @@ export class MarketplaceService {
       ]);
       const added = dto.serviceModes.filter((mode) => !(current?.serviceModes ?? []).includes(mode) && !(enabled as string[]).includes(mode));
       if (added.length)
-        throw new BadRequestException({ code: 'SERVICE_MODE_DISABLED', message: 'Hinh thuc phuc vu nay dang tam dung', modes: added });
+        throw new BadRequestException({ code: 'SERVICE_MODE_DISABLED', message: 'Hình thức phục vụ này đang tạm dừng', modes: added });
     }
     return this.prisma.technicianProfile.upsert({
       where: { userId },
@@ -552,16 +552,16 @@ export class MarketplaceService {
       where: { id: dto.catalogServiceId, isActive: true, category: { isActive: true } },
       include: { priceOptions: { where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { durationMinutes: 'asc' }] } },
     });
-    if (!catalog) throw new NotFoundException('Dich vu catalog khong ton tai hoac da bi an');
+    if (!catalog) throw new NotFoundException('Dịch vụ không tồn tại hoặc đã bị ẩn');
     const modes = dto.modes;
-    if (!modes.length) throw new BadRequestException('Dich vu phai co it nhat mot noi phuc vu');
+    if (!modes.length) throw new BadRequestException('Dịch vụ phải có ít nhất một nơi phục vụ');
     if (modes.some((mode) => !catalog.modes.includes(mode)))
-      throw new BadRequestException('Noi phuc vu khong duoc catalog cho phep');
+      throw new BadRequestException('Nơi phục vụ không được dịch vụ cho phép');
     if (catalog.modes.length === 1 && (modes.length !== 1 || modes[0] !== catalog.modes[0]))
-      throw new BadRequestException('Dich vu nay chi ho tro mot noi phuc vu da cau hinh');
+      throw new BadRequestException('Dịch vụ này chỉ hỗ trợ một nơi phục vụ đã cấu hình');
     if (modes.some((mode) => !profile.serviceModes.includes(mode)))
-      throw new BadRequestException('Dich vu khong phu hop voi noi phuc vu cua ho so KTV');
-    if (!catalog.priceOptions.length) throw new BadRequestException('Dich vu chua co goi gia hoat dong');
+      throw new BadRequestException('Dịch vụ không phù hợp với nơi phục vụ của hồ sơ KTV');
+    if (!catalog.priceOptions.length) throw new BadRequestException('Dịch vụ chưa có gói giá hoạt động');
     const primary = catalog.priceOptions[0];
     return this.prisma.technicianService.create({
       data: {
@@ -608,20 +608,20 @@ export class MarketplaceService {
   async updateMyService(userId: string, serviceId: string, dto: UpdateTechnicianServiceDto) {
     const profile = await this.myProfile(userId);
     if (dto.modes !== undefined) {
-      if (!dto.modes.length) throw new BadRequestException('Dich vu phai co it nhat mot noi phuc vu');
+      if (!dto.modes.length) throw new BadRequestException('Dịch vụ phải có ít nhất một nơi phục vụ');
       if (dto.modes.some((mode) => !profile.serviceModes.includes(mode)))
-        throw new BadRequestException('Dich vu khong phu hop voi noi phuc vu cua ho so KTV');
+        throw new BadRequestException('Dịch vụ không phù hợp với nơi phục vụ của hồ sơ KTV');
       const service = await this.prisma.technicianService.findFirst({
         where: { id: serviceId, technicianId: profile.id },
         select: { categoryId: true },
       });
-      if (!service) throw new NotFoundException('Dich vu khong ton tai');
+      if (!service) throw new NotFoundException('Dịch vụ không tồn tại');
     }
     const result = await this.prisma.technicianService.updateMany({
       where: { id: serviceId, technicianId: profile.id },
       data: dto,
     });
-    if (!result.count) throw new NotFoundException('Dich vu khong ton tai');
+    if (!result.count) throw new NotFoundException('Dịch vụ không tồn tại');
     return this.prisma.technicianService.findUniqueOrThrow({ where: { id: serviceId } });
   }
 
@@ -637,7 +637,7 @@ export class MarketplaceService {
 
   async createMyServicePriceOption(userId: string, serviceId: string, dto: CreateTechnicianServicePriceOptionDto) {
     void userId; void serviceId; void dto;
-    throw new ForbiddenException('Goi gia do Admin quan ly; KTV chi duoc chon goi gia tu catalog');
+    throw new ForbiddenException('Gói giá do Admin quản lý; KTV chỉ được chọn gói giá có sẵn');
   }
 
   async updateMyServicePriceOption(
@@ -648,7 +648,7 @@ export class MarketplaceService {
   ) {
     const profile = await this.myProfile(userId);
     if (dto.price === undefined && dto.isActive === undefined)
-      throw new BadRequestException('Vui long nhap gia hoac trang thai goi gia');
+      throw new BadRequestException('Vui lòng nhập giá hoặc trạng thái gói giá');
     if (dto.price !== undefined) await assertServicePrices(this.prisma, [dto.price]);
 
     return this.prisma.$transaction(async (tx) => {
@@ -659,7 +659,7 @@ export class MarketplaceService {
           technicianService: { technicianId: profile.id },
         },
       });
-      if (!option) throw new NotFoundException('Goi gia khong ton tai');
+      if (!option) throw new NotFoundException('Gói giá không tồn tại');
 
       const nextIsActive = dto.isActive ?? option.isActive;
       if (!nextIsActive) {
@@ -667,7 +667,7 @@ export class MarketplaceService {
           where: { technicianServiceId: serviceId, isActive: true, id: { not: optionId } },
         });
         if (activeCount === 0)
-          throw new BadRequestException('Dich vu phai co it nhat mot goi gia hoat dong');
+          throw new BadRequestException('Dịch vụ phải có ít nhất một gói giá hoạt động');
       }
 
       const updated = await tx.technicianServicePriceOption.update({
@@ -697,7 +697,7 @@ export class MarketplaceService {
 
   async removeMyServicePriceOption(userId: string, serviceId: string, optionId: string) {
     void userId; void serviceId; void optionId;
-    throw new ForbiddenException('Goi gia do Admin quan ly; KTV khong duoc xoa gia');
+    throw new ForbiddenException('Gói giá do Admin quản lý; KTV không được xóa giá');
   }
 
   async createAvailability(userId: string, dto: CreateAvailabilityDto) {
@@ -705,11 +705,11 @@ export class MarketplaceService {
     const startAt = new Date(dto.startAt);
     const endAt = new Date(dto.endAt);
     if (endAt <= startAt || startAt <= new Date())
-      throw new BadRequestException('Khung gio phai o tuong lai va co thoi gian hop le');
+      throw new BadRequestException('Khung giờ phải ở tương lai và có thời gian hợp lệ');
     const overlap = await this.prisma.availabilitySlot.findFirst({
       where: { technicianId: profile.id, startAt: { lt: endAt }, endAt: { gt: startAt } },
     });
-    if (overlap) throw new BadRequestException('Khung gio bi trung');
+    if (overlap) throw new BadRequestException('Khung giờ bị trùng');
     const slot = await this.prisma.availabilitySlot.create({ data: { technicianId: profile.id, startAt, endAt } });
     this.realtime?.broadcastAvailabilityChanged(profile.id);
     return slot;
@@ -718,7 +718,7 @@ export class MarketplaceService {
   async removeAvailability(userId: string, slotId: string) {
     const profile = await this.myProfile(userId);
     const result = await this.prisma.availabilitySlot.deleteMany({ where: { id: slotId, technicianId: profile.id } });
-    if (!result.count) throw new NotFoundException('Khung gio khong ton tai');
+    if (!result.count) throw new NotFoundException('Khung giờ không tồn tại');
     this.realtime?.broadcastAvailabilityChanged(profile.id);
   }
 
@@ -746,7 +746,7 @@ export class MarketplaceService {
     return this.prisma.$transaction(async (tx) => {
       await this.lockAddressOwner(tx, userId);
       const found = await tx.address.findFirst({ where: { id, userId, deletedAt: null } });
-      if (!found) throw new NotFoundException('Dia chi khong ton tai');
+      if (!found) throw new NotFoundException('Địa chỉ không tồn tại');
       if (dto.isDefault)
         await tx.address.updateMany({ where: { userId, deletedAt: null }, data: { isDefault: false } });
       // Explicitly unsetting the current default selects another address if available.
@@ -771,7 +771,7 @@ export class MarketplaceService {
     await this.prisma.$transaction(async (tx) => {
       await this.lockAddressOwner(tx, userId);
       const found = await tx.address.findFirst({ where: { id, userId, deletedAt: null } });
-      if (!found) throw new NotFoundException('Dia chi khong ton tai');
+      if (!found) throw new NotFoundException('Địa chỉ không tồn tại');
       await tx.address.update({ where: { id }, data: { deletedAt: new Date(), isDefault: false } });
       if (found.isDefault) {
         const replacement = await tx.address.findFirst({
@@ -828,7 +828,7 @@ export class MarketplaceService {
 
   private async myProfile(userId: string) {
     const profile = await this.prisma.technicianProfile.findUnique({ where: { userId } });
-    if (!profile) throw new ForbiddenException('Tai khoan chua co ho so ky thuat vien');
+    if (!profile) throw new ForbiddenException('Tài khoản chưa có hồ sơ kỹ thuật viên');
     return profile;
   }
 
@@ -837,7 +837,7 @@ export class MarketplaceService {
       where: { id: serviceId, technicianId },
       include: { category: { select: { slug: true } } },
     });
-    if (!service) throw new NotFoundException('Dich vu khong ton tai');
+    if (!service) throw new NotFoundException('Dịch vụ không tồn tại');
     return service;
   }
 
@@ -854,7 +854,7 @@ export class MarketplaceService {
           ? [120, 240, 360]
           : null;
     if (allowed && !allowed.includes(durationMinutes))
-      throw new BadRequestException(`Danh muc nay chi ho tro goi ${allowed.join(', ')} phut`);
+      throw new BadRequestException(`Danh mục này chỉ hỗ trợ gói ${allowed.join(', ')} phút`);
   }
 
   private async requireTechnician(id: string) {
@@ -862,11 +862,11 @@ export class MarketplaceService {
       where: { id, ...publicTechnicianWhere },
       select: { id: true },
     });
-    if (!technician) throw new NotFoundException('Ky thuat vien khong ton tai');
+    if (!technician) throw new NotFoundException('Kỹ thuật viên không tồn tại');
   }
 
   private async requireRole(userId: string, roles: string[]) {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
-    if (!user || !roles.includes(user.role)) throw new ForbiddenException('Ban khong co quyen thuc hien thao tac nay');
+    if (!user || !roles.includes(user.role)) throw new ForbiddenException('Bạn không có quyền thực hiện thao tác này');
   }
 }

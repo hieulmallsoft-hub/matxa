@@ -44,7 +44,7 @@ describe('signed-in user changes their password', () => {
   it('rejects a wrong current password without changing anything', async () => {
     const { service, prisma } = await subject();
     await expect(service.changePassword('user-1', 'session-1', 'wrong-password', 'new-password1')).rejects.toThrow(
-      new BadRequestException('Mat khau hien tai khong dung'),
+      new BadRequestException('Mật khẩu hiện tại không đúng'),
     );
     expect(prisma.userIdentity.update).not.toHaveBeenCalled();
     expect(prisma.session.updateMany).not.toHaveBeenCalled();
@@ -53,14 +53,14 @@ describe('signed-in user changes their password', () => {
   it('rejects reusing the current password', async () => {
     const { service } = await subject();
     await expect(service.changePassword('user-1', 'session-1', 'old-password1', 'old-password1')).rejects.toThrow(
-      'Mat khau moi phai khac mat khau hien tai',
+      'Mật khẩu mới phải khác mật khẩu hiện tại',
     );
   });
 
   it('rejects accounts that do not sign in with email and password', async () => {
     const { service } = await subject(null);
     await expect(service.changePassword('user-1', 'session-1', 'old-password1', 'new-password1')).rejects.toThrow(
-      'Tai khoan khong dang nhap bang mat khau',
+      'Tài khoản không đăng nhập bằng mật khẩu',
     );
   });
 });

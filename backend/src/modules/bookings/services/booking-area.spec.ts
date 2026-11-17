@@ -34,7 +34,7 @@ describe('online bookings are not tied to an area', () => {
   });
 
   it('still keeps home bookings to the customer city', async () => {
-    await expect(eligibility('HOME')).rejects.toThrow('KTV khong phu hop khu vuc cua don');
+    await expect(eligibility('HOME')).rejects.toThrow('KTV không phù hợp khu vực của đơn');
   });
 
   it('does not filter suggested technicians by city for ONLINE', async () => {

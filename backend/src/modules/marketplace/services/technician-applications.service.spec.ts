@@ -107,7 +107,7 @@ describe('TechnicianApplicationsService.updateMine with the ID card QR', () => {
 
   it('says the scan is wrong instead of saving a bad QR', async () => {
     const { prisma, service } = setup();
-    await expect(service.updateMine('user-1', { idCardQr: 'https://example.com' })).rejects.toThrow('Ma QR CCCD khong hop le');
+    await expect(service.updateMine('user-1', { idCardQr: 'https://example.com' })).rejects.toThrow('Mã QR CCCD không hợp lệ');
     expect(prisma.technicianApplication.update).not.toHaveBeenCalled();
   });
 });

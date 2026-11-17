@@ -65,10 +65,10 @@ describe('assigning an open booking charges the chosen technician', () => {
     const { service, state } = subject();
     state.balance = 1000;
     jest.spyOn(service, 'chargeTechnicianCommission').mockRejectedValue(
-      new (require('@nestjs/common').ConflictException)('So du vi khong du de nhan don'),
+      new (require('@nestjs/common').ConflictException)('Số dư ví không đủ để nhận đơn'),
     );
     await expect(service.selectTechnician('customer-1', 'booking-1', 'fftools-application')).rejects.toThrow(
-      'KTV nay hien khong nhan duoc don, vui long chon KTV khac',
+      'KTV này hiện không nhận được đơn, vui lòng chọn KTV khác',
     );
   });
 });

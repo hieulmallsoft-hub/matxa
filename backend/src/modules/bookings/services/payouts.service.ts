@@ -85,9 +85,9 @@ export class PayoutsService {
         select: { id: true, amount: true },
       });
       const total = earnings.reduce((sum, item) => sum + item.amount, 0);
-      if (!earnings.length) throw new NotFoundException('Khong con khoan nao can chi cho KTV nay');
+      if (!earnings.length) throw new NotFoundException('Không còn khoản nào cần chi cho KTV này');
       if (total !== Math.round(dto.amount))
-        throw new ConflictException('So tien da thay doi, vui long tai lai danh sach truoc khi xac nhan');
+        throw new ConflictException('Số tiền đã thay đổi, vui lòng tải lại danh sách trước khi xác nhận');
       const profile = await tx.technicianProfile.findUnique({
         where: { userId: technicianUserId },
         select: { bankBin: true, bankName: true, bankAccountNumber: true, bankAccountName: true },
@@ -108,7 +108,7 @@ export class PayoutsService {
         where: { id: { in: earnings.map((item) => item.id) }, payoutId: null },
         data: { payoutId: created.id },
       });
-      if (settled.count !== earnings.length) throw new ConflictException('Khoan chi da duoc xac nhan, vui long tai lai');
+      if (settled.count !== earnings.length) throw new ConflictException('Khoản chi đã được xác nhận, vui lòng tải lại');
       return created;
     });
     void this.notify(technicianUserId, 'TECHNICIAN_PAYOUT_SENT', 'Đã chuyển tiền thu nhập', `Psyocore đã chuyển ${payout.amount.toLocaleString('vi-VN')}đ thu nhập đơn trực tuyến vào tài khoản của bạn.`);
@@ -153,7 +153,7 @@ export class PayoutsService {
       where: { id: refundId, status: 'PENDING' },
       data: { status: 'DONE', doneById: adminId, doneAt: new Date(), note: note?.trim() || null },
     });
-    if (!updated.count) throw new NotFoundException('Khoan hoan tien khong ton tai hoac da hoan');
+    if (!updated.count) throw new NotFoundException('Khoản hoàn tiền không tồn tại hoặc đã hoàn');
     const refund = await this.prisma.bookingRefund.findUniqueOrThrow({ where: { id: refundId } });
     await this.prisma.payment.updateMany({ where: { bookingId: refund.bookingId }, data: { status: 'REFUNDED', refundedAt: new Date() } });
     void this.notify(refund.customerId, 'BOOKING_REFUNDED', 'Đã hoàn tiền', `Psyocore đã hoàn ${refund.amount.toLocaleString('vi-VN')}đ cho đơn #${refund.bookingId.slice(0, 8).toUpperCase()}.`);

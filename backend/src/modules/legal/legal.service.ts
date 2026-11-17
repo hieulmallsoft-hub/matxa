@@ -56,7 +56,7 @@ export class LegalService {
       where: { code, isActive: true },
       orderBy: { version: 'desc' },
     });
-    if (!row) throw new NotFoundException('Van ban khong ton tai');
+    if (!row) throw new NotFoundException('Văn bản không tồn tại');
     return { ...summary(row), downloadUrl: await this.downloadUrl(row.storageKey), expiresIn: 600 };
   }
 
@@ -85,13 +85,13 @@ export class LegalService {
     file: { originalname: string; mimetype: string; size: number; buffer: Buffer } | undefined,
     dto: { code?: string; title: string; audience: string; sortOrder?: number },
   ) {
-    if (!file?.buffer?.length || file.mimetype !== 'application/pdf') throw new BadRequestException('Van ban phai la file PDF');
-    if (file.size > MAX_PDF_BYTES) throw new BadRequestException(`File PDF toi da ${MAX_PDF_BYTES / 1_000_000}MB`);
+    if (!file?.buffer?.length || file.mimetype !== 'application/pdf') throw new BadRequestException('Văn bản phải là file PDF');
+    if (file.size > MAX_PDF_BYTES) throw new BadRequestException(`File PDF tối đa ${MAX_PDF_BYTES / 1_000_000}MB`);
     const title = dto.title?.trim();
-    if (!title) throw new BadRequestException('Vui long nhap ten van ban');
-    if (!LEGAL_AUDIENCES.includes(dto.audience as LegalAudience)) throw new BadRequestException('Doi tuong phai la CUSTOMER, TECHNICIAN hoac ALL');
+    if (!title) throw new BadRequestException('Vui lòng nhập tên văn bản');
+    if (!LEGAL_AUDIENCES.includes(dto.audience as LegalAudience)) throw new BadRequestException('Đối tượng phải là CUSTOMER, TECHNICIAN hoặc ALL');
     const code = codeFromTitle(dto.code?.trim() || title);
-    if (!code) throw new BadRequestException('Ma van ban khong hop le');
+    if (!code) throw new BadRequestException('Mã văn bản không hợp lệ');
 
     const latest = await this.prisma.legalDocument.findFirst({ where: { code }, orderBy: { version: 'desc' } });
     const version = (latest?.version ?? 0) + 1;
@@ -112,7 +112,7 @@ export class LegalService {
   /** Takes a document off the apps; uploading it again publishes the next version. */
   async hide(code: string) {
     const result = await this.prisma.legalDocument.updateMany({ where: { code }, data: { isActive: false } });
-    if (!result.count) throw new NotFoundException('Van ban khong ton tai');
+    if (!result.count) throw new NotFoundException('Văn bản không tồn tại');
     return { code, published: false };
   }
 

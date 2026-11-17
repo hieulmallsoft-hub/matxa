@@ -38,8 +38,8 @@ describe('technician profile photos and certificates', () => {
   });
 
   it('caps certificates at 2 and profile photos at 6', async () => {
-    await expect(subject({ status: 'APPROVED' }, 2).service.addGalleryImage('user-1', key, 0, 'CERTIFICATE')).rejects.toThrow('Toi da 2 anh chung chi');
-    await expect(subject({ status: 'APPROVED' }, 6).service.addGalleryImage('user-1', key)).rejects.toThrow('Toi da 6 anh ho so');
+    await expect(subject({ status: 'APPROVED' }, 2).service.addGalleryImage('user-1', key, 0, 'CERTIFICATE')).rejects.toThrow('Tối đa 2 ảnh chứng chỉ');
+    await expect(subject({ status: 'APPROVED' }, 6).service.addGalleryImage('user-1', key)).rejects.toThrow('Tối đa 6 ảnh hồ sơ');
   });
 
   it('needs a reason to reject a photo, and tells the technician', async () => {

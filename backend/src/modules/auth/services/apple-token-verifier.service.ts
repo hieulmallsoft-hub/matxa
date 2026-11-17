@@ -30,7 +30,7 @@ export class AppleTokenVerifierService {
         ?.split(',')
         .some((value) => value.trim())
     ) {
-      throw new ServiceUnavailableException('Apple Sign In chua duoc cau hinh');
+      throw new ServiceUnavailableException('Apple Sign In chưa được cấu hình');
     }
     const nonce = randomBytes(32).toString('hex');
     const hash = createHash('sha256').update(nonce).digest('hex');
@@ -45,7 +45,7 @@ export class AppleTokenVerifierService {
       .map((value) => value.trim())
       .filter(Boolean);
     if (!audiences?.length) {
-      throw new ServiceUnavailableException('Apple Sign In chua duoc cau hinh');
+      throw new ServiceUnavailableException('Apple Sign In chưa được cấu hình');
     }
     const [primaryAudience, ...additionalAudiences] = audiences;
     const audience = additionalAudiences.length
@@ -68,10 +68,10 @@ export class AppleTokenVerifierService {
       }
 
       const expectedNonce = createHash('sha256').update(rawNonce).digest('hex');
-      if (payload.nonce !== expectedNonce) throw new Error('Apple nonce khong khop');
+      if (payload.nonce !== expectedNonce) throw new Error('Apple nonce không khớp');
       // Atomic consumption prevents concurrent requests from reusing a challenge.
       if ((await this.redis.client.getDel(`auth:apple:nonce:${expectedNonce}`)) !== '1') {
-        throw new Error('Apple nonce het han hoac da su dung');
+        throw new Error('Apple nonce hết hạn hoặc đã sử dụng');
       }
 
       return {
@@ -80,7 +80,7 @@ export class AppleTokenVerifierService {
         emailVerified: payload.email_verified === true || payload.email_verified === 'true',
       };
     } catch {
-      throw new UnauthorizedException('Apple identity token khong hop le');
+      throw new UnauthorizedException('Apple identity token không hợp lệ');
     }
   }
 

@@ -38,7 +38,7 @@ describe('booking rules from admin settings', () => {
       ['a technician search', (service: any, start: string) => service.matchingTechnicians('customer-1', { scheduledStart: start })],
     ])('rejects %s that starts too soon', async (_label, call) => {
       await expect(call(subject({ minAdvanceHours: 2 }), inHours(1))).rejects.toThrow(
-        new BadRequestException('Vui long dat lich truoc it nhat 2 gio'),
+        new BadRequestException('Vui lòng đặt lịch trước ít nhất 2 giờ'),
       );
     });
 
@@ -75,7 +75,7 @@ describe('booking rules from admin settings', () => {
 
     it('keeps a technician outside the radius from seeing or taking the booking', async () => {
       await expect(check({ maxDispatchRadiusKm: 10 }, far)).rejects.toThrow(
-        new ForbiddenException('KTV ngoai ban kinh phuc vu cua don'),
+        new ForbiddenException('KTV ngoài bán kính phục vụ của đơn'),
       );
     });
 

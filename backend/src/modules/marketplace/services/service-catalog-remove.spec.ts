@@ -23,7 +23,7 @@ describe('deleting a catalog service', () => {
   it('keeps a booked service and tells the admin to hide it', async () => {
     const { prisma, service } = subject(3);
     await expect(service.remove('svc-1')).rejects.toBeInstanceOf(ConflictException);
-    await expect(service.remove('svc-1')).rejects.toThrow('3 don dat lich');
+    await expect(service.remove('svc-1')).rejects.toThrow('3 đơn đặt lịch');
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 

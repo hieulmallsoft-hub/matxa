@@ -4,7 +4,7 @@ import Modal from './ui/Modal';
 import { useToast } from './ui/ToastContainer';
 import { Button, Field, FormError, Input } from './ui/kit';
 
-// Backend messages are unaccented; show the admin proper Vietnamese.
+// Older backends sent these unaccented; newer ones send them with accents and they show as is.
 const SERVER_MESSAGES: Record<string, string> = {
   'Mat khau hien tai khong dung': 'Mật khẩu hiện tại không đúng.',
   'Mat khau moi phai khac mat khau hien tai': 'Mật khẩu mới phải khác mật khẩu hiện tại.',

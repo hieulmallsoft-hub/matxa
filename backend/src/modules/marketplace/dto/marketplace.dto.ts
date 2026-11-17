@@ -304,7 +304,7 @@ export class CreateAddressDto {
   })
   @Transform(({ value }) => (typeof value === 'string' ? value.replace(/[\s.\-]/g, '') || null : value))
   @IsOptional()
-  @Matches(/^\+?[0-9]{8,15}$/, { message: 'So dien thoai khong hop le' })
+  @Matches(/^\+?[0-9]{8,15}$/, { message: 'Số điện thoại không hợp lệ' })
   phone?: string | null;
 }
 

@@ -40,7 +40,7 @@ export class WalletTopupExpirationService implements OnModuleInit, OnModuleDestr
       data: {
         status: 'EXPIRED',
         failureCode: 'EXPIRED',
-        failureMessage: 'Giao dich het han thanh toan',
+        failureMessage: 'Giao dịch hết hạn thanh toán',
         processedAt: now,
       },
     });

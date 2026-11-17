@@ -5,8 +5,8 @@ const MINUTE = 60_000;
 export type TimeInterval = { startAt: Date; endAt: Date };
 
 export function availabilityRange(query: { date?: string; from?: string; to?: string }) {
-  if (query.date && (query.from || query.to)) throw new BadRequestException('Chi truyen date hoac from/to');
-  if (!query.date && (!query.from || !query.to)) throw new BadRequestException('Can date hoac ca from va to');
+  if (query.date && (query.from || query.to)) throw new BadRequestException('Chỉ truyền date hoặc from/to');
+  if (!query.date && (!query.from || !query.to)) throw new BadRequestException('Cần date hoặc cả from và to');
   const start = new Date(query.date ? `${query.date}T00:00:00+07:00` : query.from!);
   const end = query.date ? new Date(start.getTime() + 86_400_000) : new Date(query.to!);
   if (
@@ -15,7 +15,7 @@ export function availabilityRange(query: { date?: string; from?: string; to?: st
     end <= start ||
     end.getTime() - start.getTime() > 31 * 86_400_000
   ) {
-    throw new BadRequestException('Khoang ngay khong hop le, toi da 31 ngay');
+    throw new BadRequestException('Khoảng ngày không hợp lệ, tối đa 31 ngày');
   }
   return { start, end };
 }
@@ -31,7 +31,7 @@ export function buildAvailableSlots(
 ) {
   const duration = durationMinutes * MINUTE;
   const step = stepMinutes * MINUTE;
-  if (duration <= 0 || step <= 0) throw new BadRequestException('Thoi luong/step khong hop le');
+  if (duration <= 0 || step <= 0) throw new BadRequestException('Thời lượng/bước không hợp lệ');
   const busy = [...occupied].sort((a, b) => +a.startAt - +b.startAt);
   const result = new Map<number, { startAt: Date; endAt: Date }>();
   for (const window of working) {

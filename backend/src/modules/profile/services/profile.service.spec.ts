@@ -58,7 +58,7 @@ describe('ProfileService', () => {
   });
 
   it('rejects a blank display name', async () => {
-    await expect(service.updateMe(user.id, { displayName: '   ' })).rejects.toThrow('Ten hien thi');
+    await expect(service.updateMe(user.id, { displayName: '   ' })).rejects.toThrow('Tên hiển thị');
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 

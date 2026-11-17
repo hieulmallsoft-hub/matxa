@@ -43,14 +43,14 @@ export class MarketplaceGateway implements OnGatewayConnection {
       client.data.userId = payload.sub;
       this.realtime.attach(this.server);
     } catch {
-      client.emit('auth.error', { message: 'Access token khong hop le hoac da het han' });
+      client.emit('auth.error', { message: 'Access token không hợp lệ hoặc đã hết hạn' });
       client.disconnect(true);
     }
   }
 
   @SubscribeMessage('matching.subscribe')
   async subscribe(@ConnectedSocket() client: AuthSocket) {
-    if (!client.data.userId) return { event: 'matching.error', data: { message: 'Chua xac thuc' } };
+    if (!client.data.userId) return { event: 'matching.error', data: { message: 'Chưa xác thực' } };
     await client.join('marketplace:matching');
     return { event: 'matching.subscribed', data: { realtime: true } };
   }

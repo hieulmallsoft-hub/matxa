@@ -53,13 +53,13 @@ describe('promotion code on an open booking', () => {
 
   it('refuses an invalid code instead of silently charging full price', async () => {
     const { service, prisma, dto } = setup(null);
-    await expect(service.createOpen('customer-1', dto)).rejects.toThrow('Ma khuyen mai khong hop le hoac da het han');
+    await expect(service.createOpen('customer-1', dto)).rejects.toThrow('Mã khuyến mãi không hợp lệ hoặc đã hết hạn');
     expect(prisma.booking.create).not.toHaveBeenCalled();
   });
 
   it('refuses when the last use was just taken by someone else', async () => {
     const { service, prisma, dto } = setup(promotion, 0);
-    await expect(service.createOpen('customer-1', dto)).rejects.toThrow('Ma khuyen mai da het luot su dung');
+    await expect(service.createOpen('customer-1', dto)).rejects.toThrow('Mã khuyến mãi đã hết lượt sử dụng');
     expect(prisma.booking.create).not.toHaveBeenCalled();
   });
 });

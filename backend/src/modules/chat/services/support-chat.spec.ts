@@ -117,7 +117,7 @@ describe('support conversations', () => {
     await expect(service.venueInquiryText('venue')).resolves.toBe('Mình muốn đặt lịch tại Mạc Thị - Spa cho Nam (123 Nguyễn Trãi).');
     expect(prisma.venue.findFirst.mock.calls[0][0].where).toEqual({ id: 'venue', isActive: true, deletedAt: null });
     prisma.venue.findFirst.mockResolvedValue(null);
-    await expect(service.venueInquiryText('hidden')).rejects.toThrow('Khong tim thay dia diem');
+    await expect(service.venueInquiryText('hidden')).rejects.toThrow('Không tìm thấy địa điểm');
   });
 
   it('exposes support system events with display text in history', async () => {

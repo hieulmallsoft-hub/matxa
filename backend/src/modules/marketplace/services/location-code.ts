@@ -41,7 +41,7 @@ export async function resolveLocationCodes(db: LocationDb, city: string | null |
     if (!city.trim()) cityCode = null;
     else {
       const found = match(await db.city.findMany({ where: { isActive: true }, select: { code: true, name: true } }), city, CITY_PREFIX);
-      if (!found) throw new BadRequestException({ code: 'INVALID_CITY', message: 'Tinh/thanh pho khong hop le' });
+      if (!found) throw new BadRequestException({ code: 'INVALID_CITY', message: 'Tỉnh/thành phố không hợp lệ' });
       cityCode = found.code;
     }
   }
@@ -49,10 +49,10 @@ export async function resolveLocationCodes(db: LocationDb, city: string | null |
   if (district !== undefined && district !== null) {
     if (!district.trim()) districtCode = null;
     else {
-      if (!cityCode) throw new BadRequestException({ code: 'INVALID_DISTRICT', message: 'Chon tinh/thanh pho truoc khi chon phuong/xa' });
+      if (!cityCode) throw new BadRequestException({ code: 'INVALID_DISTRICT', message: 'Chọn tỉnh/thành phố trước khi chọn phường/xã' });
       const rows = await db.district.findMany({ where: { cityCode, isActive: true }, select: { code: true, name: true } });
       const found = match(rows, district, DISTRICT_PREFIX);
-      if (!found) throw new BadRequestException({ code: 'INVALID_DISTRICT', message: 'Phuong/xa khong thuoc tinh/thanh pho da chon' });
+      if (!found) throw new BadRequestException({ code: 'INVALID_DISTRICT', message: 'Phường/xã không thuộc tỉnh/thành phố đã chọn' });
       districtCode = found.code;
     }
   }

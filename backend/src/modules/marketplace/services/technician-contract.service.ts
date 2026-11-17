@@ -22,7 +22,7 @@ export class TechnicianContractService {
 
   private async ensure(userId: string) {
     const app = await this.prisma.technicianApplication.findUnique({ where: { userId } });
-    if (!app || app.status !== 'APPROVED') throw new ConflictException('Ho so KTV chua duoc duyet');
+    if (!app || app.status !== 'APPROVED') throw new ConflictException('Hồ sơ KTV chưa được duyệt');
     const identity = await this.prisma.userIdentity.findFirst({ where: { userId, provider: 'PHONE' }, select: { phoneNumber: true } });
     const contract = await this.prisma.technicianContract.upsert({
       where: { userId },
@@ -49,9 +49,9 @@ export class TechnicianContractService {
   }
 
   async signatureUploadUrl(userId: string, contentType = 'image/png', size = 0) {
-    if (!['image/png', 'image/jpeg'].includes(contentType) || size > 2_000_000) throw new BadRequestException('Chu ky khong hop le');
+    if (!['image/png', 'image/jpeg'].includes(contentType) || size > 2_000_000) throw new BadRequestException('Chữ ký không hợp lệ');
     const contract = await this.ensure(userId);
-    if (contract.status === 'APPROVED') throw new ConflictException('Hop dong da duoc duyet');
+    if (contract.status === 'APPROVED') throw new ConflictException('Hợp đồng đã được duyệt');
     const { bucket, client } = this.storage();
     const storageKey = `technician-contracts/${userId}/signatures/${randomUUID()}.png`;
     const uploadUrl = await getSignedUrl(client, new PutObjectCommand({ Bucket: bucket, Key: storageKey, ContentType: contentType }), { expiresIn: 600 });
@@ -60,18 +60,18 @@ export class TechnicianContractService {
 
   async sign(userId: string, signatureKey: string) {
     const contract = await this.ensure(userId);
-    if (!signatureKey.startsWith(`technician-contracts/${userId}/signatures/`)) throw new BadRequestException('Signature key khong hop le');
-    if (!['DRAFT', 'REJECTED'].includes(contract.status)) throw new ConflictException('Hop dong khong o trang thai cho ky');
+    if (!signatureKey.startsWith(`technician-contracts/${userId}/signatures/`)) throw new BadRequestException('Signature key không hợp lệ');
+    if (!['DRAFT', 'REJECTED'].includes(contract.status)) throw new ConflictException('Hợp đồng không ở trạng thái chờ ký');
     return this.prisma.technicianContract.update({ where: { id: contract.id }, data: { signatureKey, signedAt: new Date(), status: 'PENDING_REVIEW', rejectionReason: null } });
   }
 
   async templateUploadUrl(fileName: string, contentType: string) {
-    if (contentType !== 'application/pdf') throw new BadRequestException('Mau hop dong phai la PDF');
+    if (contentType !== 'application/pdf') throw new BadRequestException('Mẫu hợp đồng phải là PDF');
     const { bucket, client } = this.storage(); const storageKey = `technician-contracts/templates/${randomUUID()}.pdf`;
     return { uploadUrl: await getSignedUrl(client, new PutObjectCommand({ Bucket: bucket, Key: storageKey, ContentType: contentType }), { expiresIn: 600 }), storageKey, expiresIn: 600 };
   }
   async uploadTemplateFile(file: any) {
-    if (!file?.buffer?.length || file.mimetype !== 'application/pdf') throw new BadRequestException('Mau hop dong phai la PDF');
+    if (!file?.buffer?.length || file.mimetype !== 'application/pdf') throw new BadRequestException('Mẫu hợp đồng phải là PDF');
     const { bucket, client } = this.storage();
     const storageKey = `technician-contracts/templates/${randomUUID()}.pdf`;
     await client.send(new PutObjectCommand({ Bucket: bucket, Key: storageKey, ContentType: file.mimetype, Body: file.buffer }));
@@ -79,13 +79,13 @@ export class TechnicianContractService {
     return this.prisma.contractTemplate.create({ data: { storageKey, fileName: file.originalname, contentType: file.mimetype, isActive: true } });
   }
   async setTemplate(storageKey: string, fileName: string, contentType: string) {
-    if (!storageKey.startsWith('technician-contracts/templates/')) throw new BadRequestException('Storage key khong hop le');
+    if (!storageKey.startsWith('technician-contracts/templates/')) throw new BadRequestException('Storage key không hợp lệ');
     await this.prisma.contractTemplate.updateMany({ data: { isActive: false } });
     return this.prisma.contractTemplate.create({ data: { storageKey, fileName, contentType, isActive: true } });
   }
   async templateUrl() {
     const template = await this.prisma.contractTemplate.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'desc' } });
-    if (!template) throw new NotFoundException('Chua co mau hop dong'); const { bucket, client } = this.storage();
+    if (!template) throw new NotFoundException('Chưa có mẫu hợp đồng'); const { bucket, client } = this.storage();
     return { templateId: template.id, fileName: template.fileName, downloadUrl: await getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: template.storageKey }), { expiresIn: 600 }), expiresIn: 600 };
   }
   listAdmin() { return this.prisma.technicianContract.findMany({ orderBy: { createdAt: 'desc' } }); }
@@ -96,15 +96,15 @@ export class TechnicianContractService {
   /** The active template for someone filling in their application (they are not a technician yet). */
   async applicantTemplate(userId: string) {
     const app = await this.prisma.technicianApplication.findUnique({ where: { userId }, select: { id: true } });
-    if (!app) throw new NotFoundException('Chua co ho so dang ky');
+    if (!app) throw new NotFoundException('Chưa có hồ sơ đăng ký');
     return this.templateUrl();
   }
 
   async applicantSignatureUploadUrl(userId: string, contentType = 'image/png', size = 0) {
-    if (!['image/png', 'image/jpeg'].includes(contentType) || size > 2_000_000) throw new BadRequestException('Chu ky phai la anh PNG/JPEG toi da 2MB');
+    if (!['image/png', 'image/jpeg'].includes(contentType) || size > 2_000_000) throw new BadRequestException('Chữ ký phải là ảnh PNG/JPEG tối đa 2MB');
     const app = await this.prisma.technicianApplication.findUnique({ where: { userId }, select: { status: true } });
-    if (!app) throw new NotFoundException('Chua co ho so dang ky');
-    if (!['DRAFT', 'REJECTED'].includes(app.status)) throw new ConflictException('Ho so dang cho duyet hoac da duoc duyet');
+    if (!app) throw new NotFoundException('Chưa có hồ sơ đăng ký');
+    if (!['DRAFT', 'REJECTED'].includes(app.status)) throw new ConflictException('Hồ sơ đang chờ duyệt hoặc đã được duyệt');
     const { bucket, client } = this.storage();
     const storageKey = `technician-contracts/${userId}/signatures/${randomUUID()}.${contentType === 'image/jpeg' ? 'jpg' : 'png'}`;
     const uploadUrl = await getSignedUrl(client, new PutObjectCommand({ Bucket: bucket, Key: storageKey, ContentType: contentType }), { expiresIn: 600 });
@@ -117,7 +117,7 @@ export class TechnicianContractService {
    */
   async applicantPreview(userId: string) {
     const app = await this.prisma.technicianApplication.findUnique({ where: { userId } });
-    if (!app) throw new NotFoundException('Chua co ho so dang ky');
+    if (!app) throw new NotFoundException('Chưa có hồ sơ đăng ký');
     const { bucket, client } = this.storage();
     const { template, templateBytes, phoneNumber, existingNumber } = await this.contractInputs(client, bucket, userId);
     const pdf = await buildSignedContractPdf(templateBytes, null, {
@@ -162,12 +162,12 @@ export class TechnicianContractService {
 
   /** Records who signed, when and from where, and stores the template + signature page as one PDF. */
   async signApplication(userId: string, signatureKey: string, meta: { ip: string | null; userAgent: string | null; device: string | null }) {
-    if (!signatureKey?.startsWith(`technician-contracts/${userId}/signatures/`)) throw new BadRequestException('Chu ky khong hop le');
+    if (!signatureKey?.startsWith(`technician-contracts/${userId}/signatures/`)) throw new BadRequestException('Chữ ký không hợp lệ');
     const app = await this.prisma.technicianApplication.findUnique({ where: { userId } });
-    if (!app) throw new NotFoundException('Chua co ho so dang ky');
+    if (!app) throw new NotFoundException('Chưa có hồ sơ đăng ký');
     const { bucket, client } = this.storage();
     const signature = await this.readObject(client, bucket, signatureKey).catch(() => {
-      throw new BadRequestException('Chua tai anh chu ky len');
+      throw new BadRequestException('Chưa tải ảnh chữ ký lên');
     });
     const { template, templateBytes, phoneNumber, existingNumber } = await this.contractInputs(client, bucket, userId);
     const contractNumber = existingNumber ?? `HD-${new Date().getFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`;
@@ -223,7 +223,7 @@ export class TechnicianContractService {
   /** The applicant's own signed contract, so the app shows the merged PDF instead of drawing its own copy. */
   async applicantContract(userId: string) {
     const app = await this.prisma.technicianApplication.findUnique({ where: { userId }, select: { id: true } });
-    if (!app) throw new NotFoundException('Chua co ho so dang ky');
+    if (!app) throw new NotFoundException('Chưa có hồ sơ đăng ký');
     return this.contractForApplication(app.id);
   }
 
@@ -242,15 +242,15 @@ export class TechnicianContractService {
   private async readObject(client: S3Client, bucket: string, key: string) {
     const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
     const body = result.Body as { transformToByteArray(): Promise<Uint8Array> } | undefined;
-    if (!body) throw new NotFoundException('File khong ton tai');
+    if (!body) throw new NotFoundException('File không tồn tại');
     return { bytes: await body.transformToByteArray(), contentType: result.ContentType ?? '' };
   }
 
   async review(adminId: string, id: string, status: 'APPROVED' | 'REJECTED', reason?: string) {
     const contract = await this.prisma.technicianContract.findUnique({ where: { id } });
-    if (!contract) throw new NotFoundException('Hop dong khong ton tai');
-    if (contract.status !== 'PENDING_REVIEW') throw new ConflictException('Hop dong chua cho admin duyet');
-    if (status === 'REJECTED' && !reason?.trim()) throw new BadRequestException('Can co ly do tu choi');
+    if (!contract) throw new NotFoundException('Hợp đồng không tồn tại');
+    if (contract.status !== 'PENDING_REVIEW') throw new ConflictException('Hợp đồng chưa chờ admin duyệt');
+    if (status === 'REJECTED' && !reason?.trim()) throw new BadRequestException('Cần có lý do từ chối');
     let signedDocumentKey = contract.signedDocumentKey;
     // Contracts signed while applying already carry the merged PDF; only older ones get the HTML summary.
     if (status === 'APPROVED' && !signedDocumentKey) {
@@ -266,7 +266,7 @@ export class TechnicianContractService {
 
   async downloadUrl(id: string) {
     const contract = await this.prisma.technicianContract.findUnique({ where: { id } });
-    if (!contract?.signedDocumentKey) throw new NotFoundException('Hop dong chua co ban da duyet');
+    if (!contract?.signedDocumentKey) throw new NotFoundException('Hợp đồng chưa có bản đã duyệt');
     const { bucket, client } = this.storage();
     return { downloadUrl: await getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: contract.signedDocumentKey }), { expiresIn: 600 }), expiresIn: 600 };
   }

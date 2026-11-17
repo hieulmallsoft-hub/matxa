@@ -87,7 +87,7 @@ export class SettingsService {
 
   async setCommission(value: number) {
     if (!Number.isInteger(value) || value < 0 || value > 100)
-      throw new BadRequestException('Ty le KTV nhan phai la so nguyen tu 0 den 100');
+      throw new BadRequestException('Tỷ lệ KTV nhận phải là số nguyên từ 0 đến 100');
     await this.prisma.systemSetting.upsert({ where: { key: 'TECHNICIAN_SHARE_PERCENT' }, create: { key: 'TECHNICIAN_SHARE_PERCENT', value: String(value) }, update: { value: String(value) } });
     return this.getCommission();
   }
@@ -139,7 +139,7 @@ export class SettingsService {
     const current = await this.getBookingRules();
     const min = values.servicePriceMinVnd ?? current.servicePriceMinVnd;
     const max = values.servicePriceMaxVnd ?? current.servicePriceMaxVnd;
-    if (min > max) throw new BadRequestException('Gia toi thieu khong duoc lon hon gia toi da');
+    if (min > max) throw new BadRequestException('Giá tối thiểu không được lớn hơn giá tối đa');
     await this.write(BOOKING_KEYS, values);
     return this.getBookingRules();
   }
@@ -182,7 +182,7 @@ export async function assertServicePrices(db: Pick<PrismaService, 'systemSetting
   if (prices.some((price) => price !== null && price !== undefined && (price < min || price > max)))
     throw new BadRequestException({
       code: 'SERVICE_PRICE_OUT_OF_RANGE',
-      message: `Gia dich vu phai tu ${vnd(min)}d den ${vnd(max)}d`,
+      message: `Giá dịch vụ phải từ ${vnd(min)}đ đến ${vnd(max)}đ`,
       min,
       max,
     });

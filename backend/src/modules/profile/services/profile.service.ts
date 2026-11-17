@@ -24,13 +24,13 @@ export class ProfileService {
 
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: profileSelect });
-    if (!user) throw new NotFoundException('Khong tim thay tai khoan');
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
     return this.toProfile(user);
   }
 
   async updateMe(userId: string, dto: UpdateProfileDto) {
     if (dto.displayName !== undefined && !dto.displayName.trim())
-      throw new BadRequestException('Ten hien thi khong duoc de trong');
+      throw new BadRequestException('Tên hiển thị không được để trống');
     const data: Record<string, string | undefined> = {
       displayName: dto.displayName?.trim(),
       gender: dto.gender,
@@ -42,7 +42,7 @@ export class ProfileService {
         where: { provider: 'PHONE', providerSubject: phoneNumber, userId: { not: userId } },
         select: { id: true },
       });
-      if (owner) throw new ConflictException('So dien thoai da duoc lien ket voi tai khoan khac');
+      if (owner) throw new ConflictException('Số điện thoại đã được liên kết với tài khoản khác');
     }
     let previousKey: string | null = null;
     let savedKey: string | undefined;
@@ -53,10 +53,10 @@ export class ProfileService {
         !dto.avatarKey.startsWith(prefix) ||
         !/^[0-9a-f-]{36}\.(jpg|png|webp)$/i.test(dto.avatarKey.slice(prefix.length))
       ) {
-        throw new BadRequestException('Avatar key khong hop le');
+        throw new BadRequestException('Avatar key không hợp lệ');
       }
       const current = await this.prisma.user.findUnique({ where: { id: userId }, select: { avatarKey: true } });
-      if (!current) throw new NotFoundException('Khong tim thay tai khoan');
+      if (!current) throw new NotFoundException('Không tìm thấy tài khoản');
       previousKey = current.avatarKey;
       savedKey = await this.storage.prepareAvatar(userId, dto.avatarKey);
       data.avatarKey = savedKey;
@@ -73,7 +73,7 @@ export class ProfileService {
     } catch (error) {
       if (savedKey) await this.storage.deleteAvatar(userId, savedKey);
       if (savedKey && (error as { code?: string }).code === 'P2025') {
-        throw new ConflictException('Ho so da thay doi, vui long thu lai');
+        throw new ConflictException('Hồ sơ đã thay đổi, vui lòng thử lại');
       }
       throw error;
     }
@@ -95,7 +95,7 @@ export class ProfileService {
         }
       } catch (error) {
         if ((error as { code?: string }).code === 'P2002')
-          throw new ConflictException('So dien thoai da duoc lien ket voi tai khoan khac');
+          throw new ConflictException('Số điện thoại đã được liên kết với tài khoản khác');
         throw error;
       }
     }
@@ -111,7 +111,7 @@ export class ProfileService {
     const compact = input.trim().replace(/[\s().-]/g, '');
     const phone = parsePhoneNumberFromString(compact, 'VN');
     if (!phone?.isValid() || phone.country !== 'VN')
-      throw new BadRequestException('So dien thoai Viet Nam khong hop le');
+      throw new BadRequestException('Số điện thoại Việt Nam không hợp lệ');
     return phone.number;
   }
 

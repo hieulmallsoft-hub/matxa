@@ -112,14 +112,14 @@ describe('Quote and create share pricing/validation; address snapshots are immut
   });
 
   it.each(['ONSITE', 'ONLINE'] as const)('rejects addressId for %s instead of silently ignoring it', async (mode) => {
-    await expect(service.quote('customer', { ...dto(), mode })).rejects.toThrow('Chi gui addressId');
+    await expect(service.quote('customer', { ...dto(), mode })).rejects.toThrow('Chỉ gửi addressId');
     expect(db.address.findFirst).not.toHaveBeenCalled();
   });
 
   it('rejects a missing, foreign or soft-deleted HOME address', async () => {
-    await expect(service.quote('customer', { ...dto(), addressId: undefined })).rejects.toThrow('dia chi');
+    await expect(service.quote('customer', { ...dto(), addressId: undefined })).rejects.toThrow('địa chỉ');
     db.address.findFirst.mockResolvedValue(null);
-    await expect(service.quote('customer', dto())).rejects.toThrow('Dia chi khong hop le');
+    await expect(service.quote('customer', dto())).rejects.toThrow('Địa chỉ không hợp lệ');
     expect(db.address.findFirst.mock.calls[0][0].where).toEqual({ id: 'a1', userId: 'customer', deletedAt: null });
   });
 
@@ -148,16 +148,16 @@ describe('Quote and create share pricing/validation; address snapshots are immut
 
   it('rejects mismatched services/modes, past starts, unavailable windows and overlaps', async () => {
     db.technicianService.findMany.mockResolvedValueOnce([]);
-    await expect(service.quote('customer', dto())).rejects.toThrow('khong hop le');
+    await expect(service.quote('customer', dto())).rejects.toThrow('không hợp lệ');
     db.technicianService.findMany.mockResolvedValueOnce([{ id: 's1', modes: ['ONLINE'], durationMinutes: 60 }]);
-    await expect(service.quote('customer', dto())).rejects.toThrow('hinh thuc');
+    await expect(service.quote('customer', dto())).rejects.toThrow('hình thức');
     await expect(service.quote('customer', { ...dto(), scheduledStart: new Date(0).toISOString() })).rejects.toThrow(
-      'tuong lai',
+      'tương lai',
     );
     db.availabilitySlot.findFirst.mockResolvedValueOnce(null);
-    await expect(service.quote('customer', dto())).rejects.toThrow('khong ranh');
+    await expect(service.quote('customer', dto())).rejects.toThrow('không rảnh');
     db.booking.findFirst.mockResolvedValueOnce({ id: 'occupied' });
-    await expect(service.create('customer', { ...dto(), paymentMethod: 'CASH' })).rejects.toThrow('da co nguoi dat');
+    await expect(service.create('customer', { ...dto(), paymentMethod: 'CASH' })).rejects.toThrow('đã có người đặt');
     expect(db.booking.create).not.toHaveBeenCalled();
   });
 
@@ -190,11 +190,11 @@ describe('Quote and create share pricing/validation; address snapshots are immut
     expect(result).toMatchObject({ discountAmount: 100000, totalAmount: 500000, promotionCode: 'SALE' });
     expect(db.promotion.update).not.toHaveBeenCalled();
     db.promotionUsage.count.mockResolvedValueOnce(1);
-    await expect(service.quote('customer', { ...dto(), promotionCode: 'SALE' })).rejects.toThrow('het luot');
+    await expect(service.quote('customer', { ...dto(), promotionCode: 'SALE' })).rejects.toThrow('hết lượt');
     db.promotion.findFirst.mockResolvedValueOnce(null);
-    await expect(service.quote('customer', { ...dto(), promotionCode: 'EXPIRED' })).rejects.toThrow('het han');
+    await expect(service.quote('customer', { ...dto(), promotionCode: 'EXPIRED' })).rejects.toThrow('hết hạn');
     db.promotion.findFirst.mockResolvedValueOnce({ ...promo, minOrderAmount: 1000000 });
-    await expect(service.quote('customer', { ...dto(), promotionCode: 'SALE' })).rejects.toThrow('toi thieu');
+    await expect(service.quote('customer', { ...dto(), promotionCode: 'SALE' })).rejects.toThrow('tối thiểu');
   });
 
   it('supports fixed promotions and caps any discount at the full payable amount', async () => {

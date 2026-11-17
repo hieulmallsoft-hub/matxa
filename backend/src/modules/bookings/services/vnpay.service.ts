@@ -17,7 +17,7 @@ export class VnpayService {
     const secret = this.config.get<string>('VNPAY_HASH_SECRET');
     const baseUrl = this.config.get<string>('VNPAY_URL', 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html');
     const returnUrl = this.config.get<string>('VNPAY_RETURN_URL');
-    if (!tmnCode || !secret || !returnUrl) throw new BadRequestException('VNPAY chua duoc cau hinh');
+    if (!tmnCode || !secret || !returnUrl) throw new BadRequestException('VNPAY chưa được cấu hình');
     const now = new Date();
     const date = this.formatDate(now);
     const params: Record<string, string> = {

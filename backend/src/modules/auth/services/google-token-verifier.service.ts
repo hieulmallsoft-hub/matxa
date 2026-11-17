@@ -36,7 +36,7 @@ export class GoogleTokenVerifierService {
         picture: payload.picture,
       };
     } catch {
-      throw new UnauthorizedException('Google ID token khong hop le');
+      throw new UnauthorizedException('Google ID token không hợp lệ');
     }
   }
 }

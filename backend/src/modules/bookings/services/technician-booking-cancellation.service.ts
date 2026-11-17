@@ -28,7 +28,7 @@ export class TechnicianBookingCancellationService {
   async uploadUrl(userId: string, bookingId: string, dto: { contentType: string; size: number }) {
     const booking = await this.assertAssigned(userId, bookingId);
     if (!['PENDING', 'CONFIRMED'].includes(booking.status)) {
-      throw new BadRequestException('Lich dat khong the huy o trang thai hien tai');
+      throw new BadRequestException('Lịch đặt không thể hủy ở trạng thái hiện tại');
     }
     return this.storage.createUploadUrl(bookingId, userId, dto.contentType, dto.size);
   }
@@ -62,7 +62,7 @@ export class TechnicianBookingCancellationService {
         if (booking!.status === 'CANCELLED') throw new ConflictException('BOOKING_ALREADY_CANCELLED');
         if (booking!.status === 'COMPLETED') throw new ConflictException('BOOKING_ALREADY_COMPLETED');
         if (!['PENDING', 'CONFIRMED'].includes(booking!.status))
-          throw new BadRequestException('Lich dat khong the huy o trang thai hien tai');
+          throw new BadRequestException('Lịch đặt không thể hủy ở trạng thái hiện tại');
         const activeProfile = await tx.technicianProfile.findFirst({
           where: {
             id: booking!.technicianId!,
@@ -100,12 +100,12 @@ export class TechnicianBookingCancellationService {
             cancelPenalized: await isPenalizedCancel(tx, bookingId, booking!.status, 'TECHNICIAN', dto.reasonCode),
           },
         });
-        if (!update.count) throw new ConflictException('Trang thai lich dat da thay doi, vui long tai lai');
+        if (!update.count) throw new ConflictException('Trạng thái lịch đặt đã thay đổi, vui lòng tải lại');
         await refundBookingCommission(tx, bookingId);
         // A technician cancelling must not cost the customer their voucher.
         await releaseBookingPromotion(tx, bookingId);
         // Nor their money: a paid online booking is refunded in full (the admin sends it).
-        await createRefund(tx, bookingId, { reason: 'KTV huy don', feePercent: 0 });
+        await createRefund(tx, bookingId, { reason: 'KTV hủy đơn', feePercent: 0 });
         return {
           bookingId,
           status: 'CANCELLED' as const,
@@ -130,7 +130,7 @@ export class TechnicianBookingCancellationService {
 
   private validateReason(dto: TechnicianCancelBookingDto, keys: string[]) {
     if (dto.reasonCode === 'OTHER' && !dto.reasonText?.trim())
-      throw new BadRequestException('Vui long nhap ly do khac');
+      throw new BadRequestException('Vui lòng nhập lý do khác');
     if (EVIDENCE_REQUIRED.has(dto.reasonCode) && keys.length === 0) throw new BadRequestException('EVIDENCE_REQUIRED');
   }
 

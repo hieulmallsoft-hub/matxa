@@ -37,7 +37,7 @@ describe('applying while the booking is being taken', () => {
   it('refuses the application when the booking was taken in the meantime', async () => {
     const { service, tx } = subject(false);
     await expect(service.applyToOpenJob('fftools-user', 'booking-1')).rejects.toThrow(
-      new ConflictException('Don khong con mo de ung tuyen'),
+      new ConflictException('Đơn không còn mở để nhận'),
     );
     expect(tx.bookingTechnicianApplication.create).not.toHaveBeenCalled();
   });

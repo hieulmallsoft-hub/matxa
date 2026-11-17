@@ -65,7 +65,7 @@ describe('one waiting booking per customer', () => {
       booking: { findFirst: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'own-booking' }) },
     };
     const job = { id: 'b1', customerId: 'customer-1', assignmentMode: 'OPEN_MARKETPLACE', status: 'OPEN', mode: 'HOME', addressSnapshot: { city: 'HN' }, items: [] };
-    await expect(service.assertOpenEligibility(db, job, 'profile-1')).rejects.toThrow('KTV dang co don dat voi tu cach khach chua xong');
+    await expect(service.assertOpenEligibility(db, job, 'profile-1')).rejects.toThrow('KTV đang có đơn đặt với tư cách khách chưa xong');
     expect(db.booking.findFirst.mock.calls[1][0].where).toMatchObject({ customerId: 'tech-user-1', id: { not: 'b1' } });
   });
 
