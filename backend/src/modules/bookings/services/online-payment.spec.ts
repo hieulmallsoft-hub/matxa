@@ -96,6 +96,51 @@ describe('BookingsService online payment flow', () => {
     expect(subject.announceOpenJobsToFreedTechnician).toHaveBeenCalledWith('tech-1');
   });
 
+  const assign = (amount: number) => {
+    const tx: any = {
+      booking: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'b1', mode: 'ONLINE', travelFee: 0, payment: { method: 'ONLINE' } }),
+        update: jest.fn(async ({ data }: any) => ({ id: 'b1', mode: 'ONLINE', paymentDeadlineAt: data.paymentDeadlineAt, payment: { method: 'ONLINE', status: 'UNPAID', amount } })),
+      },
+      bookingTechnicianApplication: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'a1', technicianProfileId: 'p1', technicianProfile: { user: { id: 'tech-1' } } }),
+        update: jest.fn(), updateMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const subject = service({ $transaction: jest.fn((run: any) => run(tx)) });
+    jest.spyOn(subject, 'assertOpenEligibility').mockResolvedValue(undefined);
+    jest.spyOn(subject, 'bookingRules').mockResolvedValue({ onlinePaymentWaitMinutes: 15 });
+    const charge = jest.spyOn(subject, 'chargeTechnicianCommission').mockResolvedValue(undefined);
+    return { tx, run: () => subject.assignOpenBooking('b1', 'a1', 'c1'), charge };
+  };
+
+  it('a technician taking an online booking gives the customer a payment deadline', async () => {
+    const { tx, run, charge } = assign(500000);
+    await run();
+    expect(tx.booking.update).toHaveBeenCalledTimes(1);
+    expect(tx.booking.update.mock.calls[0][0].data.paymentDeadlineAt).toBeInstanceOf(Date);
+    expect(charge).not.toHaveBeenCalled();
+  });
+
+  it('a booking a voucher brought down to 0đ is paid as soon as it is taken (no payment link to open)', async () => {
+    const { tx, run } = assign(0);
+    await run();
+    expect(tx.booking.update.mock.calls[1][0].data).toMatchObject({
+      paymentDeadlineAt: null,
+      payment: { update: { status: 'PAID', provider: 'VOUCHER' } },
+    });
+  });
+
+  it('a 0đ booking that is cancelled queues no refund', async () => {
+    const tx: any = {
+      booking: { findUnique: jest.fn().mockResolvedValue({ customerId: 'c1', mode: 'ONLINE', payment: { method: 'ONLINE', status: 'PAID', amount: 0 } }) },
+      bookingRefund: { create: jest.fn() },
+    };
+    await expect(createRefund(tx, 'b1', { reason: 'x', feePercent: 20 })).resolves.toBeNull();
+    expect(tx.bookingRefund.create).not.toHaveBeenCalled();
+  });
+
   it('money that arrives after the booking was cancelled is queued for a full refund', async () => {
     const prisma: any = {
       booking: {

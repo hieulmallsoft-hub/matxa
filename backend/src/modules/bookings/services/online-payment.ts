@@ -66,6 +66,7 @@ export async function createRefund(
   });
   if (!booking || !isPrepaid(booking) || booking.payment?.status !== 'PAID') return null;
   const paid = Math.round(Number(booking.payment.amount));
+  if (paid <= 0) return null; // a voucher paid it all: there is nothing to give back
   const fee = Math.round((paid * Math.min(Math.max(options.feePercent, 0), 100)) / 100);
   try {
     return await tx.bookingRefund.create({

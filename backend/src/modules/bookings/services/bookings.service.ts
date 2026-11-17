@@ -1030,7 +1030,7 @@ export class BookingsService {
             where: { bookingId, id: { not: application.id }, status: 'APPLIED' },
             data: { status: 'NOT_SELECTED' },
           });
-          const assigned = await tx.booking.update({
+          let assigned = await tx.booking.update({
             where: { id: bookingId },
             data: {
               technicianId: application.technicianProfileId,
@@ -1047,6 +1047,14 @@ export class BookingsService {
             },
             include: { items: { include: { catalogService: true } }, payment: true },
           });
+          // A voucher covered the whole price: nothing to pay (a payment gateway refuses 0đ), so it counts as paid
+          // now and the technician can start right away. The technician's share is still recorded on completion.
+          if (prepaid && Number(assigned.payment?.amount ?? 0) <= 0)
+            assigned = await tx.booking.update({
+              where: { id: bookingId },
+              data: { paymentDeadlineAt: null, payment: { update: { status: 'PAID', paidAt: now, provider: 'VOUCHER' } } },
+              include: { items: { include: { catalogService: true } }, payment: true },
+            });
           // Charged after the assignment: the charge only accepts a booking that belongs to the
           // technician. Same transaction, so an insufficient wallet still rolls everything back.
           // A prepaid online booking is not charged: the commission comes out of the customer's payment.

@@ -758,6 +758,12 @@ KTV nhận, trong **15 phút** (admin chỉnh được). Đơn tại nhà và t�
    - đơn tự hủy, `cancellationReasonCode: "PAYMENT_NOT_RECEIVED"`;
    - **tính là 1 lần hủy của khách** (giới hạn hủy, mục V);
    - KTV được báo và nhận đơn khác được ngay.
+6. **Mã giảm giá trừ hết, đơn còn 0đ** (sửa 17/11): KTV nhận xong là đơn **coi như đã thanh toán ngay**:
+   - `paymentStatus: "PAID"`, `awaitingPayment: false`, `paymentDeadlineAt: null`;
+   - không gửi thông báo đòi thanh toán, chat mở luôn.
+
+   App **không hiện nút Thanh toán** và **không gọi** `payos-payment` cho đơn này. Nếu lỡ gọi, API trả `status: "PAID"`
+   và `paymentUrl: null`, không báo lỗi. Hủy đơn 0đ thì không có tiền hoàn. KTV vẫn được ghi tiền công khi hoàn thành.
 
 **App khách cần làm:**
 - Đơn có `awaitingPayment: true`: hiện khung **"Thanh toán trước {giờ}"**, đếm ngược theo `paymentDeadlineAt`, kèm nút
