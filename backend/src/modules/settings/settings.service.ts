@@ -39,6 +39,9 @@ export type BookingRules = {
   onlineCancelFeePercent: number;
   /** Technicians are paid out once their unpaid online earnings reach this (VND). */
   payoutMinimumVnd: number;
+  /** Allowed price of a service package (catalog and technicians' own), VND. Lowered temporarily to test payments. */
+  servicePriceMinVnd: number;
+  servicePriceMaxVnd: number;
 };
 export const SERVICE_MODES = ['HOME', 'ONLINE', 'ONSITE'] as const;
 export type ServiceModeName = (typeof SERVICE_MODES)[number];
@@ -67,6 +70,8 @@ const BOOKING_KEYS: Record<keyof BookingRules, string> = {
   onlinePaymentWaitMinutes: 'ONLINE_PAYMENT_WAIT_MINUTES',
   onlineCancelFeePercent: 'ONLINE_CANCEL_FEE_PERCENT',
   payoutMinimumVnd: 'PAYOUT_MINIMUM_VND',
+  servicePriceMinVnd: 'SERVICE_PRICE_MIN_VND',
+  servicePriceMaxVnd: 'SERVICE_PRICE_MAX_VND',
 };
 
 @Injectable()
@@ -125,10 +130,16 @@ export class SettingsService {
       onlinePaymentWaitMinutes: Number(stored.get(BOOKING_KEYS.onlinePaymentWaitMinutes) ?? 15),
       onlineCancelFeePercent: Number(stored.get(BOOKING_KEYS.onlineCancelFeePercent) ?? 20),
       payoutMinimumVnd: Number(stored.get(BOOKING_KEYS.payoutMinimumVnd) ?? 100000),
+      servicePriceMinVnd: Number(stored.get(BOOKING_KEYS.servicePriceMinVnd) ?? SERVICE_PRICE_DEFAULTS.min),
+      servicePriceMaxVnd: Number(stored.get(BOOKING_KEYS.servicePriceMaxVnd) ?? SERVICE_PRICE_DEFAULTS.max),
     };
   }
 
   async setBookingRules(values: Partial<BookingRules>) {
+    const current = await this.getBookingRules();
+    const min = values.servicePriceMinVnd ?? current.servicePriceMinVnd;
+    const max = values.servicePriceMaxVnd ?? current.servicePriceMaxVnd;
+    if (min > max) throw new BadRequestException('Gia toi thieu khong duoc lon hon gia toi da');
     await this.write(BOOKING_KEYS, values);
     return this.getBookingRules();
   }
@@ -154,6 +165,27 @@ export class SettingsService {
       ),
     );
   }
+}
+
+export const SERVICE_PRICE_DEFAULTS = { min: 400_000, max: 1_000_000 };
+
+/**
+ * Every service price (catalog package or a technician's own) must be within the admin's range: 400.000-1.000.000đ by
+ * default, lowered for a while to test payments with small amounts. 400 SERVICE_PRICE_OUT_OF_RANGE otherwise.
+ */
+export async function assertServicePrices(db: Pick<PrismaService, 'systemSetting'>, prices: Array<number | null | undefined>) {
+  const rows = await db.systemSetting.findMany({ where: { key: { in: ['SERVICE_PRICE_MIN_VND', 'SERVICE_PRICE_MAX_VND'] } } });
+  const stored = new Map(rows.map((row) => [row.key, Number(row.value)]));
+  const min = stored.get('SERVICE_PRICE_MIN_VND') ?? SERVICE_PRICE_DEFAULTS.min;
+  const max = stored.get('SERVICE_PRICE_MAX_VND') ?? SERVICE_PRICE_DEFAULTS.max;
+  const vnd = (value: number) => value.toLocaleString('vi-VN');
+  if (prices.some((price) => price !== null && price !== undefined && (price < min || price > max)))
+    throw new BadRequestException({
+      code: 'SERVICE_PRICE_OUT_OF_RANGE',
+      message: `Gia dich vu phai tu ${vnd(min)}d den ${vnd(max)}d`,
+      min,
+      max,
+    });
 }
 
 /** Stored as "3,24,168"; never set (or nothing valid) = the default 3h, 24h, 7 days. */

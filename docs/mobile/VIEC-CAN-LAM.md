@@ -791,6 +791,14 @@ KTV nhận, trong **15 phút** (admin chỉnh được). Đơn tại nhà và t�
   Admin chuyển khoản định kỳ khi đủ `minimumPayout` (mặc định 100.000đ). Chuyển xong, KTV nhận thông báo
   `TECHNICIAN_PAYOUT_SENT`.
 
+## AA. Khoảng giá dịch vụ do admin cài (app KTV, 17/11)
+
+Khoảng giá mỗi gói **không còn cố định 400.000đ – 1.000.000đ**. Admin chỉnh được, ví dụ hạ xuống 10.000đ để test thanh toán.
+- `GET /api/settings/public` có thêm `servicePriceMinVnd` và `servicePriceMaxVnd`.
+- Màn KTV sửa giá gói: **không viết cứng 400k–1tr**. Đọc 2 trường trên để kiểm tra và hiện gợi ý.
+- Giá ngoài khoảng thì `PATCH /api/technician/services/{id}/price-options/{optionId}` trả
+  `400 { "code": "SERVICE_PRICE_OUT_OF_RANGE", "message": "...", "min": 400000, "max": 1000000 }`.
+
 ## Cách tự kiểm tra trên Swagger
 
 1. `PATCH /api/technician/application` với `idCardQr` = chuỗi app quét được → response có `idCardInfo` đúng tên trên thẻ.

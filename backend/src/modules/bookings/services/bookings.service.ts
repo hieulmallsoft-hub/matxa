@@ -1460,6 +1460,8 @@ export class BookingsService {
         onlinePaymentWaitMinutes: 15,
         onlineCancelFeePercent: 20,
         payoutMinimumVnd: 100000,
+        servicePriceMinVnd: 400000,
+        servicePriceMaxVnd: 1000000,
       }
     );
   }

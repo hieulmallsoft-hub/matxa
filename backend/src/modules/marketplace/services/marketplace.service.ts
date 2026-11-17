@@ -17,7 +17,7 @@ import {
   UpsertTechnicianProfileDto,
 } from '../dto/marketplace.dto';
 import { resolveLocationCodes } from './location-code';
-import { readEnabledServiceModes } from '../../settings/settings.service';
+import { readEnabledServiceModes, assertServicePrices } from '../../settings/settings.service';
 import { applyPriceOptions, loadBookableServices, offeredServiceWhere, publicTechnicianWhere } from './technician-selection';
 import { availabilityRange, BOOKING_TIMEZONE, buildAvailableSlots } from './availability-slots';
 import { MarketplaceRealtimeService } from './marketplace-realtime.service';
@@ -649,6 +649,7 @@ export class MarketplaceService {
     const profile = await this.myProfile(userId);
     if (dto.price === undefined && dto.isActive === undefined)
       throw new BadRequestException('Vui long nhap gia hoac trang thai goi gia');
+    if (dto.price !== undefined) await assertServicePrices(this.prisma, [dto.price]);
 
     return this.prisma.$transaction(async (tx) => {
       const option = await tx.technicianServicePriceOption.findFirst({

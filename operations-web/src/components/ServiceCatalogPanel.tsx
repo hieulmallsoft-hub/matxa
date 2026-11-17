@@ -24,17 +24,16 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { request } from '../api/client';
+import { useServicePriceRange, type PriceRange } from './useServicePriceRange';
 
-const PRICE_MIN = 400_000;
-const PRICE_MAX = 1_000_000;
 const formatVnd = (value: number) => new Intl.NumberFormat('vi-VN').format(value);
 
-/** Vietnamese message for a price outside the allowed range, or null when it is fine. */
-function priceError(raw: string | undefined) {
+/** Vietnamese message for a price outside the allowed range (admin setting), or null when it is fine. */
+function priceError(raw: string | undefined, range: PriceRange) {
   if (!raw) return null;
   const price = Number(raw);
-  if (price < PRICE_MIN) return `Tối thiểu ${formatVnd(PRICE_MIN)}đ`;
-  if (price > PRICE_MAX) return `Tối đa ${formatVnd(PRICE_MAX)}đ`;
+  if (price < range.min) return `Tối thiểu ${formatVnd(range.min)}đ`;
+  if (price > range.max) return `Tối đa ${formatVnd(range.max)}đ`;
   return null;
 }
 
@@ -88,6 +87,7 @@ export function ServiceCatalogPanel({
   notify: (message: string, error?: boolean) => void;
 }) {
   const { confirm, dialog } = useConfirm();
+  const priceRange = useServicePriceRange();
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -159,8 +159,8 @@ export function ServiceCatalogPanel({
     }
 
     const durations = templates[template];
-    if (durations.some((duration) => !prices[duration] || priceError(prices[duration]))) {
-      notify(`Giá mỗi gói phải từ ${formatVnd(PRICE_MIN)}đ đến ${formatVnd(PRICE_MAX)}đ`, true);
+    if (durations.some((duration) => !prices[duration] || priceError(prices[duration], priceRange))) {
+      notify(`Giá mỗi gói phải từ ${formatVnd(priceRange.min)}đ đến ${formatVnd(priceRange.max)}đ`, true);
       return;
     }
 
@@ -785,7 +785,7 @@ export function ServiceCatalogPanel({
                   <div className="flex flex-wrap items-baseline justify-between gap-1">
                     <span className="text-xs font-bold text-[#1C2B20]">Mức giá tiêu chuẩn (VNĐ)</span>
                     <span className="text-[11px] font-semibold text-[#66756B]">
-                      Mỗi gói từ {formatVnd(PRICE_MIN)}đ đến {formatVnd(PRICE_MAX)}đ
+                      Mỗi gói từ {formatVnd(priceRange.min)}đ đến {formatVnd(priceRange.max)}đ
                     </span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -794,7 +794,7 @@ export function ServiceCatalogPanel({
                         template === 'DATE_2_4_6_HOURS'
                           ? `${duration / 60} tiếng`
                           : `${duration} phút`;
-                      const error = priceError(prices[duration]);
+                      const error = priceError(prices[duration], priceRange);
                       return (
                         <div key={duration}>
                           <label className="block text-[11px] font-semibold text-[#66756B] mb-1">

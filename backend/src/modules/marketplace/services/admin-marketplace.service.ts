@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException, 
 import { PrismaService } from '../../../database/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { activeSuspension, suspend, SuspensionRules } from '../../bookings/services/cancel-limit';
-import { parseHours } from '../../settings/settings.service';
+import { assertServicePrices, parseHours } from '../../settings/settings.service';
 import {
   AdminBookingsQueryDto,
   AdminPageDto,
@@ -430,6 +430,7 @@ export class AdminMarketplaceService {
     optionId: string,
     dto: UpdateAdminTechnicianPriceOptionDto,
   ) {
+    await assertServicePrices(this.prisma, [dto.price]);
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.technicianServicePriceOption.updateMany({
         where: { id: optionId, technicianServiceId: serviceId, technicianService: { technicianId } },

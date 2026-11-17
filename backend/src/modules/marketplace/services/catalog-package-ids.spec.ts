@@ -18,6 +18,7 @@ describe('admin edits a catalog service', () => {
     };
     const prisma: any = {
       serviceCatalogItem: { findUnique: jest.fn().mockResolvedValue(current) },
+      systemSetting: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn((callback: any) => callback(tx)),
     };
     const service = new ServiceCatalogService(prisma);

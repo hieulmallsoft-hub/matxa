@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../components/ui/ToastContainer';
 import { request } from '../api/client';
+import { forgetServicePriceRange } from '../components/useServicePriceRange';
 import { Button } from '../components/ui/kit';
 import { PageHeader } from '../components/common/PageHeader';
 import { SectionCard } from '../components/common/SectionCard';
@@ -83,6 +84,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
   const [onlinePaymentWaitMinutes, setOnlinePaymentWaitMinutes] = useState('15');
   const [onlineCancelFeePercent, setOnlineCancelFeePercent] = useState('20');
   const [payoutMinimumVnd, setPayoutMinimumVnd] = useState('100000');
+  const [servicePriceMinVnd, setServicePriceMinVnd] = useState('400000');
+  const [servicePriceMaxVnd, setServicePriceMaxVnd] = useState('1000000');
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
 
   React.useEffect(() => {
@@ -103,7 +106,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         setSupportEmail(value.supportEmail);
       })
       .catch(() => undefined);
-    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number; confirmationWaitMinutes: number; requireTechnicianPhone: boolean; homeServiceFee: number; dailyDiscountThreshold: number; dailyDiscountFeePercent: number; enabledServiceModes?: string[]; cancelLimitCount?: number; cancelLimitWindowHours?: number; suspensionHours?: number[]; suspensionResetDays?: number; onlinePaymentWaitMinutes?: number; onlineCancelFeePercent?: number; payoutMinimumVnd?: number }>('/admin/settings/booking')
+    void request<{ minAdvanceHours: number; maxDispatchRadiusKm: number; travelFeeThresholdKm: number; travelFeeAmount: number; confirmationWaitMinutes: number; requireTechnicianPhone: boolean; homeServiceFee: number; dailyDiscountThreshold: number; dailyDiscountFeePercent: number; enabledServiceModes?: string[]; cancelLimitCount?: number; cancelLimitWindowHours?: number; suspensionHours?: number[]; suspensionResetDays?: number; onlinePaymentWaitMinutes?: number; onlineCancelFeePercent?: number; payoutMinimumVnd?: number; servicePriceMinVnd?: number; servicePriceMaxVnd?: number }>('/admin/settings/booking')
       .then((value) => {
         setMinAdvanceHours(String(value.minAdvanceHours));
         setMaxTravelDistanceKm(String(value.maxDispatchRadiusKm));
@@ -124,6 +127,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         setOnlinePaymentWaitMinutes(String(value.onlinePaymentWaitMinutes ?? 15));
         setOnlineCancelFeePercent(String(value.onlineCancelFeePercent ?? 20));
         setPayoutMinimumVnd(String(value.payoutMinimumVnd ?? 100000));
+        setServicePriceMinVnd(String(value.servicePriceMinVnd ?? 400000));
+        setServicePriceMaxVnd(String(value.servicePriceMaxVnd ?? 1000000));
       })
       .catch(() => undefined);
   }, []);
@@ -192,14 +197,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
         if (!Number.isInteger(payWait) || payWait < 5 || payWait > 120) throw new Error('Thời gian chờ thanh toán phải từ 5 đến 120 phút');
         if (!Number.isInteger(cancelFee) || cancelFee < 0 || cancelFee > 100) throw new Error('Phí hủy phải từ 0 đến 100%');
         if (!Number.isInteger(payoutMin) || payoutMin < 0) throw new Error('Mức chi tối thiểu phải là số nguyên không âm');
+        const priceMin = Number(servicePriceMinVnd);
+        const priceMax = Number(servicePriceMaxVnd);
+        if (!Number.isInteger(priceMin) || priceMin < 1000 || !Number.isInteger(priceMax) || priceMax < priceMin)
+          throw new Error('Giá dịch vụ: tối thiểu từ 1.000đ và không lớn hơn tối đa');
         await request('/admin/settings/booking', {
           method: 'PATCH',
           body: JSON.stringify({
             minAdvanceHours: hours, maxDispatchRadiusKm: radius, confirmationWaitMinutes: wait, requireTechnicianPhone, enabledServiceModes,
             cancelLimitCount: limitCount, cancelLimitWindowHours: limitWindow, suspensionHours: levels, suspensionResetDays: resetDays,
             onlinePaymentWaitMinutes: payWait, onlineCancelFeePercent: cancelFee, payoutMinimumVnd: payoutMin,
+            servicePriceMinVnd: priceMin, servicePriceMaxVnd: priceMax,
           }),
         });
+        forgetServicePriceRange();
         addToast({ title: 'Đã lưu quy định đặt lịch', message: 'Áp dụng cho các đơn đặt sau khi lưu.', type: 'success' });
       }
       if (activeCategory === 'fees') {
@@ -505,6 +516,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onToggleTheme
                     Đơn tư vấn trực tuyến: khách đặt không phải trả trước; có KTV nhận thì khách có {onlinePaymentWaitMinutes} phút để thanh toán online (chat mở sau khi trả), quá giờ đơn tự hủy và tính 1 lần hủy cho khách.
                     Tiền vào tài khoản nền tảng; đơn hoàn thành thì phần của KTV (giá trừ hoa hồng) chờ chi ở mục "Chi trả & Hoàn tiền" khi đủ {Number(payoutMinimumVnd).toLocaleString('vi-VN')}đ.
                     Khách hủy sau khi đã trả được hoàn {100 - Number(onlineCancelFeePercent)}%; KTV hoặc admin hủy thì hoàn 100%.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[#1C2B20]">Giá dịch vụ tối thiểu (VND/gói)</label>
+                    <input type="number" min="1000" step="1000" value={servicePriceMinVnd} onChange={(e) => setServicePriceMinVnd(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[#1C2B20]">Giá dịch vụ tối đa (VND/gói)</label>
+                    <input type="number" min="1000" step="1000" value={servicePriceMaxVnd} onChange={(e) => setServicePriceMaxVnd(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6F8F4] border border-[#E5EBE5] text-xs font-semibold text-[#1C2B20] focus:outline-none focus:border-[#2E7D4A]" />
+                  </div>
+                  <span className="sm:col-span-2 text-[11px] text-[#66756B]">
+                    Áp dụng khi admin tạo/sửa giá dịch vụ chung và khi KTV/admin sửa giá gói của KTV. Mặc định 400.000đ – 1.000.000đ.
+                    Để test thanh toán với số tiền nhỏ: hạ tối thiểu (vd 10.000đ), tạo 1 dịch vụ test, test xong <b>đặt lại 400.000đ</b>.
+                    {Number(servicePriceMinVnd) < 400000 && <span className="block font-semibold text-[#D04A44]">Đang để thấp hơn mức thường (400.000đ), nhớ đặt lại sau khi test.</span>}
                   </span>
                 </div>
               </div>

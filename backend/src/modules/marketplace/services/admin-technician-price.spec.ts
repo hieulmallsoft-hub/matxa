@@ -12,7 +12,7 @@ describe('admin edits a technician package price', () => {
       },
       technicianService: { update: jest.fn() },
     };
-    const prisma = { $transaction: jest.fn((run: any) => run(tx)) };
+    const prisma = { $transaction: jest.fn((run: any) => run(tx)), systemSetting: { findMany: jest.fn().mockResolvedValue([]) } };
     return { tx, service: new AdminMarketplaceService(prisma as any) };
   };
 

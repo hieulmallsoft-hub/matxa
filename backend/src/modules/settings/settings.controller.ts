@@ -103,6 +103,14 @@ class UpdateBookingRulesDto {
   @ApiPropertyOptional({ example: 100000, description: 'Chi tra cho KTV khi thu nhap chua nhan dat muc nay (VND).' })
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100_000_000)
   payoutMinimumVnd?: number;
+
+  @ApiPropertyOptional({ example: 400000, description: 'Gia toi thieu moi goi dich vu (VND). Ha xuong (vd 10000) de test thanh toan, test xong dat lai.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1000) @Max(100_000_000)
+  servicePriceMinVnd?: number;
+
+  @ApiPropertyOptional({ example: 1000000, description: 'Gia toi da moi goi dich vu (VND).' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1000) @Max(100_000_000)
+  servicePriceMaxVnd?: number;
 }
 
 @ApiTags('Admin Settings')

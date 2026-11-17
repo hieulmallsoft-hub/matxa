@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { request } from '../api/client';
 import { Card } from './Card';
+import { useServicePriceRange } from './useServicePriceRange';
 
 type Technician = { id: string; user: { displayName: string | null } };
 type PriceOption = { id: string; durationMinutes: number; price: number; isActive: boolean };
@@ -18,6 +19,7 @@ export function TechnicianPricingPanel({
   const [services, setServices] = useState<TechnicianService[]>([]);
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const priceRange = useServicePriceRange();
 
   async function load(id: string) {
     if (!id) {
@@ -41,8 +43,8 @@ export function TechnicianPricingPanel({
   async function save(event: FormEvent<HTMLFormElement>, serviceId: string, optionId: string) {
     event.preventDefault();
     const price = Number(new FormData(event.currentTarget).get('price'));
-    if (!Number.isFinite(price) || price < 400_000 || price > 1_000_000) {
-      notify('Giá mỗi gói phải từ 400.000đ đến 1.000.000đ.', true);
+    if (!Number.isFinite(price) || price < priceRange.min || price > priceRange.max) {
+      notify(`Giá mỗi gói phải từ ${priceRange.min.toLocaleString('vi-VN')}đ đến ${priceRange.max.toLocaleString('vi-VN')}đ.`, true);
       return;
     }
     setSavingId(optionId);
@@ -101,8 +103,8 @@ export function TechnicianPricingPanel({
                         {option.durationMinutes} phút{!option.isActive ? ' · Đang ẩn' : ''}
                       </span>
                       <label>
-                        Giá (400.000 – 1.000.000đ)
-                        <input name="price" type="number" min="400000" max="1000000" step="1000" defaultValue={option.price} required />
+                        Giá ({priceRange.min.toLocaleString('vi-VN')} – {priceRange.max.toLocaleString('vi-VN')}đ)
+                        <input name="price" type="number" min={priceRange.min} max={priceRange.max} step="1000" defaultValue={option.price} required />
                       </label>
                       <button type="submit" disabled={savingId === option.id}>
                         {savingId === option.id ? 'Đang lưu…' : 'Lưu giá'}

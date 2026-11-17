@@ -1,6 +1,7 @@
 ﻿import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { CreateServiceCatalogDto, ServiceCatalogQueryDto, UpdateServiceCatalogDto } from '../dto/service-catalog.dto';
+import { assertServicePrices } from '../../settings/settings.service';
 
 @Injectable()
 export class ServiceCatalogService {
@@ -124,6 +125,7 @@ export class ServiceCatalogService {
   async create(dto: CreateServiceCatalogDto) {
     await this.category(dto.categoryId);
     this.validateTemplate(dto.pricingTemplate, dto.priceOptions);
+    await assertServicePrices(this.prisma, dto.priceOptions.map((item) => item.price));
     const primary = dto.priceOptions[0];
     return this.prisma.serviceCatalogItem.create({
       data: {
@@ -165,6 +167,8 @@ export class ServiceCatalogService {
         isActive: item.isActive,
       }));
     this.validateTemplate(dto.pricingTemplate ?? current.pricingTemplate, options);
+    // Only prices being sent are checked: editing a name must not fail because the range changed since.
+    if (dto.priceOptions) await assertServicePrices(this.prisma, dto.priceOptions.map((item) => item.price));
     const primary = options[0];
     return this.prisma.$transaction(async (tx) => {
       // Packages are matched by code and updated in place, so their ids stay the same across edits: apps holding a
