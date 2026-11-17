@@ -78,6 +78,6 @@ export class AdminPayosController {
   @Post(':id/payment/check')
   @ApiOperation({ summary: 'Admin: hoi lai PayOS don nay da thanh toan chua va cap nhat (don da huy ma da tra -> tao yeu cau hoan tien)' })
   check(@Param('id', ParseUUIDPipe) id: string) {
-    return this.bookings.syncPayosPayment(id).then((paymentStatus) => ({ bookingId: id, paymentStatus }));
+    return this.bookings.checkWithPayos(id).then((result) => ({ bookingId: id, ...result }));
   }
 }

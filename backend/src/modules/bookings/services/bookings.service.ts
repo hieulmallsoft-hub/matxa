@@ -422,21 +422,31 @@ export class BookingsService {
    * status afterwards ('PAID', 'PENDING', ...) or null when there is nothing to check.
    */
   async syncPayosPayment(bookingId: string) {
+    return (await this.checkWithPayos(bookingId)).paymentStatus;
+  }
+
+  /** Same check, with what PayOS answered (shown to the admin, so a mismatch can be seen rather than guessed). */
+  async checkWithPayos(bookingId: string) {
     const payment = await this.prisma.payment.findFirst({ where: { bookingId } });
-    if (!payment) return null;
-    if (payment.status === 'PAID' || payment.provider !== 'PAYOS' || !payment.providerRef || !this.payos?.isConfigured())
-      return payment.status;
-    let info: Awaited<ReturnType<PayosService['getPaymentInfo']>> = null;
+    if (!payment) return { paymentStatus: null, orderCode: null, payos: null };
+    const orderCode = payment.providerRef;
+    if (payment.status === 'PAID' || payment.provider !== 'PAYOS' || !orderCode || !this.payos?.isConfigured())
+      return { paymentStatus: payment.status, orderCode, payos: null };
+    let answer: Awaited<ReturnType<PayosService['getPaymentInfo']>>;
     try {
-      info = await this.payos.getPaymentInfo(payment.providerRef);
+      answer = await this.payos.getPaymentInfo(orderCode);
     } catch (error) {
-      this.logger.warn(`Khong hoi duoc PayOS cho don ${bookingId}: ${error instanceof Error ? error.message : 'khong ro'}`);
-      return payment.status;
+      const message = error instanceof Error ? error.message : 'khong ro';
+      this.logger.warn(`Khong hoi duoc PayOS cho don ${bookingId}: ${message}`);
+      return { paymentStatus: payment.status, orderCode, payos: { error: message } };
     }
+    const info = answer.data;
+    const payos = { code: answer.code, desc: answer.desc, status: info?.status ?? null, amount: info?.amount ?? null, amountPaid: info?.amountPaid ?? null };
+    if (answer.code !== '00') this.logger.warn(`PayOS tra loi ${answer.code} ${answer.desc} cho don ${bookingId} (orderCode ${orderCode})`);
     const paid = info?.status === 'PAID' && Number(info.amountPaid ?? info.amount) >= Number(payment.amount);
-    if (!paid) return payment.status;
+    if (!paid) return { paymentStatus: payment.status, orderCode, payos };
     await this.recordPayosResult(payment, true, info?.transactions?.[0] ?? {}, '00');
-    return 'PAID';
+    return { paymentStatus: 'PAID', orderCode, payos };
   }
 
   /** Customer-facing check (the app calls it on return from PayOS, or a "đã thanh toán?" button). */

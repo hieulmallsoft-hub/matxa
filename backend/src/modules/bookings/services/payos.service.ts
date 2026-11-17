@@ -75,6 +75,7 @@ export class PayosService {
   async getPaymentInfo(orderCode: string | number) {
     const payload = (await this.call('GET', `/${encodeURIComponent(String(orderCode))}`)) as {
       code?: string;
+      desc?: string;
       data?: {
         status?: string;
         amount?: number;
@@ -82,8 +83,7 @@ export class PayosService {
         transactions?: Array<Record<string, string | number | null | undefined>>;
       };
     };
-    if (payload.code !== '00' || !payload.data) return null;
-    return payload.data;
+    return { code: payload?.code ?? null, desc: payload?.desc ?? null, data: payload?.code === '00' ? payload.data ?? null : null };
   }
 
   /** Closes a link that is being replaced, so the customer cannot pay an old one nobody is waiting on. */

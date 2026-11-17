@@ -150,7 +150,7 @@ describe('BookingsService online payment flow', () => {
         booking: { findUnique: jest.fn().mockResolvedValue({ id: 'b1', status: 'CONFIRMED', paymentDeadlineAt: new Date(Date.now() - 1000), payment: { status: 'PENDING' } }) },
         $transaction: jest.fn(),
       };
-      const payos = { isConfigured: () => true, getPaymentInfo: jest.fn().mockResolvedValue(info) };
+      const payos = { isConfigured: () => true, getPaymentInfo: jest.fn().mockResolvedValue({ code: info ? '00' : '01', desc: null, data: info }) };
       const subject = new BookingsService(prisma, { get: (_k: string, f: unknown) => f } as any, { create: jest.fn() } as any, {} as any, undefined, payos as any) as any;
       const paid = jest.spyOn(subject, 'afterPaymentPaid').mockResolvedValue(undefined);
       return { prisma, subject, paid };
