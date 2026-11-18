@@ -100,7 +100,7 @@ export class SearchTechniciansDto {
   city?: string;
   @ApiPropertyOptional({
     example: '2026-11-05',
-    description: 'Ngay (gio Viet Nam) de tinh nextAvailableAt cua tung KTV. Mac dinh hom nay.',
+    description: 'Ngay (gio Viet Nam) de tinh nextAvailableAt cua tung KTV. Khong gui: gio trong som nhat trong 7 ngay toi (onlyAvailable=true thi tinh hom nay).',
   })
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
@@ -306,6 +306,17 @@ export class CreateAddressDto {
   @IsOptional()
   @Matches(/^\+?[0-9]{8,15}$/, { message: 'Số điện thoại không hợp lệ' })
   phone?: string | null;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    example: 'Cổng sau, tầng 3, gọi trước 10 phút',
+    description: 'Ghi chu cho KTV (khong bat buoc, toi da 500 ky tu). KTV thay khi da duoc chon cho don. Gui "" hoac null de xoa',
+  })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() || null : value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string | null;
 }
 
 export class UpdateAddressDto extends PartialType(CreateAddressDto) {}

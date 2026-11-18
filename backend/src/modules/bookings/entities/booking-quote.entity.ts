@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class BookingAddressSnapshot {
   @ApiProperty() id!: string;
@@ -7,6 +7,8 @@ export class BookingAddressSnapshot {
   @ApiProperty() latitude!: number;
   @ApiProperty() longitude!: number;
   @ApiProperty({ type: String, nullable: true }) label!: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'So lien he nhap o dia chi' }) phone?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'Ghi chu cua khach cho KTV' }) note?: string | null;
 }
 
 export class QuotedService {

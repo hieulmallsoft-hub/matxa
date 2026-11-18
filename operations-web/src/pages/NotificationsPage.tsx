@@ -67,7 +67,7 @@ export const NotificationsPage: React.FC = () => {
       setLoading(true);
       try {
         // Only ever send unreadOnly=true: the API parses the string "false" as true.
-        const params = new URLSearchParams({ page: String(nextPage), limit: String(PAGE_SIZE) });
+        const params = new URLSearchParams({ page: String(nextPage), limit: String(PAGE_SIZE), includeChat: 'true' });
         if (filter === 'unread') params.set('unreadOnly', 'true');
         const result = await request<NotificationPage>(`/notifications?${params}`);
         setItems((current) => (append ? [...current, ...result.items.filter((item) => !current.some((known) => known.id === item.id))] : result.items));

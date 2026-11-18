@@ -125,7 +125,8 @@ export class NotificationsService {
   }
 
   async list(userId: string, query: ListNotificationsDto) {
-    const where = { userId, ...(query.unreadOnly ? { readAt: null } : {}) };
+    const base = { userId, ...(query.includeChat ? {} : { type: { not: 'CHAT_MESSAGE_RECEIVED' } }) };
+    const where = { ...base, ...(query.unreadOnly ? { readAt: null } : {}) };
     const [items, total, unreadCount] = await this.prisma.$transaction([
       this.prisma.notification.findMany({
         where,
@@ -134,7 +135,7 @@ export class NotificationsService {
         take: query.limit,
       }),
       this.prisma.notification.count({ where }),
-      this.prisma.notification.count({ where: { userId, readAt: null } }),
+      this.prisma.notification.count({ where: { ...base, readAt: null } }),
     ]);
     return { items, unreadCount, total, page: query.page, limit: query.limit };
   }

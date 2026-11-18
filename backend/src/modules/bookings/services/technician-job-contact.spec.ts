@@ -60,3 +60,27 @@ describe('address phone field', () => {
     expect(errors.map((error) => error.property)).toEqual(['phone']);
   });
 });
+
+describe('address note field', () => {
+  const check = async (note: unknown) => {
+    const dto = plainToInstance(CreateAddressDto, { address: 'A', latitude: 21, longitude: 105, note });
+    return { dto, errors: await validate(dto) };
+  };
+
+  it('keeps the note, trimmed', async () => {
+    const { dto, errors } = await check('  Cổng sau, tầng 3  ');
+    expect(errors).toHaveLength(0);
+    expect(dto.note).toBe('Cổng sau, tầng 3');
+  });
+
+  it('clears an empty note', async () => {
+    const { dto, errors } = await check('   ');
+    expect(errors).toHaveLength(0);
+    expect(dto.note).toBeNull();
+  });
+
+  it('rejects a note longer than 500 characters', async () => {
+    const { errors } = await check('a'.repeat(501));
+    expect(errors.map((error) => error.property)).toEqual(['note']);
+  });
+});

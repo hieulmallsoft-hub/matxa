@@ -64,6 +64,10 @@ describe('Technician detail, favorites, availability and address workflows', () 
     prisma.$transaction.mockImplementation(async (fn) => fn(tx));
     technicianProfile.findUnique.mockResolvedValue(profile());
     favorite.findUnique.mockResolvedValue(null);
+    // free time for nextAvailableAt: none unless a test says otherwise
+    technicianService.findMany.mockResolvedValue([]);
+    availabilitySlot.findMany.mockResolvedValue([]);
+    booking.findMany.mockResolvedValue([]);
   });
 
   it('returns public detail with bookable service IDs, numeric prices, location and favorites', async () => {
@@ -108,7 +112,7 @@ describe('Technician detail, favorites, availability and address workflows', () 
     await expect(service.technicianDetail('inactive')).rejects.toThrow('không tồn tại');
   });
 
-  it('returns favorite cards and never touches booking data', async () => {
+  it('returns favorite cards with their next free time, reading bookings only for busy times', async () => {
     favorite.findMany.mockResolvedValue([{ technician: profile() }]);
     const result = await service.favorites('customer');
     expect(result[0]).toMatchObject({
@@ -129,7 +133,10 @@ describe('Technician detail, favorites, availability and address workflows', () 
     });
     await service.removeFavorite('customer', 't1');
     expect(favorite.deleteMany).toHaveBeenCalledWith({ where: { userId: 'customer', technicianId: 't1' } });
-    expect(booking.findMany).not.toHaveBeenCalled();
+    expect(result[0].nextAvailableAt).toBeNull();
+    // one batch for the whole list, busy times only
+    expect(booking.findMany).toHaveBeenCalledTimes(1);
+    expect(booking.findMany.mock.calls[0][0].select).toEqual({ technicianId: true, scheduledStart: true, scheduledEnd: true });
   });
 
   it('handles concurrent favorite adds idempotently', async () => {

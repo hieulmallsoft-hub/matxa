@@ -121,12 +121,13 @@ export class BookingsService {
       longitude: number;
       label: string | null;
       phone: string | null;
+      note: string | null;
     } | null = null;
     if (dto.mode === 'HOME') {
       if (!dto.addressId) throw new BadRequestException('Đặt tại nhà cần chọn địa chỉ');
       const address = await db.address.findFirst({
         where: { id: dto.addressId, userId, deletedAt: null },
-        select: { id: true, address: true, phone: true, latitude: true, longitude: true, label: true },
+        select: { id: true, address: true, phone: true, note: true, latitude: true, longitude: true, label: true },
       });
       if (!address) throw new BadRequestException('Địa chỉ không hợp lệ');
       addressSnapshot = {
@@ -137,6 +138,7 @@ export class BookingsService {
         longitude: Number(address.longitude),
         label: address.label,
         phone: address.phone,
+        note: address.note,
       };
     }
     const subtotal = services.reduce((sum, item) => sum.plus(item.price), new Prisma.Decimal(0)).toNumber();
@@ -805,7 +807,7 @@ export class BookingsService {
       if (!dto.addressId) throw new BadRequestException('Đặt tại nhà cần chọn địa chỉ');
       const address = await this.prisma.address.findFirst({
         where: { id: dto.addressId, userId, deletedAt: null },
-        select: { id: true, address: true, phone: true, latitude: true, longitude: true, label: true },
+        select: { id: true, address: true, phone: true, note: true, latitude: true, longitude: true, label: true },
       });
       if (!address) throw new BadRequestException('Địa chỉ không hợp lệ');
       addressSnapshot = {
@@ -816,6 +818,7 @@ export class BookingsService {
         longitude: Number(address.longitude),
         label: address.label,
         phone: address.phone,
+        note: address.note,
         city: dto.city,
         district: dto.district ?? null,
       };

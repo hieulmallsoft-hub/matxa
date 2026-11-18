@@ -22,7 +22,7 @@ describe('NotificationsService', () => {
 
   it('returns only the requested user page with unread count', async () => {
     prisma.$transaction.mockResolvedValue([[{ id: 'n1' }], 1, 1]);
-    await expect(service.list('user-1', { page: 2, limit: 10, unreadOnly: false })).resolves.toEqual({
+    await expect(service.list('user-1', { page: 2, limit: 10, unreadOnly: false, includeChat: false })).resolves.toEqual({
       items: [{ id: 'n1' }],
       total: 1,
       unreadCount: 1,
@@ -30,8 +30,17 @@ describe('NotificationsService', () => {
       limit: 10,
     });
     expect(notification.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { userId: 'user-1' }, skip: 10, take: 10 }),
+      expect.objectContaining({ where: { userId: 'user-1', type: { not: 'CHAT_MESSAGE_RECEIVED' } }, skip: 10, take: 10 }),
     );
+    // the unread badge leaves chat messages out too
+    expect(notification.count).toHaveBeenLastCalledWith({ where: { userId: 'user-1', type: { not: 'CHAT_MESSAGE_RECEIVED' }, readAt: null } });
+  });
+
+  it('includes chat messages when asked (admin web)', async () => {
+    prisma.$transaction.mockResolvedValue([[], 0, 0]);
+    await service.list('admin-1', { page: 1, limit: 20, unreadOnly: true, includeChat: true });
+    expect(notification.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 'admin-1', readAt: null } }));
+    expect(notification.count).toHaveBeenLastCalledWith({ where: { userId: 'admin-1', readAt: null } });
   });
 
   it('does not mark a notification owned by another user', async () => {

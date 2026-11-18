@@ -16,7 +16,7 @@ export function useAdminCounts(enabled: boolean) {
       request<Paged>('/admin/marketplace/bookings?status=PENDING&limit=1'),
       request<Paged>('/admin/marketplace/technician-applications?status=SUBMITTED&limit=1'),
       request<Array<{ unreadCount?: number }>>('/conversations?type=SUPPORT'),
-      request<{ unreadCount?: number }>('/notifications?unreadOnly=true&limit=1'),
+      request<{ unreadCount?: number }>('/notifications?unreadOnly=true&limit=1&includeChat=true'),
       request('/health'),
     ]);
     setCounts({

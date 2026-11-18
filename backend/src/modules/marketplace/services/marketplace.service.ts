@@ -22,6 +22,9 @@ import { applyPriceOptions, loadBookableServices, offeredServiceWhere, publicTec
 import { availabilityRange, BOOKING_TIMEZONE, buildAvailableSlots } from './availability-slots';
 import { MarketplaceRealtimeService } from './marketplace-realtime.service';
 
+/** How far ahead `nextAvailableAt` looks when the app does not ask about one day. */
+const NEXT_AVAILABLE_DAYS = 7;
+
 @Injectable()
 export class MarketplaceService {
   constructor(
@@ -255,18 +258,21 @@ export class MarketplaceService {
   }
 
   /**
-   * Earliest start each technician can still take on `date` (today by default), for their shortest package among
-   * the services matching the filters; null when the day is full. Same rule as the availability endpoint.
+   * Earliest start each technician can still take, for their shortest package among the services matching the
+   * filters: on `date` when given (or today when only available technicians are asked for), otherwise within the next
+   * NEXT_AVAILABLE_DAYS days. Null when there is none. Same rule as the availability endpoint.
    */
   private async nextAvailableStarts(
-    db: Prisma.TransactionClient,
+    db: Prisma.TransactionClient | PrismaService,
     ids: string[],
-    query: Pick<SearchTechniciansDto, 'date' | 'categoryId' | 'serviceId' | 'mode'>,
+    query: Pick<SearchTechniciansDto, 'date' | 'categoryId' | 'serviceId' | 'mode' | 'onlyAvailable'>,
   ) {
     const result = new Map<string, Date | null>();
     if (!ids.length) return result;
     const today = new Date().toLocaleDateString('en-CA', { timeZone: BOOKING_TIMEZONE });
-    const { start, end } = availabilityRange({ date: query.date ?? today });
+    const day = availabilityRange({ date: query.date ?? today });
+    const start = day.start;
+    const end = query.date || query.onlyAvailable ? day.end : new Date(start.getTime() + NEXT_AVAILABLE_DAYS * 86_400_000);
     const [services, working, occupied] = await Promise.all([
       db.technicianService.findMany({
         where: {
@@ -384,9 +390,11 @@ export class MarketplaceService {
           Math.sin(rad(Number(profile.longitude) - location.longitude) / 2) ** 2;
       distanceKm = Math.round(6371 * 2 * Math.asin(Math.sqrt(Math.min(1, Math.max(0, a)))) * 10) / 10;
     }
+    const nextAvailable = await this.nextAvailableStarts(this.prisma, [profile.id], {});
     return {
       ...profile,
       ...this.technicianCard(profile, Boolean(favorite), distanceKm),
+      nextAvailableAt: nextAvailable.get(profile.id)?.toISOString() ?? null,
       supportedModes,
       images: profile.user.avatarUrl ? [profile.user.avatarUrl] : [],
       onsiteLocation: supportedModes.includes('ONSITE')
@@ -486,11 +494,12 @@ export class MarketplaceService {
         },
       },
     });
+    const nextAvailable = await this.nextAvailableStarts(this.prisma, rows.map((row) => row.technician.id), {});
     return rows.map(({ technician }) => {
       // Customers never see the admin's hidden reason or the technician's bank account.
       const { services, hiddenReason, bankBin, bankName, bankAccountNumber, bankAccountName, ...profile } = technician;
       void services; void hiddenReason; void bankBin; void bankName; void bankAccountNumber; void bankAccountName;
-      return { ...profile, ...this.technicianCard(technician, true) };
+      return { ...profile, ...this.technicianCard(technician, true), nextAvailableAt: nextAvailable.get(technician.id)?.toISOString() ?? null };
     });
   }
 

@@ -4,7 +4,10 @@ import { MarketplaceService } from './marketplace.service';
 describe('Public technician detail contract', () => {
   const findUnique = jest.fn();
   const favorite = { findUnique: jest.fn() };
-  const service = new MarketplaceService({ technicianProfile: { findUnique }, favorite } as never);
+  const none = () => ({ findMany: async () => [] }); // no free time; plain functions survive resetAllMocks
+  const service = new MarketplaceService(
+    { technicianProfile: { findUnique }, favorite, technicianService: none(), availabilitySlot: none(), booking: none() } as never,
+  );
   const offering = (id: string, modes: string[], active = true, categoryActive = true) => ({
     id,
     technicianId: 'profile',

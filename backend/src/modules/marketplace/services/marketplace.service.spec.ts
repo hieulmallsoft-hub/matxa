@@ -119,6 +119,22 @@ describe('MarketplaceService', () => {
       expect(booking.findMany).toHaveBeenCalledTimes(1);
     });
 
+    it('looks 7 days ahead when the app sends no date, so a technician free only tomorrow still shows a time', async () => {
+      const result = await service.searchTechnicians({ page: 1, limit: 20 } as any);
+      expect(result.items.map((item: any) => [item.id, item.nextAvailableAt])).toEqual([
+        ['busy', at(10).toISOString()],
+        ['full', null],
+      ]);
+      const { startAt, endAt } = availabilitySlot.findMany.mock.calls[0][0].where;
+      expect(endAt.gt.getTime() + 7 * 86_400_000).toBe(startAt.lt.getTime());
+    });
+
+    it('keeps one day (today) for onlyAvailable without a date', async () => {
+      await service.searchTechnicians({ onlyAvailable: true, page: 1, limit: 20 } as any);
+      const { startAt, endAt } = availabilitySlot.findMany.mock.calls[0][0].where;
+      expect(startAt.lt.getTime() - endAt.gt.getTime()).toBe(86_400_000);
+    });
+
     it('drops technicians with no free time when onlyAvailable is set, and counts only the rest', async () => {
       const result = await service.searchTechnicians({ date: day, onlyAvailable: true, page: 1, limit: 20 } as any);
       expect(result.items.map((item: any) => item.id)).toEqual(['busy']);

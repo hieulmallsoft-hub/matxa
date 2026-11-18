@@ -672,6 +672,8 @@ model Address {
   address   String
   /// Contact number for this address (who the technician calls); null = the account's phone.
   phone     String?
+  /// Customer's note for the technician (gate code, floor, landmark…); copied into the booking like the phone.
+  note      String?
   latitude  Decimal   @db.Decimal(10, 7)
   longitude Decimal   @db.Decimal(10, 7)
   isDefault Boolean   @default(false) @map("is_default")

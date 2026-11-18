@@ -30,7 +30,7 @@ describe('Quote and create share pricing/validation; address snapshots are immut
     scheduledStart: new Date(Date.now() + 3600000).toISOString(),
     addressId: 'a1',
   });
-  const originalAddress = { id: 'a1', address: 'Original street', label: 'Home', latitude: 10, longitude: 106 };
+  const originalAddress = { id: 'a1', address: 'Original street', label: 'Home', latitude: 10, longitude: 106, phone: '0912345678', note: 'Cổng sau, tầng 3' };
 
   beforeEach(() => {
     jest.resetAllMocks();
@@ -71,7 +71,7 @@ describe('Quote and create share pricing/validation; address snapshots are immut
       services: [{ id: 's1', serviceId: 's1', technicianServiceId: 's1', price: 500000 }],
     });
     expect(+result.endAt - +result.startAt).toBe(3600000);
-    expect(result.addressSnapshot).toMatchObject({ addressText: 'Original street', latitude: 10, longitude: 106 });
+    expect(result.addressSnapshot).toMatchObject({ addressText: 'Original street', latitude: 10, longitude: 106, phone: '0912345678', note: 'Cổng sau, tầng 3' });
     expect(db.booking.create).not.toHaveBeenCalled();
     expect(db.promotion.update).not.toHaveBeenCalled();
     expect(db.promotionUsage.count).not.toHaveBeenCalled();

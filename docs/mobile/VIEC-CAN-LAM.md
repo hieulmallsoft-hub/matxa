@@ -283,11 +283,18 @@ GET /api/marketplace/technicians?city=HN&categoryId=…&mode=HOME&date=2026-11-0
 | Tham số mới | Ý nghĩa |
 |---|---|
 | `city` | Mã thành phố (`HN`…). Server lọc luôn, **bỏ** bước tự lọc bằng `/locations/cities` |
-| `date` | Ngày `YYYY-MM-DD` (giờ VN) để tính giờ trống. Bỏ trống = hôm nay |
+| `date` | Ngày `YYYY-MM-DD` (giờ VN) để tính giờ trống. Bỏ trống = tìm trong **7 ngày tới** (sửa 18/11) |
 | `onlyAvailable=true` | Bỏ KTV hết chỗ trong ngày `date`. `total` và phân trang tính sau khi lọc |
 
-Mỗi KTV có **`nextAvailableAt`**: giờ bắt đầu sớm nhất còn đặt được trong ngày `date`, theo gói ngắn nhất của các
-dịch vụ khớp bộ lọc (`categoryId`, `serviceId`, `mode`). `null` = hết chỗ. Hiện "Sớm nhất HH:mm" theo giờ VN.
+Mỗi KTV có **`nextAvailableAt`**: giờ bắt đầu sớm nhất còn đặt được, theo gói ngắn nhất của các dịch vụ khớp bộ lọc
+(`categoryId`, `serviceId`, `mode`). `null` = không còn chỗ. Hiện "Sớm nhất HH:mm" theo giờ VN, khác ngày hôm nay thì
+kèm ngày ("Sớm nhất 09:00 20/11").
+- Có gửi `date`: chỉ tính trong ngày đó. Có `onlyAvailable=true` mà không gửi `date`: tính hôm nay.
+- Không gửi `date` (sửa 18/11): tìm trong **7 ngày tới**, nên KTV hôm nay kín mà mai rảnh vẫn có giờ.
+- **Sửa 18/11:** `nextAvailableAt` có ở cả `GET /api/marketplace/technicians`, `GET /api/marketplace/home`,
+  **chi tiết KTV** `GET /api/marketplace/technicians/{id}` và **yêu thích** `GET /api/favorites` (trước đây 2 API sau luôn
+  trả `null`). App **bỏ việc tự gọi lịch từng KTV** (`/availability`) chỉ để hiện giờ sớm nhất. Chỉ gọi `/availability`
+  khi khách mở màn chọn giờ của một KTV. Việc này cũng tránh chạm giới hạn 300 lượt/phút mỗi IP.
 
 **KTV đang có đơn bị ẩn (10/11):** KTV đã nhận một đơn (đơn `CONFIRMED`) sẽ không còn xuất hiện trong
 `GET /api/marketplace/technicians` và trong danh sách KTV ở `GET /api/marketplace/home`. KTV cũng bị ẩn khi chính
@@ -452,6 +459,20 @@ PATCH /api/addresses/{id}   { "phone": "0912345678" }     // gửi "" hoặc nul
 **App KTV:** `GET /api/technician/jobs/{id}/contact` trả **số nhập ở địa chỉ** nếu có, không có thì trả số của tài khoản
 khách. Có thêm `source`: `"ADDRESS"` hoặc `"ACCOUNT"`. Không phải sửa gì, vẫn gọi số trong `phoneNumber`.
 Trong chi tiết đơn (sau khi KTV được chọn), `address.phone` cũng có số này.
+
+**Ghi chú địa chỉ (thêm 18/11):** địa chỉ có thêm trường **`note`** (không bắt buộc, tối đa 500 ký tự), dùng cho ô
+"Ghi chú" trên form Thêm/Sửa địa chỉ, ví dụ "Cổng sau, tầng 3, gọi trước 10 phút".
+
+```http
+POST  /api/addresses        { "address": "...", "latitude": 21.02, "longitude": 105.85, "phone": "0912345678", "note": "Cổng sau, tầng 3" }
+PATCH /api/addresses/{id}   { "note": "Cổng sau, tầng 3" }     // gửi "" hoặc null để xóa
+```
+
+- `GET /api/addresses` trả kèm `note` (`null` = chưa nhập), để hiện lại khi sửa.
+- Đặt đơn tại nhà thì ghi chú được lưu cùng địa chỉ của đơn. Sau này sửa địa chỉ thì đơn cũ vẫn giữ ghi chú lúc đặt.
+- **App KTV:** chi tiết đơn `GET /api/technician/jobs/{id}` có **`address.note`** khi KTV **đã được chọn** cho đơn
+  (cùng lúc với `address.phone`). KTV chỉ đang xem đơn mở thì không thấy. Hiện dưới địa chỉ, ví dụ "Ghi chú: …",
+  ẩn khi `null`.
 
 ## P. Đơn tại cơ sở: địa chỉ và bản đồ (app khách)
 
@@ -810,6 +831,15 @@ KTV nhận, trong **15 phút** (admin chỉnh được). Đơn tại nhà và t�
 
   Admin chuyển khoản định kỳ khi đủ `minimumPayout` (mặc định 100.000đ). Chuyển xong, KTV nhận thông báo
   `TECHNICIAN_PAYOUT_SENT`.
+
+## AB. Danh sách thông báo không còn tin chat (app khách + app KTV, 18/11)
+
+`GET /api/notifications` **mặc định bỏ tin chat** (`CHAT_MESSAGE_RECEIVED`), cả trong `items`, `total` lẫn
+`unreadCount`. Tin chat cũ cũng không hiện nữa.
+- App **bỏ đoạn tự lọc tin chat**. Mỗi trang giờ toàn là thông báo thật, số chưa đọc đúng.
+- **Push tin nhắn vẫn gửi như cũ** (data có `type: "CHAT_MESSAGE_RECEIVED"`, `conversationId`…), bấm vào mở chat.
+- Số tin chưa đọc của chat lấy ở danh sách cuộc trò chuyện (`unreadCount` từng cuộc), không lấy ở thông báo.
+- Muốn lấy cả tin chat (web admin đang dùng): thêm `includeChat=true`.
 
 ## AA. Khoảng giá dịch vụ do admin cài (app KTV, 17/11)
 
