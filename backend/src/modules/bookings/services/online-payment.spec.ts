@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common';
-import { createRefund, isAwaitingPayment, recordTechnicianEarning, vietQrUrl } from './online-payment';
+import { bankBinFromName, createRefund, isAwaitingPayment, recordTechnicianEarning, vietQrUrl } from './online-payment';
 import { BookingsService } from './bookings.service';
 import { PayoutsService } from './payouts.service';
 jest.mock('./cancel-limit', () => ({
@@ -234,5 +234,18 @@ describe('admin pays a technician out', () => {
   it('refuses when the amount no longer matches (new earnings or already paid)', async () => {
     const { service } = setup([{ id: 'e1', amount: 300000 }]);
     await expect(service.markPaid('admin', 'tech-1', { upTo: '2026-11-16T03:00:00.000Z', amount: 375000 })).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
+describe('bankBinFromName', () => {
+  it('finds the BIN from the bank name the gateway sends', () => {
+    expect(bankBinFromName('TMCP Tien Phong')).toBe('970423');
+    expect(bankBinFromName('Ngân hàng TMCP Ngoại thương Việt Nam')).toBe('970436');
+    expect(bankBinFromName('TMCP Sai Gon Thuong Tin')).toBe('970403');
+    expect(bankBinFromName('TMCP Dong Nam A')).toBe('970440');
+    expect(bankBinFromName('TMCP Nam A')).toBe('970428');
+    expect(bankBinFromName('MBBank')).toBe('970422');
+    expect(bankBinFromName('Ngan hang la')).toBeNull();
+    expect(bankBinFromName(null)).toBeNull();
   });
 });

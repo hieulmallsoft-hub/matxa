@@ -780,7 +780,9 @@ KTV nhận, trong **15 phút** (admin chỉnh được). Đơn tại nhà và t�
     {onlineCancelFeePercent}%)"*. Lấy `onlineCancelFeePercent` từ `GET /api/settings/public`, mặc định 20;
   - KTV hoặc admin hủy: hoàn 100%.
 
-  Tiền do admin chuyển khoản lại vào tài khoản khách đã dùng để trả. Chuyển xong, khách nhận thông báo `BOOKING_REFUNDED`.
+  Tiền do admin chuyển khoản lại vào tài khoản khách đã dùng để trả (PayOS tự gửi về, **khách không phải nhập số tài
+  khoản**, app không cần màn hoàn tiền). Chuyển xong, khách nhận thông báo `BOOKING_REFUNDED`, bấm vào mở chi tiết đơn.
+  Đơn chỉ thanh toán sau khi KTV nhận, nên không có trường hợp "hủy trước khi KTV nhận" mà phải hoàn tiền.
 
 **App KTV cần làm:**
 - Thẻ việc có `displayStatus: "AWAITING_PAYMENT"`: hiện *"Đang chờ khách thanh toán (đến {giờ})"*.

@@ -82,6 +82,57 @@ export async function createRefund(
   }
 }
 
+// The payment gateway sends the payer's bank by name only ("TMCP Tien Phong"), but VietQR needs its BIN. Checked in
+// order, so a longer name comes before one it contains ("sai gon thuong tin" before "sai gon").
+const BANK_BINS: [string[], string][] = [
+  [['tien phong', 'tpbank', 'tpb'], '970423'],
+  [['ngoai thuong', 'vietcombank', 'vcb'], '970436'],
+  [['sai gon cong thuong', 'saigonbank'], '970400'],
+  [['cong thuong', 'vietinbank'], '970415'],
+  [['dau tu va phat trien', 'bidv'], '970418'],
+  [['nong nghiep', 'agribank'], '970405'],
+  [['ky thuong', 'techcombank', 'tcb'], '970407'],
+  [['quan doi', 'mbbank', 'mb'], '970422'],
+  [['a chau', 'acb'], '970416'],
+  [['viet nam thinh vuong', 'vpbank'], '970432'],
+  [['sai gon thuong tin', 'sacombank'], '970403'],
+  [['sai gon ha noi', 'shb'], '970443'],
+  [['sai gon', 'scb'], '970429'],
+  [['quoc te', 'vib'], '970441'],
+  [['phat trien thanh pho ho chi minh', 'phat trien tp hcm', 'hdbank'], '970437'],
+  [['hang hai', 'msb'], '970426'],
+  [['dong nam a', 'seabank'], '970440'],
+  [['loc phat', 'buu dien lien viet', 'lpbank', 'lienvietpostbank'], '970449'],
+  [['xuat nhap khau', 'eximbank'], '970431'],
+  [['phuong dong', 'ocb'], '970448'],
+  [['an binh', 'abbank'], '970425'],
+  [['bac a', 'bacabank'], '970409'],
+  [['nam a', 'namabank'], '970428'],
+  [['viet a', 'vietabank'], '970427'],
+  [['kien long', 'kienlongbank'], '970452'],
+  [['ban viet', 'vietcapitalbank'], '970454'],
+  [['dong a', 'dongabank'], '970406'],
+  [['quoc dan', 'ncb'], '970419'],
+  [['bao viet', 'baovietbank'], '970438'],
+  [['viet nam thuong tin', 'vietbank'], '970433'],
+  [['dai chung', 'pvcombank'], '970412'],
+  [['thinh vuong va phat trien', 'pgbank'], '970430'],
+  [['cake'], '546034'],
+  [['ubank'], '546035'],
+];
+
+export function bankBinFromName(name: string | null | undefined) {
+  if (!name) return null;
+  const plain = ` ${name
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()} `;
+  return BANK_BINS.find(([keys]) => keys.some((key) => plain.includes(` ${key} `)))?.[1] ?? null;
+}
+
 /** VietQR image the admin scans with a banking app: account, amount and transfer note filled in. */
 export function vietQrUrl(bankBin: string | null | undefined, accountNumber: string | null | undefined, amount: number, note: string, accountName?: string | null) {
   if (!bankBin || !accountNumber) return null;

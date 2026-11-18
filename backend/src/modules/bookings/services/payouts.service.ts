@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException, 
 import { PrismaService } from '../../../database/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { SettingsService } from '../../settings/settings.service';
-import { vietQrUrl } from './online-payment';
+import { bankBinFromName, vietQrUrl } from './online-payment';
 
 /**
  * Money the platform holds for online bookings: technicians' earnings, paid out by the admin's bank transfer (VietQR),
@@ -134,16 +134,17 @@ export class PayoutsService {
     return refunds.map((refund) => {
       const payment = payments.find((item) => item.bookingId === refund.bookingId);
       const transferNote = `PSYOCORE HOAN ${refund.bookingId.slice(0, 8).toUpperCase()}`;
+      const bankBin = payment?.payerBankBin ?? bankBinFromName(payment?.payerBankName);
       return {
         ...refund,
         customerName: users.find((user) => user.id === refund.customerId)?.displayName ?? null,
         paidAt: payment?.paidAt ?? null,
-        bankBin: payment?.payerBankBin ?? null,
+        bankBin,
         bankName: payment?.payerBankName ?? null,
         accountNumber: payment?.payerAccountNumber ?? null,
         accountName: payment?.payerAccountName ?? null,
         transferNote,
-        qrUrl: vietQrUrl(payment?.payerBankBin, payment?.payerAccountNumber, refund.amount, transferNote, payment?.payerAccountName),
+        qrUrl: vietQrUrl(bankBin, payment?.payerAccountNumber, refund.amount, transferNote, payment?.payerAccountName),
       };
     });
   }
