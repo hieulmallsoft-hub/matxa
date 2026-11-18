@@ -1276,10 +1276,11 @@ export class BookingsService {
     });
     const rules = await this.bookingRules();
     if (!query) {
-      const bookings = await listQuery;
+      const bookings = await this.withRefunds(await listQuery, userId);
       return bookings.map((booking) => this.historyResponse(this.withHistoricalAddress(booking), userId, rules));
     }
-    const [bookings, total] = await Promise.all([listQuery, this.prisma.booking.count({ where })]);
+    const [listed, total] = await Promise.all([listQuery, this.prisma.booking.count({ where })]);
+    const bookings = await this.withRefunds(listed, userId);
     const items = bookings.map((booking) => this.historyResponse(this.withHistoricalAddress(booking), userId, rules));
     return query ? { items, total, page: options.page, limit: options.limit } : items;
   }
@@ -1341,7 +1342,9 @@ export class BookingsService {
     if (!internal && booking.payment?.status === 'PENDING' && booking.payment.provider === 'PAYOS' && (await this.syncPayosPayment(id)) === 'PAID')
       booking = (await load()) ?? booking;
     const historical = this.withHistoricalAddress(booking);
-    return internal ? historical : this.historyResponse(historical, userId, await this.bookingRules());
+    if (internal) return historical;
+    const [withRefund] = await this.withRefunds([historical], userId);
+    return this.historyResponse(withRefund, userId, await this.bookingRules());
   }
 
   async listTechnicianJobs(userId: string, query: TechnicianJobQueryDto) {
@@ -2557,6 +2560,19 @@ export class BookingsService {
     };
   }
 
+  /** Adds the refund queued for the customer's cancelled paid online bookings (only those can have one). */
+  private async withRefunds<T extends { id: string; customerId: string; status: string; mode: string; payment?: { method?: string | null; status?: string | null } | null }>(
+    bookings: T[],
+    userId: string,
+  ): Promise<Array<T & { refund?: unknown }>> {
+    const ids = bookings
+      .filter((booking) => booking.customerId === userId && booking.status === 'CANCELLED' && isPrepaid(booking) && booking.payment?.status === 'PAID')
+      .map((booking) => booking.id);
+    if (!ids.length) return bookings;
+    const refunds = await this.prisma.bookingRefund.findMany({ where: { bookingId: { in: ids } } });
+    return bookings.map((booking) => ({ ...booking, refund: refunds.find((refund) => refund.bookingId === booking.id) ?? null }));
+  }
+
   private historyResponse(booking: any, userId: string, travelRules?: { travelFeeThresholdKm: number; travelFeeAmount: number }) {
     const isCustomer = booking.customerId === userId;
     const canCancel = isCustomer && ['OPEN', 'PENDING', 'CONFIRMED'].includes(booking.status);
@@ -2606,8 +2622,13 @@ export class BookingsService {
       discount: Number(booking.discountAmount),
       total: Number(booking.totalAmount),
       totalAmount: Number(booking.totalAmount),
+      // The payer's bank account and the gateway references are the customer's own business (admins see them in the
+      // refunds page); a technician calling this API gets the payment without them.
+      payment: paymentView(booking.payment, isCustomer),
       paymentMethod: booking.payment?.method ?? null,
       ...paymentFields(booking),
+      // What a cancelled paid booking gives back, as queued for the admin (not recomputed from today's fee).
+      refund: isCustomer ? refundView(booking.refund) : null,
       canCancel,
       canReview,
       // Each side sees only its own complaint, which is between it and the admins.
@@ -2969,6 +2990,38 @@ export class BookingsService {
  * Payment state for the apps. `awaitingPayment`: a technician took the online booking and the customer must pay before
  * `paymentDeadlineAt` (else it is cancelled); chat and contact open once paid.
  */
+const PAYMENT_PRIVATE_FIELDS = [
+  'payerBankBin',
+  'payerBankName',
+  'payerAccountNumber',
+  'payerAccountName',
+  'providerRef',
+  'providerTransactionNo',
+  'bankCode',
+  'bankTranNo',
+  'refundRef',
+  'responseCode',
+] as const;
+
+function paymentView(payment: any, isCustomer: boolean) {
+  if (!payment || isCustomer) return payment ?? null;
+  const view = { ...payment };
+  for (const field of PAYMENT_PRIVATE_FIELDS) delete view[field];
+  return view;
+}
+
+function refundView(refund: any) {
+  if (!refund) return null;
+  return {
+    status: refund.status as 'PENDING' | 'DONE',
+    paidAmount: refund.paidAmount,
+    feeAmount: refund.feeAmount,
+    amount: refund.amount,
+    createdAt: refund.createdAt,
+    doneAt: refund.doneAt ?? null,
+  };
+}
+
 function paymentFields(booking: any) {
   return {
     paymentStatus: booking.payment?.status ?? null,

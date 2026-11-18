@@ -819,6 +819,15 @@ KTV nhận, trong **15 phút** (admin chỉnh được). Đơn tại nhà và t�
     {onlineCancelFeePercent}%)"*. Lấy `onlineCancelFeePercent` từ `GET /api/settings/public`, mặc định 20;
   - KTV hoặc admin hủy: hoàn 100%.
 
+  - **Số tiền hoàn lấy từ backend (sửa 18/11), không tự tính:** đơn đã bị hủy và có tiền hoàn thì `GET /api/bookings/{id}`
+    và `GET /api/bookings` có **`refund`**:
+    ```json
+    "refund": { "status": "PENDING", "paidAmount": 2000, "feeAmount": 300, "amount": 1700, "createdAt": "...", "doneAt": null }
+    ```
+    Hiện "Hoàn tiền: {amount}" kèm "Psyocore đang xử lý" khi `status = "PENDING"`, "Đã hoàn lúc {doneAt}" khi `"DONE"`.
+    `refund = null` thì không có tiền hoàn (đơn chưa trả, đơn 0đ, đơn không bị hủy), ẩn dòng này. Hộp xác nhận **trước khi**
+    hủy vẫn dùng `onlineCancelFeePercent` để báo trước.
+
   Tiền do admin chuyển khoản lại vào tài khoản khách đã dùng để trả (PayOS tự gửi về, **khách không phải nhập số tài
   khoản**, app không cần màn hoàn tiền). Chuyển xong, khách nhận thông báo `BOOKING_REFUNDED`, bấm vào mở chi tiết đơn.
   Đơn chỉ thanh toán sau khi KTV nhận, nên không có trường hợp "hủy trước khi KTV nhận" mà phải hoàn tiền.
@@ -828,6 +837,9 @@ KTV nhận, trong **15 phút** (admin chỉnh được). Đơn tại nhà và t�
   `canContact` và `canComplete` là `false` cho tới khi khách trả. `GET /api/technician/jobs/{id}/contact` trả
   `403 PAYMENT_REQUIRED`.
 - Nhận đơn trực tuyến **không cần số dư ví** và **không bị trừ hoa hồng trong ví**. Hoa hồng trừ thẳng vào tiền công.
+- **Bảo mật (sửa 18/11):** khi tài khoản KTV gọi `GET /api/bookings/{id}` hay `GET /api/bookings`, `payment` **không còn**
+  tài khoản ngân hàng của người trả (`payer*`) và mã giao dịch cổng thanh toán (`providerRef`, `providerTransactionNo`…).
+  Chỉ khách của đơn mới thấy. App KTV vốn không dùng các trường này nên không phải sửa.
 - Chi tiết việc của đơn trực tuyến (sửa 17/11):
   - `platformFee` là hoa hồng thật, chốt lúc nhận đơn;
   - `technicianEarning` = giá − hoa hồng, trùng số ở màn Thu nhập;
