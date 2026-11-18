@@ -48,6 +48,8 @@ describe('Technician detail, favorites, availability and address workflows', () 
     address: 'Studio',
     latitude: '10',
     longitude: '106',
+    facilityLatitude: '10',
+    facilityLongitude: '106',
     services: [
       {
         id: 's1',

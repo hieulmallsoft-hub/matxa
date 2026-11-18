@@ -504,6 +504,24 @@ Giờ `GET /api/technician/jobs` và `GET /api/technician/jobs/{id}` có thêm `
 App KTV hiện `facility.name` và `facility.address` trên thẻ và trong chi tiết đơn, thay cho địa chỉ khách (đơn tại cơ
 sở không có địa chỉ khách).
 
+**Tọa độ cơ sở riêng (sửa 18/11):** trước đây ghim bản đồ của cơ sở lấy từ `latitude/longitude` của hồ sơ KTV, mà app
+cập nhật cặp này theo GPS điện thoại, nên KTV mở app ở chỗ khác là cơ sở nhảy theo. Giờ cơ sở có tọa độ riêng:
+- **App KTV, form cơ sở** (`PATCH /api/technician/profile` và `PATCH /api/technician/application`): gửi điểm KTV chọn
+  trên bản đồ vào **`facilityLatitude`** và **`facilityLongitude`** (luôn gửi cả hai).
+
+  ```http
+  PATCH /api/technician/profile   { "address": "43 Cầu Giấy", "facilityLatitude": 21.03047, "facilityLongitude": 105.80082 }
+  ```
+- **Đổi chữ địa chỉ cơ sở thì bắt buộc gửi kèm tọa độ mới.** Thiếu thì `400 { "code": "FACILITY_LOCATION_REQUIRED" }`
+  ("Vui lòng chọn vị trí cơ sở trên bản đồ"). Gửi một trong hai tọa độ thì `400 FACILITY_LOCATION_INCOMPLETE`. Gửi lại
+  đúng địa chỉ cũ thì không cần tọa độ. Xóa địa chỉ (`""`) thì tọa độ cơ sở cũng bị xóa.
+- `latitude/longitude` (GPS điện thoại) giữ nguyên như cũ, chỉ dùng tính km đến nhà khách, **không còn ảnh hưởng cơ sở**.
+- `facility.latitude/longitude` ở các API đơn, và `onsiteLocation` ở chi tiết KTV, giờ là tọa độ cơ sở.
+- **KTV đang có cơ sở cần chọn lại điểm trên bản đồ một lần.** Tọa độ cũ không được chép sang vì có thể chỉ là GPS điện
+  thoại. Trong lúc chưa chọn lại, `facility.latitude/longitude = null`: app chỉ hiện chữ địa chỉ, ẩn bản đồ.
+- **Đơn giữ nguyên cơ sở lúc nhận:** khi KTV nhận đơn tại cơ sở, tên, địa chỉ và tọa độ cơ sở được lưu vào đơn. KTV sửa
+  hồ sơ sau đó thì đơn cũ (kể cả đã hoàn thành hoặc đã hủy) không đổi theo nữa. App không phải làm gì thêm.
+
 **KTV chưa nhập địa chỉ cơ sở** (hồ sơ không có `facility` hay `address`) thì không nhận được đơn tại cơ sở:
 - không được báo đơn mới;
 - không hiện trong danh sách gợi ý KTV cho khách;

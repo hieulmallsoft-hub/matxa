@@ -216,6 +216,10 @@ export class UpsertTechnicianProfileDto {
   })
   @IsOptional() @IsString() @MaxLength(100) district?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) address?: string;
+  @ApiPropertyOptional({ description: 'Vi do co so (diem KTV chon tren ban do). Gui cung facilityLongitude; bat buoc khi doi dia chi co so' })
+  @IsOptional() @Type(() => Number) @IsLatitude() facilityLatitude?: number;
+  @ApiPropertyOptional({ description: 'Kinh do co so. Gui cung facilityLatitude' })
+  @IsOptional() @Type(() => Number) @IsLongitude() facilityLongitude?: number;
   @ApiPropertyOptional() @IsOptional() @Type(() => Boolean) @IsBoolean() isAvailable?: boolean;
   @ApiPropertyOptional({ example: '970436', description: 'Ma BIN ngan hang (6 so, theo danh sach VietQR https://api.vietqr.io/v2/banks) de nhan tien don thanh toan online' })
   @IsOptional() @Matches(/^\d{6}$/, { message: 'Ma ngan hang phai gom 6 chu so (BIN)' }) bankBin?: string;

@@ -21,6 +21,7 @@ import { readEnabledServiceModes, assertServicePrices } from '../../settings/set
 import { applyPriceOptions, loadBookableServices, offeredServiceWhere, publicTechnicianWhere } from './technician-selection';
 import { availabilityRange, BOOKING_TIMEZONE, buildAvailableSlots } from './availability-slots';
 import { MarketplaceRealtimeService } from './marketplace-realtime.service';
+import { facilityCoordinates } from './facility-location';
 
 /** How far ahead `nextAvailableAt` looks when the app does not ask about one day. */
 const NEXT_AVAILABLE_DAYS = 7;
@@ -344,6 +345,8 @@ export class MarketplaceService {
         district: true,
         facility: true,
         address: true,
+        facilityLatitude: true,
+        facilityLongitude: true,
         isVerified: true,
         isActive: true,
         isAvailable: true,
@@ -401,8 +404,9 @@ export class MarketplaceService {
         ? {
             address: profile.address,
             city: profile.city,
-            latitude: profile.latitude === null ? null : Number(profile.latitude),
-            longitude: profile.longitude === null ? null : Number(profile.longitude),
+            // the facility's own point; the phone's position (latitude/longitude) is not where customers go
+            latitude: profile.facilityLatitude === null ? null : Number(profile.facilityLatitude),
+            longitude: profile.facilityLongitude === null ? null : Number(profile.facilityLongitude),
           }
         : null,
       services: profile.services.map((service) => ({
@@ -548,10 +552,14 @@ export class MarketplaceService {
       if (added.length)
         throw new BadRequestException({ code: 'SERVICE_MODE_DISABLED', message: 'Hình thức phục vụ này đang tạm dừng', modes: added });
     }
+    // The facility's map point is its own; the phone's position (latitude/longitude) never moves it.
+    const current =
+      dto.address !== undefined ? await this.prisma.technicianProfile.findUnique({ where: { userId }, select: { address: true } }) : null;
+    const update = { ...data, ...facilityCoordinates(dto, current?.address) };
     return this.prisma.technicianProfile.upsert({
       where: { userId },
-      create: { userId, ...data },
-      update: data,
+      create: { userId, ...update },
+      update,
     });
   }
 

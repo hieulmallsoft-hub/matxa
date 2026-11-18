@@ -367,6 +367,8 @@ model TechnicianApplication {
   district       String?
   facility       String?
   address        String?
+  facilityLatitude  Decimal? @map("facility_latitude") @db.Decimal(10, 7)
+  facilityLongitude Decimal? @map("facility_longitude") @db.Decimal(10, 7)
   bio            String?
   supportedModes ServiceMode[] @default([]) @map("supported_modes")
   idCardFrontKey String?  @map("id_card_front_key")
@@ -491,6 +493,10 @@ model TechnicianProfile {
   district        String?
   facility        String?
   address         String?
+  /// Where the facility is (the point the technician picks on the map). Separate from latitude/longitude, which follow
+  /// the technician's phone and are used for travel distances.
+  facilityLatitude  Decimal?          @map("facility_latitude") @db.Decimal(10, 7)
+  facilityLongitude Decimal?          @map("facility_longitude") @db.Decimal(10, 7)
   isVerified      Boolean             @default(false) @map("is_verified")
   isActive        Boolean             @default(true) @map("is_active")
   /// Why an admin hid the profile (isActive = false); shown to the technician. Cleared when shown again.

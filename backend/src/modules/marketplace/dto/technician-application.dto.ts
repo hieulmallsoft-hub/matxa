@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsArray, IsIn, IsInt, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 export class UpdateTechnicianApplicationDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) displayName?: string;
@@ -10,6 +10,10 @@ export class UpdateTechnicianApplicationDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) district?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(150) facility?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(300) address?: string;
+  @ApiPropertyOptional({ description: 'Vi do co so (diem KTV chon tren ban do). Gui cung facilityLongitude; bat buoc khi doi dia chi co so' })
+  @IsOptional() @Type(() => Number) @IsLatitude() facilityLatitude?: number;
+  @ApiPropertyOptional({ description: 'Kinh do co so. Gui cung facilityLatitude' })
+  @IsOptional() @Type(() => Number) @IsLongitude() facilityLongitude?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) applicationType?: string;
   @ApiPropertyOptional({ enum: ['HOME', 'ONSITE', 'ONLINE'], isArray: true })
   @IsOptional()

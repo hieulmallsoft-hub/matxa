@@ -1131,6 +1131,7 @@ export class BookingsService {
           // Charged after the assignment: the charge only accepts a booking that belongs to the
           // technician. Same transaction, so an insufficient wallet still rolls everything back.
           // A prepaid online booking is not charged: the commission comes out of the customer's payment.
+          if (booking.mode === 'ONSITE') await this.snapshotFacility(tx, bookingId);
           if (!prepaid) await this.chargeTechnicianCommission(application.technicianProfile.user.id, bookingId, tx);
           else await this.recordPrepaidCommission(application.technicianProfile.user.id, bookingId, tx);
           const losers = await tx.bookingTechnicianApplication.findMany({
@@ -1604,6 +1605,27 @@ export class BookingsService {
     return roundVnd((Number(grossServiceAmount ?? 0) * (await this.commissionRate(userId))) / 100);
   }
 
+  /**
+   * An ONSITE booking keeps the facility (name, address, map point) as it is when the technician takes it, like a home
+   * booking keeps the customer's address: later edits to the technician's profile no longer rewrite past bookings.
+   */
+  private async snapshotFacility(db: Prisma.TransactionClient, bookingId: string) {
+    const booking = await db.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        mode: true,
+        addressSnapshot: true,
+        technician: { select: { facility: true, address: true, city: true, district: true, facilityLatitude: true, facilityLongitude: true } },
+      },
+    });
+    if (booking?.mode !== 'ONSITE' || !booking.technician) return;
+    const facility = facilityLocation(booking.technician);
+    if (!facility) return;
+    const snapshot = booking.addressSnapshot;
+    const base = snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot) ? (snapshot as Prisma.JsonObject) : {};
+    await db.booking.update({ where: { id: bookingId }, data: { addressSnapshot: { ...base, facility } } });
+  }
+
   private async chargeTechnicianCommission(
     userId: string,
     bookingId: string,
@@ -1935,6 +1957,7 @@ export class BookingsService {
       dto.status === 'CONFIRMED'
         ? await this.prisma.$transaction(async (tx) => {
             const confirmed = await this.transition(id, booking.status, { status: 'CONFIRMED' }, tx);
+            if (booking.mode === 'ONSITE') await this.snapshotFacility(tx, id);
             await this.chargeTechnicianCommission(userId, id, tx);
             return confirmed;
           })
@@ -2208,7 +2231,7 @@ export class BookingsService {
     const profile = await this.prisma.technicianProfile.findFirst({
       where: { userId, isActive: true, isVerified: true, user: { status: 'ACTIVE' } },
       // Location for distances; facility fields for ONSITE job cards.
-      select: { id: true, latitude: true, longitude: true, facility: true, address: true, city: true, district: true },
+      select: { id: true, latitude: true, longitude: true, facility: true, address: true, facilityLatitude: true, facilityLongitude: true, city: true, district: true },
     });
     if (!profile) {
       // Hidden by an admin: say so, with the reason, instead of the generic refusal.
@@ -2398,11 +2421,13 @@ export class BookingsService {
       // another took it); for the customer, the assigned technician's.
       facility:
         booking.mode === 'ONSITE'
-          ? facilityLocation(
-              viewerTechnicianId
-                ? !booking.technicianId || booking.technicianId === viewerTechnicianId ? viewerLocation : null
-                : booking.technician,
-            )
+          ? viewerTechnicianId
+            ? !booking.technicianId
+              ? facilityLocation(viewerLocation)
+              : booking.technicianId === viewerTechnicianId
+                ? (bookedFacility(booking) ?? facilityLocation(viewerLocation))
+                : null
+            : (bookedFacility(booking) ?? facilityLocation(booking.technician))
           : null,
       city: booking.addressSnapshot?.city ?? null,
       district: booking.addressSnapshot?.district ?? null,
@@ -2556,7 +2581,7 @@ export class BookingsService {
         avatarUrl: booking.technician?.user?.avatarUrl ?? null,
       },
       // ONSITE: where the customer goes — the technician's facility, with coordinates for the map. null otherwise.
-      facility: booking.mode === 'ONSITE' ? facilityLocation(booking.technician) : null,
+      facility: booking.mode === 'ONSITE' ? (bookedFacility(booking) ?? facilityLocation(booking.technician)) : null,
       items: (booking.items ?? []).map((item: any) => ({
         ...item,
         technicianServiceId: item.serviceId,
@@ -2972,7 +2997,15 @@ function facilityLocation(profile: any) {
     address: profile.address ?? null,
     city: profile.city ?? null,
     district: profile.district ?? null,
-    latitude: coordinate(profile.latitude),
-    longitude: coordinate(profile.longitude),
+    // the point picked on the map; the technician's phone position (latitude/longitude) is not the facility
+    latitude: coordinate(profile.facilityLatitude),
+    longitude: coordinate(profile.facilityLongitude),
   };
+}
+
+/** The facility as it was when the technician took the booking (stored in the booking), if any. */
+function bookedFacility(booking: { addressSnapshot?: unknown }) {
+  const snapshot = booking.addressSnapshot;
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return undefined;
+  return (snapshot as { facility?: ReturnType<typeof facilityLocation> }).facility;
 }

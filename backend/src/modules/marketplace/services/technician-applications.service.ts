@@ -7,6 +7,7 @@ import { readEnabledServiceModes } from '../../settings/settings.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { TechnicianContractService } from './technician-contract.service';
 import { parseIdCardQr } from './id-card-qr';
+import { facilityCoordinates } from './facility-location';
 
 const ADMIN_USER_SELECT = {
   id: true,
@@ -125,6 +126,7 @@ export class TechnicianApplicationsService {
         district: location.district,
         facility: dto.facility?.trim(),
         address: dto.address?.trim(),
+        ...facilityCoordinates(dto, current.address),
         bio: dto.bio?.trim(),
         status: 'DRAFT',
       },
@@ -389,6 +391,8 @@ export class TechnicianApplicationsService {
           district: location.district,
           facility: app.facility,
           address: app.address,
+          facilityLatitude: app.facilityLatitude,
+          facilityLongitude: app.facilityLongitude,
           serviceModes: app.supportedModes.length ? app.supportedModes : ['HOME'],
           isVerified: true,
         },
@@ -399,6 +403,8 @@ export class TechnicianApplicationsService {
           district: location.district,
           facility: app.facility,
           address: app.address,
+          facilityLatitude: app.facilityLatitude,
+          facilityLongitude: app.facilityLongitude,
           serviceModes: app.supportedModes.length ? app.supportedModes : ['HOME'],
           isVerified: true,
         },

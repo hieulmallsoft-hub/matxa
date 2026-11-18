@@ -15,8 +15,11 @@ describe('customer booking shows where the facility is (ONSITE)', () => {
     address: '12 Ly Thuong Kiet, Hoan Kiem',
     city: 'HN',
     district: 'HN-HK',
-    latitude: '21.0208713',
-    longitude: '105.8577338',
+    // where the phone last was: never shown as the facility
+    latitude: '21.0065',
+    longitude: '105.8484',
+    facilityLatitude: '21.0208713',
+    facilityLongitude: '105.8577338',
     user: { id: 'tech-1', displayName: 'Luna', avatarUrl: null },
   };
   const booking = (mode: string, technician: any = profile) => ({
@@ -33,6 +36,11 @@ describe('customer booking shows where the facility is (ONSITE)', () => {
     });
   });
 
+  it('keeps the facility stored when the technician took the booking, whatever the profile says now', () => {
+    const stored = { name: 'Spa cu', address: '43 Cau Giay', city: 'HN', district: null, latitude: 21.03047, longitude: 105.80082 };
+    expect(view({ ...booking('ONSITE'), addressSnapshot: { facility: stored } }).facility).toEqual(stored);
+  });
+
   it('is null for home bookings and before a technician is assigned', () => {
     expect(view(booking('HOME')).facility).toBeNull();
     expect(view(booking('ONSITE', null)).facility).toBeNull();
@@ -47,7 +55,11 @@ describe('customer booking shows where the facility is (ONSITE)', () => {
 
 describe('technician job card shows the facility the customer comes to (ONSITE)', () => {
   const service = new BookingsService({} as any, { get: (_k: string, f: unknown) => f } as any, {} as any, {} as any);
-  const own = { id: 'profile-1', facility: 'KTV Duc', address: '119a Tran Dai Nghia', city: 'HN', district: 'HN-PHUONG-BACH-MAI', latitude: 21.0065, longitude: 105.8484 };
+  const own = {
+    id: 'profile-1', facility: 'KTV Duc', address: '119a Tran Dai Nghia', city: 'HN', district: 'HN-PHUONG-BACH-MAI',
+    latitude: 21.0285, longitude: 105.8542, // phone position
+    facilityLatitude: 21.0065, facilityLongitude: 105.8484,
+  };
   const job = (technicianId: string | null, status = 'CONFIRMED', mode = 'ONSITE') => ({
     id: 'booking-1', customerId: 'customer-1', technicianId, requestedTechnicianId: 'profile-1', mode, status,
     assignmentMode: 'OPEN_MARKETPLACE', items: [], applications: [], complaints: [], addressSnapshot: { city: 'HN' },
@@ -59,6 +71,12 @@ describe('technician job card shows the facility the customer comes to (ONSITE)'
     const expected = { name: 'KTV Duc', address: '119a Tran Dai Nghia', city: 'HN', district: 'HN-PHUONG-BACH-MAI', latitude: 21.0065, longitude: 105.8484 };
     expect(card(job('profile-1'), true).facility).toEqual(expected);
     expect(card(job(null, 'OPEN'), false).facility).toEqual(expected);
+  });
+
+  it('shows the facility stored with a job already taken, not the edited profile', () => {
+    const stored = { name: 'KTV Duc', address: '43 Cau Giay', city: 'HN', district: null, latitude: 21.03047, longitude: 105.80082 };
+    const taken = { ...job('profile-1'), addressSnapshot: { city: 'HN', facility: stored } };
+    expect(card(taken, true).facility).toEqual(stored);
   });
 
   it('is null for home jobs and once another technician took the job', () => {
@@ -88,5 +106,30 @@ describe('a technician without a facility cannot take an ONSITE job', () => {
 
   it('accepts a technician with a facility address', async () => {
     await expect(eligibility({ facility: null, address: '119a Tran Dai Nghia' })).resolves.not.toThrow();
+  });
+});
+
+describe('taking an ONSITE booking stores the facility in it', () => {
+  const service: any = new BookingsService({} as any, { get: (_k: string, f: unknown) => f } as any, {} as any, {} as any);
+  const technician = { facility: 'Spa Hoa Sen', address: '43 Cau Giay', city: 'HN', district: null, facilityLatitude: '21.03047', facilityLongitude: '105.80082' };
+
+  it('copies the facility and its map point next to what the booking already keeps', async () => {
+    const db = {
+      booking: {
+        findUnique: jest.fn().mockResolvedValue({ mode: 'ONSITE', addressSnapshot: { city: 'HN' }, technician }),
+        update: jest.fn(),
+      },
+    };
+    await service.snapshotFacility(db, 'booking-1');
+    expect(db.booking.update).toHaveBeenCalledWith({
+      where: { id: 'booking-1' },
+      data: { addressSnapshot: { city: 'HN', facility: { name: 'Spa Hoa Sen', address: '43 Cau Giay', city: 'HN', district: null, latitude: 21.03047, longitude: 105.80082 } } },
+    });
+  });
+
+  it('leaves other bookings alone', async () => {
+    const db = { booking: { findUnique: jest.fn().mockResolvedValue({ mode: 'HOME', addressSnapshot: null, technician }), update: jest.fn() } };
+    await service.snapshotFacility(db, 'booking-1');
+    expect(db.booking.update).not.toHaveBeenCalled();
   });
 });
