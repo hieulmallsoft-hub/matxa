@@ -20,6 +20,76 @@ import {
   SelectTechnicianDto,
   UpdateBookingStatusDto,
 } from '../dto/booking.dto';
+import type { SchemaObject } from '@nestjs/swagger/dist/interfaces/open-api-spec.interface';
+
+/** Refund of a cancelled paid online booking, as queued for the admin. Only the booking's customer gets it. */
+const refundSchema: SchemaObject = {
+  type: 'object',
+  nullable: true,
+  description:
+    'Tien hoan cua don truc tuyen da thanh toan roi bi huy (chi khach cua don thay; KTV luon null). null = khong co tien hoan ' +
+    '(don chua tra, don 0d, don tai nha/tai co so, don khong bi huy). App hien thang `amount`, khong tu tinh phi huy.',
+  properties: {
+    status: { type: 'string', enum: ['PENDING', 'DONE'], description: 'PENDING = Psyocore dang xu ly, DONE = da hoan', example: 'PENDING' },
+    paidAmount: { type: 'number', description: 'So khach da tra (dong)', example: 2000 },
+    feeAmount: { type: 'number', description: 'Phi huy giu lai (0 khi KTV/admin huy)', example: 300 },
+    amount: { type: 'number', description: 'So tien hoan cho khach', example: 1700 },
+    createdAt: { type: 'string', format: 'date-time', description: 'Luc tao yeu cau hoan (luc don bi huy)' },
+    doneAt: { type: 'string', format: 'date-time', nullable: true, description: 'Luc admin bam "Da hoan"; null khi chua hoan' },
+  },
+};
+
+/** The booking's payment. The payer's bank account and gateway references only reach the booking's customer. */
+const paymentSchema: SchemaObject = {
+  type: 'object',
+  nullable: true,
+  description:
+    'Thanh toan cua don. Cac truong payer* (tai khoan nguoi tra) va ma giao dich cong thanh toan (providerRef, ' +
+    'providerTransactionNo, bankCode, bankTranNo, refundRef, responseCode) chi tra cho chinh khach cua don; KTV goi thi khong co.',
+  properties: {
+    id: { type: 'string' },
+    method: { type: 'string', enum: ['CASH', 'ONLINE'] },
+    status: { type: 'string', enum: ['UNPAID', 'PENDING', 'PAID', 'FAILED', 'REFUNDED'], example: 'PAID' },
+    amount: { type: 'string', description: 'So tien (chuoi so)', example: '2000' },
+    provider: { type: 'string', nullable: true, example: 'PAYOS' },
+    paidAt: { type: 'string', format: 'date-time', nullable: true },
+    expiresAt: { type: 'string', format: 'date-time', nullable: true },
+    payerBankName: { type: 'string', nullable: true, description: 'Chi khach cua don', example: 'TMCP Tien Phong' },
+    payerAccountNumber: { type: 'string', nullable: true, description: 'Chi khach cua don' },
+    payerAccountName: { type: 'string', nullable: true, description: 'Chi khach cua don' },
+  },
+};
+
+/** Fields common to a booking in the customer's/technician's list and in its detail. */
+const bookingSchema: SchemaObject = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    status: { type: 'string', enum: ['OPEN', 'PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'EXPIRED'] },
+    mode: { type: 'string', enum: ['HOME', 'ONSITE', 'ONLINE'] },
+    assignmentMode: { type: 'string' },
+    scheduledStart: { type: 'string', format: 'date-time' },
+    scheduledEnd: { type: 'string', format: 'date-time' },
+    items: { type: 'array', items: { type: 'object' } },
+    totalAmount: { type: 'number' },
+    paymentMethod: { type: 'string', nullable: true, enum: ['CASH', 'ONLINE'] },
+    paymentStatus: { type: 'string', nullable: true, example: 'PAID' },
+    paymentDeadlineAt: { type: 'string', format: 'date-time', nullable: true, description: 'Han thanh toan don truc tuyen' },
+    awaitingPayment: { type: 'boolean', description: 'true = da co KTV nhan, khach chua thanh toan' },
+    payment: paymentSchema,
+    refund: refundSchema,
+    cancellation: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        reasonCode: { type: 'string', nullable: true },
+        reasonText: { type: 'string', nullable: true },
+        cancelledAt: { type: 'string', format: 'date-time', nullable: true },
+        cancelledBy: { type: 'string', nullable: true, enum: ['CUSTOMER', 'TECHNICIAN', 'ADMIN'] },
+      },
+    },
+  },
+};
 
 @ApiTags('Bookings')
 @ApiBearerAuth('access-token')
@@ -109,12 +179,15 @@ export class BookingsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Danh sach lich cua khach hoac ky thuat vien' })
+  @ApiOperation({
+    summary: 'Danh sach lich cua khach hoac ky thuat vien',
+    description: 'Moi don co cung cac truong nhu chi tiet don, gom `refund` (don cua chinh khach) va `payment` (payer* chi khach cua don thay).',
+  })
   @ApiOkResponse({
     schema: {
       type: 'object',
       properties: {
-        items: { type: 'array', items: { type: 'object' } },
+        items: { type: 'array', items: bookingSchema },
         total: { type: 'number' },
         page: { type: 'number' },
         limit: { type: 'number' },
@@ -158,21 +231,13 @@ export class BookingsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Chi tiet lich dat' })
-  @ApiOkResponse({
-    schema: {
-      type: 'object',
-      properties: {
-        id: { type: 'string' },
-        status: { type: 'string' },
-        assignmentMode: { type: 'string' },
-        scheduledStart: { type: 'string', format: 'date-time' },
-        scheduledEnd: { type: 'string', format: 'date-time' },
-        items: { type: 'array', items: { type: 'object' } },
-        paymentStatus: { type: 'string', nullable: true },
-      },
-    },
+  @ApiOperation({
+    summary: 'Chi tiet lich dat',
+    description:
+      'Khach, KTV cua don hoac admin. Don truc tuyen da thanh toan roi bi huy: `refund` co so tien hoan (chi khach thay). ' +
+      'Tai khoan nguoi tra trong `payment` (payer*) chi tra cho khach cua don.',
   })
+  @ApiOkResponse({ schema: bookingSchema })
   detail(@CurrentAuth() auth: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.bookings.detail(auth.sub, id);
   }
